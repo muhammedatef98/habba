@@ -7,22 +7,23 @@ awaiting the product owner's decision. No application code has been written.
 
 ## Index
 
-| #                                                           | Decision                                                             | Status   | Gates                                |
-| ----------------------------------------------------------- | -------------------------------------------------------------------- | -------- | ------------------------------------ |
-| [0001](0001-record-architecture-decisions.md)               | Record architecture decisions                                        | Accepted | —                                    |
-| [0002](0002-migration-ordering-and-spec-sql-corrections.md) | Migration ordering; corrections to spec SQL that does not run        | Proposed | Phase 1                              |
-| [0003](0003-timeline-append-only-enforcement.md)            | Append-only enforcement via triggers, not rules; single write path   | Proposed | Phase 2                              |
-| [0004](0004-timeline-hash-chain.md)                         | Hash-chain payload, canonicalisation, per-vehicle locking            | Proposed | Phase 2                              |
-| [0005](0005-timeline-provenance-levels.md)                  | **What "verified" is allowed to mean**                               | Proposed | Phase 2                              |
-| [0006](0006-order-state-machine.md)                         | State machine totality, `checked_in`, auto-completion, order numbers | Proposed | Phase 3                              |
-| [0007](0007-money-vat-and-rounding.md)                      | Money representation, VAT rate as data, rounding rule                | Proposed | Phase 3                              |
-| [0008](0008-payments-escrow-and-merchant-of-record.md)      | Escrow model and merchant of record                                  | Proposed | Phase 3                              |
-| [0009](0009-zatca-seller-of-record.md)                      | ZATCA seller of record and invoice types                             | Proposed | Phase 3 (schema), Phase 6 (delivery) |
-| [0010](0010-data-residency-and-pdpl.md)                     | Supabase region, PDPL posture, erasure vs immutability               | Proposed | Phase 1                              |
-| [0011](0011-saudi-identifier-formats.md)                    | Plates, IBAN, national ID, VAT number                                | Proposed | Phase 1                              |
-| [0012](0012-offline-capture-semantics.md)                   | `occurred_at` vs `recorded_at`; what the chain proves                | Proposed | Phase 3                              |
-| [0013](0013-provider-order-visibility.md)                   | Masked order discovery via RPC, not RLS row reads                    | Proposed | Phase 3                              |
-| [0014](0014-toolchain-and-versions.md)                      | Node, pnpm, Expo SDK, TypeScript strictness, CI                      | Proposed | Phase 1                              |
+| #                                                           | Decision                                                             | Status       | Gates                                |
+| ----------------------------------------------------------- | -------------------------------------------------------------------- | ------------ | ------------------------------------ |
+| [0001](0001-record-architecture-decisions.md)               | Record architecture decisions                                        | Accepted     | —                                    |
+| [0002](0002-migration-ordering-and-spec-sql-corrections.md) | Migration ordering; corrections to spec SQL that does not run        | Proposed     | Phase 1                              |
+| [0003](0003-timeline-append-only-enforcement.md)            | Append-only enforcement via triggers, not rules; single write path   | Proposed     | Phase 2                              |
+| [0004](0004-timeline-hash-chain.md)                         | Hash-chain payload, canonicalisation, per-vehicle locking            | Proposed     | Phase 2                              |
+| [0005](0005-timeline-provenance-levels.md)                  | **What "verified" is allowed to mean**                               | Proposed     | Phase 2                              |
+| [0006](0006-order-state-machine.md)                         | State machine totality, `checked_in`, auto-completion, order numbers | Proposed     | Phase 3                              |
+| [0007](0007-money-vat-and-rounding.md)                      | Money representation, VAT rate as data, rounding rule                | Proposed     | Phase 3                              |
+| [0008](0008-payments-escrow-and-merchant-of-record.md)      | Escrow model and merchant of record                                  | Proposed     | Phase 3                              |
+| [0009](0009-zatca-seller-of-record.md)                      | ZATCA seller of record and invoice types                             | Proposed     | Phase 3 (schema), Phase 6 (delivery) |
+| [0010](0010-data-residency-and-pdpl.md)                     | Supabase region, PDPL posture, erasure vs immutability               | Proposed     | Phase 1                              |
+| [0011](0011-saudi-identifier-formats.md)                    | Plates, IBAN, national ID, VAT number                                | Proposed     | Phase 1                              |
+| [0012](0012-offline-capture-semantics.md)                   | `occurred_at` vs `recorded_at`; what the chain proves                | Proposed     | Phase 3                              |
+| [0013](0013-provider-order-visibility.md)                   | Masked order discovery via RPC, not RLS row reads                    | Proposed     | Phase 3                              |
+| [0014](0014-toolchain-and-versions.md)                      | Node, pnpm, Expo SDK, TypeScript strictness, CI                      | Proposed     | Phase 1                              |
+| [0015](0015-local-verification-harness.md)                  | Postgres + PostGIS + PostgREST harness, no Docker                    | **Accepted** | Phase 1                              |
 
 ## Blocking Phase 1
 
