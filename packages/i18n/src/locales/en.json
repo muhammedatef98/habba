@@ -1,0 +1,105 @@
+{
+  "common": {
+    "appName": "Habba",
+    "continue": "Continue",
+    "back": "Back",
+    "cancel": "Cancel",
+    "save": "Save",
+    "next": "Next",
+    "done": "Done",
+    "retry": "Retry",
+    "skip": "Skip",
+    "optional": "Optional",
+    "loading": "Loading…",
+    "search": "Search"
+  },
+  "auth": {
+    "welcomeTitle": "Welcome to Habba",
+    "welcomeSubtitle": "Your vehicle's digital logbook, and help wherever you are",
+    "phoneLabel": "Mobile number",
+    "phonePlaceholder": "5X XXX XXXX",
+    "phoneHint": "We'll text you a verification code",
+    "sendCode": "Send code",
+    "otpTitle": "Enter your code",
+    "otpSubtitle": "We sent a 4-digit code to {{phone}}",
+    "resendIn": "Resend in {{seconds}}s",
+    "resend": "Resend code",
+    "verify": "Verify",
+    "nameTitle": "What's your name?",
+    "nameLabel": "Full name",
+    "errors": {
+      "invalidPhone": "That mobile number isn't valid. It should start with 5 and be 9 digits.",
+      "invalidOtp": "That code isn't right. Check your messages and try again.",
+      "otpExpired": "That code has expired. Request a new one.",
+      "tooManyAttempts": "Too many attempts. Wait a minute and try again.",
+      "network": "Couldn't connect. Check your internet and try again."
+    }
+  },
+  "vehicle": {
+    "addTitle": "Add your vehicle",
+    "addSubtitle": "Three steps, and the plate is optional",
+    "makeLabel": "Make",
+    "modelLabel": "Model",
+    "yearLabel": "Year",
+    "plateLabel": "Plate number",
+    "plateHint": "Optional — you can add it later",
+    "vinLabel": "VIN",
+    "nicknameLabel": "Nickname",
+    "nicknamePlaceholder": "Work car",
+    "mileageLabel": "Current mileage",
+    "mileageUnit": "km",
+    "colourLabel": "Colour",
+    "myVehicles": "My vehicles",
+    "addAnother": "Add another vehicle",
+    "errors": {
+      "plateUnparseable": "We couldn't read that plate. Use up to 3 letters and 4 digits, e.g. A B J 1234",
+      "yearTooOld": "Year must be 1970 or later.",
+      "yearTooNew": "That year isn't valid.",
+      "vinInvalid": "A VIN is 17 characters and never contains I, O or Q.",
+      "required": "This field is required."
+    }
+  },
+  "logbook": {
+    "title": "Vehicle logbook",
+    "emptyTitle": "Your logbook starts here",
+    "emptyBody": "Every service, inspection and part gets recorded here. Over time this becomes the most valuable thing you own when you sell the car.",
+    "emptyAction": "Record a past service",
+    "verifiedBadge": "Habba-verified",
+    "selfReportedBadge": "Owner-entered",
+    "selfDocumentedBadge": "Owner-entered with attachment",
+    "thirdPartyBadge": "Third party",
+    "recordedLater": "Recorded later",
+    "mileageAt": "at {{mileage}} km",
+    "coverage": "{{verified}} Habba-verified, {{selfReported}} owner-entered",
+    "events": {
+      "vehicle_registered": "Vehicle registered with Habba",
+      "service_completed": "Service completed",
+      "inspection_completed": "Inspection completed",
+      "parts_replaced": "Parts replaced",
+      "mileage_recorded": "Mileage updated",
+      "warranty_claimed": "Warranty claimed",
+      "ownership_transferred": "Ownership transferred",
+      "alert_raised": "Maintenance alert",
+      "alert_dismissed": "Alert dismissed"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "arabic": "العربية",
+    "english": "English",
+    "theme": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "signOut": "Sign out",
+    "restartRequired": "The app will restart to apply the new text direction."
+  },
+  "errors": {
+    "generic": "Something went wrong.",
+    "genericAction": "Try again",
+    "offline": "You're offline. We'll save what you entered and send it when you reconnect.",
+    "notFound": "We couldn't find that.",
+    "forbidden": "You don't have permission to do that."
+  }
+}

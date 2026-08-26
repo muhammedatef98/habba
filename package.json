@@ -1,0 +1,32 @@
+{
+  "name": "habba",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Habba (هبّة) — Saudi car-care super-app",
+  "packageManager": "pnpm@10.25.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\"",
+    "test": "pnpm -r --parallel test",
+    "db:start": "./supabase/scripts/local-db.sh start",
+    "db:stop": "./supabase/scripts/local-db.sh stop",
+    "db:reset": "./supabase/scripts/local-db.sh reset",
+    "db:migrate": "./supabase/scripts/local-db.sh migrate",
+    "db:test": "./supabase/scripts/local-db.sh test",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm db:test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^3.2.4"
+  }
+}

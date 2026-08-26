@@ -1,0 +1,26 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Expo
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Local database harness (see supabase/scripts/local-db.sh)
+supabase/.data/
+supabase/.tmp/
+
+# Secrets — never commit. CLAUDE.md §11.
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.log

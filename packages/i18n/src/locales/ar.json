@@ -1,0 +1,105 @@
+{
+  "common": {
+    "appName": "هبّة",
+    "continue": "متابعة",
+    "back": "رجوع",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "next": "التالي",
+    "done": "تم",
+    "retry": "إعادة المحاولة",
+    "skip": "تخطّي",
+    "optional": "اختياري",
+    "loading": "جارٍ التحميل…",
+    "search": "بحث"
+  },
+  "auth": {
+    "welcomeTitle": "أهلاً بك في هبّة",
+    "welcomeSubtitle": "دفتر سيارتك الرقمي، وخدمة تصلك أينما كنت",
+    "phoneLabel": "رقم الجوال",
+    "phonePlaceholder": "5X XXX XXXX",
+    "phoneHint": "سنرسل لك رمز تحقّق برسالة نصية",
+    "sendCode": "إرسال الرمز",
+    "otpTitle": "أدخل رمز التحقّق",
+    "otpSubtitle": "أرسلنا رمزاً مكوّناً من ٤ أرقام إلى {{phone}}",
+    "resendIn": "إعادة الإرسال خلال {{seconds}} ثانية",
+    "resend": "إعادة إرسال الرمز",
+    "verify": "تحقّق",
+    "nameTitle": "ما اسمك؟",
+    "nameLabel": "الاسم الكامل",
+    "errors": {
+      "invalidPhone": "رقم الجوال غير صحيح. تأكد أنه يبدأ بـ ٥ ويتكوّن من ٩ أرقام.",
+      "invalidOtp": "الرمز غير صحيح. تحقّق من الرسالة وحاول مرة أخرى.",
+      "otpExpired": "انتهت صلاحية الرمز. اطلب رمزاً جديداً.",
+      "tooManyAttempts": "محاولات كثيرة. انتظر دقيقة ثم حاول مرة أخرى.",
+      "network": "تعذّر الاتصال. تحقّق من الإنترنت وحاول مرة أخرى."
+    }
+  },
+  "vehicle": {
+    "addTitle": "أضف سيارتك",
+    "addSubtitle": "ثلاث خطوات فقط، وبيانات اللوحة اختيارية",
+    "makeLabel": "الشركة المصنّعة",
+    "modelLabel": "الموديل",
+    "yearLabel": "سنة الصنع",
+    "plateLabel": "رقم اللوحة",
+    "plateHint": "اختياري — يمكنك إضافته لاحقاً",
+    "vinLabel": "رقم الهيكل (VIN)",
+    "nicknameLabel": "اسم مختصر للسيارة",
+    "nicknamePlaceholder": "سيارة الشغل",
+    "mileageLabel": "قراءة العداد الحالية",
+    "mileageUnit": "كم",
+    "colourLabel": "اللون",
+    "myVehicles": "سياراتي",
+    "addAnother": "أضف سيارة أخرى",
+    "errors": {
+      "plateUnparseable": "لم نتمكّن من قراءة رقم اللوحة. استخدم ٣ حروف و٤ أرقام مثل: أ ب ح ١٢٣٤",
+      "yearTooOld": "سنة الصنع يجب أن تكون ١٩٧٠ أو بعدها.",
+      "yearTooNew": "سنة الصنع غير صحيحة.",
+      "vinInvalid": "رقم الهيكل يجب أن يتكوّن من ١٧ خانة بدون الأحرف I أو O أو Q.",
+      "required": "هذا الحقل مطلوب."
+    }
+  },
+  "logbook": {
+    "title": "دفتر السيارة",
+    "emptyTitle": "دفتر سيارتك يبدأ من هنا",
+    "emptyBody": "كل صيانة وكل فحص وكل قطعة غيار تُسجَّل هنا. مع الوقت يصبح هذا الدفتر أهم ما تملكه عند بيع السيارة.",
+    "emptyAction": "سجّل صيانة سابقة",
+    "verifiedBadge": "موثّق من هبّة",
+    "selfReportedBadge": "مُدخل من المالك",
+    "selfDocumentedBadge": "مُدخل من المالك مع مرفق",
+    "thirdPartyBadge": "من جهة خارجية",
+    "recordedLater": "سُجّل لاحقاً",
+    "mileageAt": "عند {{mileage}} كم",
+    "coverage": "{{verified}} سجل موثّق من هبّة، و{{selfReported}} مُدخل من المالك",
+    "events": {
+      "vehicle_registered": "تم تسجيل السيارة في هبّة",
+      "service_completed": "صيانة مكتملة",
+      "inspection_completed": "فحص مكتمل",
+      "parts_replaced": "تبديل قطع غيار",
+      "mileage_recorded": "تحديث قراءة العداد",
+      "warranty_claimed": "مطالبة ضمان",
+      "ownership_transferred": "نقل ملكية",
+      "alert_raised": "تنبيه صيانة",
+      "alert_dismissed": "تم تجاهل التنبيه"
+    }
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "language": "اللغة",
+    "arabic": "العربية",
+    "english": "English",
+    "theme": "المظهر",
+    "themeLight": "فاتح",
+    "themeDark": "داكن",
+    "themeSystem": "حسب النظام",
+    "signOut": "تسجيل الخروج",
+    "restartRequired": "سيُعاد تشغيل التطبيق لتطبيق اتجاه الكتابة الجديد."
+  },
+  "errors": {
+    "generic": "حدث خطأ غير متوقّع.",
+    "genericAction": "حاول مرة أخرى",
+    "offline": "لا يوجد اتصال بالإنترنت. سنحفظ ما أدخلته ونرسله عند عودة الاتصال.",
+    "notFound": "لم نعثر على ما تبحث عنه.",
+    "forbidden": "ليس لديك صلاحية لهذا الإجراء."
+  }
+}

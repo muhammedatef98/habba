@@ -96,6 +96,26 @@ bypassed, a fork becomes a constraint violation — a loud failure — rather th
 asserts the resulting chain is linear. The spec mandates this test for slot booking; it matters
 more here.
 
+### Chain ordering — corrected during implementation
+
+This ADR originally specified ordering by `(recorded_at, id)`. **That is wrong, and the test suite
+caught it on the first run.** Two reasons:
+
+- `recorded_at` defaults to `now()`, which in Postgres is the **transaction start time**. Every row
+  appended within one transaction carries an identical value.
+- The tiebreak, `id`, is a random UUID. Ordering by it is arbitrary.
+
+So the "chain tip" lookup returned whichever random UUID happened to sort highest, not the row
+actually written last. The first transaction that appended two events to one vehicle forked the
+chain — and a fork is unrepairable on an append-only table.
+
+The fix is a dedicated `seq bigint generated always as identity` column giving strict insertion
+order. The tip is `order by seq desc limit 1`; verification walks `order by seq`.
+
+Worth noting what saved this: the `unique (vehicle_id, prev_hash)` backstop turned an invisible
+data-corruption bug into a loud constraint violation during testing. It was specified as
+belt-and-braces and it earned its place immediately.
+
 ### Verification
 
 ```sql
@@ -103,9 +123,9 @@ verify_vehicle_timeline(p_vehicle_id uuid)
   returns table (is_valid boolean, checked_count int, first_invalid_id uuid, reason text)
 ```
 
-Walks rows in `recorded_at, id` order (insert order — **not** `occurred_at`, which may be
-backdated; see ADR-0012), recomputes each `row_hash`, and confirms each `prev_hash` matches its
-predecessor. Returns the first break rather than a bare boolean, so support can diagnose.
+Walks rows in `seq` order (insert order — **not** `occurred_at`, which may be backdated; see
+ADR-0012), recomputes each `row_hash`, and confirms each `prev_hash` matches its predecessor.
+Returns the first break rather than a bare boolean, so support can diagnose.
 
 `generate_habba_report` calls this and **refuses to issue a report on a broken chain**. A report
 that silently omits verification is worse than no report.
