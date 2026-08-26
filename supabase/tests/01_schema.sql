@@ -14,7 +14,7 @@ insert into public.profiles (id, role, full_name, phone) values
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c1111111-1111-1111-1111-111111111111', 'الدمام', 'Dammam', 'المنطقة الشرقية',
-   'Eastern Province', st_point(50.1033, 26.4207)::geography);
+   'Eastern Province', extensions.st_point(50.1033, 26.4207)::extensions.geography);
 
 insert into public.vehicle_makes (id, name_ar, name_en) values
   ('a1111111-1111-1111-1111-111111111111', 'ماركة اختبار', 'TestMake');
@@ -26,7 +26,7 @@ insert into public.vehicle_models (id, make_id, name_ar, name_en, year_from, bod
 
 -- PostGIS is actually working -----------------------------------------------
 select test.assert(
-  (select st_srid(centroid) from public.cities limit 1) = 4326,
+  (select extensions.st_srid(centroid) from public.cities limit 1) = 4326,
   'cities.centroid is a 4326 geography'
 );
 

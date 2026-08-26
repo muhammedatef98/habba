@@ -102,6 +102,27 @@ $$;
 
 grant execute on function public.test_seed_auth_user(uuid, text) to authenticated, anon;
 
+-- Stands in for the ops verification queue, which is Phase 6 (build prompt
+-- §9.4). Provider approval is deliberately NOT self-service — a provider that
+-- could approve itself would make KYC advisory — so tests need a way to act as
+-- ops without an admin console existing yet.
+--
+-- ⚠️ LOCAL ONLY, same as above: defined in the shim, never in a migration.
+create or replace function public.test_approve_provider(p_provider_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.providers
+  set verification_status = 'approved', nafath_verified_at = now()
+  where id = p_provider_id;
+end;
+$$;
+
+grant execute on function public.test_approve_provider(uuid) to authenticated;
+
 -- Match Supabase's default grants: tables are reachable, and RLS decides.
 alter default privileges in schema public
   grant select, insert, update, delete on tables to authenticated;

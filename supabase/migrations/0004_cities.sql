@@ -9,7 +9,7 @@ create table public.cities (
   name_en    text not null,
   region_ar  text not null,
   region_en  text not null,
-  centroid   geography(point, 4326) not null,
+  centroid   extensions.geography(point, 4326) not null,
   is_active  boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

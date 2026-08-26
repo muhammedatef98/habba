@@ -98,6 +98,7 @@ export function isVerifiedEntry(provenance: ReportProvenance): boolean {
  * deployed function.
  */
 
+
 /**
  * Escapes text for HTML.
  *

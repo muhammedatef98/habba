@@ -4,16 +4,16 @@
 
 -- Cities ---------------------------------------------------------------------
 insert into public.cities (name_ar, name_en, region_ar, region_en, centroid, is_active) values
-  ('الرياض',   'Riyadh',   'منطقة الرياض',   'Riyadh Region',    st_point(46.6753, 24.7136)::geography, true),
-  ('الدمام',   'Dammam',   'المنطقة الشرقية', 'Eastern Province', st_point(50.1033, 26.4207)::geography, true),
-  ('الخبر',    'Khobar',   'المنطقة الشرقية', 'Eastern Province', st_point(50.2083, 26.2794)::geography, true),
-  ('الظهران',  'Dhahran',  'المنطقة الشرقية', 'Eastern Province', st_point(50.1140, 26.2361)::geography, true),
-  ('الجبيل',   'Jubail',   'المنطقة الشرقية', 'Eastern Province', st_point(49.6225, 27.0174)::geography, true),
-  ('القطيف',   'Qatif',    'المنطقة الشرقية', 'Eastern Province', st_point(50.0115, 26.5196)::geography, true),
-  ('الأحساء',  'Al Ahsa',  'المنطقة الشرقية', 'Eastern Province', st_point(49.5877, 25.3833)::geography, true),
-  ('جدة',      'Jeddah',   'منطقة مكة المكرمة', 'Makkah Region',  st_point(39.1925, 21.4858)::geography, false),
-  ('مكة المكرمة','Makkah', 'منطقة مكة المكرمة', 'Makkah Region',  st_point(39.8579, 21.3891)::geography, false),
-  ('المدينة المنورة','Madinah','منطقة المدينة المنورة','Madinah Region', st_point(39.6142, 24.5247)::geography, false)
+  ('الرياض',   'Riyadh',   'منطقة الرياض',   'Riyadh Region',    extensions.st_point(46.6753, 24.7136)::extensions.geography, true),
+  ('الدمام',   'Dammam',   'المنطقة الشرقية', 'Eastern Province', extensions.st_point(50.1033, 26.4207)::extensions.geography, true),
+  ('الخبر',    'Khobar',   'المنطقة الشرقية', 'Eastern Province', extensions.st_point(50.2083, 26.2794)::extensions.geography, true),
+  ('الظهران',  'Dhahran',  'المنطقة الشرقية', 'Eastern Province', extensions.st_point(50.1140, 26.2361)::extensions.geography, true),
+  ('الجبيل',   'Jubail',   'المنطقة الشرقية', 'Eastern Province', extensions.st_point(49.6225, 27.0174)::extensions.geography, true),
+  ('القطيف',   'Qatif',    'المنطقة الشرقية', 'Eastern Province', extensions.st_point(50.0115, 26.5196)::extensions.geography, true),
+  ('الأحساء',  'Al Ahsa',  'المنطقة الشرقية', 'Eastern Province', extensions.st_point(49.5877, 25.3833)::extensions.geography, true),
+  ('جدة',      'Jeddah',   'منطقة مكة المكرمة', 'Makkah Region',  extensions.st_point(39.1925, 21.4858)::extensions.geography, false),
+  ('مكة المكرمة','Makkah', 'منطقة مكة المكرمة', 'Makkah Region',  extensions.st_point(39.8579, 21.3891)::extensions.geography, false),
+  ('المدينة المنورة','Madinah','منطقة المدينة المنورة','Madinah Region', extensions.st_point(39.6142, 24.5247)::extensions.geography, false)
 on conflict do nothing;
 
 

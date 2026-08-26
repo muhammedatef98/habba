@@ -84,10 +84,11 @@ cmd_migrate() {
     "${PSQL[@]}" -d "$PGDATABASE" -f "$migration" >/dev/null
   done
 
-  if [ -f "$ROOT/supabase/seed/seed.sql" ]; then
-    echo "seeding"
-    "${PSQL[@]}" -d "$PGDATABASE" -f "$ROOT/supabase/seed/seed.sql" >/dev/null
-  fi
+  for seed in "$ROOT"/supabase/seed/*.sql; do
+    [ -e "$seed" ] || continue
+    echo "seeding $(basename "$seed")"
+    "${PSQL[@]}" -d "$PGDATABASE" -f "$seed" >/dev/null
+  done
 
   echo "migrations applied cleanly"
 }
