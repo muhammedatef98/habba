@@ -63,6 +63,13 @@ cmd_stop() {
 }
 
 cmd_create() {
+  # PostgREST (or a stray psql) holds a connection, and DROP DATABASE fails
+  # while anyone is attached. Evict them first so `reset` is reliable rather
+  # than dependent on what happens to be running.
+  psql -h localhost -p "$PGPORT" -d postgres -v ON_ERROR_STOP=1 --quiet -c \
+    "select pg_terminate_backend(pid) from pg_stat_activity
+     where datname = '$PGDATABASE' and pid <> pg_backend_pid()" >/dev/null
+
   psql -h localhost -p "$PGPORT" -d postgres -v ON_ERROR_STOP=1 --quiet \
     -c "drop database if exists $PGDATABASE" \
     -c "create database $PGDATABASE"

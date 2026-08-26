@@ -21,15 +21,24 @@ create table if not exists auth.users (
   created_at    timestamptz not null default now()
 );
 
--- Supabase exposes the current user id by reading a request-scoped GUC that it
--- populates from the JWT. Tests set the same GUC directly, which is what makes
--- role impersonation faithful.
+-- Mirrors Supabase's real auth.uid()/auth.role(), which read TWO GUC forms:
+--
+--   request.jwt.claim.sub    legacy per-claim GUC (PostgREST < 9)
+--   request.jwt.claims       single JSON GUC (PostgREST >= 9, incl. v16)
+--
+-- Both matter here. The .sql suites set the legacy GUC directly because it is
+-- the simplest way to impersonate a user in psql; the PostgREST integration
+-- tests go through a real JWT and therefore produce the JSON form. Supporting
+-- only one would make one of the two test layers a fiction.
 create or replace function auth.uid()
 returns uuid
 language sql
 stable
 as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'
+  )::uuid;
 $$;
 
 create or replace function auth.role()
@@ -37,7 +46,11 @@ returns text
 language sql
 stable
 as $$
-  select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), 'anon');
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+    'anon'
+  );
 $$;
 
 do $$
@@ -51,12 +64,43 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then
     create role service_role nologin noinherit bypassrls;
   end if;
+
+  -- PostgREST connects as `authenticator`, a near-powerless role whose only
+  -- privilege is switching into the role named by the JWT. Supabase uses the
+  -- same arrangement, and it is what makes the HTTP integration tests exercise
+  -- genuine role-based RLS rather than a simulation of it.
+  if not exists (select 1 from pg_roles where rolname = 'authenticator') then
+    create role authenticator login noinherit;
+  end if;
 end
 $$;
+
+grant anon, authenticated, service_role to authenticator;
 
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
 grant select on auth.users to authenticated, service_role;
+
+-- Stands in for GoTrue's sign-up, which the local harness cannot run (it needs
+-- Docker). Integration tests call this to create the auth.users row that a
+-- real phone-OTP sign-up would have created.
+--
+-- ⚠️ LOCAL ONLY. This function is defined in the shim, never in a migration,
+-- so it cannot reach a hosted Supabase project — where GoTrue owns auth.users
+-- and nothing else may write to it.
+create or replace function public.test_seed_auth_user(p_id uuid, p_phone text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into auth.users (id, phone) values (p_id, p_phone)
+  on conflict (id) do nothing;
+end;
+$$;
+
+grant execute on function public.test_seed_auth_user(uuid, text) to authenticated, anon;
 
 -- Match Supabase's default grants: tables are reachable, and RLS decides.
 alter default privileges in schema public

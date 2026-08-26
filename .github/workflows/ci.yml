@@ -93,3 +93,30 @@ jobs:
 
       - name: Hash chain under concurrency
         run: ./supabase/scripts/concurrency-test.sh
+
+      # The seam. Everything above proves the schema; the app's unit tests
+      # prove the client. Only this proves they work together — app code
+      # through supabase-js, over HTTP, through a real JWT, through RLS.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install PostgREST
+        run: |
+          curl -fsSL -o postgrest.tar.xz \
+            https://github.com/PostgREST/postgrest/releases/download/v16.2/postgrest-v16.2-linux-static-x86-64.tar.xz
+          tar -xJf postgrest.tar.xz
+          sudo mv postgrest /usr/local/bin/
+
+      - name: Start PostgREST
+        run: ./supabase/scripts/postgrest.sh start
+
+      - name: Integration tests (app → PostgREST → RLS)
+        # Fail rather than skip if the harness is down — a skipped integration
+        # suite is a green build that proved nothing.
+        env:
+          HABBA_REQUIRE_HARNESS: '1'
+        run: pnpm --filter @habba/customer exec vitest run src/data/supabase-repository.integration.test.ts

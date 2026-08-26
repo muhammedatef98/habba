@@ -16,6 +16,9 @@
  */
 
 import { normalisePlate } from '@habba/core';
+import { getSupabaseClient } from '../lib/supabase.js';
+import { useSession } from '../state/session.js';
+import { SupabaseRepository } from './supabase-repository.js';
 import type {
   NewVehicleInput,
   Profile,
@@ -275,4 +278,17 @@ export class InMemoryRepository implements Repository {
   }
 }
 
-export const repository: Repository = new InMemoryRepository();
+/**
+ * The repository the app uses.
+ *
+ * Supabase when the app has been pointed at a project, in-memory otherwise.
+ * The switch is configuration, not a code change — see ADR-0010 for why no
+ * project exists yet.
+ */
+function createRepository(): Repository {
+  const client = getSupabaseClient();
+  if (client === null) return new InMemoryRepository();
+  return new SupabaseRepository(client, () => useSession.getState().userId);
+}
+
+export const repository: Repository = createRepository();
