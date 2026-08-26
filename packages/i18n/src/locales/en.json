@@ -81,6 +81,29 @@
       "ownership_transferred": "Ownership transferred",
       "alert_raised": "Maintenance alert",
       "alert_dismissed": "Alert dismissed"
+    },
+    "addRecord": "Record a past service",
+    "recordTitle": "Record a past service",
+    "recordSubtitle": "Add service that happened before Habba. It appears in the logbook as owner-entered.",
+    "recordWhat": "What was done?",
+    "recordWhatPlaceholder": "Oil and filter change",
+    "recordWhen": "When?",
+    "recordMileage": "Mileage at the time",
+    "recordNotVerifiedNotice": "This entry shows as “owner-entered” because Habba did not carry out the work. Services Habba performs appear as verified.",
+    "updateMileage": "Update mileage",
+    "mileageNow": "Current mileage",
+    "generateReport": "Generate Habba report",
+    "reportReady": "Report ready",
+    "reportShareHint": "Share this link with the buyer. It works without a login.",
+    "reportCopyLink": "Copy link",
+    "reportCoverage": "{{verified}} of {{total}} records Habba-verified",
+    "reportChainVerified": "Record chain verified",
+    "errors": {
+      "descriptionRequired": "Describe the service.",
+      "futureDate": "A service cannot be dated in the future.",
+      "mileageTooLow": "That reading is below the recorded {{current}} km. Check the number.",
+      "reportChainBroken": "The report could not be issued because this logbook failed verification. Contact support.",
+      "reportFailed": "The report could not be issued. Try again."
     }
   },
   "settings": {

@@ -24,3 +24,6 @@ supabase/.tmp/
 
 .DS_Store
 *.log
+
+# Integration test artifacts (rendered report pages)
+.tmp/

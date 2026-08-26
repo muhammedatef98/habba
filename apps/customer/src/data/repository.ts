@@ -28,6 +28,14 @@ import type {
   VehicleModel,
 } from './types.js';
 
+export interface PastServiceInput {
+  readonly vehicleId: string;
+  readonly summaryAr: string;
+  readonly occurredAt: Date;
+  readonly mileage?: number | undefined;
+  readonly details?: Readonly<Record<string, unknown>> | undefined;
+}
+
 export interface Repository {
   listMakes(): Promise<readonly VehicleMake[]>;
   listModels(makeId: string): Promise<readonly VehicleModel[]>;
@@ -37,6 +45,12 @@ export interface Repository {
   listTimeline(vehicleId: string): Promise<readonly TimelineEvent[]>;
   getProfile(): Promise<Profile | null>;
   upsertProfile(profile: Omit<Profile, 'id'>): Promise<Profile>;
+
+  // Phase 2. Note there is still no method that writes a timeline row with a
+  // caller-chosen provenance — that remains impossible by construction.
+  recordPastService(input: PastServiceInput): Promise<void>;
+  recordMileage(vehicleId: string, mileage: number): Promise<void>;
+  generateReport(vehicleId: string): Promise<string>;
 }
 
 const MAKES: readonly VehicleMake[] = [
@@ -275,6 +289,76 @@ export class InMemoryRepository implements Repository {
   async upsertProfile(profile: Omit<Profile, 'id'>): Promise<Profile> {
     this.profile = { id: this.profile?.id ?? 'dev-user', ...profile };
     return this.profile;
+  }
+
+  async recordPastService(input: PastServiceInput): Promise<void> {
+    if (input.occurredAt.getTime() > Date.now()) {
+      throw new Error('future_date');
+    }
+
+    const events = this.timeline.get(input.vehicleId) ?? [];
+    const now = new Date().toISOString();
+
+    // Mirrors derive_timeline_provenance: no order, no attachments here, so
+    // always self_reported. The stub must not be more generous than the
+    // database or the UI learns the wrong lesson.
+    events.push({
+      id: `evt-${input.vehicleId}-${events.length + 1}`,
+      vehicleId: input.vehicleId,
+      eventType: 'service_completed',
+      occurredAt: input.occurredAt.toISOString(),
+      recordedAt: now,
+      mileage: input.mileage ?? null,
+      provenance: 'self_reported',
+      summaryAr: input.summaryAr,
+      summaryEn: input.summaryAr,
+    });
+
+    this.timeline.set(input.vehicleId, events);
+    this.bumpMileage(input.vehicleId, input.mileage);
+  }
+
+  async recordMileage(vehicleId: string, mileage: number): Promise<void> {
+    const vehicle = this.vehicles.get(vehicleId);
+    if (vehicle === undefined) throw new Error('not_found');
+    if (mileage < vehicle.currentMileage) throw new Error('mileage_too_low');
+
+    const events = this.timeline.get(vehicleId) ?? [];
+    const now = new Date().toISOString();
+
+    events.push({
+      id: `evt-${vehicleId}-${events.length + 1}`,
+      vehicleId,
+      eventType: 'mileage_recorded',
+      occurredAt: now,
+      recordedAt: now,
+      mileage,
+      provenance: 'self_reported',
+      summaryAr: `قراءة العداد: ${mileage} كم`,
+      summaryEn: `Mileage reading: ${mileage} km`,
+    });
+
+    this.timeline.set(vehicleId, events);
+    this.bumpMileage(vehicleId, mileage);
+  }
+
+  async generateReport(vehicleId: string): Promise<string> {
+    // The dev stub cannot verify a hash chain — it has none. It returns a
+    // placeholder token so the share flow is exercisable offline; the real
+    // refusal-on-broken-chain behaviour lives in the database.
+    if (!this.vehicles.has(vehicleId)) throw new Error('not_found');
+    return `dev-report-${vehicleId}`;
+  }
+
+  private bumpMileage(vehicleId: string, mileage: number | undefined): void {
+    if (mileage === undefined) return;
+    const vehicle = this.vehicles.get(vehicleId);
+    if (vehicle === undefined) return;
+
+    this.vehicles.set(vehicleId, {
+      ...vehicle,
+      currentMileage: Math.max(vehicle.currentMileage, mileage),
+    });
   }
 }
 

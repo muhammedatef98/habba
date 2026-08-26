@@ -81,6 +81,29 @@
       "ownership_transferred": "نقل ملكية",
       "alert_raised": "تنبيه صيانة",
       "alert_dismissed": "تم تجاهل التنبيه"
+    },
+    "addRecord": "سجّل صيانة سابقة",
+    "recordTitle": "سجّل صيانة سابقة",
+    "recordSubtitle": "أضف الصيانة التي تمّت قبل هبّة. ستظهر في الدفتر كسجل مُدخل من المالك.",
+    "recordWhat": "ما الذي تمّ؟",
+    "recordWhatPlaceholder": "تغيير زيت وفلتر",
+    "recordWhen": "متى؟",
+    "recordMileage": "قراءة العداد وقتها",
+    "recordNotVerifiedNotice": "هذا السجل سيظهر كـ«مُدخل من المالك» لأن هبّة لم تنفّذ الصيانة. السجلات التي تنفّذها هبّة تظهر موثّقة.",
+    "updateMileage": "تحديث العداد",
+    "mileageNow": "قراءة العداد الآن",
+    "generateReport": "أصدر تقرير هبّة",
+    "reportReady": "التقرير جاهز",
+    "reportShareHint": "شارك هذا الرابط مع المشتري. يعمل بدون تسجيل دخول.",
+    "reportCopyLink": "نسخ الرابط",
+    "reportCoverage": "{{verified}} من {{total}} سجل موثّق من هبّة",
+    "reportChainVerified": "تم التحقّق من سلسلة السجلات",
+    "errors": {
+      "descriptionRequired": "اكتب وصفاً للصيانة.",
+      "futureDate": "لا يمكن تسجيل صيانة بتاريخ مستقبلي.",
+      "mileageTooLow": "القراءة أقل من العداد المسجّل ({{current}} كم). تحقّق من الرقم.",
+      "reportChainBroken": "تعذّر إصدار التقرير لأن سجل السيارة لم يجتز التحقّق. تواصل مع الدعم.",
+      "reportFailed": "تعذّر إصدار التقرير. حاول مرة أخرى."
     }
   },
   "settings": {

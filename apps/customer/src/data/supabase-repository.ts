@@ -21,7 +21,7 @@ import type {
   VehicleMake,
   VehicleModel,
 } from './types.js';
-import type { Repository } from './repository.js';
+import type { PastServiceInput, Repository } from './repository.js';
 
 interface VehicleRow {
   id: string;
@@ -270,5 +270,42 @@ export class SupabaseRepository implements Repository {
       phone: row.phone,
       preferredLocale: row.preferred_locale,
     };
+  }
+
+  async recordPastService(input: PastServiceInput): Promise<void> {
+    // record_past_service takes no provenance parameter — the server decides,
+    // and with no order attached it can only ever be self_reported or
+    // self_documented (ADR-0005).
+    const { error } = await this.client.rpc('record_past_service', {
+      p_vehicle_id: input.vehicleId,
+      p_summary_ar: input.summaryAr,
+      p_occurred_at: input.occurredAt.toISOString(),
+      p_mileage: input.mileage ?? null,
+      p_details: input.details ?? {},
+    });
+
+    if (error !== null) throw new Error(`recordPastService: ${error.message}`);
+  }
+
+  async recordMileage(vehicleId: string, mileage: number): Promise<void> {
+    const { error } = await this.client.rpc('record_mileage', {
+      p_vehicle_id: vehicleId,
+      p_mileage: mileage,
+    });
+
+    if (error !== null) throw new Error(`recordMileage: ${error.message}`);
+  }
+
+  async generateReport(vehicleId: string): Promise<string> {
+    const { data, error } = await this.client.rpc('generate_habba_report', {
+      p_vehicle_id: vehicleId,
+    });
+
+    // A broken chain surfaces here as a refusal, and the UI must say so
+    // plainly rather than retrying — the logbook needs support, not another
+    // attempt.
+    if (error !== null) throw new Error(`generateReport: ${error.message}`);
+
+    return data as string;
   }
 }

@@ -12,9 +12,10 @@
  * an owner's recollection must never look the same.
  */
 
+import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, ProvenanceBadge, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
@@ -28,6 +29,9 @@ const PROVENANCE_LABEL_KEY: Record<Provenance, string> = {
   third_party: 'logbook.thirdPartyBadge',
 };
 
+/** Where the public report is served. Replaced by the real domain at launch. */
+const REPORT_BASE_URL = 'https://habba.sa/r';
+
 export default function LogbookScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -35,10 +39,31 @@ export default function LogbookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isArabic = i18n.language === 'ar';
 
+  const [reportToken, setReportToken] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+
   const timeline = useQuery({
     queryKey: ['timeline', id],
     queryFn: () => repository.listTimeline(id ?? ''),
     enabled: id !== undefined,
+  });
+
+  const report = useMutation({
+    mutationFn: () => repository.generateReport(id ?? ''),
+    onSuccess: (token) => {
+      setReportToken(token);
+      setReportError(null);
+    },
+    onError: (error: Error) => {
+      setReportToken(null);
+      // A refused report means the logbook failed verification. That is not a
+      // transient error and must not invite a retry — it needs support.
+      setReportError(
+        error.message.includes('failed verification')
+          ? t('logbook.errors.reportChainBroken')
+          : t('logbook.errors.reportFailed'),
+      );
+    },
   });
 
   if (!isAuthenticated) return <Redirect href="/" />;
@@ -113,6 +138,54 @@ export default function LogbookScreen() {
           );
         })}
       </View>
+
+      <Button
+        testID="record-service"
+        label={t('logbook.addRecord')}
+        variant={events.length === 0 ? 'primary' : 'secondary'}
+        onPress={() => router.push({ pathname: '/record-service', params: { id } })}
+      />
+
+      {/* تقرير هبّة is only meaningful once there is history to report on. */}
+      {events.length > 0 ? (
+        <>
+          <Button
+            testID="generate-report"
+            label={t('logbook.generateReport')}
+            variant="accent"
+            onPress={() => report.mutate()}
+            loading={report.isPending}
+          />
+
+          {reportToken !== null ? (
+            <Card elevation="sm">
+              <View style={{ gap: theme.spacing.sm }}>
+                <Text variant="bodyStrong">{t('logbook.reportReady')}</Text>
+                <Text variant="caption" tone="muted">
+                  {t('logbook.reportShareHint')}
+                </Text>
+                <Text variant="caption" style={{ color: theme.colors.primary }} selectable>
+                  {`${REPORT_BASE_URL}/${reportToken}`}
+                </Text>
+                <Text variant="caption" tone="subtle">
+                  {t('logbook.reportCoverage', {
+                    verified: verifiedCount,
+                    total: events.length,
+                  })}
+                </Text>
+              </View>
+            </Card>
+          ) : null}
+
+          {reportError !== null ? (
+            <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
+              <Text variant="caption" style={{ color: theme.colors.emergency }}>
+                {reportError}
+              </Text>
+            </Card>
+          ) : null}
+        </>
+      ) : null}
 
       <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>

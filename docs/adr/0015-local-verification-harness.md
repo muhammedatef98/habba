@@ -27,12 +27,12 @@ logbook — and two half-proofs do not make it.
 Run PostgreSQL, PostGIS and **PostgREST** natively, driven by scripts in
 `supabase/scripts/`.
 
-| Piece | Role |
-|---|---|
-| `local-db.sh` | boots a throwaway cluster under `supabase/.data`, applies the shim + migrations + seed, runs the `.sql` suites |
-| `supabase_shim.sql` | recreates the Supabase primitives the migrations depend on: `auth.users`, `auth.uid()`, `auth.role()`, and the `anon` / `authenticated` / `service_role` / `authenticator` roles |
-| `postgrest.sh` | serves the database over HTTP — the same component Supabase runs behind its API gateway |
-| `concurrency-test.sh` | multi-session hash-chain test, which a single psql script cannot express |
+| Piece                 | Role                                                                                                                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `local-db.sh`         | boots a throwaway cluster under `supabase/.data`, applies the shim + migrations + seed, runs the `.sql` suites                                                                   |
+| `supabase_shim.sql`   | recreates the Supabase primitives the migrations depend on: `auth.users`, `auth.uid()`, `auth.role()`, and the `anon` / `authenticated` / `service_role` / `authenticator` roles |
+| `postgrest.sh`        | serves the database over HTTP — the same component Supabase runs behind its API gateway                                                                                          |
+| `concurrency-test.sh` | multi-session hash-chain test, which a single psql script cannot express                                                                                                         |
 
 Tests then stack in three layers, each proving something the others cannot:
 
@@ -44,7 +44,7 @@ Tests then stack in three layers, each proving something the others cannot:
 
 ### Why PostgREST specifically
 
-It is not a stand-in. Supabase's data API *is* PostgREST, so the integration
+It is not a stand-in. Supabase's data API _is_ PostgREST, so the integration
 tests exercise the real request path: JWT verification, `SET LOCAL ROLE`,
 `request.jwt.claims`, RLS. The only local substitutions are GoTrue (tests mint
 their own JWTs) and the API gateway (a fetch shim strips the `/rest/v1` prefix
