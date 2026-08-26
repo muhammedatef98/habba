@@ -18,8 +18,8 @@ Three problems with that formula, in increasing order of severity.
 
 `attachments` and `mileage` are excluded. Those are the two fields a fraudulent seller would most
 want to change: swap the before/after photos, or lower the recorded mileage. Under the spec's
-formula both can be altered without breaking verification — and `attachments` is the *photographic
-evidence* the report's credibility rests on.
+formula both can be altered without breaking verification — and `attachments` is the _photographic
+evidence_ the report's credibility rests on.
 
 ### 2. `prev_hash` computation races
 
@@ -37,7 +37,7 @@ same vehicle. Not exotic.
 ### 3. `details` is `jsonb`, and text rendering is not a stable contract
 
 Hashing `details::text` depends on how the running Postgres renders `jsonb`. `jsonb` normalises key
-order deterministically *within* a version, but that is an implementation detail, not a documented
+order deterministically _within_ a version, but that is an implementation detail, not a documented
 guarantee across major versions. A Postgres upgrade could invalidate every historical hash at once.
 
 ## Decision
@@ -133,8 +133,8 @@ that silently omits verification is worse than no report.
 ## Consequences
 
 - Chain order is insert order, which may differ from real-world event order when history is
-  backdated or synced from offline (ADR-0012). The verifier proves *"these rows have not been
-  altered since they were written"*, not *"these events happened in this order"*. The public report
+  backdated or synced from offline (ADR-0012). The verifier proves _"these rows have not been
+  altered since they were written"_, not _"these events happened in this order"_. The public report
   page must state exactly that. Overclaiming here is the fastest way to lose the trust the moat
   depends on.
 - `canonical_json()` becomes frozen infrastructure. It needs a comment saying so, and a test that
@@ -145,8 +145,8 @@ that silently omits verification is worse than no report.
 ## Open items
 
 - **Should the chain be externally anchored?** The current design proves internal consistency, but
-  a party with database write access *and* the ability to recompute all subsequent hashes could
+  a party with database write access _and_ the ability to recompute all subsequent hashes could
   rewrite history wholesale. Periodically publishing chain heads somewhere Habba does not control
   (or signing them with a key held outside the database) closes that gap. Not needed for Phase 2 —
-  but if تقرير هبّة is ever marketed as *tamper-proof* rather than *tamper-evident*, it becomes
+  but if تقرير هبّة is ever marketed as _tamper-proof_ rather than _tamper-evident_, it becomes
   necessary. Recommend deferring, with the language on the public page kept honest until then.

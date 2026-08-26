@@ -8,8 +8,8 @@
 
 The spec's state machine covers the on-demand emergency path well and leaves three gaps.
 
-**1. `checked_in` has nowhere to live.** §6.5 says workshop mode *"skips `en_route`/`arrived`; use
-`checked_in` semantics via `order_events`."* But `order_events.to_status` is typed `order_status`,
+**1. `checked_in` has nowhere to live.** §6.5 says workshop mode _"skips `en_route`/`arrived`; use
+`checked_in` semantics via `order_events`."_ But `order_events.to_status` is typed `order_status`,
 and that enum has no `checked_in` member. The instruction is not implementable as specified.
 
 **2. Non-emergency paths are undefined.** `searching` and the broadcast/accept cycle describe
@@ -17,8 +17,8 @@ on-demand matching. For `workshop` and `mobile_scheduled`, the customer picks a 
 and slot — there is no search. The transition out of `draft` for those modes is unspecified.
 
 **3. Auto-completion contradicts the escrow promise.** §1 lists escrow as a core differentiator:
-*"captured only after the customer confirms completion."* §6.5 then says `awaiting_approval →
-completed` happens *"automatically after 24h of no response"* — which captures the customer's money
+_"captured only after the customer confirms completion."_ §6.5 then says `awaiting_approval →
+completed` happens _"automatically after 24h of no response"_ — which captures the customer's money
 without the confirmation the feature is sold on.
 
 ## Decision
@@ -57,13 +57,13 @@ the order goes straight to `quoted` (fixed-price services) or `accepted`.
 
 ### Guards, enforced in the trigger
 
-| Transition | Guard |
-|---|---|
-| `quoted → accepted` | a payment authorisation exists (`payment_intent_id` set, `escrow_status = 'authorised'`) |
-| `in_progress → awaiting_approval` | if `parts_amount > 0`, every `order_parts` row has `approved_by_customer = true` |
-| `awaiting_approval → completed` | actor is the **customer**, or the auto-completion job (below) |
-| `→ completed` | writes a `vehicle_timeline` row **in the same transaction** (see exception below) |
-| `completed → disputed` | `now() < completed_at + interval '72 hours'` |
+| Transition                        | Guard                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `quoted → accepted`               | a payment authorisation exists (`payment_intent_id` set, `escrow_status = 'authorised'`) |
+| `in_progress → awaiting_approval` | if `parts_amount > 0`, every `order_parts` row has `approved_by_customer = true`         |
+| `awaiting_approval → completed`   | actor is the **customer**, or the auto-completion job (below)                            |
+| `→ completed`                     | writes a `vehicle_timeline` row **in the same transaction** (see exception below)        |
+| `completed → disputed`            | `now() < completed_at + interval '72 hours'`                                             |
 
 ### The `completed` → timeline write, and its one exception
 
@@ -81,7 +81,7 @@ timeline event. No history is lost; it is deferred.
 ### Auto-completion and escrow capture — split the two
 
 The 24h auto-completion exists for a real reason: providers cannot be left unpaid because a
-customer stopped responding. But automatic *capture* is not the same as automatic *completion*.
+customer stopped responding. But automatic _capture_ is not the same as automatic _completion_.
 
 Recommended resolution:
 
@@ -103,7 +103,7 @@ after they have had 96 hours and three notifications to object.
 
 **Gaps are acceptable and expected** (rolled-back transactions consume sequence values). Gapless
 numbering would require serialising all order creation — the wrong trade. If an external
-requirement ever demands gapless *invoice* numbering, that belongs on `zatca_invoices`, which is
+requirement ever demands gapless _invoice_ numbering, that belongs on `zatca_invoices`, which is
 lower-volume and issued after the fact (ADR-0009), not on `orders`.
 
 ## Consequences

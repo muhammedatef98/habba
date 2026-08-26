@@ -6,8 +6,8 @@
 
 ## Context
 
-`CLAUDE.md` §2.5 says money is `numeric(12,2)`, never float, *"All amounts in SAR (halalas stored
-as decimals, not integers, for ZATCA compatibility)."*
+`CLAUDE.md` §2.5 says money is `numeric(12,2)`, never float, _"All amounts in SAR (halalas stored
+as decimals, not integers, for ZATCA compatibility)."_
 
 The representation is settled. What is not settled — and what actually causes invoice rejections —
 is **where rounding happens**. `numeric(12,2)` cannot hold an unrounded intermediate, so every
@@ -48,7 +48,7 @@ date, not today's rate. The rate applied is snapshotted onto the order at quote 
 
 - **Round half away from zero (`ROUND_HALF_UP`) to 2 decimal places.** This is Postgres `numeric`'s
   native `round()` behaviour, and it matches standard commercial practice. Banker's rounding is
-  *not* used.
+  _not_ used.
 - **VAT is computed and rounded per line item**, then summed to the document total:
 
   ```
@@ -61,7 +61,7 @@ date, not today's rate. The rate applied is snapshotted onto the order at quote 
   ```
 
 - **A database-level assertion enforces reconciliation:** `total_amount = parts_amount +
-  labour_amount + vat_amount` must hold exactly, as a check constraint. If rounding ever makes it
+labour_amount + vat_amount` must hold exactly, as a check constraint. If rounding ever makes it
   fail, the write fails loudly rather than producing an invoice ZATCA will reject.
 
 Line-level rounding is chosen because the e-invoice itemises lines, and the printed line values

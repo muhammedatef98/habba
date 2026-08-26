@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Unit tests
+        run: pnpm -r test
+
+  database:
+    name: Migrations, RLS, hash chain
+    runs-on: ubuntu-latest
+
+    # A real Postgres with real PostGIS. The RLS suite switches to the
+    # `authenticated` role and relies on genuine policy evaluation — mocking any
+    # part of this would only test the mock (ADR-0014).
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: habba_dev
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: 54329
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: habba_dev
+      HABBA_PGPORT: 54329
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply shim and migrations
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/scripts/supabase_shim.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "  $(basename "$migration")"
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          psql -v ON_ERROR_STOP=1 -f supabase/seed/seed.sql
+
+      - name: Schema, timeline, tamper and RLS suites
+        run: |
+          for suite in supabase/tests/*.sql; do
+            echo "── $(basename "$suite")"
+            psql -v ON_ERROR_STOP=1 -f "$suite"
+          done
+
+      - name: Hash chain under concurrency
+        run: ./supabase/scripts/concurrency-test.sh

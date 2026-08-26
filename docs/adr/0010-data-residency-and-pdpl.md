@@ -17,18 +17,18 @@ Three pressures:
    IBANs, precise location traces, and vehicle identifiers — close to the highest-sensitivity end of
    consumer data short of health records.
 2. **Latency.** Provider location updates, the matching function, and the live-tracking screen (the
-   spec's *"emotional core"*) are all latency-sensitive from Saudi devices.
+   spec's _"emotional core"_) are all latency-sensitive from Saudi devices.
 3. **Region availability.** Supabase does not currently offer a Saudi region. Every option is a
    cross-border transfer, which makes the PDPL basis a requirement rather than a nicety.
 
 ## Options
 
-| Region | Approx. RTT from Riyadh | Notes |
-|---|---|---|
-| `eu-central-1` (Frankfurt) | ~90–110 ms | Mature, strong DP framework, common choice for MENA products |
-| `ap-south-1` (Mumbai) | ~40–60 ms | Best latency of the available options; Indian data-protection regime is a separate assessment |
-| `eu-west-*` / US | 120 ms+ | No advantage |
-| Self-hosted on a KSA/Bahrain cloud region | Best | Strongest residency story; abandons managed Supabase and a large amount of Phase 1 velocity |
+| Region                                    | Approx. RTT from Riyadh | Notes                                                                                         |
+| ----------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------- |
+| `eu-central-1` (Frankfurt)                | ~90–110 ms              | Mature, strong DP framework, common choice for MENA products                                  |
+| `ap-south-1` (Mumbai)                     | ~40–60 ms               | Best latency of the available options; Indian data-protection regime is a separate assessment |
+| `eu-west-*` / US                          | 120 ms+                 | No advantage                                                                                  |
+| Self-hosted on a KSA/Bahrain cloud region | Best                    | Strongest residency story; abandons managed Supabase and a large amount of Phase 1 velocity   |
 
 **Latency figures above are estimates and must be measured**, not trusted — a quick test from a
 Saudi network before committing costs nothing.

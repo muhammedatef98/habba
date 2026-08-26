@@ -83,12 +83,7 @@ export interface ParsedPlate {
 }
 
 export type PlateParseError =
-  | 'empty'
-  | 'no_digits'
-  | 'too_many_digits'
-  | 'no_letters'
-  | 'too_many_letters'
-  | 'unknown_letter';
+  'empty' | 'no_digits' | 'too_many_digits' | 'no_letters' | 'too_many_letters' | 'unknown_letter';
 
 export type PlateParseResult =
   | { readonly ok: true; readonly plate: ParsedPlate }

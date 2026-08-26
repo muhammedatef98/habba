@@ -11,19 +11,19 @@ This is the sharpest contradiction in the spec, and it sits directly on the moat
 - §1 sells the output as a **"verified Habba Report"** whose value is that a used-car buyer will
   pay more for a documented car.
 - Phase 2's headline feature is **the owner manually entering their own past service history**,
-  and Phase 2's acceptance criterion is *"the hash chain verifies."*
+  and Phase 2's acceptance criterion is _"the hash chain verifies."_
 
 A hash chain proves **"this row has not changed since it was written."** It proves nothing about
-whether the row was ever true. An owner can type *"timing belt replaced at 90,000 km"* about a
+whether the row was ever true. An owner can type _"timing belt replaced at 90,000 km"_ about a
 belt that was never touched, and the chain will verify perfectly, and the PDF will carry a
 verification QR.
 
 If a buyer ever discovers that a green "verified" badge covered a seller's self-typed claim, the
 product's central asset is gone — and it goes in a way that is very hard to recover from, because
-the damage is to the word *verified*.
+the damage is to the word _verified_.
 
 The schema as specified has nowhere to record the difference. Because `vehicle_timeline` is
-append-only, adding this distinction *after* rows exist means every historical row is
+append-only, adding this distinction _after_ rows exist means every historical row is
 retroactively unclassifiable.
 
 ## Decision
@@ -49,17 +49,17 @@ create type timeline_provenance as enum (
 2. **The UI never uses one word for two things.** Distinct labels and distinct visual treatment in
    the timeline, e.g. `موثّق من هبّة` vs `مُدخل من المالك`. No green check on self-reported rows.
 3. **تقرير هبّة separates the two sections** and states the count of each on the summary line
-   (e.g. *"14 سجل موثّق من هبّة، 3 سجلات مُدخلة من المالك"*). The verification QR attests to the
+   (e.g. _"14 سجل موثّق من هبّة، 3 سجلات مُدخلة من المالك"_). The verification QR attests to the
    chain's integrity, and the public page says precisely that — not "this history is true."
 4. The report surfaces a **Habba-verified coverage ratio**. This is the honest version of the
-   value proposition, and it is a *better* one: it gives the owner a reason to route future
+   value proposition, and it is a _better_ one: it gives the owner a reason to route future
    service through Habba (raising the ratio raises resale value), which is exactly the recurring
    behaviour the business wants. The moat gets stronger by being honest, not weaker.
 
 ## Consequences
 
-- Phase 2's standalone value proposition changes from *"a verified history"* to *"your car's
-  complete history, with Habba-verified entries marked"*. Marketing copy must be written against
+- Phase 2's standalone value proposition changes from _"a verified history"_ to _"your car's
+  complete history, with Habba-verified entries marked"_. Marketing copy must be written against
   the second claim. Weaker headline, survivable product.
 - `self_reported` entries still deliver most of Phase 2's real utility — an owner who can find
   their own service history in one place is well served, and the acquisition loop through

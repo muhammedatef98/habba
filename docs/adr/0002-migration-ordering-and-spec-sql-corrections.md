@@ -21,12 +21,12 @@ Applied as written, the migrations fail. Three separate problems:
 2. **Forward foreign-key references.** The spec's section order references tables before they
    exist:
 
-   | In section | References | Defined in |
-   |---|---|---|
-   | `profiles.city_id` (§6.1) | `cities` | §6.1, *after* `profiles` |
-   | `vehicle_timeline.order_id` (§6.2) | `orders` | §6.5 |
-   | `vehicle_timeline.provider_id` (§6.2) | `providers` | §6.4 |
-   | `orders.slot_id` (§6.5) | `appointment_slots` | §6.6 |
+   | In section                            | References          | Defined in               |
+   | ------------------------------------- | ------------------- | ------------------------ |
+   | `profiles.city_id` (§6.1)             | `cities`            | §6.1, _after_ `profiles` |
+   | `vehicle_timeline.order_id` (§6.2)    | `orders`            | §6.5                     |
+   | `vehicle_timeline.provider_id` (§6.2) | `providers`         | §6.4                     |
+   | `orders.slot_id` (§6.5)               | `appointment_slots` | §6.6                     |
 
 3. **Migrations are declared forward-only** (§4), so a bad early migration cannot be edited later
    once it has been applied to any shared environment.
@@ -76,8 +76,8 @@ so it belongs in a trigger. A hardcoded constant would silently start rejecting 
 
 Tables are created without policies, then `0016+` enables RLS and adds policies. **A table with
 RLS enabled and zero policies denies everything** — which is the correct fail-closed default
-(`CLAUDE.md` §2.3). The RLS test (`tests/rls.spec.ts`) must therefore assert *both* that strangers
-are denied *and* that owners are allowed, or a table with no policies would pass a
+(`CLAUDE.md` §2.3). The RLS test (`tests/rls.spec.ts`) must therefore assert _both_ that strangers
+are denied _and_ that owners are allowed, or a table with no policies would pass a
 denial-only test trivially.
 
 ## Consequences

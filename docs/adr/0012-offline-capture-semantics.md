@@ -9,8 +9,8 @@
 Two principles in `CLAUDE.md` pull against each other:
 
 - **§2.2** — all business logic lives in Postgres; the app is a thin client.
-- **§2.7** — *"A technician in a basement parking garage must still be able to complete a job;
-  queue and sync."*
+- **§2.7** — _"A technician in a basement parking garage must still be able to complete a job;
+  queue and sync."_
 
 Underground parking is where a flat battery or a jump-start actually happens, so this is a core
 path, not an edge case. But job completion is exactly the moment that writes to the timeline, and
@@ -25,16 +25,16 @@ overclaiming.
 
 ### Two timestamps, distinct meanings
 
-| Column | Source | Meaning |
-|---|---|---|
-| `occurred_at` | client-asserted | when the event happened in the world |
-| `recorded_at` | server `now()`, non-null | when the row was durably written |
+| Column        | Source                   | Meaning                              |
+| ------------- | ------------------------ | ------------------------------------ |
+| `occurred_at` | client-asserted          | when the event happened in the world |
+| `recorded_at` | server `now()`, non-null | when the row was durably written     |
 
 - **The chain is ordered by `recorded_at, id`** — insert order. `verify_vehicle_timeline` walks that
   order (ADR-0004).
 - **The timeline UI and the report display by `occurred_at`** — the order a human cares about.
 - Both are in the hashed payload, so neither can be altered after the fact.
-- Where they differ materially, the UI shows it: *"سُجّل لاحقًا"* with the sync time. Visible, not hidden.
+- Where they differ materially, the UI shows it: _"سُجّل لاحقًا"_ with the sync time. Visible, not hidden.
 
 ### Bounding client-asserted time
 
@@ -58,12 +58,12 @@ logbook is a visible, trust-damaging bug.
 
 Not everything can be queued. The split:
 
-| Offline-capable | Requires connectivity |
-|---|---|
-| Capture: photos, mileage, parts used, notes | Payment authorisation and capture |
-| Marking work steps done locally | Customer approval of a quote |
-| Drafting the quote | Timeline write and hash computation |
-| Viewing the assigned job | State transitions (validated server-side) |
+| Offline-capable                             | Requires connectivity                     |
+| ------------------------------------------- | ----------------------------------------- |
+| Capture: photos, mileage, parts used, notes | Payment authorisation and capture         |
+| Marking work steps done locally             | Customer approval of a quote              |
+| Drafting the quote                          | Timeline write and hash computation       |
+| Viewing the assigned job                    | State transitions (validated server-side) |
 
 The provider app therefore has a **local job state** that syncs into the server state machine. It
 does not decide transitions — it records intent, and the server validates on sync. This preserves
@@ -77,8 +77,8 @@ That is a product decision, not just an error state.
 ### Honest language on the public report
 
 The verification statement must say what is true: **these records have not been altered since they
-were recorded, and here is when each was recorded.** Not: *"this history is chronologically
-proven."* See ADR-0005 — the same discipline applies to both provenance and ordering.
+were recorded, and here is when each was recorded.** Not: _"this history is chronologically
+proven."_ See ADR-0005 — the same discipline applies to both provenance and ordering.
 
 ## Consequences
 

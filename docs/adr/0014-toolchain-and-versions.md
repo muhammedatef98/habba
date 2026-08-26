@@ -12,7 +12,7 @@ the spec.
 
 ### Expo SDK 52
 
-The spec says *"Expo SDK 52+"*. SDK 52 is several release cycles old by now. The `+` permits a
+The spec says _"Expo SDK 52+"_. SDK 52 is several release cycles old by now. The `+` permits a
 newer version, and the reasons to take it are concrete rather than cosmetic:
 
 - New Architecture (Fabric/TurboModules) maturity, which affects `react-native-reanimated`
@@ -45,17 +45,17 @@ Phase 1 avoids a mid-build tooling detour.
 
 ## Decision
 
-| Item | Choice |
-|---|---|
-| Node | Latest LTS, pinned via `.nvmrc` and `engines` |
-| Package manager | pnpm (per §3), version pinned via `packageManager` in root `package.json` |
-| Monorepo | pnpm workspaces, no Nx/Turbo in Phase 1 — add only if build times justify it |
-| Expo SDK | Latest stable at init (see above), pinned exactly, no `^` ranges on Expo packages |
-| TypeScript | `strict: true`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` |
-| Lint | ESLint flat config + `@typescript-eslint`, with a rule banning `any` and bare `@ts-ignore` |
-| Format | Prettier, with `prettier-plugin-organize-imports` |
-| Tests | Vitest for units; Detox on critical flows only (per §3) |
-| CI | GitHub Actions: install → typecheck → lint → unit → **RLS test against an ephemeral Supabase** |
+| Item            | Choice                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Node            | Latest LTS, pinned via `.nvmrc` and `engines`                                                  |
+| Package manager | pnpm (per §3), version pinned via `packageManager` in root `package.json`                      |
+| Monorepo        | pnpm workspaces, no Nx/Turbo in Phase 1 — add only if build times justify it                   |
+| Expo SDK        | Latest stable at init (see above), pinned exactly, no `^` ranges on Expo packages              |
+| TypeScript      | `strict: true`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`                  |
+| Lint            | ESLint flat config + `@typescript-eslint`, with a rule banning `any` and bare `@ts-ignore`     |
+| Format          | Prettier, with `prettier-plugin-organize-imports`                                              |
+| Tests           | Vitest for units; Detox on critical flows only (per §3)                                        |
+| CI              | GitHub Actions: install → typecheck → lint → unit → **RLS test against an ephemeral Supabase** |
 
 ### `strict` is not enough on its own
 
@@ -71,7 +71,7 @@ Both are stricter than the spec requires and cheap to adopt at commit one; expen
 ### CI must run the RLS test against a real database
 
 The spec requires `tests/rls.spec.ts` in CI (§6.9). This means CI spins up a Supabase instance,
-applies all migrations, seeds test users, and asserts policies from *each role's* perspective. A
+applies all migrations, seeds test users, and asserts policies from _each role's_ perspective. A
 mocked RLS test is worthless — it tests the mock. This shapes the CI setup in Phase 1.
 
 ## ⚠️ Owner decision required

@@ -13,7 +13,7 @@
 
 Build **Habba (هبّة)** — a Saudi car-care super-app that connects vehicle owners with mechanics, mobile technicians, and workshops.
 
-Arabic name: **هبّة** — double meaning: *a gust of wind* (speed) and *to rush to someone's aid* (rescue).
+Arabic name: **هبّة** — double meaning: _a gust of wind_ (speed) and _to rush to someone's aid_ (rescue).
 Latin spelling is always **Habba**. Never `Habah`, `Heba`, or `Hiba`.
 
 **Primary market:** Saudi Arabia (launch: Eastern Province + Riyadh). Arabic-first, RTL-first.
@@ -32,6 +32,7 @@ Habba's defensible differentiator is:
 Every vehicle gets a **permanent, immutable, owner-portable service record** keyed to its VIN and plate.
 
 Every single interaction writes to it:
+
 - every oil change (with mileage, oil grade, filter part number)
 - every repair (with photos before/after, parts used, part serial numbers, warranty period)
 - every inspection report
@@ -41,7 +42,7 @@ Every single interaction writes to it:
 **Why this is a moat, not a feature:**
 
 1. **Lock-in through accumulated value.** After 18 months a customer's logbook is worth more than the switching cost. They cannot take it to a competitor.
-2. **Resale value — the killer app.** When the owner sells the car, they generate a **verified Habba Report** (signed PDF + public QR link). A documented car sells for meaningfully more in the Saudi used-car market. This makes Habba valuable to people who *aren't currently buying a service*.
+2. **Resale value — the killer app.** When the owner sells the car, they generate a **verified Habba Report** (signed PDF + public QR link). A documented car sells for meaningfully more in the Saudi used-car market. This makes Habba valuable to people who _aren't currently buying a service_.
 3. **The buyer becomes a customer.** The new owner receives the logbook via ownership transfer in-app → free customer acquisition with zero CAC.
 4. **Predictive maintenance from real data.** Mileage + service history + make/model → proactive alerts ("your timing belt is due in ~1,400 km"). This converts one-off emergency users into recurring subscribers.
 5. **Data advantage compounds.** Real repair costs per make/model/region → accurate instant quotes no competitor can match.
@@ -50,13 +51,13 @@ Every single interaction writes to it:
 
 ### Secondary differentiators (build these too)
 
-| # | Feature | Why it matters |
-|---|---------|----------------|
-| 2 | **Three fulfilment modes in one app** | Competitors do one. Habba does on-demand mobile, scheduled mobile, and workshop booking through one order pipeline. |
-| 3 | **Video triage before dispatch** | Customer records 20s of the problem/sound. Provider quotes before driving out. Kills false dispatches — the #1 cost in this business. |
-| 4 | **Escrow payments** | Money is authorised at booking, captured only after the customer confirms completion. Solves the trust problem that plagues this market. |
-| 5 | **Tracked warranty (ضمان)** | Every job carries a warranty period. If it fails within the window, re-service is free and auto-routed back to the same provider. Nobody does this. |
-| 6 | **Transparent parts pricing** | Parts are line-itemed with part numbers, OEM vs aftermarket flagged, price shown before approval. |
+| #   | Feature                               | Why it matters                                                                                                                                      |
+| --- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2   | **Three fulfilment modes in one app** | Competitors do one. Habba does on-demand mobile, scheduled mobile, and workshop booking through one order pipeline.                                 |
+| 3   | **Video triage before dispatch**      | Customer records 20s of the problem/sound. Provider quotes before driving out. Kills false dispatches — the #1 cost in this business.               |
+| 4   | **Escrow payments**                   | Money is authorised at booking, captured only after the customer confirms completion. Solves the trust problem that plagues this market.            |
+| 5   | **Tracked warranty (ضمان)**           | Every job carries a warranty period. If it fails within the window, re-service is free and auto-routed back to the same provider. Nobody does this. |
+| 6   | **Transparent parts pricing**         | Parts are line-itemed with part numbers, OEM vs aftermarket flagged, price shown before approval.                                                   |
 
 ---
 
@@ -123,21 +124,22 @@ habba/
 
 Use these exact terms in UI copy. Use the English identifiers in code.
 
-| Arabic (UI) | Code identifier | Meaning |
-|---|---|---|
-| دفتر السيارة | `vehicle_logbook` | The digital logbook — the moat |
-| بلاغ / طلب | `order` | A service request |
-| فنّي | `technician` | Individual mobile provider |
-| ورشة | `workshop` | Fixed-location provider |
-| مقدّم خدمة | `provider` | Umbrella for both |
-| فحص | `inspection` | Pre-purchase or periodic inspection |
-| ضمان | `warranty` | Warranty on completed work |
-| عرض سعر | `quote` | Provider's price offer |
-| قطع غيار | `parts` | Parts line items |
-| مشوار الفنّي | `dispatch` | Technician en route |
-| تقرير هبّة | `habba_report` | The shareable verified vehicle report |
+| Arabic (UI)  | Code identifier   | Meaning                               |
+| ------------ | ----------------- | ------------------------------------- |
+| دفتر السيارة | `vehicle_logbook` | The digital logbook — the moat        |
+| بلاغ / طلب   | `order`           | A service request                     |
+| فنّي         | `technician`      | Individual mobile provider            |
+| ورشة         | `workshop`        | Fixed-location provider               |
+| مقدّم خدمة   | `provider`        | Umbrella for both                     |
+| فحص          | `inspection`      | Pre-purchase or periodic inspection   |
+| ضمان         | `warranty`        | Warranty on completed work            |
+| عرض سعر      | `quote`           | Provider's price offer                |
+| قطع غيار     | `parts`           | Parts line items                      |
+| مشوار الفنّي | `dispatch`        | Technician en route                   |
+| تقرير هبّة   | `habba_report`    | The shareable verified vehicle report |
 
 **Saudi-specific formats you must handle:**
+
 - Plate numbers: 3 Arabic letters + 4 digits, with the Latin-letter equivalent (e.g. `أ ب ج ١٢٣٤` / `A B J 1234`). Store both, search both.
 - IBAN: `SA` + 22 characters. Validate with mod-97.
 - National ID (هوية): 10 digits starting with `1`. Iqama (إقامة): 10 digits starting with `2`.

@@ -143,7 +143,9 @@ export const lightColors: ColorScheme = {
 
   verified: petrol[700],
   verifiedSubtle: petrol[50],
-  selfReported: neutral[500],
+  // neutral[600], not neutral[500]: at 500 the badge text measured 3.79:1
+  // against its own surface, under the 4.5:1 floor. Caught by tokens.test.ts.
+  selfReported: neutral[600],
   selfReportedSubtle: neutral[100],
 
   focusRing: petrol[400],
@@ -272,7 +274,12 @@ export const elevation = {
   none: { shadowOpacity: 0, elevation: 0 },
   sm: { shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   md: { shadowOpacity: 0.1, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
-  lg: { shadowOpacity: 0.16, shadowRadius: 28, shadowOffset: { width: 0, height: 12 }, elevation: 12 },
+  lg: {
+    shadowOpacity: 0.16,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
 } as const;
 
 /**

@@ -8,13 +8,13 @@
 
 The spec contains a direct, security-relevant contradiction.
 
-**§6.9 (RLS):** *"`orders`: customer reads own; provider reads own assigned **+ open orders in their
-city matching their services during `searching`**."*
+**§6.9 (RLS):** _"`orders`: customer reads own; provider reads own assigned **+ open orders in their
+city matching their services during `searching`**."_
 
-**§7.1 (matching, anti-patterns):** *"Do not let a provider see the customer's exact address before
-accepting — show approximate distance only."*
+**§7.1 (matching, anti-patterns):** _"Do not let a provider see the customer's exact address before
+accepting — show approximate distance only."_
 
-**§9.2 (provider app):** *"Never show exact address pre-acceptance."*
+**§9.2 (provider app):** _"Never show exact address pre-acceptance."_
 
 An RLS `SELECT` policy grants access to **whole rows**. If a provider can read an open order row,
 they can read `service_location` (a precise PostGIS point), `service_address_ar`,
@@ -22,7 +22,7 @@ they can read `service_location` (a precise PostGIS point), `service_address_ar`
 privileges are a separate, coarser mechanism that cannot be conditioned on row state.
 
 So the §6.9 policy, implemented literally, breaks §7.1 and §9.2 — and it does so invisibly, because
-the *app* would only display distance while the *API* returns the address to anyone who calls it
+the _app_ would only display distance while the _API_ returns the address to anyone who calls it
 directly. A stalking or fraud vector, dressed as a UI decision.
 
 Worth naming plainly: this is a real privacy risk. A provider who can query the exact home address
@@ -76,7 +76,7 @@ one moment of disclosure, easy to audit.
 
 ### `provider_locations`
 
-The spec's §6.9 policy (*"readable only by the customer of an active order with that provider"*)
+The spec's §6.9 policy (_"readable only by the customer of an active order with that provider"_)
 omits the provider's own access. Complete set:
 
 - Provider: `INSERT`/`UPDATE` own row only. No read of any other provider's location — competitor

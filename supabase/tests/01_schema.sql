@@ -17,11 +17,11 @@ insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid)
    'Eastern Province', st_point(50.1033, 26.4207)::geography);
 
 insert into public.vehicle_makes (id, name_ar, name_en) values
-  ('a1111111-1111-1111-1111-111111111111', 'تويوتا', 'Toyota');
+  ('a1111111-1111-1111-1111-111111111111', 'ماركة اختبار', 'TestMake');
 
 insert into public.vehicle_models (id, make_id, name_ar, name_en, year_from, body_type) values
   ('b1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111',
-   'كامري', 'Camry', 2015, 'sedan');
+   'موديل اختبار', 'TestModel', 2015, 'sedan');
 
 
 -- PostGIS is actually working -----------------------------------------------

@@ -21,7 +21,7 @@ export type IbanResult =
 
 /** Strips spaces and normalises case/script. IBANs are printed in groups of 4. */
 export function normaliseIban(input: string): string {
-  return toLatinDigits(input).replace(/[\s\-]/g, '').toUpperCase();
+  return toLatinDigits(input).replace(/[\s-]/g, '').toUpperCase();
 }
 
 /**

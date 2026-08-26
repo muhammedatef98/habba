@@ -49,11 +49,11 @@ cleanup
   insert into public.profiles (id, full_name, phone)
     values ('${OWNER}', 'اختبار التزامن', '+966509999999');
   insert into public.vehicle_makes (id, name_ar, name_en)
-    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'تويوتا', 'Toyota')
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ماركة اختبار', 'TestMake')
     on conflict do nothing;
   insert into public.vehicle_models (id, make_id, name_ar, name_en, year_from)
     values ('bbbbbbbb-aaaa-4aaa-8aaa-bbbbbbbbbbbb',
-            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'كامري', 'Camry', 2015)
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'موديل اختبار', 'TestModel', 2015)
     on conflict do nothing;
   insert into public.vehicles (id, owner_id, make_id, model_id, year, plate_en)
     values ('${VEHICLE}', '${OWNER}', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',

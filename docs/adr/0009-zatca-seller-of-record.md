@@ -19,7 +19,7 @@ against those credentials. Two very different architectures follow:
   onboarding**, and Habba is issuing invoices as an agent using each provider's credentials. That is
   a multi-tenant credential-management problem, and it is a far larger build.
 
-The spec's note — *"Implement the TLV encoder in an Edge Function"* — addresses the QR, which is
+The spec's note — _"Implement the TLV encoder in an Edge Function"_ — addresses the QR, which is
 the easy part. The QR is a TLV-encoded blob carrying seller name, VAT number, timestamp, total with
 VAT, and VAT amount. Encoding it is an afternoon. Deciding **whose VAT number goes in it** is the
 architectural decision, and it must be made in Phase 3 when payments are built, not in Phase 6 when

@@ -13,7 +13,7 @@ ways that will reject valid real-world input, and the plate example in the spec 
 
 ### Plate numbers
 
-The spec says *"3 Arabic letters + 4 digits"* with the example `أ ب ج ١٢٣٤` / `A B J 1234`.
+The spec says _"3 Arabic letters + 4 digits"_ with the example `أ ب ج ١٢٣٤` / `A B J 1234`.
 
 Three corrections:
 
@@ -24,9 +24,9 @@ disproportionately belong to exactly the kind of customer worth keeping.
 **2. Only a restricted letter set is used.** Saudi plates use a fixed subset of Arabic letters,
 each with a defined Latin equivalent chosen to be visually unambiguous. The commonly cited mapping:
 
-| ا/أ | ب | ح | د | ر | س | ص | ط | ع | ق | ك | ل | م | ن | هـ | و | ي |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| A | B | J | D | R | S | X | T | E | G | K | L | Z | N | H | U | V |
+| ا/أ | ب   | ح   | د   | ر   | س   | ص   | ط   | ع   | ق   | ك   | ل   | م   | ن   | هـ  | و   | ي   |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A   | B   | J   | D   | R   | S   | X   | T   | E   | G   | K   | L   | Z   | N   | H   | U   | V   |
 
 Note the mapping is **not phonetic** — `ص→X`, `م→Z`, `ي→V` — which is precisely why it must come
 from an authoritative source and not from transliteration intuition.

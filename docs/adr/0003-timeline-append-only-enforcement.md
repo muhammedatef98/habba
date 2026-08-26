@@ -6,8 +6,8 @@
 
 ## Context
 
-`CLAUDE.md` §2.4 says: *"The timeline is append-only. Enforce with **triggers and revoked
-grants**, not convention."*
+`CLAUDE.md` §2.4 says: _"The timeline is append-only. Enforce with **triggers and revoked
+grants**, not convention."_
 
 The spec's own SQL then does something different, and worse:
 
@@ -88,7 +88,7 @@ append_vehicle_timeline_event(
 ```
 
 The function owns: authorisation, hash-chain computation (ADR-0004), provenance stamping
-(ADR-0005), and actor attribution. It is the *only* object with the grant to insert.
+(ADR-0005), and actor attribution. It is the _only_ object with the grant to insert.
 
 `SECURITY DEFINER` functions must set `search_path = ''` and schema-qualify everything, or they are
 a privilege-escalation vector. This is mandatory in review.

@@ -11,7 +11,7 @@
 
 Build **Habba (هبّة)** — a Saudi car-care super-app that connects vehicle owners with mechanics, mobile technicians, and workshops.
 
-Arabic name: **هبّة** — double meaning: *a gust of wind* (speed) and *to rush to someone's aid* (rescue).
+Arabic name: **هبّة** — double meaning: _a gust of wind_ (speed) and _to rush to someone's aid_ (rescue).
 Latin spelling is always **Habba**. Never `Habah`, `Heba`, or `Hiba`.
 
 **Primary market:** Saudi Arabia (launch: Eastern Province + Riyadh). Arabic-first, RTL-first.
@@ -30,6 +30,7 @@ Habba's defensible differentiator is:
 Every vehicle gets a **permanent, immutable, owner-portable service record** keyed to its VIN and plate.
 
 Every single interaction writes to it:
+
 - every oil change (with mileage, oil grade, filter part number)
 - every repair (with photos before/after, parts used, part serial numbers, warranty period)
 - every inspection report
@@ -39,7 +40,7 @@ Every single interaction writes to it:
 **Why this is a moat, not a feature:**
 
 1. **Lock-in through accumulated value.** After 18 months a customer's logbook is worth more than the switching cost. They cannot take it to a competitor.
-2. **Resale value — the killer app.** When the owner sells the car, they generate a **verified Habba Report** (signed PDF + public QR link). A documented car sells for meaningfully more in the Saudi used-car market. This makes Habba valuable to people who *aren't currently buying a service*.
+2. **Resale value — the killer app.** When the owner sells the car, they generate a **verified Habba Report** (signed PDF + public QR link). A documented car sells for meaningfully more in the Saudi used-car market. This makes Habba valuable to people who _aren't currently buying a service_.
 3. **The buyer becomes a customer.** The new owner receives the logbook via ownership transfer in-app → free customer acquisition with zero CAC.
 4. **Predictive maintenance from real data.** Mileage + service history + make/model → proactive alerts ("your timing belt is due in ~1,400 km"). This converts one-off emergency users into recurring subscribers.
 5. **Data advantage compounds.** Real repair costs per make/model/region → accurate instant quotes no competitor can match.
@@ -48,13 +49,13 @@ Every single interaction writes to it:
 
 ### Secondary differentiators (build these too)
 
-| # | Feature | Why it matters |
-|---|---------|----------------|
-| 2 | **Three fulfilment modes in one app** | Competitors do one. Habba does on-demand mobile, scheduled mobile, and workshop booking through one order pipeline. |
-| 3 | **Video triage before dispatch** | Customer records 20s of the problem/sound. Provider quotes before driving out. Kills false dispatches — the #1 cost in this business. |
-| 4 | **Escrow payments** | Money is authorised at booking, captured only after the customer confirms completion. Solves the trust problem that plagues this market. |
-| 5 | **Tracked warranty (ضمان)** | Every job carries a warranty period. If it fails within the window, re-service is free and auto-routed back to the same provider. Nobody does this. |
-| 6 | **Transparent parts pricing** | Parts are line-itemed with part numbers, OEM vs aftermarket flagged, price shown before approval. |
+| #   | Feature                               | Why it matters                                                                                                                                      |
+| --- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2   | **Three fulfilment modes in one app** | Competitors do one. Habba does on-demand mobile, scheduled mobile, and workshop booking through one order pipeline.                                 |
+| 3   | **Video triage before dispatch**      | Customer records 20s of the problem/sound. Provider quotes before driving out. Kills false dispatches — the #1 cost in this business.               |
+| 4   | **Escrow payments**                   | Money is authorised at booking, captured only after the customer confirms completion. Solves the trust problem that plagues this market.            |
+| 5   | **Tracked warranty (ضمان)**           | Every job carries a warranty period. If it fails within the window, re-service is free and auto-routed back to the same provider. Nobody does this. |
+| 6   | **Transparent parts pricing**         | Parts are line-itemed with part numbers, OEM vs aftermarket flagged, price shown before approval.                                                   |
 
 ---
 
@@ -121,21 +122,22 @@ habba/
 
 Use these exact terms in UI copy. Use the English identifiers in code.
 
-| Arabic (UI) | Code identifier | Meaning |
-|---|---|---|
-| دفتر السيارة | `vehicle_logbook` | The digital logbook — the moat |
-| بلاغ / طلب | `order` | A service request |
-| فنّي | `technician` | Individual mobile provider |
-| ورشة | `workshop` | Fixed-location provider |
-| مقدّم خدمة | `provider` | Umbrella for both |
-| فحص | `inspection` | Pre-purchase or periodic inspection |
-| ضمان | `warranty` | Warranty on completed work |
-| عرض سعر | `quote` | Provider's price offer |
-| قطع غيار | `parts` | Parts line items |
-| مشوار الفنّي | `dispatch` | Technician en route |
-| تقرير هبّة | `habba_report` | The shareable verified vehicle report |
+| Arabic (UI)  | Code identifier   | Meaning                               |
+| ------------ | ----------------- | ------------------------------------- |
+| دفتر السيارة | `vehicle_logbook` | The digital logbook — the moat        |
+| بلاغ / طلب   | `order`           | A service request                     |
+| فنّي         | `technician`      | Individual mobile provider            |
+| ورشة         | `workshop`        | Fixed-location provider               |
+| مقدّم خدمة   | `provider`        | Umbrella for both                     |
+| فحص          | `inspection`      | Pre-purchase or periodic inspection   |
+| ضمان         | `warranty`        | Warranty on completed work            |
+| عرض سعر      | `quote`           | Provider's price offer                |
+| قطع غيار     | `parts`           | Parts line items                      |
+| مشوار الفنّي | `dispatch`        | Technician en route                   |
+| تقرير هبّة   | `habba_report`    | The shareable verified vehicle report |
 
 **Saudi-specific formats you must handle:**
+
 - Plate numbers: 3 Arabic letters + 4 digits, with the Latin-letter equivalent (e.g. `أ ب ج ١٢٣٤` / `A B J 1234`). Store both, search both.
 - IBAN: `SA` + 22 characters. Validate with mod-97.
 - National ID (هوية): 10 digits starting with `1`. Iqama (إقامة): 10 digits starting with `2`.
@@ -306,13 +308,13 @@ create table services (
 
 **Seed the catalogue with at least these:**
 
-| Category | Services |
-|---|---|
-| `emergency` | ونش/سحب، بطارية (شحن/تبديل)، بنشر/تبديل إطار، فتح أبواب، توصيل بنزين، سخونة رادياتير |
-| `periodic` | تغيير زيت وفلتر، فلتر هواء، فحص فرامل، تبديل بطارية، تبديل إطارات، فحص تكييف |
-| `inspection` | فحص قبل الشراء (شامل)، فحص دوري، فحص كمبيوتر |
-| `wash` | غسيل متنقل، تلميع، تنظيف داخلي، حماية سيراميك |
-| `bodywork` | سمكرة، دهان، إصلاح خدوش، تبديل زجاج |
+| Category     | Services                                                                             |
+| ------------ | ------------------------------------------------------------------------------------ |
+| `emergency`  | ونش/سحب، بطارية (شحن/تبديل)، بنشر/تبديل إطار، فتح أبواب، توصيل بنزين، سخونة رادياتير |
+| `periodic`   | تغيير زيت وفلتر، فلتر هواء، فحص فرامل، تبديل بطارية، تبديل إطارات، فحص تكييف         |
+| `inspection` | فحص قبل الشراء (شامل)، فحص دوري، فحص كمبيوتر                                         |
+| `wash`       | غسيل متنقل، تلميع، تنظيف داخلي، حماية سيراميك                                        |
+| `bodywork`   | سمكرة، دهان، إصلاح خدوش، تبديل زجاج                                                  |
 
 ### 6.4 Providers
 
@@ -459,6 +461,7 @@ completed → disputed (within 72h)
 ```
 
 Rules:
+
 - `quoted → accepted` requires a payment authorisation.
 - `in_progress → awaiting_approval` requires all `order_parts` approved by customer if `parts_amount > 0`.
 - `awaiting_approval → completed` may only be triggered by the **customer**, or automatically after 24h of no response.
@@ -627,7 +630,7 @@ generate_habba_report(vehicle_id) →
   - the public page must work without login and be mobile-first
 ```
 
-**Privacy rule:** the report shows the *car's* history, never the owner's name, phone, or addresses. Redact provider names to business names only.
+**Privacy rule:** the report shows the _car's_ history, never the owner's name, phone, or addresses. Redact provider names to business names only.
 
 ---
 
@@ -636,6 +639,7 @@ generate_habba_report(vehicle_id) →
 Build in `packages/ui`. Do not use a third-party kit.
 
 ### Direction & typography
+
 - `I18nManager.forceRTL(true)` at boot; handle the required reload.
 - Use **logical** properties everywhere: `marginStart`/`marginEnd`, never `marginLeft`/`marginRight`.
 - Icons that imply direction (arrows, chevrons, progress) must mirror in RTL. Icons that don't (car, wrench) must **not**.
@@ -643,9 +647,11 @@ Build in `packages/ui`. Do not use a third-party kit.
 - Arabic needs more line-height than Latin: `lineHeight = fontSize * 1.7`.
 
 ### Visual direction
+
 The category is full of generic blue "trust" apps and aggressive red "emergency" apps. **Do neither.**
 
-Habba's identity comes from its name — *a gust of wind, a rush to aid*. Suggested direction:
+Habba's identity comes from its name — _a gust of wind, a rush to aid_. Suggested direction:
+
 - Primary: a deep desert teal / petrol (`#0E4F4A`-ish family) — calm competence, not panic
 - Accent: warm sand/amber for CTAs — reads as Saudi without being cliché
 - Semantic red reserved **exclusively** for genuine emergencies. Never for marketing.
@@ -653,7 +659,8 @@ Habba's identity comes from its name — *a gust of wind, a rush to aid*. Sugges
 - **Dark mode is not optional.** Half of emergency usage happens after sunset.
 
 ### Motion
-Movement should suggest *wind*: eased, directional, never bouncy. Use `react-native-reanimated`. The dispatch tracking screen is the emotional core of the product — invest in it.
+
+Movement should suggest _wind_: eased, directional, never bouncy. Use `react-native-reanimated`. The dispatch tracking screen is the emotional core of the product — invest in it.
 
 ---
 
@@ -661,33 +668,35 @@ Movement should suggest *wind*: eased, directional, never bouncy. Use `react-nat
 
 ### 9.1 Customer app
 
-| Screen | Notes |
-|---|---|
-| Onboarding | Phone OTP. Add first vehicle in ≤3 taps (make → model → year). Plate optional at first. |
-| Home | Vehicle switcher at top. Two primary actions: **طلب طارئ** (one tap) and **حجز موعد**. Predictive alerts surface here. |
-| Emergency flow | Service → location confirm → optional 20s video triage → searching animation → provider matched → live tracking |
-| Booking flow | Service → mode (mobile/workshop) → provider or slot → confirm |
-| Live tracking | Map + ETA + provider card + call/chat. This screen must feel *excellent*. |
-| Quote approval | Line-itemed parts + labour, each part with OEM flag and price. Approve/reject per line. |
-| **دفتر السيارة** | The timeline. Chronological, filterable, with photos. **This is the app's soul — design it first, not last.** |
-| Report | Generate/share تقرير هبّة |
-| Wallet & invoices | ZATCA invoices downloadable |
+| Screen            | Notes                                                                                                                  |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Onboarding        | Phone OTP. Add first vehicle in ≤3 taps (make → model → year). Plate optional at first.                                |
+| Home              | Vehicle switcher at top. Two primary actions: **طلب طارئ** (one tap) and **حجز موعد**. Predictive alerts surface here. |
+| Emergency flow    | Service → location confirm → optional 20s video triage → searching animation → provider matched → live tracking        |
+| Booking flow      | Service → mode (mobile/workshop) → provider or slot → confirm                                                          |
+| Live tracking     | Map + ETA + provider card + call/chat. This screen must feel _excellent_.                                              |
+| Quote approval    | Line-itemed parts + labour, each part with OEM flag and price. Approve/reject per line.                                |
+| **دفتر السيارة**  | The timeline. Chronological, filterable, with photos. **This is the app's soul — design it first, not last.**          |
+| Report            | Generate/share تقرير هبّة                                                                                              |
+| Wallet & invoices | ZATCA invoices downloadable                                                                                            |
 
 ### 9.2 Provider app
 
-| Screen | Notes |
-|---|---|
-| Onboarding & KYC | ID/Iqama + IBAN + Nafath. Status tracking while in review. |
-| Online toggle | Prominent. Location broadcast only while online (battery + privacy). |
-| Incoming order | Full-screen with sound, 45s countdown, distance + service + estimated payout. Never show exact address pre-acceptance. |
-| Job flow | Navigate → arrived → diagnose → build quote (parts + labour) → await approval → work → complete with photos |
-| Completion | **Mandatory:** mileage reading + before/after photos + parts used. This is what feeds the logbook — enforce it. |
-| Earnings | Daily/weekly, payout schedule, commission breakdown |
+| Screen           | Notes                                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Onboarding & KYC | ID/Iqama + IBAN + Nafath. Status tracking while in review.                                                             |
+| Online toggle    | Prominent. Location broadcast only while online (battery + privacy).                                                   |
+| Incoming order   | Full-screen with sound, 45s countdown, distance + service + estimated payout. Never show exact address pre-acceptance. |
+| Job flow         | Navigate → arrived → diagnose → build quote (parts + labour) → await approval → work → complete with photos            |
+| Completion       | **Mandatory:** mileage reading + before/after photos + parts used. This is what feeds the logbook — enforce it.        |
+| Earnings         | Daily/weekly, payout schedule, commission breakdown                                                                    |
 
 ### 9.3 Workshop console (inside provider app)
+
 Slot calendar, bay management, staff assignment, walk-in orders.
 
 ### 9.4 Admin (Next.js)
+
 Provider verification queue, live order map, dispute resolution, pricing/rules tuning, payout runs, fraud flags.
 
 ---
@@ -697,31 +706,37 @@ Provider verification queue, live order map, dispute resolution, pricing/rules t
 > Do not start a phase before the previous one's acceptance criteria pass.
 
 ### PHASE 1 — Foundation
+
 Monorepo, Supabase project, migrations for §6.1–6.2, auth with phone OTP, RTL shell, design system primitives, i18n scaffolding, CI with lint + typecheck + RLS test.
 
 **Acceptance:** a user signs up with a Saudi phone number, adds a vehicle, sees an empty logbook. RLS test passes. App runs RTL in Arabic and LTR in English.
 
 ### PHASE 2 — The logbook (build the moat first)
+
 Timeline schema with hash chain, manual entry (owner logs their own past service), mileage tracking, timeline UI, `verify_vehicle_timeline`, تقرير هبّة PDF + public page.
 
 **Acceptance:** an owner records 3 past services manually, generates a report, opens the public link in a browser, and the hash chain verifies. **Ship this to real users before building orders** — it has standalone value and validates the moat.
 
 ### PHASE 3 — On-demand emergency
+
 Service catalogue, provider onboarding + KYC stub, matching function, order state machine, live tracking, escrow authorise/capture, completion → timeline write, ratings.
 
 **Acceptance:** end-to-end emergency order on two devices, completed job appears in the logbook automatically, payment captured only after customer confirmation.
 
 ### PHASE 4 — Scheduled & workshop
+
 Slots with concurrency safety, workshop profiles, booking flow, check-in semantics, warranty tracking and auto-routing.
 
 **Acceptance:** two clients cannot book the same slot (prove with a concurrent test). A warranty claim within the window creates a free child order routed to the original provider.
 
 ### PHASE 5 — Inspections
+
 Templates, structured capture with photos, scoring, PDF, public share, pre-purchase flow with no owned vehicle, buyer→owner conversion on purchase.
 
 **Acceptance:** a pre-purchase inspection produces a shareable report; if the buyer purchases, the report converts into a new `vehicles` row with the inspection as its first timeline event.
 
 ### PHASE 6 — Intelligence & compliance
+
 Predictive maintenance cron, alert→booking conversion, ZATCA invoicing, payouts, admin dashboard, analytics.
 
 **Acceptance:** a vehicle with history receives a correctly-timed alert; a completed order produces a ZATCA-valid invoice with a scannable QR.

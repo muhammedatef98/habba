@@ -20,11 +20,11 @@ Format is MADR-lite: **Status, Date, Context, Decision, Consequences, Open items
 
 Statuses:
 
-| Status | Meaning |
-|---|---|
-| `Proposed` | Written by Claude with a recommendation. **Not yet approved by the product owner.** Do not build on it. |
-| `Accepted` | Approved. Binding on all subsequent code. |
-| `Superseded by ADR-NNNN` | Replaced. Never delete an ADR; supersede it. |
+| Status                   | Meaning                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `Proposed`               | Written by Claude with a recommendation. **Not yet approved by the product owner.** Do not build on it. |
+| `Accepted`               | Approved. Binding on all subsequent code.                                                               |
+| `Superseded by ADR-NNNN` | Replaced. Never delete an ADR; supersede it.                                                            |
 
 Anything marked **`Proposed`** and flagged `⚠️ NEEDS OWNER DECISION` blocks the phase that depends
 on it. Those are listed in `docs/adr/README.md`.

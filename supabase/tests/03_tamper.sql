@@ -19,9 +19,9 @@ insert into auth.users (id, phone) values ('11111111-1111-1111-1111-111111111111
 insert into public.profiles (id, full_name, phone) values
   ('11111111-1111-1111-1111-111111111111', 'مالك', '+966501111111');
 insert into public.vehicle_makes (id, name_ar, name_en) values
-  ('a1111111-1111-1111-1111-111111111111', 'تويوتا', 'Toyota');
+  ('a1111111-1111-1111-1111-111111111111', 'ماركة اختبار', 'TestMake');
 insert into public.vehicle_models (id, make_id, name_ar, name_en, year_from) values
-  ('b1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'كامري', 'Camry', 2015);
+  ('b1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'موديل اختبار', 'TestModel', 2015);
 insert into public.vehicles (id, owner_id, make_id, model_id, year, plate_en) values
   ('d1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
    'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', 2020, 'ABJ 1234');
