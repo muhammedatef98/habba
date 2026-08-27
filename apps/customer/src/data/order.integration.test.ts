@@ -161,11 +161,22 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
 
     // KYC is an ops decision. If a provider could set this, verification would
     // be advisory — and the roadside trust promise rests on it not being.
+    //
+    // The attempt has to be a real CHANGE: on a rerun this provider is already
+    // approved, and setting a column to the value it already holds is not a
+    // change the guard has any reason to reject.
     const selfApprove = await tech
       .from('providers')
-      .update({ verification_status: 'approved' })
+      .update({ verification_status: 'suspended' })
       .eq('id', providerId);
     expect(selfApprove.error).not.toBeNull();
+
+    // Nor can they grant themselves a Nafath badge nobody issued.
+    const selfNafath = await tech
+      .from('providers')
+      .update({ nafath_verified_at: new Date().toISOString() })
+      .eq('id', providerId);
+    expect(selfNafath.error).not.toBeNull();
   });
 
   test('an approved, online provider is matched to a nearby emergency', async () => {

@@ -137,13 +137,18 @@ select test.assert_eq(
 update public.providers set is_online = true
 where id = 'e0000000-0000-4000-8000-000000000001';
 
+-- Verification is an ops action since 0034; a provider cannot set it.
+select test.become('33333333-0000-4000-8000-000000000003');
 update public.providers set verification_status = 'pending'
 where id = 'e0000000-0000-4000-8000-000000000001';
+select test.become('11111111-0000-4000-8000-000000000001');
 select test.assert_eq(
   (select count(*)::int from public.match_providers('f0000000-0000-4000-8000-000000000001')),
   0, 'an unverified provider is not matched');
+select test.become('33333333-0000-4000-8000-000000000003');
 update public.providers set verification_status = 'approved'
 where id = 'e0000000-0000-4000-8000-000000000001';
+select test.become('11111111-0000-4000-8000-000000000001');
 
 -- Radius ladder (§7.1).
 select test.assert_eq(public.match_radius_for_round(1), 8000, 'round 1 searches 8km');

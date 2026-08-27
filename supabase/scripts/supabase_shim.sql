@@ -115,9 +115,17 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- Declares itself privileged, because 0034 makes verification_status and
+  -- nafath_verified_at writable only by ops or a trusted server-side function.
+  -- A provider granting themselves either would make KYC theatre — this shim
+  -- stands in for the ops console that will do it for real.
+  perform public.begin_privileged_write();
+
   update public.providers
   set verification_status = 'approved', nafath_verified_at = now()
   where id = p_provider_id;
+
+  perform public.end_privileged_write();
 end;
 $$;
 
