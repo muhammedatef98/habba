@@ -162,7 +162,52 @@ begin
 end;
 $$;
 
+-- A workshop registering its address hits the same wall: `location` is a
+-- PostGIS point, so it cannot be written through the table API at all. Every
+-- geography column in the schema needs an RPC like this one, and the absence
+-- of any single one makes that part of the product unbuildable from the app.
+create or replace function public.upsert_workshop(
+  p_address_ar       text,
+  p_lon              double precision,
+  p_lat              double precision,
+  p_bay_count        int default 1,
+  p_opening_hours    jsonb default '{}'::jsonb,
+  p_service_radius_km int default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_provider_id uuid := public.current_provider_id();
+begin
+  if v_provider_id is null then
+    raise exception 'Not a provider' using errcode = 'insufficient_privilege';
+  end if;
+
+  perform public.assert_plausible_coordinate(p_lon, p_lat);
+
+  insert into public.workshops (
+    provider_id, address_ar, location, bay_count, opening_hours, service_radius_km
+  ) values (
+    v_provider_id, p_address_ar,
+    extensions.st_point(p_lon, p_lat)::extensions.geography,
+    p_bay_count, coalesce(p_opening_hours, '{}'::jsonb), p_service_radius_km
+  )
+  on conflict (provider_id) do update
+    set address_ar = excluded.address_ar,
+        location = excluded.location,
+        bay_count = excluded.bay_count,
+        opening_hours = excluded.opening_hours,
+        service_radius_km = excluded.service_radius_km;
+
+  return v_provider_id;
+end;
+$$;
+
 grant execute on function public.create_emergency_order(uuid, double precision, double precision, uuid, text, text, int, jsonb) to authenticated;
+grant execute on function public.upsert_workshop(text, double precision, double precision, int, jsonb, int) to authenticated;
 grant execute on function public.update_provider_location(double precision, double precision, numeric) to authenticated;
 grant execute on function public.set_provider_online(boolean) to authenticated;
 grant execute on function public.assert_plausible_coordinate(double precision, double precision) to authenticated;

@@ -98,9 +98,19 @@ create trigger orders_set_updated_at
 -- lower-volume and issued after the fact.
 create sequence if not exists public.order_number_seq;
 
+-- SECURITY DEFINER because a trigger runs as the CALLING user, and
+-- `authenticated` has no USAGE on the sequence. Granting the sequence to
+-- clients instead would let anyone burn order numbers at will.
+--
+-- Not caught by the .sql suites (they run as the owner) nor by the Phase 3
+-- integration tests (they create orders through create_emergency_order, which
+-- is already SECURITY DEFINER, so the trigger inherited that). It surfaced the
+-- first time a client inserted into `orders` directly.
 create or replace function public.assign_order_number()
 returns trigger
 language plpgsql
+security definer
+set search_path = ''
 as $$
 begin
   if new.order_number is null then
