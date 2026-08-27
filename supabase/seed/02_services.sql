@@ -72,3 +72,20 @@ on conflict do nothing;
 -- Pre-purchase inspection is the one service that runs against a car the
 -- customer does not own (build prompt §6.5, Phase 5).
 update public.services set requires_vehicle = false where name_en = 'Pre-purchase inspection';
+
+
+-- Completion evidence exemptions (0032).
+--
+-- Set here rather than in the migration because migrations run before seeds.
+-- Demanding a before/after photo of a fuel delivery trains technicians to
+-- submit junk to get past the screen — which is worse than asking for
+-- nothing, because junk evidence still looks like evidence on a resale report.
+update public.services
+set requires_completion_photos = false
+where name_en in ('Fuel delivery', 'Lockout assistance', 'Towing');
+
+-- A pre-purchase inspection examines a car with no logbook yet, and its
+-- evidence lives in the inspection report instead.
+update public.services
+set requires_completion_photos = false, requires_completion_mileage = false
+where name_en = 'Pre-purchase inspection';

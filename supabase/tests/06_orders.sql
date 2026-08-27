@@ -197,6 +197,13 @@ select test.assert_raises(
 update public.order_parts set approved_by_customer = true, approved_at = now()
 where order_id = 'f0000000-0000-4000-8000-000000000001';
 
+-- Completion evidence is mandatory before hand-back (0032). Without it the
+-- logbook entry this order produces would say a battery was replaced and
+-- nothing more.
+update public.orders
+set completion_mileage = 91200, completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
+where id = 'f0000000-0000-4000-8000-000000000001';
+
 update public.orders set status = 'awaiting_approval'
 where id = 'f0000000-0000-4000-8000-000000000001';
 
@@ -233,10 +240,13 @@ select test.assert_eq(
   'habba_verified'::public.timeline_provenance,
   'work done through a Habba order IS habba_verified');
 
+-- The COMPLETION reading (91,200), not the booking reading (91,000). The car
+-- was driven since it was booked, and the logbook should record where the
+-- odometer actually stood when the work was done.
 select test.assert_eq(
   (select mileage from public.vehicle_timeline
    where order_id = 'f0000000-0000-4000-8000-000000000001'),
-  91000, 'the mileage from the order reaches the logbook');
+  91200, 'the completion reading reaches the logbook, not the booking estimate');
 
 select test.assert(
   (select warranty_expires_at from public.orders

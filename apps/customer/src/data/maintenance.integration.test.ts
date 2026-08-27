@@ -258,6 +258,14 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
       .eq('id', priorId);
     await shop.rpc('check_in_vehicle', { p_order_id: priorId });
     await shop.from('orders').update({ status: 'in_progress' }).eq('id', priorId);
+    await shop.rpc('record_completion_evidence', {
+      p_order_id: priorId,
+      p_mileage: 62000,
+      p_media: [
+        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
+        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
+      ],
+    });
     await shop
       .from('orders')
       .update({
@@ -335,6 +343,14 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
       .eq('id', orderId);
     await shop.rpc('check_in_vehicle', { p_order_id: orderId });
     await shop.from('orders').update({ status: 'in_progress' }).eq('id', orderId);
+    await shop.rpc('record_completion_evidence', {
+      p_order_id: orderId,
+      p_mileage: 86000,
+      p_media: [
+        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
+        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
+      ],
+    });
     await shop
       .from('orders')
       .update({

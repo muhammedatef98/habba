@@ -119,6 +119,9 @@ update public.orders set status = 'accepted', escrow_status = 'authorised',
   payment_intent_id = 'intel_1' where id = 'f0000000-0000-4000-c000-000000000001';
 update public.orders set status = 'checked_in' where id = 'f0000000-0000-4000-c000-000000000001';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-c000-000000000001';
+update public.orders
+set completion_mileage = 62000, completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
+where id = 'f0000000-0000-4000-c000-000000000001';
 update public.orders set status = 'awaiting_approval',
   labour_amount = 180, vat_amount = 27, total_amount = 207, vat_rate_applied = 0.15,
   mileage_at_order = 62000
@@ -350,6 +353,10 @@ update public.orders set status = 'accepted', payment_intent_id = 'intel_2'
 where id = 'f0000000-0000-4000-c000-000000000002';
 update public.orders set status = 'checked_in' where id = 'f0000000-0000-4000-c000-000000000002';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-c000-000000000002';
+update public.orders
+set completion_mileage = 62500,
+    completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
+where id = 'f0000000-0000-4000-c000-000000000002';
 update public.orders set status = 'awaiting_approval' where id = 'f0000000-0000-4000-c000-000000000002';
 select test.become('11111111-0000-4000-c000-000000000001');
 update public.orders set status = 'completed' where id = 'f0000000-0000-4000-c000-000000000002';

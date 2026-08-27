@@ -274,6 +274,19 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
       expect(step.error, status).toBeNull();
     }
 
+    // Completion evidence is mandatory before hand-back (§9.2, §11). This is
+    // the real path a technician takes: one call carrying the odometer reading
+    // and the before/after photos, while they are still beside the car.
+    const evidence = await tech.rpc('record_completion_evidence', {
+      p_order_id: orderId,
+      p_mileage: 45120,
+      p_media: [
+        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
+        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
+      ],
+    });
+    expect(evidence.error).toBeNull();
+
     await tech
       .from('orders')
       .update({
@@ -317,7 +330,8 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     // transaction as the status change — this is the moat filling itself.
     expect(rows).toHaveLength(1);
     expect(rows[0]?.event_type).toBe('service_completed');
-    expect(rows[0]?.mileage).toBe(45000);
+    // The COMPLETION reading, not the 45,000 recorded at booking.
+    expect(rows[0]?.mileage).toBe(45120);
 
     // And unlike Phase 2's owner-typed history, this genuinely IS verified:
     // Habba dispatched it, and the provider identity is on the record.
