@@ -94,6 +94,9 @@ jobs:
       - name: Hash chain under concurrency
         run: ./supabase/scripts/concurrency-test.sh
 
+      - name: Slot booking under concurrency
+        run: ./supabase/scripts/slot-concurrency-test.sh
+
       # The seam. Everything above proves the schema; the app's unit tests
       # prove the client. Only this proves they work together — app code
       # through supabase-js, over HTTP, through a real JWT, through RLS.

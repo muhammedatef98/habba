@@ -106,9 +106,11 @@ cmd_test() {
   done
   if [ "$failed" -ne 0 ]; then echo; echo "DATABASE TESTS FAILED"; exit 1; fi
 
-  # Needs genuinely concurrent sessions, so it cannot be a .sql suite.
+  # Need genuinely concurrent sessions, so they cannot be .sql suites.
   echo
   "$ROOT/supabase/scripts/concurrency-test.sh" || { echo "CONCURRENCY TEST FAILED"; exit 1; }
+  echo
+  "$ROOT/supabase/scripts/slot-concurrency-test.sh" || { echo "SLOT CONCURRENCY TEST FAILED"; exit 1; }
 
   echo; echo "all database tests passed"
 }
