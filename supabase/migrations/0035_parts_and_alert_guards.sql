@@ -78,11 +78,14 @@ begin
 end;
 $$;
 
-create trigger order_parts_a_guard
+-- Named `_a_guard_columns` to match every other column guard: it must sort
+-- first among the table's triggers, and the audit in tests/16 discovers guards
+-- by that suffix.
+create trigger order_parts_a_guard_columns
   before update on public.order_parts
   for each row execute function public.guard_order_parts();
 
-alter table public.order_parts enable always trigger order_parts_a_guard;
+alter table public.order_parts enable always trigger order_parts_a_guard_columns;
 
 
 -- ---------------------------------------------------------------------------
