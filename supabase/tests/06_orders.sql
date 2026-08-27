@@ -66,7 +66,7 @@ select test.become('11111111-0000-4000-8000-000000000001');
 
 insert into public.orders
   (id, customer_id, vehicle_id, service_id, fulfilment_mode, service_location,
-   service_address_ar, problem_description, mileage_at_order, created_by)
+   service_address_ar, problem_description, mileage_at_order, quoted_amount, created_by)
 values
   ('f0000000-0000-4000-8000-000000000001',
    '11111111-0000-4000-8000-000000000001',
@@ -75,7 +75,7 @@ values
    extensions.st_point(50.1050, 26.4220)::extensions.geography,
    'حي الشاطئ، شارع الأمير محمد، مبنى ١٢',
    'السيارة ما تشتغل، صوت طقطقة',
-   91000,
+   91000, 120,
    '11111111-0000-4000-8000-000000000001');
 
 select test.assert(
@@ -152,22 +152,27 @@ select test.assert_eq(public.match_radius_for_round(3), 25000, 'round 3 expands 
 
 
 -- Escrow guard: nobody drives out on an unfunded order ------------------------
-update public.orders set status = 'quoted', quoted_amount = 120
+-- The price is central for emergency services (§11) and set at creation, so
+-- moving to `quoted` changes only the status.
+update public.orders set status = 'quoted'
 where id = 'f0000000-0000-4000-8000-000000000001';
 
+-- Acceptance is the provider's action, and it is refused while the job is
+-- unfunded: nobody drives out on an order nobody has paid for.
+select test.become('22222222-0000-4000-8000-000000000002');
 select test.assert_raises(
-  $$update public.orders
-    set status = 'accepted', provider_id = 'e0000000-0000-4000-8000-000000000001'
-    where id = 'f0000000-0000-4000-8000-000000000001'$$,
-  'an order cannot be accepted before the payment is authorised',
+  $$select public.accept_order('f0000000-0000-4000-8000-000000000001')$$,
+  'a provider cannot accept an unfunded job',
   '23514');
 
-update public.orders
-set status = 'accepted',
-    provider_id = 'e0000000-0000-4000-8000-000000000001',
-    escrow_status = 'authorised',
-    payment_intent_id = 'test_intent_001'
-where id = 'f0000000-0000-4000-8000-000000000001';
+select test.become('11111111-0000-4000-8000-000000000001');
+select public.authorise_order_payment('f0000000-0000-4000-8000-000000000001', 'test_intent_001');
+
+select test.become('22222222-0000-4000-8000-000000000002');
+select test.assert(
+  public.accept_order('f0000000-0000-4000-8000-000000000001'),
+  'the provider accepts once the money is held');
+select test.become('11111111-0000-4000-8000-000000000001');
 
 select test.assert_eq(
   (select escrow_status from public.orders where id = 'f0000000-0000-4000-8000-000000000001'),
@@ -184,9 +189,13 @@ update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-8
 insert into public.order_parts (order_id, name_ar, part_number, is_oem, quantity, unit_price)
 values ('f0000000-0000-4000-8000-000000000001', 'بطارية ٧٠ أمبير', 'BAT-70-AGM', true, 1, 320.00);
 
+-- The provider prices the work; the customer approves it. Since 0033 the
+-- customer cannot write these columns at all.
+select test.become('22222222-0000-4000-8000-000000000002');
 update public.orders set parts_amount = 320.00, labour_amount = 120.00, vat_amount = 66.00,
-  total_amount = 506.00, vat_rate_applied = 0.15
+  total_amount = 506.00, vat_rate_applied = 0.15, warranty_days = 90
 where id = 'f0000000-0000-4000-8000-000000000001';
+select test.become('11111111-0000-4000-8000-000000000001');
 
 select test.assert_raises(
   $$update public.orders set status = 'awaiting_approval'
@@ -200,9 +209,10 @@ where order_id = 'f0000000-0000-4000-8000-000000000001';
 -- Completion evidence is mandatory before hand-back (0032). Without it the
 -- logbook entry this order produces would say a battery was replaced and
 -- nothing more.
-update public.orders
-set completion_mileage = 91200, completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
-where id = 'f0000000-0000-4000-8000-000000000001';
+-- Recorded through the provider RPC; a customer cannot write evidence (0033).
+select test.become('22222222-0000-4000-8000-000000000002');
+select public.record_completion_evidence('f0000000-0000-4000-8000-000000000001', 91200, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select test.become('11111111-0000-4000-8000-000000000001');
 
 update public.orders set status = 'awaiting_approval'
 where id = 'f0000000-0000-4000-8000-000000000001';
@@ -224,7 +234,7 @@ select test.assert_eq(
    where vehicle_id = 'd0000000-0000-4000-8000-000000000001'),
   0, 'the logbook is empty before completion');
 
-update public.orders set status = 'completed', warranty_days = 90
+update public.orders set status = 'completed'
 where id = 'f0000000-0000-4000-8000-000000000001';
 
 select test.assert_eq(
@@ -300,6 +310,9 @@ select test.assert_raises(
 
 
 -- Totals must reconcile, or ZATCA rejects the invoice (ADR-0007) ---------------
+-- Checked as the provider, since only they may write amounts at all — the
+-- reconciliation constraint is the thing under test here, not the guard.
+select test.become('22222222-0000-4000-8000-000000000002');
 select test.assert_raises(
   $$update public.orders
     set parts_amount = 100, labour_amount = 100, vat_amount = 30, total_amount = 999

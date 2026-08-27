@@ -196,15 +196,16 @@ describe.skipIf(!harnessUp)('Phase 5 acceptance — pre-purchase inspection', ()
     // Drive it to in_progress so the inspector can file. A scheduled mobile
     // order goes draft → quoted → accepted → en_route, with no search step:
     // the customer chose this provider.
-    await buyer.from('orders').update({ status: 'quoted', quoted_amount: 350 }).eq('id', orderId);
-    await buyer
-      .from('orders')
-      .update({
-        status: 'accepted',
-        escrow_status: 'authorised',
-        payment_intent_id: 'insp_intent_int',
-      })
-      .eq('id', orderId);
+    // book_appointment set the price from the catalogue; the customer cannot
+    // write amounts at all (0033).
+    await buyer.from('orders').update({ status: 'quoted' }).eq('id', orderId);
+    // Payment state is written only by the payment function (0033); a client
+    // declaring its own order paid was the vulnerability that closed.
+    await buyer.rpc('authorise_order_payment', {
+      p_order_id: orderId,
+      p_payment_intent_id: 'insp_intent_int',
+    });
+    await buyer.from('orders').update({ status: 'accepted' }).eq('id', orderId);
 
     for (const status of ['en_route', 'arrived', 'in_progress']) {
       const step = await inspector.from('orders').update({ status }).eq('id', orderId);

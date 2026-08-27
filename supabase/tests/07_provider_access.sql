@@ -62,7 +62,7 @@ insert into public.provider_locations (provider_id, location, updated_at) values
 
 insert into public.orders
   (id, customer_id, vehicle_id, service_id, fulfilment_mode, status,
-   service_location, service_address_ar, problem_description, created_by)
+   service_location, service_address_ar, problem_description, quoted_amount, created_by)
 values
   ('f0000000-0000-4000-9000-000000000001',
    '11111111-0000-4000-9000-000000000001',
@@ -71,7 +71,7 @@ values
    extensions.st_point(50.2095, 26.2805)::extensions.geography,
    'حي العقربية، شارع ٧، فيلا ٢٢',
    'إطار مثقوب، الموقع قريب من مسجد الحي',
-   '11111111-0000-4000-9000-000000000001');
+   100, '11111111-0000-4000-9000-000000000001');
 
 
 -- ===========================================================================
@@ -126,15 +126,13 @@ select test.assert_eq(
 -- After acceptance -------------------------------------------------------------
 reset role;
 select test.become('11111111-0000-4000-9000-000000000001');
-update public.orders
-set status = 'quoted', quoted_amount = 100
+update public.orders set status = 'quoted'
 where id = 'f0000000-0000-4000-9000-000000000001';
-update public.orders
-set status = 'accepted',
-    provider_id = 'e0000000-0000-4000-9000-000000000002',
-    escrow_status = 'authorised',
-    payment_intent_id = 'test_intent_007'
-where id = 'f0000000-0000-4000-9000-000000000001';
+select public.authorise_order_payment('f0000000-0000-4000-9000-000000000001', 'test_intent_007');
+
+select test.become('22222222-0000-4000-9000-000000000002');
+select public.accept_order('f0000000-0000-4000-9000-000000000001');
+select test.become('11111111-0000-4000-9000-000000000001');
 
 set role authenticated;
 select test.become('22222222-0000-4000-9000-000000000002');
@@ -170,9 +168,10 @@ reset role;
 update public.orders set status = 'en_route' where id = 'f0000000-0000-4000-9000-000000000001';
 update public.orders set status = 'arrived' where id = 'f0000000-0000-4000-9000-000000000001';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-9000-000000000001';
-update public.orders
-set completion_mileage = 40100, completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
-where id = 'f0000000-0000-4000-9000-000000000001';
+-- Recorded through the provider RPC; a customer cannot write evidence (0033).
+select test.become('22222222-0000-4000-9000-000000000002');
+select public.record_completion_evidence('f0000000-0000-4000-9000-000000000001', 40100, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select test.become('11111111-0000-4000-9000-000000000001');
 select test.become('11111111-0000-4000-9000-000000000001');
 update public.orders set status = 'completed' where id = 'f0000000-0000-4000-9000-000000000001';
 

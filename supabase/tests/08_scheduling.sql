@@ -145,9 +145,8 @@ select test.assert_eq(
 
 -- Workshop flow: check-in replaces en_route/arrived ---------------------------------
 update public.orders set status = 'quoted', quoted_amount = 180 where id = :'order3';
-update public.orders
-set status = 'accepted', escrow_status = 'authorised', payment_intent_id = 'test_sched_001'
-where id = :'order3';
+select public.authorise_order_payment(:'order3', 'test_sched_001');
+update public.orders set status = 'accepted' where id = :'order3';
 
 select test.assert_raises(
   format($$update public.orders set status = 'en_route' where id = '%s'$$, :'order3'),
@@ -162,13 +161,17 @@ select test.assert_eq(
   'the vehicle is checked in at the workshop');
 
 update public.orders set status = 'in_progress' where id = :'order3';
+-- Recorded through the provider RPC; a customer cannot write evidence (0033).
+select test.become('22222222-0000-4000-a000-000000000002');
+select public.record_completion_evidence(:'order3', 90500, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select test.become('11111111-0000-4000-a000-000000000001');
+select test.become('22222222-0000-4000-a000-000000000002');
 update public.orders
-set completion_mileage = 90500, completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
+set labour_amount = 180, vat_amount = 27, total_amount = 207, warranty_days = 30
 where id = :'order3';
-update public.orders
-set status = 'awaiting_approval', labour_amount = 180, vat_amount = 27, total_amount = 207
-where id = :'order3';
-update public.orders set status = 'completed', warranty_days = 30 where id = :'order3';
+update public.orders set status = 'awaiting_approval' where id = :'order3';
+select test.become('11111111-0000-4000-a000-000000000001');
+update public.orders set status = 'completed' where id = :'order3';
 
 select test.assert_eq(
   (select count(*)::int from public.vehicle_timeline where order_id = :'order3'),
@@ -239,9 +242,10 @@ select public.check_in_vehicle(:'claim');
 update public.orders set status = 'in_progress' where id = :'claim';
 -- A free warranty re-service is exempt from nothing: it is still work on the
 -- car and still belongs in the logbook with evidence.
-update public.orders
-set completion_mileage = 90800, completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
-where id = :'claim';
+-- Recorded through the provider RPC; a customer cannot write evidence (0033).
+select test.become('22222222-0000-4000-a000-000000000002');
+select public.record_completion_evidence(:'claim', 90800, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select test.become('11111111-0000-4000-a000-000000000001');
 update public.orders set status = 'awaiting_approval' where id = :'claim';
 update public.orders set status = 'completed' where id = :'claim';
 

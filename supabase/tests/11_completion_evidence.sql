@@ -58,11 +58,15 @@ values
 
 update public.orders set status = 'searching' where id = 'f0000000-0000-4000-d000-000000000001';
 update public.orders set status = 'quoted' where id = 'f0000000-0000-4000-d000-000000000001';
-update public.orders set status = 'accepted', escrow_status = 'authorised',
-  payment_intent_id = 'evid_1' where id = 'f0000000-0000-4000-d000-000000000001';
+select public.authorise_order_payment('f0000000-0000-4000-d000-000000000001', 'evid_1');
+update public.orders set status = 'accepted' where id = 'f0000000-0000-4000-d000-000000000001';
 update public.orders set status = 'en_route' where id = 'f0000000-0000-4000-d000-000000000001';
 update public.orders set status = 'arrived' where id = 'f0000000-0000-4000-d000-000000000001';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-d000-000000000001';
+
+-- From here the PROVIDER acts: since 0033 a customer cannot write evidence or
+-- amounts at all, which is a separate guard from the one under test here.
+select test.become('22222222-0000-4000-d000-000000000002');
 
 -- THE guard. Without evidence, the job cannot be handed back.
 select test.assert_raises(
@@ -114,6 +118,7 @@ select test.assert_eq(
   'awaiting_approval'::order_status,
   'with a reading and both photos, the job hands back');
 
+select test.become('11111111-0000-4000-d000-000000000001');
 update public.orders set status = 'completed'
 where id = 'f0000000-0000-4000-d000-000000000001';
 
@@ -180,11 +185,12 @@ values
 
 update public.orders set status = 'searching' where id = 'f0000000-0000-4000-d000-000000000002';
 update public.orders set status = 'quoted' where id = 'f0000000-0000-4000-d000-000000000002';
-update public.orders set status = 'accepted', escrow_status = 'authorised',
-  payment_intent_id = 'evid_2' where id = 'f0000000-0000-4000-d000-000000000002';
+select public.authorise_order_payment('f0000000-0000-4000-d000-000000000002', 'evid_2');
+update public.orders set status = 'accepted' where id = 'f0000000-0000-4000-d000-000000000002';
 update public.orders set status = 'en_route' where id = 'f0000000-0000-4000-d000-000000000002';
 update public.orders set status = 'arrived' where id = 'f0000000-0000-4000-d000-000000000002';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-d000-000000000002';
+select test.become('22222222-0000-4000-d000-000000000002');
 
 -- The reading is still required — a fuel delivery still tells us where the
 -- odometer was.
@@ -199,6 +205,7 @@ where id = 'f0000000-0000-4000-d000-000000000002';
 
 update public.orders set status = 'awaiting_approval'
 where id = 'f0000000-0000-4000-d000-000000000002';
+select test.become('11111111-0000-4000-d000-000000000001');
 
 select test.assert_eq(
   (select status from public.orders where id = 'f0000000-0000-4000-d000-000000000002'),
@@ -221,8 +228,11 @@ values
 
 update public.orders set status = 'searching' where id = 'f0000000-0000-4000-d000-000000000003';
 update public.orders set status = 'quoted' where id = 'f0000000-0000-4000-d000-000000000003';
-update public.orders set status = 'accepted', escrow_status = 'authorised',
-  payment_intent_id = 'evid_3' where id = 'f0000000-0000-4000-d000-000000000003';
+-- Only the customer authorises payment for their own order.
+select test.become('11111111-0000-4000-d000-000000000001');
+select public.authorise_order_payment('f0000000-0000-4000-d000-000000000003', 'evid_3');
+update public.orders set status = 'accepted' where id = 'f0000000-0000-4000-d000-000000000003';
+select test.become('22222222-0000-4000-d000-000000000002');
 update public.orders set status = 'en_route' where id = 'f0000000-0000-4000-d000-000000000003';
 update public.orders set status = 'arrived' where id = 'f0000000-0000-4000-d000-000000000003';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-d000-000000000003';

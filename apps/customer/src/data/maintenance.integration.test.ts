@@ -248,14 +248,13 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     const priorId = (prior.data as { id: string }).id;
 
     await owner.from('orders').update({ status: 'quoted' }).eq('id', priorId);
-    await owner
-      .from('orders')
-      .update({
-        status: 'accepted',
-        escrow_status: 'authorised',
-        payment_intent_id: 'intel_prior',
-      })
-      .eq('id', priorId);
+    // Payment state is written only by the payment function (0033); a client
+    // declaring its own order paid was the vulnerability that closed.
+    await owner.rpc('authorise_order_payment', {
+      p_order_id: priorId,
+      p_payment_intent_id: 'intel_prior',
+    });
+    await owner.from('orders').update({ status: 'accepted' }).eq('id', priorId);
     await shop.rpc('check_in_vehicle', { p_order_id: priorId });
     await shop.from('orders').update({ status: 'in_progress' }).eq('id', priorId);
     await shop.rpc('record_completion_evidence', {
@@ -333,14 +332,13 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     orderId = (order.data as { id: string }).id;
 
     await owner.from('orders').update({ status: 'quoted' }).eq('id', orderId);
-    await owner
-      .from('orders')
-      .update({
-        status: 'accepted',
-        escrow_status: 'authorised',
-        payment_intent_id: 'intel_http_1',
-      })
-      .eq('id', orderId);
+    // Payment state is written only by the payment function (0033); a client
+    // declaring its own order paid was the vulnerability that closed.
+    await owner.rpc('authorise_order_payment', {
+      p_order_id: orderId,
+      p_payment_intent_id: 'intel_http_1',
+    });
+    await owner.from('orders').update({ status: 'accepted' }).eq('id', orderId);
     await shop.rpc('check_in_vehicle', { p_order_id: orderId });
     await shop.from('orders').update({ status: 'in_progress' }).eq('id', orderId);
     await shop.rpc('record_completion_evidence', {
@@ -403,8 +401,10 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     const owner = clientFor(OWNER_ID);
     const ops = clientFor(OPS_ID);
 
-    // Money must actually have been taken before anyone is paid.
-    await owner.from('orders').update({ escrow_status: 'captured' }).eq('id', orderId);
+    // Money must actually have been taken before anyone is paid — and it is
+    // taken by the payment function, not by asserting it in an UPDATE (0033).
+    const captured = await owner.rpc('capture_order_payment', { p_order_id: orderId });
+    expect(captured.error).toBeNull();
 
     // One payout per provider per period is a real constraint — a repeated
     // payout run must not pay twice. The provider is reused across test runs,

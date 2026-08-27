@@ -231,38 +231,46 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
 
   test('money is authorised before the provider is committed', async () => {
     const customer = clientFor(CUSTOMER_ID);
+    const tech = clientFor(TECH_ID);
 
-    await customer
-      .from('orders')
-      .update({ status: 'quoted', quoted_amount: 120 })
-      .eq('id', orderId);
+    // The price came from the catalogue at creation; emergency pricing is
+    // central (§11), so moving to `quoted` changes only the status.
+    await customer.from('orders').update({ status: 'quoted' }).eq('id', orderId);
 
-    // Accepting without an authorisation must fail — nobody drives out on an
-    // unfunded order.
-    const premature = await customer
+    // A client cannot declare its own order paid (0033). Before that guard,
+    // this succeeded and the escrow check waved the order straight through.
+    const forged = await customer
       .from('orders')
-      .update({ status: 'accepted', provider_id: providerId })
+      .update({ escrow_status: 'authorised', payment_intent_id: 'forged' })
       .eq('id', orderId);
+    expect(forged.error).not.toBeNull();
+
+    // And nobody drives out on an unfunded order.
+    const premature = await tech.rpc('accept_order', { p_order_id: orderId });
     expect(premature.error).not.toBeNull();
 
     const auth = await payments.authorise(orderId, sarOrThrow('120.00'));
     expect(auth.ok).toBe(true);
     if (!auth.ok) return;
 
-    const accepted = await customer
-      .from('orders')
-      .update({
-        status: 'accepted',
-        provider_id: providerId,
-        escrow_status: 'authorised',
-        payment_intent_id: auth.paymentIntentId,
-      })
-      .eq('id', orderId)
-      .select()
-      .single();
+    const authorised = await customer.rpc('authorise_order_payment', {
+      p_order_id: orderId,
+      p_payment_intent_id: auth.paymentIntentId,
+    });
+    expect(authorised.error).toBeNull();
 
+    // The PROVIDER accepts, atomically — of a broadcast to five, one wins.
+    const accepted = await tech.rpc('accept_order', { p_order_id: orderId });
     expect(accepted.error).toBeNull();
-    expect((accepted.data as { escrow_status: string }).escrow_status).toBe('authorised');
+    expect(accepted.data).toBe(true);
+
+    const after = await customer
+      .from('orders')
+      .select('escrow_status, provider_id')
+      .eq('id', orderId)
+      .single();
+    expect((after.data as { escrow_status: string }).escrow_status).toBe('authorised');
+    expect((after.data as { provider_id: string }).provider_id).toBe(providerId);
   });
 
   test('the job runs, and only the customer can close it', async () => {
@@ -295,9 +303,12 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
         vat_amount: 18,
         total_amount: 138,
         vat_rate_applied: 0.15,
-        status: 'awaiting_approval',
+        // The warranty is the provider's commitment, not the customer's to
+        // grant — so it is set here, with the amounts.
+        warranty_days: 90,
       })
       .eq('id', orderId);
+    await tech.from('orders').update({ status: 'awaiting_approval' }).eq('id', orderId);
 
     // The provider marking their own work complete would gut the escrow
     // promise, so the database refuses it.
@@ -309,7 +320,7 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
 
     const customerCloses = await customer
       .from('orders')
-      .update({ status: 'completed', warranty_days: 90 })
+      .update({ status: 'completed' })
       .eq('id', orderId);
     expect(customerCloses.error).toBeNull();
   });
@@ -362,7 +373,8 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     const capture = await payments.capture(row.payment_intent_id, sarOrThrow('120.00'));
     expect(capture.ok).toBe(true);
 
-    await customer.from('orders').update({ escrow_status: 'captured' }).eq('id', orderId);
+    const captured = await customer.rpc('capture_order_payment', { p_order_id: orderId });
+    expect(captured.error).toBeNull();
   });
 
   test('the customer rates the completed job', async () => {

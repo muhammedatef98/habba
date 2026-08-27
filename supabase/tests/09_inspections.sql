@@ -60,9 +60,8 @@ values
    'معرض السيارات، طريق الملك',
    'e0000000-0000-4000-b000-000000000001', 350, '11111111-0000-4000-b000-000000000001');
 
-update public.orders set status = 'accepted', escrow_status = 'authorised',
-  payment_intent_id = 'insp_intent_1'
-where id = 'f0000000-0000-4000-b000-000000000001';
+select public.authorise_order_payment('f0000000-0000-4000-b000-000000000001', 'insp_intent_1');
+update public.orders set status = 'accepted' where id = 'f0000000-0000-4000-b000-000000000001';
 update public.orders set status = 'en_route' where id = 'f0000000-0000-4000-b000-000000000001';
 update public.orders set status = 'arrived' where id = 'f0000000-0000-4000-b000-000000000001';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-b000-000000000001';

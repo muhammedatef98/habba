@@ -115,16 +115,22 @@ values
    180, '11111111-0000-4000-c000-000000000001');
 
 update public.orders set status = 'quoted' where id = 'f0000000-0000-4000-c000-000000000001';
-update public.orders set status = 'accepted', escrow_status = 'authorised',
-  payment_intent_id = 'intel_1' where id = 'f0000000-0000-4000-c000-000000000001';
+select public.authorise_order_payment('f0000000-0000-4000-c000-000000000001', 'intel_1');
+update public.orders set status = 'accepted' where id = 'f0000000-0000-4000-c000-000000000001';
 update public.orders set status = 'checked_in' where id = 'f0000000-0000-4000-c000-000000000001';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-c000-000000000001';
+-- Recorded through the provider RPC; a customer cannot write evidence (0033).
+select test.become('22222222-0000-4000-c000-000000000002');
+select public.record_completion_evidence('f0000000-0000-4000-c000-000000000001', 62000, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select test.become('11111111-0000-4000-c000-000000000001');
+select test.become('22222222-0000-4000-c000-000000000002');
 update public.orders
-set completion_mileage = 62000, completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
+set labour_amount = 180, vat_amount = 27, total_amount = 207, vat_rate_applied = 0.15
 where id = 'f0000000-0000-4000-c000-000000000001';
-update public.orders set status = 'awaiting_approval',
-  labour_amount = 180, vat_amount = 27, total_amount = 207, vat_rate_applied = 0.15,
-  mileage_at_order = 62000
+select test.become('11111111-0000-4000-c000-000000000001');
+update public.orders set mileage_at_order = 62000
+where id = 'f0000000-0000-4000-c000-000000000001';
+update public.orders set status = 'awaiting_approval'
 where id = 'f0000000-0000-4000-c000-000000000001';
 update public.orders set status = 'completed', completed_at = now() - interval '360 days'
 where id = 'f0000000-0000-4000-c000-000000000001';
@@ -294,8 +300,10 @@ select test.assert_raises(
 -- ===========================================================================
 -- Payouts
 -- ===========================================================================
-update public.orders set escrow_status = 'captured'
-where id = 'f0000000-0000-4000-c000-000000000001';
+-- Capture goes through the payment function, and only after the customer has
+-- confirmed. A direct write is refused since 0033.
+select test.become('11111111-0000-4000-c000-000000000001');
+select public.capture_order_payment('f0000000-0000-4000-c000-000000000001');
 
 select test.become('33333333-0000-4000-c000-000000000003');   -- ops
 
@@ -357,6 +365,10 @@ update public.orders
 set completion_mileage = 62500,
     completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
 where id = 'f0000000-0000-4000-c000-000000000002';
+select test.become('22222222-0000-4000-c000-000000000002');
+select public.record_completion_evidence('f0000000-0000-4000-c000-000000000002', 62500,
+  '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select test.become('11111111-0000-4000-c000-000000000001');
 update public.orders set status = 'awaiting_approval' where id = 'f0000000-0000-4000-c000-000000000002';
 select test.become('11111111-0000-4000-c000-000000000001');
 update public.orders set status = 'completed' where id = 'f0000000-0000-4000-c000-000000000002';
