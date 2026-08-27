@@ -16,7 +16,12 @@ create or replace function public.book_appointment(
   p_service_id  uuid,
   p_vehicle_id  uuid default null,
   p_problem     text default null,
-  p_mileage     int default null
+  p_mileage     int default null,
+  -- Where the technician should come, for a mobile scheduled booking.
+  -- Ignored for workshop bookings, where the address is the workshop's.
+  p_lon         double precision default null,
+  p_lat         double precision default null,
+  p_address_ar  text default null
 )
 returns uuid
 language plpgsql
@@ -91,6 +96,18 @@ begin
       using errcode = 'check_violation';
   end if;
 
+  -- A mobile scheduled booking needs somewhere for the technician to go.
+  -- Taking the location from the workshop row (which a mobile provider does
+  -- not have) silently produced NULL and failed the orders_mode_location
+  -- constraint, making mobile scheduled bookings impossible to create.
+  if v_mode = 'mobile_scheduled' then
+    if p_lon is null or p_lat is null then
+      raise exception 'A mobile appointment needs the address the technician should visit'
+        using errcode = 'check_violation';
+    end if;
+    perform public.assert_plausible_coordinate(p_lon, p_lat);
+  end if;
+
   insert into public.orders (
     customer_id, vehicle_id, service_id, fulfilment_mode, status,
     provider_id, workshop_id, slot_id, scheduled_for,
@@ -101,11 +118,12 @@ begin
     v_slot.provider_id,
     case when v_mode = 'workshop' then v_slot.provider_id else null end,
     p_slot_id, v_slot.starts_at,
-    -- A workshop order is located at the workshop; a scheduled mobile visit
-    -- needs a customer location, which the caller supplies separately before
-    -- confirming. The orders_mode_location constraint enforces the pairing.
-    case when v_mode = 'workshop' then null else v_workshop.location end,
-    case when v_mode = 'workshop' then v_workshop.address_ar else null end,
+    -- A workshop order is located at the workshop; a mobile scheduled visit is
+    -- located wherever the customer said.
+    case when v_mode = 'workshop'
+         then null
+         else extensions.st_point(p_lon, p_lat)::extensions.geography end,
+    case when v_mode = 'workshop' then v_workshop.address_ar else p_address_ar end,
     p_problem, p_mileage, v_service.base_price, v_actor
   )
   returning id into v_order_id;
@@ -226,6 +244,6 @@ begin
 end;
 $$;
 
-grant execute on function public.book_appointment(uuid, uuid, uuid, text, int) to authenticated;
+grant execute on function public.book_appointment(uuid, uuid, uuid, text, int, double precision, double precision, text) to authenticated;
 grant execute on function public.check_in_vehicle(uuid) to authenticated;
 grant execute on function public.generate_slots(date, int, int, int, int, int) to authenticated;
