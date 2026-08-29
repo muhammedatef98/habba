@@ -1,9 +1,11 @@
 /**
  * Vehicle list — the home screen.
  *
- * Phase 1 stops here: the emergency and booking actions of §9.1 arrive in
- * Phase 3. What matters now is that the logbook is reachable in one tap,
- * because it is the product's soul (§9.1) and Phase 2 builds on it.
+ * §9.1 Home: vehicle switcher at top, two primary actions (طلب طارئ one tap /
+ * حجز موعد). طلب طارئ jumps straight into the emergency flow rather than a
+ * menu — that is the "one tap" the spec asks for. حجز موعد is a real route
+ * today, but Phase 4 (slots, workshops) is not built yet, so it explains that
+ * honestly instead of presenting a dead or fake button.
  */
 
 import { View } from 'react-native';
@@ -12,12 +14,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
-import { useIsAuthenticated } from '@/state/session';
+import { useIsAuthenticated, useIsGuest } from '@/state/session';
 
 export default function VehiclesScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
+  const isGuest = useIsGuest();
   const isArabic = i18n.language === 'ar';
 
   const vehicles = useQuery({
@@ -45,9 +48,64 @@ export default function VehiclesScreen() {
     return [makeName, modelName].filter(Boolean).join(' ');
   };
 
+  const hasVehicles = (vehicles.data?.length ?? 0) > 0;
+
+  function handleEmergency() {
+    if (!hasVehicles) {
+      router.push('/add-vehicle');
+      return;
+    }
+    router.push('/emergency');
+  }
+
   return (
     <Screen scrollable>
       <Text variant="title">{t('vehicle.myVehicles')}</Text>
+
+      {/* Persistent but not modal: a guest is never blocked, only reminded.
+          §11 — the logbook is not gated, so this asks rather than demands. */}
+      {isGuest ? (
+        <Card
+          testID="guest-banner"
+          elevation="none"
+          style={{ backgroundColor: theme.colors.accentSubtle }}
+        >
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong" style={{ color: theme.colors.accentText }}>
+              {t('auth.guestBannerTitle')}
+            </Text>
+            <Text variant="caption" style={{ color: theme.colors.accentText }}>
+              {t('auth.guestBannerBody')}
+            </Text>
+            <Button
+              testID="guest-save-account"
+              label={t('auth.guestBannerAction')}
+              variant="accent"
+              size="medium"
+              onPress={() => router.push('/save-account')}
+            />
+          </View>
+        </Card>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <Button
+            testID="home-emergency"
+            label={t('home.emergencyAction')}
+            variant="emergency"
+            onPress={handleEmergency}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button
+            testID="home-booking"
+            label={t('home.bookingAction')}
+            variant="secondary"
+            onPress={() => router.push('/booking')}
+          />
+        </View>
+      </View>
 
       {vehicles.data?.length === 0 ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>

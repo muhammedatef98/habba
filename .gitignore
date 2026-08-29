@@ -13,6 +13,12 @@ coverage/
 *.key
 *.mobileprovision
 
+# Generated native projects. `expo run:ios` / `expo prebuild` recreate these
+# from app.json — 1.2 GB of CocoaPods and Xcode state that must not be
+# versioned. metro.config.js and app.json ARE the source of truth.
+apps/*/ios/
+apps/*/android/
+
 # Local database harness (see supabase/scripts/local-db.sh)
 supabase/.data/
 supabase/.tmp/

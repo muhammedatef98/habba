@@ -117,7 +117,7 @@ beforeAll(async () => {
         business_name_ar: 'مركز الفحص المعتمد',
         city_id: cityId,
       })
-      .select()
+      .select('id')
       .single();
     providerId = (created.data as { id: string }).id;
   }

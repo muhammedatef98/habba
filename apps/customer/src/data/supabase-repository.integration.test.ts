@@ -131,9 +131,12 @@ describe.skipIf(!harnessUp)('SupabaseRepository against real PostgREST + RLS', (
     const profile = await repo.upsertProfile({
       fullName: 'محمد العتيبي',
       phone: '+966501234501',
+      email: null,
+      isGuest: false,
       preferredLocale: 'ar',
     });
     expect(profile.id).toBe(OWNER_ID);
+    expect(profile.isGuest).toBe(false);
 
     const makes = await repo.listMakes();
     expect(makes.length).toBeGreaterThan(0);

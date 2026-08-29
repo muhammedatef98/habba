@@ -151,7 +151,7 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
           business_name_ar: 'خدمة بطاريات سريعة',
           city_id: cityId,
         })
-        .select()
+        .select('id, verification_status')
         .single();
 
       expect(created.error).toBeNull();

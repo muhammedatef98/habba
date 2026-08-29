@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone } from '@habba/core';
 import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/lib/otp';
+import { repository } from '@/data/repository';
 import { useIsAuthenticated, useSession } from '@/state/session';
 
 export default function PhoneScreen() {
@@ -19,12 +20,29 @@ export default function PhoneScreen() {
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
   const setPendingPhone = useSession((state) => state.setPendingPhone);
+  const signInAsGuest = useSession((state) => state.signInAsGuest);
 
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const [sending, setSending] = useState(false);
+  const [enteringAsGuest, setEnteringAsGuest] = useState(false);
 
   if (isAuthenticated) return <Redirect href="/vehicles" />;
+
+  async function handleGuest() {
+    setEnteringAsGuest(true);
+    setError(undefined);
+
+    try {
+      const profile = await repository.signInAsGuest();
+      signInAsGuest(profile.id, profile.fullName);
+      router.replace('/vehicles');
+    } catch {
+      setError(t('auth.errors.network'));
+    } finally {
+      setEnteringAsGuest(false);
+    }
+  }
 
   async function handleSend() {
     const parsed = parseSaudiPhone(phone);
@@ -92,6 +110,31 @@ export default function PhoneScreen() {
           loading={sending}
           disabled={phone.length === 0}
         />
+
+        {/* Phone stays the primary path (§9.1). These are alternatives, and
+            their weight in the hierarchy says so — secondary, then ghost. */}
+        <Button
+          testID="email-signin"
+          label={t('auth.useEmail')}
+          variant="secondary"
+          onPress={() => router.push('/email')}
+        />
+
+        {/* §11: the logbook is top-of-funnel and must never be gated. Letting
+            someone in before they hand over a phone number is what that
+            actually means in an onboarding screen. */}
+        <View style={{ gap: theme.spacing.xs }}>
+          <Button
+            testID="continue-as-guest"
+            label={t('auth.continueAsGuest')}
+            variant="ghost"
+            onPress={() => void handleGuest()}
+            loading={enteringAsGuest}
+          />
+          <Text variant="caption" tone="subtle" align="center">
+            {t('auth.guestHint')}
+          </Text>
+        </View>
       </View>
     </Screen>
   );

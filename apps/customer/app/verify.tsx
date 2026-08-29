@@ -62,6 +62,8 @@ export default function VerifyScreen() {
     const profile = await repository.upsertProfile({
       fullName: fullName.trim(),
       phone: phoneE164,
+      email: null,
+      isGuest: false,
       preferredLocale: locale,
     });
 

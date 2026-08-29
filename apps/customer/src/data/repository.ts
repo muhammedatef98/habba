@@ -15,18 +15,30 @@
  * shape of this interface reflects the shape of the security model.
  */
 
-import { normalisePlate } from '@habba/core';
+import { addSar, applyRate, multiplySar, normalisePlate, sarOrThrow } from '@habba/core';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { useSession } from '../state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import type {
+  NewEmergencyOrderInput,
+  NewRatingInput,
   NewVehicleInput,
+  Order,
+  OrderPart,
   Profile,
+  ProviderSummary,
+  Service,
   TimelineEvent,
   Vehicle,
   VehicleMake,
   VehicleModel,
 } from './types.js';
+
+export interface GuestUpgradeInput {
+  readonly fullName: string;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
+}
 
 export interface PastServiceInput {
   readonly vehicleId: string;
@@ -46,11 +58,38 @@ export interface Repository {
   getProfile(): Promise<Profile | null>;
   upsertProfile(profile: Omit<Profile, 'id'>): Promise<Profile>;
 
+  /**
+   * Starts a guest session — a real anonymous auth user with a real uid, so
+   * RLS works and the logbook is genuinely theirs (migration 0039).
+   */
+  signInAsGuest(): Promise<Profile>;
+  /**
+   * Attaches a phone or email to the CURRENT uid. Keeping the uid is the
+   * entire point: the guest's vehicles and timeline carry over rather than
+   * being stranded on an abandoned account.
+   */
+  upgradeGuest(input: GuestUpgradeInput): Promise<Profile>;
+
   // Phase 2. Note there is still no method that writes a timeline row with a
   // caller-chosen provenance — that remains impossible by construction.
   recordPastService(input: PastServiceInput): Promise<void>;
   recordMileage(vehicleId: string, mileage: number): Promise<void>;
   generateReport(vehicleId: string): Promise<string>;
+
+  // Phase 3. Note there is no method that sets `escrowStatus`, `totalAmount`
+  // or `providerId` directly — those are guarded server-side (0033) and
+  // written only by the matching function and the payment functions, never by
+  // a client call.
+  listEmergencyServices(): Promise<readonly Service[]>;
+  createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
+  getOrder(orderId: string): Promise<Order | null>;
+  getOrderProvider(providerId: string): Promise<ProviderSummary | null>;
+  listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
+  approveOrderPart(partId: string): Promise<void>;
+  cancelOrder(orderId: string, reason?: string): Promise<void>;
+  /** Sets status to `completed`, then captures the escrowed payment (§1). */
+  confirmOrderCompletion(orderId: string): Promise<void>;
+  rateOrder(input: NewRatingInput): Promise<void>;
 }
 
 const MAKES: readonly VehicleMake[] = [
@@ -204,6 +243,205 @@ const MODELS: readonly VehicleModel[] = [
   { id: 'm-lx', makeId: 'make-lexus', nameAr: 'LX', nameEn: 'LX', yearFrom: 2010, yearTo: null },
 ];
 
+// Mirrors seed/02_services.sql: same names and prices, so the dev flow
+// teaches the UI the real catalogue rather than a fictional one.
+const EMERGENCY_SERVICES: readonly Service[] = [
+  {
+    id: 'svc-towing',
+    category: 'emergency',
+    nameAr: 'ونش/سحب',
+    nameEn: 'Towing',
+    descriptionAr: null,
+    icon: 'truck',
+    basePrice: sarOrThrow('150.00'),
+    requiresVehicle: true,
+  },
+  {
+    id: 'svc-battery',
+    category: 'emergency',
+    nameAr: 'بطارية — شحن أو تبديل',
+    nameEn: 'Battery jump or replacement',
+    descriptionAr: null,
+    icon: 'battery',
+    basePrice: sarOrThrow('120.00'),
+    requiresVehicle: true,
+  },
+  {
+    id: 'svc-tyre',
+    category: 'emergency',
+    nameAr: 'بنشر وتبديل إطار',
+    nameEn: 'Tyre puncture or change',
+    descriptionAr: null,
+    icon: 'tyre',
+    basePrice: sarOrThrow('100.00'),
+    requiresVehicle: true,
+  },
+  {
+    id: 'svc-lockout',
+    category: 'emergency',
+    nameAr: 'فتح أبواب',
+    nameEn: 'Lockout assistance',
+    descriptionAr: null,
+    icon: 'key',
+    basePrice: sarOrThrow('130.00'),
+    requiresVehicle: false,
+  },
+  {
+    id: 'svc-fuel',
+    category: 'emergency',
+    nameAr: 'توصيل بنزين',
+    nameEn: 'Fuel delivery',
+    descriptionAr: null,
+    icon: 'fuel',
+    basePrice: sarOrThrow('90.00'),
+    requiresVehicle: false,
+  },
+  {
+    id: 'svc-overheating',
+    category: 'emergency',
+    nameAr: 'سخونة رادياتير',
+    nameEn: 'Overheating radiator',
+    descriptionAr: null,
+    icon: 'thermometer',
+    basePrice: sarOrThrow('140.00'),
+    requiresVehicle: true,
+  },
+];
+
+const DEV_PROVIDER: ProviderSummary = {
+  id: 'provider-dev-1',
+  businessNameAr: 'فني الحي — خدمة الطوارئ',
+  ratingAvg: 4.7,
+  ratingCount: 128,
+};
+
+/**
+ * Development order state machine.
+ *
+ * A deliberately small slice of `enforce_order_transition`: enough for the
+ * emergency flow to be exercisable end to end offline. It advances itself on
+ * a timer to imitate a provider accepting and working the job, since there is
+ * no second device in dev — the point is to let the tracking screen, quote
+ * approval and completion confirmation all be built and clicked through
+ * before a real Supabase project exists.
+ */
+class DevOrderSimulator {
+  private readonly orders = new Map<string, Order>();
+  private readonly parts = new Map<string, OrderPart[]>();
+  private counter = 0;
+
+  create(input: NewEmergencyOrderInput): string {
+    this.counter += 1;
+    const id = `order-${this.counter}`;
+    const service = EMERGENCY_SERVICES.find((candidate) => candidate.id === input.serviceId);
+
+    const order: Order = {
+      id,
+      status: 'searching',
+      fulfilmentMode: 'mobile_ondemand',
+      vehicleId: input.vehicleId ?? null,
+      serviceId: input.serviceId,
+      providerId: null,
+      serviceAddressAr: input.addressAr ?? null,
+      problemDescription: input.problem ?? null,
+      quotedAmount: service?.basePrice ?? null,
+      partsAmount: null,
+      labourAmount: null,
+      vatAmount: null,
+      totalAmount: null,
+      escrowStatus: 'authorised',
+    };
+    this.orders.set(id, order);
+
+    // Advances through the same statuses a real dispatch would, so the
+    // tracking screen has something to show without a second device.
+    this.advanceAfter(id, 2500, (current) => ({ ...current, status: 'accepted', providerId: DEV_PROVIDER.id }));
+    this.advanceAfter(id, 5000, (current) => ({ ...current, status: 'en_route' }));
+    this.advanceAfter(id, 8000, (current) => ({ ...current, status: 'arrived' }));
+    this.advanceAfter(id, 10500, (current) => {
+      // A parts quote appears mid-job, same as a technician diagnosing at the
+      // roadside — this is what the quote-approval screen has to react to.
+      this.parts.set(id, [
+        {
+          id: `${id}-part-1`,
+          orderId: id,
+          nameAr: 'بطارية ٧٠ أمبير',
+          partNumber: 'BAT-70A',
+          isOem: false,
+          quantity: 1,
+          unitPrice: sarOrThrow('320.00'),
+          warrantyDays: 180,
+          approvedByCustomer: false,
+        },
+      ]);
+      return { ...current, status: 'in_progress' };
+    });
+
+    return id;
+  }
+
+  private advanceAfter(id: string, delayMs: number, update: (order: Order) => Order) {
+    setTimeout(() => {
+      const current = this.orders.get(id);
+      if (current === undefined || current.status === 'cancelled') return;
+      this.orders.set(id, update(current));
+    }, delayMs);
+  }
+
+  get(id: string): Order | null {
+    return this.orders.get(id) ?? null;
+  }
+
+  listParts(id: string): readonly OrderPart[] {
+    return this.parts.get(id) ?? [];
+  }
+
+  approvePart(partId: string): void {
+    for (const [orderId, lines] of this.parts) {
+      const index = lines.findIndex((line) => line.id === partId);
+      if (index === -1) continue;
+
+      const approved = lines.map((line, i) => (i === index ? { ...line, approvedByCustomer: true } : line));
+      this.parts.set(orderId, approved);
+
+      if (approved.every((line) => line.approvedByCustomer)) {
+        const order = this.orders.get(orderId);
+        if (order !== undefined) {
+          const partsAmount = approved.reduce(
+            (sum, line) => addSar(sum, multiplySar(line.unitPrice, line.quantity)),
+            sarOrThrow('0.00'),
+          );
+          const labourAmount = order.quotedAmount ?? sarOrThrow('0.00');
+          const vatAmount = applyRate(addSar(partsAmount, labourAmount), '0.15');
+          const totalAmount = addSar(addSar(partsAmount, labourAmount), vatAmount);
+          this.orders.set(orderId, {
+            ...order,
+            status: 'awaiting_approval',
+            partsAmount,
+            labourAmount,
+            vatAmount,
+            totalAmount,
+          });
+        }
+      }
+      return;
+    }
+  }
+
+  cancel(id: string): void {
+    const order = this.orders.get(id);
+    if (order === undefined) return;
+    this.orders.set(id, { ...order, status: 'cancelled' });
+  }
+
+  confirmCompletion(id: string): void {
+    const order = this.orders.get(id);
+    if (order === undefined) return;
+    if (order.status !== 'awaiting_approval') throw new Error('not_awaiting_approval');
+    this.orders.set(id, { ...order, status: 'completed', escrowStatus: 'captured' });
+  }
+}
+
 /**
  * Development repository.
  *
@@ -217,6 +455,7 @@ const MODELS: readonly VehicleModel[] = [
 export class InMemoryRepository implements Repository {
   private readonly vehicles = new Map<string, Vehicle>();
   private readonly timeline = new Map<string, TimelineEvent[]>();
+  private readonly orders = new DevOrderSimulator();
   private profile: Profile | null = null;
   private counter = 0;
 
@@ -291,6 +530,39 @@ export class InMemoryRepository implements Repository {
     return this.profile;
   }
 
+  async signInAsGuest(): Promise<Profile> {
+    // Mirrors what Supabase anonymous auth does: a real, distinct uid. The
+    // vehicles map is keyed on nothing else, so a guest's cars are genuinely
+    // their own — the stub must not pretend guests share an account.
+    this.profile = {
+      id: this.profile?.id ?? `guest-${Date.now()}`,
+      fullName: 'ضيف',
+      phone: null,
+      email: null,
+      isGuest: true,
+      preferredLocale: 'ar',
+    };
+    return this.profile;
+  }
+
+  async upgradeGuest(input: GuestUpgradeInput): Promise<Profile> {
+    if (this.profile === null) throw new Error('not_signed_in');
+    if (input.phone === undefined && input.email === undefined) {
+      // Same refusal the database gives (profiles_has_identity, 0039).
+      throw new Error('no_identity');
+    }
+
+    // The id is carried over unchanged — that is what keeps the logbook.
+    this.profile = {
+      ...this.profile,
+      fullName: input.fullName,
+      phone: input.phone ?? this.profile.phone,
+      email: input.email ?? this.profile.email,
+      isGuest: false,
+    };
+    return this.profile;
+  }
+
   async recordPastService(input: PastServiceInput): Promise<void> {
     if (input.occurredAt.getTime() > Date.now()) {
       throw new Error('future_date');
@@ -348,6 +620,65 @@ export class InMemoryRepository implements Repository {
     // refusal-on-broken-chain behaviour lives in the database.
     if (!this.vehicles.has(vehicleId)) throw new Error('not_found');
     return `dev-report-${vehicleId}`;
+  }
+
+  async listEmergencyServices() {
+    return EMERGENCY_SERVICES;
+  }
+
+  async createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string> {
+    return this.orders.create(input);
+  }
+
+  async getOrder(orderId: string) {
+    return this.orders.get(orderId);
+  }
+
+  async getOrderProvider(providerId: string) {
+    return providerId === DEV_PROVIDER.id ? DEV_PROVIDER : null;
+  }
+
+  async listOrderParts(orderId: string) {
+    return this.orders.listParts(orderId);
+  }
+
+  async approveOrderPart(partId: string): Promise<void> {
+    this.orders.approvePart(partId);
+  }
+
+  async cancelOrder(orderId: string): Promise<void> {
+    this.orders.cancel(orderId);
+  }
+
+  async confirmOrderCompletion(orderId: string): Promise<void> {
+    this.orders.confirmCompletion(orderId);
+
+    // Phase 3's acceptance criterion (build prompt §10): a completed job
+    // appears in the logbook automatically. The real write goes through
+    // `append_vehicle_timeline_event` server-side; the stub mirrors the
+    // outcome so the logbook screen has something to show.
+    const order = this.orders.get(orderId);
+    if (order?.vehicleId === null || order?.vehicleId === undefined) return;
+
+    const events = this.timeline.get(order.vehicleId) ?? [];
+    const now = new Date().toISOString();
+    events.push({
+      id: `evt-${order.vehicleId}-${events.length + 1}`,
+      vehicleId: order.vehicleId,
+      eventType: 'service_completed',
+      occurredAt: now,
+      recordedAt: now,
+      mileage: null,
+      provenance: 'habba_verified',
+      summaryAr: 'صيانة طارئة عبر هبّة',
+      summaryEn: 'Emergency service via Habba',
+    });
+    this.timeline.set(order.vehicleId, events);
+  }
+
+  async rateOrder(): Promise<void> {
+    // No read surface depends on the dev rating yet — accepting and
+    // discarding it is enough to exercise the flow offline.
   }
 
   private bumpMileage(vehicleId: string, mileage: number | undefined): void {

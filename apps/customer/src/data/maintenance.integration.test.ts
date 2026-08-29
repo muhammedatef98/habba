@@ -164,7 +164,7 @@ beforeAll(async () => {
         cr_number: '1010404040',
         city_id: cityId,
       })
-      .select()
+      .select('id')
       .single();
     providerId = (created.data as { id: string }).id;
   }
