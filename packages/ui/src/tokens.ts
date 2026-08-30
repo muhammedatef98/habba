@@ -61,13 +61,14 @@ const neutral = {
 
 /** Reserved for genuine emergencies. Never decorative, never marketing (§8). */
 const emergency = {
+  50: '#FEF2F1',
   400: '#E5534B',
   500: '#D2342B',
   600: '#A82720',
 } as const;
 
-const success = { 400: '#4CAF7D', 500: '#2E8B5A', 600: '#1F6B43' } as const;
-const warning = { 400: '#E0A030', 500: '#C07C12', 600: '#945D0A' } as const;
+const success = { 50: '#EDF9F2', 400: '#4CAF7D', 500: '#2E8B5A', 600: '#1F6B43' } as const;
+const warning = { 50: '#FDF8EC', 400: '#E0A030', 500: '#C07C12', 600: '#945D0A' } as const;
 
 export const palette = { petrol, sand, neutral, emergency, success, warning } as const;
 
@@ -100,8 +101,19 @@ export interface ColorScheme {
 
   readonly emergency: string;
   readonly emergencyText: string;
+  /** Text/icon color for emergency state on white or emergencySubtle. Passes 4.5:1. */
+  readonly emergencyFg: string;
+  readonly emergencySubtle: string;
   readonly success: string;
+  /** Text/icon color for success state on white or successSubtle. Passes 4.5:1. */
+  readonly successFg: string;
+  readonly successSubtle: string;
   readonly warning: string;
+  /** Text/icon color for warning state on white or warningSubtle. Passes 4.5:1. */
+  readonly warningFg: string;
+  readonly warningSubtle: string;
+
+  readonly textLink: string;
 
   /** ADR-0005: verified and owner-entered must never look the same. */
   readonly verified: string;
@@ -138,8 +150,16 @@ export const lightColors: ColorScheme = {
 
   emergency: emergency[500],
   emergencyText: neutral[0],
+  emergencyFg: emergency[600],
+  emergencySubtle: emergency[50],
   success: success[500],
+  successFg: success[600],
+  successSubtle: success[50],
   warning: warning[500],
+  warningFg: warning[600],
+  warningSubtle: warning[50],
+
+  textLink: petrol[700],
 
   verified: petrol[700],
   verifiedSubtle: petrol[50],
@@ -181,8 +201,19 @@ export const darkColors: ColorScheme = {
 
   emergency: emergency[400],
   emergencyText: neutral[950],
+  // Dark subtle backgrounds are custom hand-tuned values — no palette entry at
+  // this darkness exists, and deriving them from the 50-step scale would require
+  // adding 12+ palette entries for a single use case.
+  emergencyFg: emergency[400],
+  emergencySubtle: '#1B0908',
   success: success[400],
+  successFg: success[400],
+  successSubtle: '#091810',
   warning: warning[400],
+  warningFg: warning[400],
+  warningSubtle: '#1A1104',
+
+  textLink: petrol[300],
 
   verified: petrol[300],
   verifiedSubtle: petrol[900],
@@ -283,6 +314,42 @@ export const elevation = {
 } as const;
 
 /**
+ * Letter spacing — use sparingly. Arabic is a connected script: positive
+ * tracking breaks letter joins and should only be used on isolated Latin UI
+ * labels (all-caps, codes). Zero is the correct default for Arabic body copy.
+ */
+export const letterSpacing = {
+  tight: -0.3,  // display headings (Latin only)
+  normal: 0,    // body text, any script
+  wide: 0.5,    // Latin labels and captions
+  wider: 1.0,   // all-caps Latin only (plate codes, IBANs)
+} as const;
+
+export const iconSize = {
+  xs: 14,
+  sm: 16,
+  md: 20,
+  lg: 24,
+  xl: 32,
+  '2xl': 40,
+} as const;
+
+/**
+ * Layer scale for React Native zIndex and elevation stacking.
+ * Avoids the "what z-index is my modal?" problem by naming intent.
+ */
+export const zIndex = {
+  base: 0,
+  raised: 1,
+  dropdown: 100,
+  sticky: 200,
+  overlay: 300,
+  modal: 400,
+  toast: 500,
+  tooltip: 600,
+} as const;
+
+/**
  * Motion should suggest wind: eased, directional, never bouncy (§8).
  * Springs with visible overshoot are explicitly off-brand here.
  */
@@ -312,6 +379,9 @@ export const theme = {
   fontSize,
   fontWeight,
   fontFamily,
+  letterSpacing,
+  iconSize,
+  zIndex,
   elevation,
   duration,
   easing,

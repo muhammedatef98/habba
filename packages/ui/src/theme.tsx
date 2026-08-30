@@ -16,10 +16,13 @@ import {
   fontFamily,
   fontSize,
   fontWeight,
+  iconSize,
+  letterSpacing,
   lineHeightFor,
   MIN_TOUCH_TARGET,
   radius,
   spacing,
+  zIndex,
   type ColorScheme,
   type ThemeMode,
 } from './tokens.js';
@@ -35,6 +38,9 @@ export interface HabbaTheme {
   readonly fontSize: typeof fontSize;
   readonly fontWeight: typeof fontWeight;
   readonly fontFamily: typeof fontFamily;
+  readonly letterSpacing: typeof letterSpacing;
+  readonly iconSize: typeof iconSize;
+  readonly zIndex: typeof zIndex;
   readonly elevation: typeof elevation;
   readonly duration: typeof duration;
   readonly easing: typeof easing;
@@ -75,6 +81,9 @@ export function ThemeProvider({ children, locale, preference = 'system' }: Theme
       fontSize,
       fontWeight,
       fontFamily,
+      letterSpacing,
+      iconSize,
+      zIndex,
       elevation,
       duration,
       easing,

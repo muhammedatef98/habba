@@ -2,9 +2,12 @@ import { describe, expect, test } from 'vitest';
 import {
   ARABIC_LINE_HEIGHT_RATIO,
   darkColors,
+  iconSize,
+  letterSpacing,
   lightColors,
   lineHeightFor,
   MIN_TOUCH_TARGET,
+  zIndex,
   type ColorScheme,
 } from './tokens.js';
 
@@ -65,6 +68,43 @@ describe('colour contrast (WCAG 2.2)', () => {
       expect(colors.verifiedSubtle).not.toBe(colors.selfReportedSubtle);
     },
   );
+});
+
+describe('status colour pairs (fg on subtle background, WCAG 2.2)', () => {
+  test.each(schemes)('%s: successFg on successSubtle meets 4.5:1', (_name, colors) => {
+    expect(contrast(colors.successFg, colors.successSubtle)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test.each(schemes)('%s: warningFg on warningSubtle meets 4.5:1', (_name, colors) => {
+    expect(contrast(colors.warningFg, colors.warningSubtle)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test.each(schemes)('%s: emergencyFg on emergencySubtle meets 4.5:1', (_name, colors) => {
+    expect(contrast(colors.emergencyFg, colors.emergencySubtle)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test.each(schemes)('%s: textLink on background meets 4.5:1', (_name, colors) => {
+    expect(contrast(colors.textLink, colors.background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.textLink, colors.surface)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('token structure invariants', () => {
+  test('iconSize values are ascending', () => {
+    const values = Object.values(iconSize);
+    for (let i = 1; i < values.length; i++) {
+      expect(values[i]).toBeGreaterThan(values[i - 1] ?? 0);
+    }
+  });
+
+  test('zIndex overlay < modal < toast', () => {
+    expect(zIndex.overlay).toBeLessThan(zIndex.modal);
+    expect(zIndex.modal).toBeLessThan(zIndex.toast);
+  });
+
+  test('letterSpacing.normal is 0 (Arabic body copy default)', () => {
+    expect(letterSpacing.normal).toBe(0);
+  });
 });
 
 describe('typography and touch targets', () => {
