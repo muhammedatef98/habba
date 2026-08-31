@@ -15,9 +15,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sarOrThrow, type SarAmount } from '@habba/core';
 import type {
+  AlertConfidence,
+  OrderStatus,
   CompletionMedia,
   EscrowStatus,
   JobProgress,
+  MaintenanceAlert,
+  OrderSummary,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
@@ -33,6 +37,28 @@ import type {
   VehicleModel,
 } from './types.js';
 import type { GuestUpgradeInput, PastServiceInput, Repository } from './repository.js';
+
+interface MaintenanceAlertRow {
+  readonly id: string;
+  readonly vehicle_id: string;
+  readonly service_id: string;
+  readonly message_ar: string;
+  readonly message_en: string;
+  readonly due_at_km: number | null;
+  readonly estimated_km: number | null;
+  readonly confidence: AlertConfidence;
+}
+
+interface OrderSummaryRow {
+  readonly id: string;
+  readonly status: OrderStatus;
+  readonly total_amount: number | null;
+  readonly created_at: string;
+  // PostgREST returns an embedded resource as an array even when the foreign
+  // key makes it one-to-one, and supabase-js types it that way. Narrowed at
+  // the boundary rather than pretending the join is scalar.
+  readonly services: readonly { readonly name_ar: string }[] | null;
+}
 
 /** Shape of one `order_live_progress` row (migration 0040). */
 interface LiveProgressRow {
@@ -490,7 +516,9 @@ export class SupabaseRepository implements Repository {
     const rows = unwrap(
       await this.client
         .from('services')
-        .select('id, category, name_ar, name_en, description_ar, icon, base_price, requires_vehicle')
+        .select(
+          'id, category, name_ar, name_en, description_ar, icon, base_price, requires_vehicle',
+        )
         .eq('category', 'emergency')
         .eq('is_active', true)
         .order('sort_order'),
@@ -598,17 +626,70 @@ export class SupabaseRepository implements Repository {
         : {}),
       // Once verified there is nothing left to show — the technician has
       // already proved they are the right person.
-      ...(code !== undefined && handover.data?.verified_at === null
-        ? { handoverCode: code }
-        : {}),
+      ...(code !== undefined && handover.data?.verified_at === null ? { handoverCode: code } : {}),
     };
+  }
+
+  /**
+   * Open predictive alerts for one vehicle (migration 0028, §1.4).
+   *
+   * Dismissed and actioned alerts are filtered server-side by status rather
+   * than here: an alert the owner has already dealt with reappearing on the
+   * home screen is the fastest way to teach them to ignore the card.
+   */
+  async listMaintenanceAlerts(vehicleId: string): Promise<readonly MaintenanceAlert[]> {
+    const rows = unwrap(
+      await this.client
+        .from('maintenance_alerts')
+        .select(
+          'id, vehicle_id, service_id, message_ar, message_en, due_at_km, estimated_km, confidence',
+        )
+        .eq('vehicle_id', vehicleId)
+        .eq('status', 'open')
+        .order('due_at_km', { ascending: true, nullsFirst: false }),
+      'listMaintenanceAlerts',
+    );
+
+    return (rows as readonly MaintenanceAlertRow[]).map((row) => ({
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      serviceId: row.service_id,
+      messageAr: row.message_ar,
+      messageEn: row.message_en,
+      dueAtKm: row.due_at_km,
+      estimatedKm: row.estimated_km,
+      confidence: row.confidence,
+    }));
+  }
+
+  async listRecentOrders(limit = 5): Promise<readonly OrderSummary[]> {
+    // Joins the service for its Arabic name: the row reads "بنشر · قبل 3 أيام"
+    // and an order id would tell the customer nothing.
+    const rows = unwrap(
+      await this.client
+        .from('orders')
+        .select('id, status, total_amount, created_at, services(name_ar)')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      'listRecentOrders',
+    );
+
+    return (rows as readonly OrderSummaryRow[]).map((row) => ({
+      id: row.id,
+      status: row.status,
+      serviceNameAr: row.services?.[0]?.name_ar ?? '',
+      totalAmount: toSarOrNull(row.total_amount),
+      createdAt: row.created_at,
+    }));
   }
 
   async listOrderParts(orderId: string): Promise<readonly OrderPart[]> {
     const rows = unwrap(
       await this.client
         .from('order_parts')
-        .select('id, order_id, name_ar, part_number, is_oem, quantity, unit_price, warranty_days, approved_by_customer')
+        .select(
+          'id, order_id, name_ar, part_number, is_oem, quantity, unit_price, warranty_days, approved_by_customer',
+        )
         .eq('order_id', orderId)
         .order('created_at'),
       'listOrderParts',

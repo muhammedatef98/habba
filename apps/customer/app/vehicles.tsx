@@ -13,6 +13,8 @@ import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
+import { MaintenanceAlertCard } from '@/components/home/MaintenanceAlertCard';
+import { RecentOrderRow } from '@/components/home/RecentOrderRow';
 import { repository } from '@/data/repository';
 import { useIsAuthenticated, useIsGuest } from '@/state/session';
 
@@ -29,6 +31,23 @@ export default function VehiclesScreen() {
   });
 
   const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
+
+  const recentOrders = useQuery({
+    queryKey: ['recent-orders'],
+    queryFn: () => repository.listRecentOrders(1),
+  });
+
+  const primaryVehicleId = vehicles.data?.[0]?.id;
+
+  // Alerts belong to the car the switcher has selected. Only the first vehicle
+  // for now — a switcher that changes which car the home screen is about is
+  // its own piece of work, and querying every vehicle's alerts to show one
+  // card would be wasteful.
+  const alerts = useQuery({
+    queryKey: ['maintenance-alerts', primaryVehicleId],
+    queryFn: () => repository.listMaintenanceAlerts(primaryVehicleId ?? ''),
+    enabled: primaryVehicleId !== undefined,
+  });
   const allModels = useQuery({
     queryKey: ['models', 'all'],
     queryFn: async () => {
@@ -88,6 +107,15 @@ export default function VehiclesScreen() {
         </Card>
       ) : null}
 
+      {(alerts.data ?? []).slice(0, 1).map((alert) => (
+        <MaintenanceAlertCard
+          key={alert.id}
+          testID="home-maintenance-alert"
+          alert={alert}
+          onBook={() => router.push('/booking')}
+        />
+      ))}
+
       {/*
         Teal, not red, and deliberately so. §8 reserves red for a genuine
         emergency that is already under way — the design does not let it appear
@@ -134,6 +162,15 @@ export default function VehiclesScreen() {
           variant="secondary"
           onPress={() => router.push('/booking')}
         />
+
+        {(recentOrders.data ?? []).map((order) => (
+          <RecentOrderRow
+            key={order.id}
+            testID="home-recent-order"
+            order={order}
+            onPress={() => router.push({ pathname: '/tracking', params: { id: order.id } })}
+          />
+        ))}
       </View>
 
       {vehicles.data?.length === 0 ? (

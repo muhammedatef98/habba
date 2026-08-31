@@ -163,7 +163,12 @@
     "noVehicleBody": "لطلب خدمة طارئة نحتاج بيانات سيارتك.",
     "emergencyCta": "طلب طارئ",
     "emergencySubtitle": "أقرب فنّي متاح · 24 ساعة",
-    "bookAppointment": "حجز موعد"
+    "bookAppointment": "حجز موعد",
+    "alertsTitle": "تنبيهات سيارتك",
+    "bookNow": "احجز الآن",
+    "recentTitle": "آخر الطلبات",
+    "noRecent": "ما عندك طلبات سابقة بعد.",
+    "lastReading": "آخر قراءة {{km}} كم"
   },
   "booking": {
     "title": "حجز موعد",
@@ -358,5 +363,11 @@
     "gapMileage": "قراءة العداد",
     "gapBefore": "صورة قبل العمل",
     "gapAfter": "صورة بعد العمل"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "orders": "طلباتي",
+    "wallet": "المحفظة",
+    "account": "حسابي"
   }
 }

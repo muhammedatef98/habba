@@ -163,7 +163,12 @@
     "noVehicleBody": "We need your vehicle's details to send an emergency request.",
     "emergencyCta": "Emergency request",
     "emergencySubtitle": "Nearest available technician · 24 hours",
-    "bookAppointment": "Book an appointment"
+    "bookAppointment": "Book an appointment",
+    "alertsTitle": "Your vehicle alerts",
+    "bookNow": "Book now",
+    "recentTitle": "Recent orders",
+    "noRecent": "You don't have any past orders yet.",
+    "lastReading": "Last reading {{km}} km"
   },
   "booking": {
     "title": "Book an appointment",
@@ -358,5 +363,11 @@
     "gapMileage": "Odometer reading",
     "gapBefore": "Photo before the work",
     "gapAfter": "Photo after the work"
+  },
+  "nav": {
+    "home": "Home",
+    "orders": "Orders",
+    "wallet": "Wallet",
+    "account": "Account"
   }
 }

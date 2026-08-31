@@ -21,6 +21,8 @@ import { useSession } from '../state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import type {
   JobProgress,
+  MaintenanceAlert,
+  OrderSummary,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
@@ -81,6 +83,10 @@ export interface Repository {
   // or `providerId` directly — those are guarded server-side (0033) and
   // written only by the matching function and the payment functions, never by
   // a client call.
+  /** Open predictive alerts for a vehicle, most urgent first (§1.4). */
+  listMaintenanceAlerts(vehicleId: string): Promise<readonly MaintenanceAlert[]>;
+  /** The customer's recent orders, newest first. */
+  listRecentOrders(limit?: number): Promise<readonly OrderSummary[]>;
   listEmergencyServices(): Promise<readonly Service[]>;
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
   getOrder(orderId: string): Promise<Order | null>;
@@ -336,11 +342,13 @@ const DEV_PROVIDER: ProviderSummary = {
 class DevOrderSimulator {
   private readonly orders = new Map<string, Order>();
   private readonly parts = new Map<string, OrderPart[]>();
+  private readonly createdAt = new Map<string, string>();
   private counter = 0;
 
   create(input: NewEmergencyOrderInput): string {
     this.counter += 1;
     const id = `order-${this.counter}`;
+    this.createdAt.set(id, new Date().toISOString());
     const service = EMERGENCY_SERVICES.find((candidate) => candidate.id === input.serviceId);
 
     const order: Order = {
@@ -365,7 +373,11 @@ class DevOrderSimulator {
 
     // Advances through the same statuses a real dispatch would, so the
     // tracking screen has something to show without a second device.
-    this.advanceAfter(id, 2500, (current) => ({ ...current, status: 'accepted', providerId: DEV_PROVIDER.id }));
+    this.advanceAfter(id, 2500, (current) => ({
+      ...current,
+      status: 'accepted',
+      providerId: DEV_PROVIDER.id,
+    }));
     this.advanceAfter(id, 5000, (current) => ({ ...current, status: 'en_route' }));
     this.advanceAfter(id, 8000, (current) => ({ ...current, status: 'arrived' }));
     this.advanceAfter(id, 10500, (current) => {
@@ -411,7 +423,9 @@ class DevOrderSimulator {
       const index = lines.findIndex((line) => line.id === partId);
       if (index === -1) continue;
 
-      const approved = lines.map((line, i) => (i === index ? { ...line, approvedByCustomer: true } : line));
+      const approved = lines.map((line, i) =>
+        i === index ? { ...line, approvedByCustomer: true } : line,
+      );
       this.parts.set(orderId, approved);
 
       if (approved.every((line) => line.approvedByCustomer)) {
@@ -436,6 +450,22 @@ class DevOrderSimulator {
       }
       return;
     }
+  }
+
+  /** Newest first. Mirrors the ordering the server read will use. */
+  recent(limit: number): readonly OrderSummary[] {
+    return [...this.orders.values()]
+      .reverse()
+      .slice(0, limit)
+      .map((order) => ({
+        id: order.id,
+        status: order.status,
+        serviceNameAr:
+          EMERGENCY_SERVICES.find((candidate) => candidate.id === order.serviceId)?.nameAr ??
+          order.serviceId,
+        totalAmount: order.totalAmount,
+        createdAt: this.createdAt.get(order.id) ?? new Date().toISOString(),
+      }));
   }
 
   cancel(id: string): void {
@@ -646,6 +676,30 @@ export class InMemoryRepository implements Repository {
 
   async getOrderProvider(providerId: string) {
     return providerId === DEV_PROVIDER.id ? DEV_PROVIDER : null;
+  }
+
+  // Seeded rather than empty: the alert card is the moat's most visible claim
+  // (§1.4), and a home screen that never shows one teaches the wrong thing
+  // about what the product is for. These mirror the shape the rules engine
+  // produces server-side, not invented figures for a live order.
+  async listMaintenanceAlerts(vehicleId: string): Promise<readonly MaintenanceAlert[]> {
+    if (this.vehicles.get(vehicleId) === undefined) return [];
+    return [
+      {
+        id: `alert-${vehicleId}-oil`,
+        vehicleId,
+        serviceId: 'svc-oil',
+        messageAr: 'تبديل الزيت خلال 600 كم',
+        messageEn: 'Oil change due within 600 km',
+        dueAtKm: 62400,
+        estimatedKm: 61800,
+        confidence: 'estimated',
+      },
+    ];
+  }
+
+  async listRecentOrders(limit = 5): Promise<readonly OrderSummary[]> {
+    return this.orders.recent(limit);
   }
 
   // The in-memory repository has no PostGIS and no provider moving around, so

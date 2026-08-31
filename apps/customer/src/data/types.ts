@@ -109,6 +109,36 @@ export interface NewEmergencyOrderInput {
   readonly mileage?: number | undefined;
 }
 
+/**
+ * A predictive maintenance alert (migration 0028).
+ *
+ * §1.4 — the moat's fourth claim: mileage plus service history turns one-off
+ * emergency users into recurring ones. The message is stored rather than
+ * rebuilt on read so the owner can be shown exactly what they were told, which
+ * matters when the claim is "your timing belt is due in ~1,400 km".
+ */
+export type AlertConfidence = 'estimated' | 'measured' | 'overdue';
+
+export interface MaintenanceAlert {
+  readonly id: string;
+  readonly vehicleId: string;
+  readonly serviceId: string;
+  readonly messageAr: string;
+  readonly messageEn: string;
+  readonly dueAtKm: number | null;
+  readonly estimatedKm: number | null;
+  readonly confidence: AlertConfidence;
+}
+
+/** One row in the customer's order history. */
+export interface OrderSummary {
+  readonly id: string;
+  readonly status: OrderStatus;
+  readonly serviceNameAr: string;
+  readonly totalAmount: SarAmount | null;
+  readonly createdAt: string;
+}
+
 /** A provider's public-facing card — never the KYC columns behind it (0037). */
 export interface ProviderSummary {
   readonly id: string;
