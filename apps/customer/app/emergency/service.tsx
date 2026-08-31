@@ -12,9 +12,10 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { useEmergencyDraft } from '@/state/emergency-draft';
+import { serviceIcon } from '@/lib/service-icon';
 import { vehicleLabel } from '@/lib/vehicle-label';
 
 export default function ServiceSelectionScreen() {
@@ -79,8 +80,13 @@ export default function ServiceSelectionScreen() {
                 backgroundColor: isSelected ? theme.colors.primarySubtle : theme.colors.surface,
               }}
             >
+              <Icon
+                name={serviceIcon(option.icon)}
+                size={theme.iconSize['2xl']}
+                color={isSelected ? theme.colors.primary : theme.colors.textMuted}
+              />
               <View style={{ gap: theme.spacing.xs }}>
-                <Text variant="heading">{option.nameAr}</Text>
+                <Text variant="subheading">{option.nameAr}</Text>
                 {option.descriptionAr !== null ? (
                   <Text variant="caption" tone="muted">
                     {option.descriptionAr}
