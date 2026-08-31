@@ -17,6 +17,20 @@ import { KeyboardAvoidingView, Platform, ScrollView, View, type ViewStyle } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './theme.js';
 
+/**
+ * Floor for the bottom inset, in dp.
+ *
+ * On a device with a home indicator, iOS claims roughly this strip for the
+ * system swipe. A control sitting inside it looks tappable and is not — the
+ * gesture recogniser wins. Observed on the video-triage screen, where the skip
+ * button ended up 18dp from the edge and simply did not respond, which reads
+ * as a broken button rather than a layout problem.
+ *
+ * `max` rather than an addition: where the real inset is already this large or
+ * larger it is used unchanged, so this cannot double-pad a notched device.
+ */
+const HOME_INDICATOR_RESERVE = 34;
+
 export interface ScreenProps {
   readonly children: ReactNode;
   readonly scrollable?: boolean;
@@ -43,7 +57,7 @@ export function Screen({
     // clear the text AND the text should keep its own breathing room, which
     // max() would collapse into one.
     paddingTop: insets.top + gutter,
-    paddingBottom: insets.bottom + gutter,
+    paddingBottom: Math.max(insets.bottom, HOME_INDICATOR_RESERVE) + gutter,
     paddingLeft: insets.left + gutter,
     paddingRight: insets.right + gutter,
     gap: theme.spacing.base,

@@ -15,10 +15,12 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { useEmergencyDraft } from '@/state/emergency-draft';
+import { vehicleLabel } from '@/lib/vehicle-label';
 
 export default function ServiceSelectionScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
+  const isArabic = i18n.language.startsWith('ar');
 
   const service = useEmergencyDraft((state) => state.service);
   const vehicleId = useEmergencyDraft((state) => state.vehicleId);
@@ -28,6 +30,14 @@ export default function ServiceSelectionScreen() {
   const services = useQuery({
     queryKey: ['emergency-services'],
     queryFn: () => repository.listEmergencyServices(),
+  });
+
+  // Needed only to name the vehicle chips. Same query keys as the home screen,
+  // so this is a cache hit rather than a second round trip.
+  const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
+  const allModels = useQuery({
+    queryKey: ['models', 'all'],
+    queryFn: () => repository.listModels(''),
   });
 
   const vehicles = useQuery({
@@ -102,7 +112,11 @@ export default function ServiceSelectionScreen() {
                   }}
                 >
                   <Text variant="body">
-                    {vehicle.nickname ?? vehicle.plateAr ?? vehicle.plateEn ?? vehicle.id}
+                    {vehicleLabel(vehicle, {
+                      makes: makes.data,
+                      models: allModels.data,
+                      isArabic,
+                    })}
                   </Text>
                 </Card>
               );
