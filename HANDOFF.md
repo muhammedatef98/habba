@@ -51,8 +51,8 @@ twice consecutively. Both Expo apps bundle and the customer app runs on the iOS
 simulator. Repo is private at **github.com/muhammedatef98/habba**.
 
 ```
-40 migrations · 20 SQL suites · 2 concurrency tests · 50 customer tests
-90 core tests · 27 ui · 9 i18n · 4 provider · typecheck + lint green
+42 migrations · 22 SQL suites · 2 concurrency tests · 50 customer tests
+90 core tests · 29 ui · 9 i18n · 4 provider · typecheck + lint green
 34 integration tests against real PostgREST + RLS
 ```
 
@@ -350,24 +350,28 @@ wrong call and cost more than the fix did.
 - **Booking flow (§9.1)** — placeholder screen. Backend built and tested,
   including the slot-concurrency guarantee. This is the obvious next increment.
 - **Inspection screens (Phase 5)** — backend done, no customer UI.
-- **Camera and GPS are stubs** — both behind interfaces (`location-provider.ts`
-  mirrors `otp-provider.ts`); swapping in real implementations is one file each.
+- **GPS is a stub** — behind an interface (`location-provider.ts` mirrors
+  `otp-provider.ts`); swapping in the real implementation is one file. The
+  camera is now real (expo-camera, 20s cap, uploads to the `triage-media`
+  bucket).
 - **No masked-call relay** — `ProviderSummary` has no phone field, so call and
   chat on the tracking screens are disabled. Needs a relay number issued per
   job, not the technician's own line.
 - **Guest → account conversion** uses the dev stub. Real Supabase
   `signInAnonymously` + identity linking is not wired.
-- **Video triage (§9.1)** — the 20-second clip before dispatch is not built.
-  `app/emergency/triage.tsx` exists and says so on screen rather than showing a
-  viewfinder that would discard the recording. expo-camera is the missing piece.
-- **Dispatch telemetry (design screen 05)** — the contacted / reviewing / busy
-  counters and the second-precision log have nothing behind them. `match_providers`
-  ranks candidates but nothing persists what was offered or what came back, so
-  the counts are not derivable. Needs an offers table and a matcher that writes
-  to it. `DispatchTelemetry` in `data/types.ts` is the shape it should take; the
-  screen renders without it rather than showing invented numbers.
-- **Map on live tracking (design screen 07)** — react-native-maps is not wired.
-  Distance and ETA are real (`order_live_progress`, 0040); the map surface is not.
+- **Push notifications** — no notifications table and nothing sending them, so
+  the design's header bell is deliberately absent rather than decorative.
+- **Wallet** — nothing holds a balance, a card or a transaction; escrow is
+  per-order and lives on the order. The tab bar ships with three tabs, not the
+  design's four, until there is something to put in it.
+- **Dispatch expansion rounds** — round 1 broadcasts automatically on
+  `searching` (0042). The ladder widens after 45s of silence (§7.1) and a
+  trigger cannot wait, so rounds 2 and 3 need an Edge Function on a timer.
+  Everything else about the waiting screen is real.
+- **Provider-side offer UI** — `order_offers` is readable and updatable by the
+  provider, but the provider app has no screen for it yet. Offers stay
+  `pending` until something marks them viewed or declined, so the customer's
+  "reviewing" count will read zero in practice until that lands.
 - **PDF generation** — print-to-PDF only, no server-side render.
 - **Ownership transfer acceptance** — `accept_ownership_transfer()` exists
   (0037) with OTP verification, atomic claim, privileged owner reassignment and
