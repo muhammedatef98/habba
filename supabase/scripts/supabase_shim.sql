@@ -138,3 +138,51 @@ alter default privileges in schema public
   grant select on tables to anon;
 alter default privileges in schema public
   grant all on tables to service_role;
+
+
+-- ---------------------------------------------------------------------------
+-- storage
+-- ---------------------------------------------------------------------------
+-- Enough of Supabase Storage for migrations that define buckets and object
+-- policies to apply and be tested. The real service adds an HTTP API, resumable
+-- uploads, image transformation and a worker that reaps orphans — none of which
+-- a policy test needs.
+--
+-- What IS faithful is the shape RLS depends on: `storage.objects` keyed by
+-- bucket and path, with `owner`, and `storage.foldername()` returning the path
+-- segments, because every real bucket policy is written against those.
+
+create schema if not exists storage;
+
+create table if not exists storage.buckets (
+  id          text primary key,
+  name        text not null,
+  public      boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists storage.objects (
+  id          uuid primary key default gen_random_uuid(),
+  bucket_id   text not null references storage.buckets(id) on delete cascade,
+  name        text not null,
+  owner       uuid,
+  created_at  timestamptz not null default now(),
+  metadata    jsonb,
+  unique (bucket_id, name)
+);
+
+-- Supabase's own helper: splits an object name into its path segments, so a
+-- policy can say "the first folder must be the caller's order id". Returns the
+-- segments WITHOUT the filename, matching the real implementation.
+create or replace function storage.foldername(name text)
+returns text[]
+language sql
+immutable
+parallel safe
+as $$
+  select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1];
+$$;
+
+grant usage on schema storage to anon, authenticated, service_role;
+grant select on storage.buckets to anon, authenticated;
+grant select, insert, update, delete on storage.objects to authenticated;

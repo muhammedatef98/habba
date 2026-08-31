@@ -87,6 +87,14 @@ export interface Repository {
   listMaintenanceAlerts(vehicleId: string): Promise<readonly MaintenanceAlert[]>;
   /** The customer's recent orders, newest first. */
   listRecentOrders(limit?: number): Promise<readonly OrderSummary[]>;
+  /**
+   * Uploads a triage clip against an order and records it on the order.
+   *
+   * Returns false when there is nowhere to upload to — the dev build has no
+   * storage — so the caller can carry on rather than trapping the customer.
+   * A clip is an aid to the technician, never a precondition for rescue.
+   */
+  attachTriageClip(orderId: string, clip: { uri: string; seconds: number }): Promise<boolean>;
   listEmergencyServices(): Promise<readonly Service[]>;
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
   getOrder(orderId: string): Promise<Order | null>;
@@ -700,6 +708,12 @@ export class InMemoryRepository implements Repository {
 
   async listRecentOrders(limit = 5): Promise<readonly OrderSummary[]> {
     return this.orders.recent(limit);
+  }
+
+  // No storage in the in-memory build, and saying so is the point: a silent
+  // success here would hide that the clip went nowhere.
+  async attachTriageClip(): Promise<boolean> {
+    return false;
   }
 
   // The in-memory repository has no PostGIS and no provider moving around, so

@@ -683,6 +683,49 @@ export class SupabaseRepository implements Repository {
     }));
   }
 
+  /**
+   * Uploads the clip to the private `triage-media` bucket (0041) and records it
+   * on the order.
+   *
+   * Keyed `<order_id>/<filename>`, because the bucket's policies authorise on
+   * the first path segment — an object anywhere else matches no order and is
+   * refused. Nothing here needs to check that; RLS does.
+   *
+   * Failure returns false rather than throwing. The clip helps the technician
+   * prepare; it is not a precondition for being rescued, and an upload that
+   * fails on a roadside connection must not take the order down with it.
+   */
+  async attachTriageClip(
+    orderId: string,
+    clip: { uri: string; seconds: number },
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(clip.uri);
+      const body = await response.arrayBuffer();
+      const path = `${orderId}/${Date.now()}.mp4`;
+
+      const upload = await this.client.storage
+        .from('triage-media')
+        .upload(path, body, { contentType: 'video/mp4', upsert: false });
+
+      if (upload.error !== null) return false;
+
+      // The order carries the reference; the bucket carries the bytes. Storing
+      // the path rather than a signed URL, because a signed URL expires and
+      // this row is permanent.
+      const { error } = await this.client
+        .from('orders')
+        .update({
+          triage_media: [{ path, kind: 'video', seconds: clip.seconds }],
+        })
+        .eq('id', orderId);
+
+      return error === null;
+    } catch {
+      return false;
+    }
+  }
+
   async listOrderParts(orderId: string): Promise<readonly OrderPart[]> {
     const rows = unwrap(
       await this.client

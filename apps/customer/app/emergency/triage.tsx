@@ -21,6 +21,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { repository } from '@/data/repository';
 import { useEmergencyDraft } from '@/state/emergency-draft';
 
 /** §9.1. Long enough to show a fault, short enough that nobody narrates. */
@@ -54,10 +55,32 @@ export default function VideoTriageScreen() {
     return () => clearInterval(timer);
   }, [recording]);
 
+  const [uploading, setUploading] = useState(false);
+
   const goToTracking = useCallback(
     () => router.replace({ pathname: '/tracking', params: { id: id ?? '' } }),
     [id],
   );
+
+  /**
+   * Upload, then move on either way.
+   *
+   * A failed upload does not block: the technician is already being matched,
+   * and holding the customer on a camera screen because a roadside connection
+   * dropped would invert the whole point of the step being optional. The clip
+   * is cleared regardless so it cannot leak into a later, unrelated order.
+   */
+  const useClip = useCallback(async () => {
+    if (clip === null || id === undefined) {
+      goToTracking();
+      return;
+    }
+    setUploading(true);
+    await repository.attachTriageClip(id, clip);
+    setClip(null);
+    setUploading(false);
+    goToTracking();
+  }, [clip, id, goToTracking, setClip]);
 
   const record = useCallback(async () => {
     if (camera.current === null) return;
@@ -193,7 +216,11 @@ export default function VideoTriageScreen() {
           testID="emergency-triage-skip"
           label={clip !== null ? t('emergency.triageUse') : t('emergency.triageSkip')}
           variant="secondary"
-          onPress={goToTracking}
+          loading={uploading}
+          onPress={() => {
+            if (clip === null) goToTracking();
+            else void useClip();
+          }}
         />
       </View>
     </Screen>
