@@ -51,9 +51,14 @@ twice consecutively. Both Expo apps bundle and the customer app runs on the iOS
 simulator. Repo is private at **github.com/muhammedatef98/habba**.
 
 ```
-39 migrations · 19 SQL suites · 2 concurrency tests · 48 customer tests
-90 core tests · 10 ui · 9 i18n · 4 provider · typecheck + lint green
+40 migrations · 20 SQL suites · 2 concurrency tests · 50 customer tests
+90 core tests · 27 ui · 9 i18n · 4 provider · typecheck + lint green
+34 integration tests against real PostgREST + RLS
 ```
+
+⚠️ On macOS with PostgreSQL 17, `pg_ctl` fails with "postmaster became
+multithreaded during startup" unless `LC_ALL` is set. Use
+`LC_ALL=C pnpm verify` — without it the integration suites silently skip.
 
 ---
 
@@ -76,10 +81,11 @@ habba/
 │  ├─ core/                  saudi validators, SarAmount money, report render,
 │  │                         inspection scoring, job-flow state mirror
 │  ├─ ui/                    design system (tokens, Text, Button, Card, Field,
-│  │                         Screen, ProvenanceBadge, theme)
+│  │                         Screen, ProvenanceBadge, StatusPill, StatCluster,
+│  │                         ProgressStages, TimelineList, theme)
 │  └─ i18n/                  ar.json + en.json, typed keys
 ├─ supabase/
-│  ├─ migrations/            0001–0039, forward-only
+│  ├─ migrations/            0001–0040, forward-only
 │  ├─ tests/                 00_helpers + 01–19 SQL suites
 │  ├─ seed/                  cities, services, maintenance rules
 │  └─ scripts/               local-db.sh, postgrest.sh, supabase_shim.sql,
@@ -102,8 +108,7 @@ pnpm verify          # typecheck + lint + unit + SQL suites + integration
 ```
 
 **Run `pnpm verify` TWICE.** The integration suite skips itself if PostgREST is
-still warming, so a single run can show `16 passed | 32 skipped` and still exit
-0. Two consecutive green runs is the real check. This is also how a stale-cache
+still warming, so a single run can show `16 passed | 32 skipped` and still exit 0. Two consecutive green runs is the real check. This is also how a stale-cache
 bug hid for hours (§8).
 
 Run the app:
@@ -121,25 +126,25 @@ Location is a fixed Dammam coordinate.
 
 ## 5. Key architectural decisions
 
-| ADR | Decision |
-|---|---|
-| 0003 | Timeline append-only via three independent layers: no INSERT policy, revoked grants, SECURITY DEFINER write path |
-| 0004 | Hash chain over timeline rows; ordered by `seq` (identity column), **not** `recorded_at` — `now()` is transaction-start so all rows tie |
+| ADR  | Decision                                                                                                                                              |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0003 | Timeline append-only via three independent layers: no INSERT policy, revoked grants, SECURITY DEFINER write path                                      |
+| 0004 | Hash chain over timeline rows; ordered by `seq` (identity column), **not** `recorded_at` — `now()` is transaction-start so all rows tie               |
 | 0005 | Provenance levels: `self_reported`, `self_documented`, `habba_verified`, `third_party`. Derived server-side; a client can never request a trust level |
-| 0006 | Order state machine in `order_transitions` table; `checked_in` replaces en_route/arrived for workshop mode |
-| 0007 | `SarAmount` = branded string, integer-halala arithmetic, ROUND_HALF_UP to match Postgres |
-| 0008 | **UNRESOLVED — blocks shipping payments.** Merchant of record / SAMA question |
-| 0009 | **UNRESOLVED — completed orders may be unbillable.** ZATCA seller of record |
-| 0010 | **UNRESOLVED.** Supabase region / data residency / PDPL |
-| 0013 | Providers see masked order info before accepting; exact address only after |
-| 0015 | Local harness exists so migrations are *verified*, not merely written |
+| 0006 | Order state machine in `order_transitions` table; `checked_in` replaces en_route/arrived for workshop mode                                            |
+| 0007 | `SarAmount` = branded string, integer-halala arithmetic, ROUND_HALF_UP to match Postgres                                                              |
+| 0008 | **UNRESOLVED — blocks shipping payments.** Merchant of record / SAMA question                                                                         |
+| 0009 | **UNRESOLVED — completed orders may be unbillable.** ZATCA seller of record                                                                           |
+| 0010 | **UNRESOLVED.** Supabase region / data residency / PDPL                                                                                               |
+| 0013 | Providers see masked order info before accepting; exact address only after                                                                            |
+| 0015 | Local harness exists so migrations are _verified_, not merely written                                                                                 |
 
 ---
 
 ## 6. Security model — read this before touching RLS
 
-**The recurring bug class:** RLS grants row-level access and *cannot express
-which columns*. `WITH CHECK` sees only the new row, never the old one. Fifteen
+**The recurring bug class:** RLS grants row-level access and _cannot express
+which columns_. `WITH CHECK` sees only the new row, never the old one. Fifteen
 vulnerabilities were found across four adversarial audit passes; **none** was
 found by the ~150 feature tests, because those all exercise the intended flow.
 
@@ -155,11 +160,12 @@ found by the ~150 feature tests, because those all exercise the intended flow.
 - **`is_ops()` is NOT exempted in `guard_profile_columns`** — deliberately.
   Exempting it would be circular: a user who set their own role to `ops` would
   pass the guard that stops them setting their own role.
-- **Column read control** is a *grant-layer* problem, not RLS. A column-level
+- **Column read control** is a _grant-layer_ problem, not RLS. A column-level
   `REVOKE` is a **silent no-op** against an existing table-level grant. You must
   `REVOKE SELECT ON <table>` then `GRANT SELECT (explicit, column, list)`.
 
 **Standing audits (these are build steps, not documentation):**
+
 - `tests/16_write_surface_audit.sql` — every client-updatable table classified,
   every guarded table has a guard, every guard is `ENABLE ALWAYS`, sensitive
   columns still exist on guarded tables, append-only tables expose no write policy.
@@ -179,12 +185,54 @@ phone, globally-readable commission rates and invoice sellers.
 
 ## 7. What was built in this session
 
+### Design-system port and emergency-flow rebuild (latest session)
+
+A Claude Design handoff bundle (`Habba Emergency Flow.dc.html`, `Habba Design
+System.dc.html`) became the source of truth for colour and for the emergency
+flow's information architecture. Branch: `feat/emergency-flow-design-port`.
+
+- **Palette ported wholesale.** Every ramp in `tokens.ts` changed, so every
+  existing screen restyled. Warning is now an alias of sand — the design makes
+  warning and accent the same amber deliberately, so a non-emergency alert can
+  never borrow the emergency red, and an alias stops them drifting. New Info
+  ramp; there was no informational colour before.
+- **Five design values were changed on the way in**, each a colour that is fine
+  as a border or a dot being used for small text below 4.5:1. Four were fixed by
+  promoting the text role to a darker step the designer already chose; only
+  `petrol[400]` (#34968F) is new. Every divergence is marked `WCAG:` in
+  `tokens.ts`. **The fifth was caught by the existing provenance-badge test**,
+  not predicted — a grey that passes on the page background fails on the darker
+  sunken surface the badge actually sits on. That test earned its keep.
+- **Ten screens, no new state machine.** They map one-to-one onto `OrderStatus`.
+  `tracking.tsx` is now a dispatcher over six components in
+  `src/components/tracking/`; `emergency.tsx` split into a route group.
+- **The home screen's red emergency button is gone.** The design forbids red
+  before an emergency is under way; a permanently red button is the "everything
+  is urgent" failure the palette exists to prevent. Weight comes from size now.
+- **Nothing is stubbed with plausible data.** Unbacked figures are optional
+  fields with defined reduced states. See §10 for what is still missing and why
+  inventing it would have been worse than omitting it.
+- **Migration 0040** added handover codes and `order_live_progress`. The
+  handover code lives in its own table because `orders_read_assigned_provider`
+  would otherwise let the provider read the code they are being checked
+  against — RLS is row-granular, and column grants cannot separate two parties
+  who are both `authenticated`.
+
+⚠️ One correction worth remembering: 0040's first draft justified
+`order_live_progress` on privacy grounds. That was wrong — 0022 already lets a
+customer read their assigned provider's position during the in-transit window.
+The function's real value is keeping the ETA arithmetic in Postgres (§2.2) and
+refusing to answer from a stale fix. An integration test now pins the 0022
+policy so a future narrowing surfaces there rather than as a blank screen.
+
 ### Phase 3 customer surfaces (§9.1)
+
 The backend passed Phase 3's acceptance criteria long ago, but **nothing had
 ever driven it from the app**. Added:
 
 - `app/vehicles.tsx` — home; vehicle switcher + طلب طارئ / حجز موعد
-- `app/emergency.tsx` — service → location confirm → submit → tracking
+- `app/emergency/` — service → location confirm → optional video triage,
+  behind a Zustand draft store and a dark-scoped ThemeProvider
 - `app/tracking.tsx` — status, provider card, quote banner, completion
   confirmation, rating. §8 calls this the emotional core; motion is eased and
   directional, never bouncy (a breathing pulse, not a spinner)
@@ -193,6 +241,7 @@ ever driven it from the app**. Added:
 - `src/components/RatingStars.tsx` — 48dp touch targets, no third-party widget
 
 ### Guest access + email identity (migration 0039)
+
 **The decision that matters:** a guest is a real Supabase **anonymous auth
 user**, not an unauthenticated client. Every RLS policy keys on `auth.uid()`;
 a guest without one matches zero rows and could not own a logbook at all —
@@ -208,11 +257,13 @@ New screens: `app/email.tsx` (register/sign-in), `app/save-account.tsx`
 (guest → account), guest banner on home.
 
 ### Read-surface hardening (0037, 0038)
-First audit of what clients can *read* — all prior passes audited writes.
+
+First audit of what clients can _read_ — all prior passes audited writes.
 
 ### Harness fix — the most instructive bug
+
 `postgrest.sh stop` ran `kill "$(cat $PIDFILE)" && rm -f "$PIDFILE"`. `kill`
-only *requests* termination and returns immediately, but the pidfile was
+only _requests_ termination and returns immediately, but the pidfile was
 deleted regardless. So: stop printed "postgrest stopped" while the process
 lived → pidfile gone → `is_running` false → `start` launched a new instance
 that **could not bind the taken port** → the readiness probe hit the **old**
@@ -242,14 +293,14 @@ wrong call and cost more than the fix did.
 
 ## 9. Open decisions — these block real work
 
-| # | Decision | Blocks |
-|---|---|---|
-| 1 | **ADR-0008 — payments / merchant of record / SAMA** | Anything that moves real money. `authorise_order_payment` / `capture_order_payment` are the interface; the PSP behind them is unchosen |
-| 2 | **ADR-0009 — ZATCA seller of record** | Completed orders may be unbillable. Schema records *which* seller so invoices stay attributable either way |
-| 3 | **ADR-0010 — Supabase region / PDPL** | No hosted project exists. App falls back to in-memory repository |
-| 4 | **SMS provider** (Unifonic / Taqnyat / Twilio) | Real phone OTP. CITC sender-ID registration required |
-| 5 | **Plate letter map verification** against official MOI/Absher source | ADR-0011, now load-bearing in 5+ places |
-| 6 | **Expo SDK 57 vs Expo Go** | SDK 57 *is* the current stable release, so an up-to-date Expo Go supports it. If the user's Expo Go is outdated the fallback is a dev build, or downgrade to SDK 54 |
+| #   | Decision                                                             | Blocks                                                                                                                                                              |
+| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **ADR-0008 — payments / merchant of record / SAMA**                  | Anything that moves real money. `authorise_order_payment` / `capture_order_payment` are the interface; the PSP behind them is unchosen                              |
+| 2   | **ADR-0009 — ZATCA seller of record**                                | Completed orders may be unbillable. Schema records _which_ seller so invoices stay attributable either way                                                          |
+| 3   | **ADR-0010 — Supabase region / PDPL**                                | No hosted project exists. App falls back to in-memory repository                                                                                                    |
+| 4   | **SMS provider** (Unifonic / Taqnyat / Twilio)                       | Real phone OTP. CITC sender-ID registration required                                                                                                                |
+| 5   | **Plate letter map verification** against official MOI/Absher source | ADR-0011, now load-bearing in 5+ places                                                                                                                             |
+| 6   | **Expo SDK 57 vs Expo Go**                                           | SDK 57 _is_ the current stable release, so an up-to-date Expo Go supports it. If the user's Expo Go is outdated the fallback is a dev build, or downgrade to SDK 54 |
 
 ---
 
@@ -265,6 +316,16 @@ wrong call and cost more than the fix did.
 - **Guest → account conversion** uses the dev stub. Real Supabase
   `signInAnonymously` + identity linking is not wired.
 - **Video triage (§9.1)** — the 20-second clip before dispatch is not built.
+  `app/emergency/triage.tsx` exists and says so on screen rather than showing a
+  viewfinder that would discard the recording. expo-camera is the missing piece.
+- **Dispatch telemetry (design screen 05)** — the contacted / reviewing / busy
+  counters and the second-precision log have nothing behind them. `match_providers`
+  ranks candidates but nothing persists what was offered or what came back, so
+  the counts are not derivable. Needs an offers table and a matcher that writes
+  to it. `DispatchTelemetry` in `data/types.ts` is the shape it should take; the
+  screen renders without it rather than showing invented numbers.
+- **Map on live tracking (design screen 07)** — react-native-maps is not wired.
+  Distance and ETA are real (`order_live_progress`, 0040); the map surface is not.
 - **PDF generation** — print-to-PDF only, no server-side render.
 - **Ownership transfer acceptance** — `accept_ownership_transfer()` exists
   (0037) with OTP verification, atomic claim, privileged owner reassignment and
@@ -322,5 +383,5 @@ means every screen from every earlier phase had never actually run.
 **What I would not trust yet:** that the read-side audit is complete. It was one
 pass, and each prior write-side pass found things the previous one missed —
 including a hole that made the previous passes moot. The standing audits narrow
-the class, but they are *completeness* checks, not proofs: they verify every
+the class, but they are _completeness_ checks, not proofs: they verify every
 table has been classified and guarded, not that each guard is correct.
