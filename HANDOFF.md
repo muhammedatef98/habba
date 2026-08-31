@@ -225,6 +225,37 @@ The function's real value is keeping the ETA arithmetic in Postgres (§2.2) and
 refusing to answer from a stale fix. An integration test now pins the 0022
 policy so a future narrowing surfaces there rather than as a blank screen.
 
+### Brand mark and the defects running it surfaced
+
+- **The app had no icon** — a blank springboard tile — and the mark appeared
+  nowhere inside it. `apps/customer/scripts/generate-logo-assets.py` now renders
+  every size from the design's own paths; the raster output is committed.
+  react-native-svg is deliberately not a dependency: it would mean a native
+  rebuild for eleven static images.
+- Shared marks live in `packages/ui/assets`, launcher icons in the app. The
+  design system owns the brand; each app owns its own launcher.
+- **Call and chat dialled `+966500000000`** — nobody. Now inert until a masked
+  relay number exists, with copy explaining why. Dialling a wrong number during
+  an emergency is worse than a disabled button.
+
+### ⚠️ Two traps that cost hours, worth not rediscovering
+
+**Controls in the home-indicator strip look broken.** The triage skip button
+rendered 18dp from the bottom edge, inside the strip iOS claims for its own
+swipe, and simply did not respond. It presents as a _navigation_ bug — the
+button appears dead, so the router and the route tree are the obvious suspects.
+Three navigation rewrites later the answer was that the press never arrived:
+the same button responded when tapped 18dp higher. `Screen` now floors the
+bottom inset at 34dp. Nothing in the test suite asserts layout, so a green run
+says nothing about whether a control is reachable.
+
+**`[runtime not ready]: ReferenceError: Property 'MessageQueue' doesn't exist`**
+is a stale native binary, not app code. It appears when the installed build's
+Expo config no longer matches what Metro serves — changing `app.json` (adding
+the icon did exactly this) is enough. `npx expo run:ios` fixes it; relaunching
+the existing binary against a fresh Metro does not, and neither does clearing
+the Metro cache.
+
 ### Phase 3 customer surfaces (§9.1)
 
 The backend passed Phase 3's acceptance criteria long ago, but **nothing had
@@ -313,6 +344,9 @@ wrong call and cost more than the fix did.
 - **Inspection screens (Phase 5)** — backend done, no customer UI.
 - **Camera and GPS are stubs** — both behind interfaces (`location-provider.ts`
   mirrors `otp-provider.ts`); swapping in real implementations is one file each.
+- **No masked-call relay** — `ProviderSummary` has no phone field, so call and
+  chat on the tracking screens are disabled. Needs a relay number issued per
+  job, not the technician's own line.
 - **Guest → account conversion** uses the dev stub. Real Supabase
   `signInAnonymously` + identity linking is not wired.
 - **Video triage (§9.1)** — the 20-second clip before dispatch is not built.
