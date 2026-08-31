@@ -11,7 +11,10 @@
     "skip": "تخطّي",
     "optional": "اختياري",
     "loading": "جارٍ التحميل…",
-    "search": "بحث"
+    "search": "بحث",
+    "later": "لاحقاً",
+    "share": "مشاركة",
+    "verified": "موثّق"
   },
   "auth": {
     "welcomeTitle": "أهلاً بك في هبّة",
@@ -157,7 +160,10 @@
     "emergencyAction": "طلب طارئ",
     "bookingAction": "حجز موعد",
     "noVehicleTitle": "أضف سيارة أولاً",
-    "noVehicleBody": "لطلب خدمة طارئة نحتاج بيانات سيارتك."
+    "noVehicleBody": "لطلب خدمة طارئة نحتاج بيانات سيارتك.",
+    "emergencyCta": "طلب طارئ",
+    "emergencySubtitle": "أقرب فنّي متاح · 24 ساعة",
+    "bookAppointment": "حجز موعد"
   },
   "booking": {
     "title": "حجز موعد",
@@ -181,7 +187,21 @@
     "errors": {
       "noLocation": "لم نتمكّن من تحديد موقعك بعد.",
       "createFailed": "تعذّر إرسال الطلب. حاول مرة أخرى."
-    }
+    },
+    "serviceHeadline": "وش صار؟",
+    "serviceSubhead": "اختر وبنبحث لك عن أقرب فنّي فوراً.",
+    "estimatedPrice": "السعر التقديري لـ{{service}}",
+    "priceRange": "{{min}} – {{max}} ر.س",
+    "dragToAdjust": "اسحب لتعديل الموقع",
+    "placeRoadside": "على كتف الطريق",
+    "placeParking": "داخل موقف",
+    "confirmAndSubmit": "تأكيد وإرسال الطلب",
+    "triageTitle": "صوّر 20 ثانية — يساعد الفنّي يجهّز القطعة",
+    "triageBody": "خطوة اختيارية تماماً. البحث عن فنّي بدأ فعلاً في الخلفية.",
+    "triageSkip": "تخطّي — أكمل بدون فيديو",
+    "cameraPreview": "معاينة الكاميرا",
+    "cameraAim": "وجّهها على المشكلة أو الصوت",
+    "triageUnavailable": "تسجيل الفيديو غير متاح على هذا الجهاز."
   },
   "tracking": {
     "title": "تتبّع الطلب",
@@ -208,6 +228,56 @@
       "notFound": "لم نعثر على هذا الطلب.",
       "confirmFailed": "تعذّر تأكيد الإنجاز. حاول مرة أخرى.",
       "cancelFailed": "تعذّر إلغاء الطلب."
+    },
+    "searchingHeadline": "نبحث لك عن فنّي",
+    "searchingReassure": "ما نحتاج منك شي. خلّ الجوال مفتوح وبنخبرك أول ما نلقى أحد.",
+    "searchRadius": "نطاق البحث الآن {{km}} كم",
+    "contactedLabel": "تواصلنا مع",
+    "techniciansCount": "{{count}} فنّيين",
+    "reviewing": "{{count}} يراجعون الطلب",
+    "aboutToRespond": "{{count}} على وشك الرد",
+    "busy": "{{count}} مشغولون",
+    "radiusExpanded": "وسّعنا النطاق إلى {{km}} كم",
+    "avgMatchTime": "متوسط وقت المطابقة في حيّك هذي الساعة {{minutes}} دقيقة",
+    "cancelFreeBeforeMatch": "الإلغاء قبل المطابقة مجاني",
+    "matchedBanner": "لقينا لك فنّي",
+    "orderCount": "{{count}} طلب",
+    "unitMinute": "دقيقة",
+    "unitMinutes": "دقائق",
+    "unitKm": "كم",
+    "totalWithVat": "ر.س شامل الضريبة",
+    "priceFixedNote": "السعر ثابت. أي عمل إضافي يوصلك كعرض سعر تعتمده بنفسك قبل التنفيذ.",
+    "acceptWithAmount": "قبول · {{amount}} ر.س",
+    "findAnother": "ابحث عن فنّي آخر",
+    "arrivesIn": "يوصلك خلال",
+    "distance": "المسافة",
+    "price": "السعر",
+    "chatAction": "محادثة",
+    "shareTrip": "شارك رحلتك مع أحد",
+    "providerArrived": "{{name}} وصل",
+    "waitingAtVehicle": "ينتظرك عند السيارة",
+    "handoverCodePrompt": "أعطِ {{name}} هذا الرمز قبل البدء",
+    "agreedTotal": "المتفق عليه",
+    "agreedTotalLong": "الإجمالي المتفق عليه",
+    "inProgressPill": "جارٍ العمل",
+    "providerWorking": "{{name}} يشتغل على السيارة",
+    "workingBody": "بيحدّثك عند كل خطوة. ما تحتاج تسوي شي.",
+    "paidWith": "مدفوع · {{method}}",
+    "zatcaInvoice": "فاتورة ضريبية معتمدة (ZATCA)",
+    "rateProviderQuestion": "كيف كان {{name}}؟",
+    "vatLine": "ضريبة القيمة المضافة 15%",
+    "labourLine": "أجرة الخدمة",
+    "totalLine": "الإجمالي",
+    "stages": {
+      "accepted": "قَبِل",
+      "enRoute": "في الطريق",
+      "arrived": "وصل",
+      "completed": "مكتمل"
+    },
+    "tags": {
+      "fast": "وصل بسرعة",
+      "respectful": "تعامل محترم",
+      "explained": "شرح الوضع"
     }
   },
   "quote": {

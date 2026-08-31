@@ -55,7 +55,7 @@ export default function VehiclesScreen() {
       router.push('/add-vehicle');
       return;
     }
-    router.push('/emergency');
+    router.push('/emergency/service');
   }
 
   return (
@@ -88,23 +88,47 @@ export default function VehiclesScreen() {
         </Card>
       ) : null}
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-        <View style={{ flex: 1 }}>
-          <Button
-            testID="home-emergency"
-            label={t('home.emergencyAction')}
-            variant="emergency"
-            onPress={handleEmergency}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            testID="home-booking"
-            label={t('home.bookingAction')}
-            variant="secondary"
-            onPress={() => router.push('/booking')}
-          />
-        </View>
+      {/*
+        Teal, not red, and deliberately so. §8 reserves red for a genuine
+        emergency that is already under way — the design does not let it appear
+        before the sixth screen of the flow. A red button sitting on the home
+        screen at all times is exactly the "everything is urgent" failure the
+        palette exists to prevent, and it would leave nothing louder to say
+        when something actually is wrong.
+
+        Given weight instead through size: the primary action is a full-width
+        block roughly twice the height of the secondary one.
+      */}
+      <View style={{ gap: theme.spacing.md }}>
+        <Card
+          testID="home-emergency"
+          elevation="md"
+          onPress={handleEmergency}
+          accessibilityLabel={t('home.emergencyCta')}
+          style={{
+            minHeight: 88,
+            justifyContent: 'center',
+            backgroundColor: theme.colors.primary,
+            borderColor: theme.colors.primary,
+            borderRadius: theme.radius.xl,
+          }}
+        >
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text variant="heading" style={{ color: theme.colors.primaryText }}>
+              {t('home.emergencyCta')}
+            </Text>
+            <Text variant="caption" style={{ color: theme.colors.primaryText, opacity: 0.85 }}>
+              {t('home.emergencySubtitle')}
+            </Text>
+          </View>
+        </Card>
+
+        <Button
+          testID="home-booking"
+          label={t('home.bookAppointment')}
+          variant="secondary"
+          onPress={() => router.push('/booking')}
+        />
       </View>
 
       {vehicles.data?.length === 0 ? (

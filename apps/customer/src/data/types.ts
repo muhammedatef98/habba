@@ -148,6 +148,57 @@ export interface OrderPart {
   readonly approvedByCustomer: boolean;
 }
 
+/**
+ * Dispatch telemetry — the live numbers screen 05 of the design shows while a
+ * request is out for matching.
+ *
+ * Every field is optional and none of it is ever computed on the client
+ * (CLAUDE.md §2.2). The design's stated intent for this screen is "لا دوّارة" —
+ * show real figures instead of a meaningless spinner — so the honest failure
+ * mode when the server does not supply a field is to omit that row, never to
+ * invent a number. The screens are built to read correctly with all of this
+ * absent, which is the current state until the matching service publishes it.
+ */
+export interface DispatchTelemetry {
+  /** Providers the matcher has actually reached. */
+  readonly contactedCount?: number | undefined;
+  readonly reviewingCount?: number | undefined;
+  readonly respondingCount?: number | undefined;
+  readonly busyCount?: number | undefined;
+  /** Current search radius in kilometres, as widened by the matcher. */
+  readonly radiusKm?: number | undefined;
+  /** Rolling median match time for this area, in seconds. */
+  readonly areaMedianSeconds?: number | undefined;
+  readonly log?: readonly DispatchLogEntry[] | undefined;
+}
+
+export interface DispatchLogEntry {
+  readonly id: string;
+  readonly kind: 'submitted' | 'radius_expanded' | 'providers_notified';
+  readonly occurredAt: string;
+  readonly radiusKm?: number | undefined;
+  readonly providerCount?: number | undefined;
+}
+
+/**
+ * Live job figures. Same rule as DispatchTelemetry: server-supplied or absent.
+ * An ETA invented on the device is worse than no ETA — it is a promise the
+ * system has not made.
+ */
+export interface JobProgress {
+  readonly etaMinutes?: number | undefined;
+  readonly distanceKm?: number | undefined;
+  /** 0–1 within the current stage; drives the partial fill on ProgressStages. */
+  readonly stageProgress?: number | undefined;
+  /**
+   * Handover verification code. Server-only by design — it exists to stop a
+   * vehicle being released to the wrong person, so a client-generated value
+   * would defeat the entire control. Rendered only when present.
+   */
+  readonly handoverCode?: string | undefined;
+  readonly lastUpdateAt?: string | undefined;
+}
+
 export interface NewRatingInput {
   readonly orderId: string;
   readonly providerId: string;

@@ -1,87 +1,46 @@
 /**
  * Live tracking — §8: "the emotional core of the product. Invest in it."
  *
- * §9.1: status timeline + ETA + provider card + call/chat. There is no real
- * map or live provider position here yet — react-native-maps and the
- * customer-facing read of provider_locations are both open work — but the
- * status progression, the quote-approval handoff, the completion
- * confirmation that triggers payment capture, and the automatic logbook
- * write are all real and wired to the database's actual state machine.
+ * This file is a dispatcher, not a screen. The design (`Habba Emergency Flow`,
+ * screens 05–08c) is six distinct states, and each one is its own component
+ * under `src/components/tracking/`. What lives here is the data: one polled
+ * order query, the provider and parts reads that hang off it, and the four
+ * mutations. Keeping the queries in one place means the six states cannot
+ * disagree about what the order says.
  *
- * Motion follows §8: eased and directional, never bouncy. The searching
- * state pulses rather than spins — a spinner implies indeterminate mechanical
- * work; a slow breathing pulse reads as "searching for someone," which is
- * closer to what is actually happening.
+ * Dark is this flow's default theme rather than the device's — most emergencies
+ * happen after sunset, and a white screen at night on the hard shoulder is
+ * hostile. The nested ThemeProvider scopes that to this route.
+ *
+ * The map and the live provider position are still open work (react-native-maps
+ * plus a customer read of provider_locations), as is the dispatch telemetry
+ * behind screen 05. Every one of those is modelled as optional data and the
+ * screens render correctly without it — see DispatchTelemetry in data/types.ts
+ * for why nothing here is stubbed with invented numbers.
  */
 
-import { useEffect } from 'react';
-import { Linking, View } from 'react-native';
+import { Share, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Screen, Text, ThemeProvider, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
-import { useIsAuthenticated } from '@/state/session';
-import { RatingStars } from '@/components/RatingStars';
+import { useIsAuthenticated, useSession } from '@/state/session';
+import { Arrived } from '@/components/tracking/Arrived';
+import { Completed } from '@/components/tracking/Completed';
+import { InProgress } from '@/components/tracking/InProgress';
+import { LiveTracking } from '@/components/tracking/LiveTracking';
+import { Matched } from '@/components/tracking/Matched';
+import { Searching } from '@/components/tracking/Searching';
 import type { OrderStatus } from '@/data/types';
 
 const TERMINAL: readonly OrderStatus[] = ['completed', 'cancelled', 'disputed'];
 const SEARCHING: readonly OrderStatus[] = ['draft', 'searching'];
 
-function SearchingPulse() {
-  const theme = useTheme();
-  const scale = useSharedValue(1);
-
-  useEffect(() => {
-    scale.value = withRepeat(
-      withTiming(1.12, { duration: theme.duration.deliberate, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    );
-  }, [scale, theme.duration.deliberate]);
-
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
-  return (
-    <View style={{ alignItems: 'center', paddingVertical: theme.spacing.xl }}>
-      <Animated.View
-        style={[
-          {
-            width: 96,
-            height: 96,
-            borderRadius: theme.radius.full,
-            backgroundColor: theme.colors.primarySubtle,
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          style,
-        ]}
-      >
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: theme.radius.full,
-            backgroundColor: theme.colors.primary,
-          }}
-        />
-      </Animated.View>
-    </View>
-  );
-}
-
-export default function TrackingScreen() {
+function TrackingBody() {
   const { t } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
-  const isAuthenticated = useIsAuthenticated();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const order = useQuery({
@@ -127,8 +86,6 @@ export default function TrackingScreen() {
       }),
   });
 
-  if (!isAuthenticated) return <Redirect href="/" />;
-
   if (order.isLoading) {
     return (
       <Screen>
@@ -148,76 +105,84 @@ export default function TrackingScreen() {
     );
   }
 
-  const { status } = order.data;
+  const current = order.data;
+  const { status } = current;
+  const providerData = provider.data ?? null;
   const hasUnapprovedParts = (parts.data ?? []).some((line) => !line.approvedByCustomer);
-  const canCancel = !TERMINAL.includes(status) && status !== 'in_progress';
 
-  return (
-    <Screen scrollable>
-      <Text variant="title">{t('tracking.title')}</Text>
+  // Neither of these is available from the backend yet. They are read as
+  // `undefined` deliberately rather than filled in with plausible values —
+  // see the module comment.
+  const telemetry = undefined;
+  const progress = undefined;
 
-      {SEARCHING.includes(status) ? (
-        <View style={{ gap: theme.spacing.sm }}>
-          <SearchingPulse />
-          <Text variant="heading" align="center">
-            {t('tracking.searchingTitle')}
-          </Text>
-          <Text variant="body" tone="muted" align="center">
-            {t('tracking.searchingBody')}
-          </Text>
-        </View>
-      ) : (
-        <Card elevation="none" style={{ backgroundColor: theme.colors.primarySubtle }}>
-          <Text variant="bodyStrong" style={{ color: theme.colors.primary }}>
-            {t(`job.status.${status}`)}
-          </Text>
-        </Card>
-      )}
+  if (SEARCHING.includes(status)) {
+    return (
+      <Screen scrollable>
+        <Searching
+          telemetry={telemetry}
+          onCancel={() => cancel.mutate()}
+          cancelPending={cancel.isPending}
+        />
+      </Screen>
+    );
+  }
 
-      {provider.data !== null && provider.data !== undefined ? (
-        <Card testID="tracking-provider-card">
-          <View style={{ gap: theme.spacing.sm }}>
-            <Text variant="label" tone="muted">
-              {t('tracking.providerCard')}
-            </Text>
-            <Text variant="bodyStrong">{provider.data.businessNameAr}</Text>
-            <Text variant="caption" tone="muted">
-              {t('tracking.ratingLabel', {
-                rating: provider.data.ratingAvg.toFixed(1),
-                count: provider.data.ratingCount,
-              })}
-            </Text>
-            <Button
-              label={t('tracking.callAction')}
-              variant="secondary"
-              size="medium"
-              onPress={() => void Linking.openURL('tel:+966500000000')}
-            />
-          </View>
-        </Card>
-      ) : null}
+  if (status === 'quoted') {
+    return (
+      <Screen scrollable>
+        <Matched
+          order={current}
+          provider={providerData}
+          progress={progress}
+          onFindAnother={() => cancel.mutate()}
+        />
+      </Screen>
+    );
+  }
 
-      {status === 'in_progress' && hasUnapprovedParts ? (
-        <Card
-          testID="tracking-quote-banner"
-          elevation="none"
-          style={{ backgroundColor: theme.colors.accentSubtle }}
-        >
-          <View style={{ gap: theme.spacing.sm }}>
-            <Text variant="bodyStrong" style={{ color: theme.colors.accentText }}>
-              {t('tracking.quoteReadyBanner')}
-            </Text>
-            <Button
-              label={t('tracking.reviewQuote')}
-              variant="accent"
-              size="medium"
-              onPress={() => router.push({ pathname: '/quote', params: { id } })}
-            />
-          </View>
-        </Card>
-      ) : null}
+  if (status === 'accepted' || status === 'en_route' || status === 'checked_in') {
+    return (
+      <Screen scrollable>
+        <LiveTracking
+          order={current}
+          provider={providerData}
+          progress={progress}
+          onShare={() => {
+            void Share.share({ message: t('tracking.shareTrip') });
+          }}
+        />
+      </Screen>
+    );
+  }
 
-      {status === 'awaiting_approval' ? (
+  if (status === 'arrived') {
+    return (
+      <Screen scrollable>
+        <Arrived order={current} provider={providerData} progress={progress} />
+      </Screen>
+    );
+  }
+
+  if (status === 'in_progress') {
+    return (
+      <Screen scrollable>
+        <InProgress
+          order={current}
+          provider={providerData}
+          progress={progress}
+          hasUnapprovedParts={hasUnapprovedParts}
+          onReviewQuote={() => router.push({ pathname: '/quote', params: { id } })}
+        />
+      </Screen>
+    );
+  }
+
+  // The customer closes the job, not the provider (ADR-0006), so this state
+  // needs its own explicit confirmation rather than folding into `completed`.
+  if (status === 'awaiting_approval') {
+    return (
+      <Screen scrollable>
         <Card testID="tracking-confirm-completion">
           <View style={{ gap: theme.spacing.sm }}>
             <Text variant="heading">{t('tracking.confirmCompletionTitle')}</Text>
@@ -231,63 +196,56 @@ export default function TrackingScreen() {
               loading={confirmCompletion.isPending}
             />
             {confirmCompletion.isError ? (
-              <Text variant="caption" style={{ color: theme.colors.emergency }}>
+              <Text variant="caption" tone="emergency">
                 {t('tracking.errors.confirmFailed')}
               </Text>
             ) : null}
           </View>
         </Card>
-      ) : null}
+      </Screen>
+    );
+  }
 
-      {status === 'completed' ? (
-        <Card testID="tracking-completed">
-          <View style={{ gap: theme.spacing.md }}>
-            <View style={{ gap: theme.spacing.xs }}>
-              <Text variant="heading">{t('tracking.completedTitle')}</Text>
-              <Text variant="body" tone="muted">
-                {t('tracking.completedBody')}
-              </Text>
-            </View>
-
-            {order.data.vehicleId !== null ? (
-              <Button
-                label={t('tracking.viewLogbook')}
-                variant="secondary"
-                onPress={() =>
-                  router.push({ pathname: '/logbook', params: { id: order.data?.vehicleId ?? '' } })
-                }
-              />
-            ) : null}
-
-            <View style={{ gap: theme.spacing.sm }}>
-              <Text variant="label" tone="muted">
-                {t('tracking.rateTitle')}
-              </Text>
-              {rate.isSuccess ? (
-                <Text variant="body">{t('tracking.rateThanks')}</Text>
-              ) : (
-                <RatingStars onRate={(stars) => rate.mutate(stars)} disabled={rate.isPending} />
-              )}
-            </View>
-          </View>
-        </Card>
-      ) : null}
-
-      {status === 'cancelled' ? (
-        <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
-          <Text variant="heading">{t('tracking.cancelledTitle')}</Text>
-        </Card>
-      ) : null}
-
-      {canCancel ? (
-        <Button
-          testID="cancel-order"
-          label={t('tracking.cancelAction')}
-          variant="ghost"
-          onPress={() => cancel.mutate()}
-          loading={cancel.isPending}
+  if (status === 'completed') {
+    return (
+      <Screen scrollable>
+        <Completed
+          order={current}
+          provider={providerData}
+          onRate={(stars) => rate.mutate(stars)}
+          ratePending={rate.isPending}
+          rateSucceeded={rate.isSuccess}
+          onViewLogbook={() =>
+            router.push({ pathname: '/logbook', params: { id: current.vehicleId ?? '' } })
+          }
+          onDismiss={() => router.replace('/')}
         />
-      ) : null}
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen scrollable>
+      <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
+        <Text variant="heading">{t('tracking.cancelledTitle')}</Text>
+      </Card>
+      <Button label={t('common.back')} variant="ghost" onPress={() => router.replace('/')} />
     </Screen>
+  );
+}
+
+export default function TrackingScreen() {
+  const isAuthenticated = useIsAuthenticated();
+  // The locale still comes from the session — only the light/dark preference is
+  // overridden here. Pinning the locale too would silently force Arabic on an
+  // English user the moment they opened a tracking screen.
+  const locale = useSession((state) => state.locale);
+
+  if (!isAuthenticated) return <Redirect href="/" />;
+
+  return (
+    <ThemeProvider locale={locale} preference="dark">
+      <TrackingBody />
+    </ThemeProvider>
   );
 }

@@ -11,7 +11,10 @@
     "skip": "Skip",
     "optional": "Optional",
     "loading": "Loading…",
-    "search": "Search"
+    "search": "Search",
+    "later": "Later",
+    "share": "Share",
+    "verified": "Verified"
   },
   "auth": {
     "welcomeTitle": "Welcome to Habba",
@@ -157,7 +160,10 @@
     "emergencyAction": "Emergency request",
     "bookingAction": "Book an appointment",
     "noVehicleTitle": "Add a vehicle first",
-    "noVehicleBody": "We need your vehicle's details to send an emergency request."
+    "noVehicleBody": "We need your vehicle's details to send an emergency request.",
+    "emergencyCta": "Emergency request",
+    "emergencySubtitle": "Nearest available technician · 24 hours",
+    "bookAppointment": "Book an appointment"
   },
   "booking": {
     "title": "Book an appointment",
@@ -181,7 +187,21 @@
     "errors": {
       "noLocation": "We couldn't determine your location yet.",
       "createFailed": "The request could not be sent. Try again."
-    }
+    },
+    "serviceHeadline": "What happened?",
+    "serviceSubhead": "Pick one and we'll find your nearest technician right away.",
+    "estimatedPrice": "Estimated price for {{service}}",
+    "priceRange": "{{min}} – {{max}} SAR",
+    "dragToAdjust": "Drag to adjust location",
+    "placeRoadside": "On the hard shoulder",
+    "placeParking": "In a car park",
+    "confirmAndSubmit": "Confirm and send request",
+    "triageTitle": "Record 20 seconds — it helps the technician bring the right part",
+    "triageBody": "Entirely optional. We've already started looking for a technician.",
+    "triageSkip": "Skip — continue without video",
+    "cameraPreview": "Camera preview",
+    "cameraAim": "Point it at the problem or the sound",
+    "triageUnavailable": "Video recording isn't available on this device."
   },
   "tracking": {
     "title": "Track request",
@@ -208,6 +228,56 @@
       "notFound": "We couldn't find that request.",
       "confirmFailed": "Confirmation failed. Try again.",
       "cancelFailed": "The request could not be cancelled."
+    },
+    "searchingHeadline": "Finding you a technician",
+    "searchingReassure": "Nothing needed from you. Keep your phone handy and we'll tell you the moment we find someone.",
+    "searchRadius": "Search radius now {{km}} km",
+    "contactedLabel": "We've contacted",
+    "techniciansCount": "{{count}} technicians",
+    "reviewing": "{{count}} reviewing the request",
+    "aboutToRespond": "{{count}} about to respond",
+    "busy": "{{count}} busy",
+    "radiusExpanded": "Widened the search to {{km}} km",
+    "avgMatchTime": "Average match time in your area right now is {{minutes}} minutes",
+    "cancelFreeBeforeMatch": "Cancelling before a match is free",
+    "matchedBanner": "We found you a technician",
+    "orderCount": "{{count}} jobs",
+    "unitMinute": "minute",
+    "unitMinutes": "minutes",
+    "unitKm": "km",
+    "totalWithVat": "SAR incl. VAT",
+    "priceFixedNote": "The price is fixed. Any additional work reaches you as a quote you approve yourself before it starts.",
+    "acceptWithAmount": "Accept · {{amount}} SAR",
+    "findAnother": "Find another technician",
+    "arrivesIn": "Arrives in",
+    "distance": "Distance",
+    "price": "Price",
+    "chatAction": "Chat",
+    "shareTrip": "Share your trip with someone",
+    "providerArrived": "{{name}} has arrived",
+    "waitingAtVehicle": "Waiting for you at the vehicle",
+    "handoverCodePrompt": "Give {{name}} this code before work starts",
+    "agreedTotal": "Agreed",
+    "agreedTotalLong": "Agreed total",
+    "inProgressPill": "In progress",
+    "providerWorking": "{{name}} is working on the vehicle",
+    "workingBody": "They'll update you at each step. Nothing needed from you.",
+    "paidWith": "Paid · {{method}}",
+    "zatcaInvoice": "Approved tax invoice (ZATCA)",
+    "rateProviderQuestion": "How was {{name}}?",
+    "vatLine": "VAT 15%",
+    "labourLine": "Service charge",
+    "totalLine": "Total",
+    "stages": {
+      "accepted": "Accepted",
+      "enRoute": "En route",
+      "arrived": "Arrived",
+      "completed": "Completed"
+    },
+    "tags": {
+      "fast": "Arrived quickly",
+      "respectful": "Courteous",
+      "explained": "Explained the issue"
     }
   },
   "quote": {
