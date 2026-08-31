@@ -279,7 +279,8 @@
       "respectful": "Courteous",
       "explained": "Explained the issue"
     },
-    "evidenceTitle": "Photos from the job"
+    "evidenceTitle": "Photos from the job",
+    "contactUnavailable": "Calling the technician isn't available yet — we're setting up a relay number that protects both sides' privacy."
   },
   "quote": {
     "title": "Parts quote",
