@@ -51,7 +51,7 @@ twice consecutively. Both Expo apps bundle and the customer app runs on the iOS
 simulator. Repo is private at **github.com/muhammedatef98/habba**.
 
 ```
-42 migrations · 22 SQL suites · 2 concurrency tests · 50 customer tests
+44 migrations · 23 SQL suites · 2 concurrency tests · 50 customer tests
 90 core tests · 29 ui · 9 i18n · 4 provider · typecheck + lint green
 34 integration tests against real PostgREST + RLS
 ```
@@ -364,14 +364,10 @@ wrong call and cost more than the fix did.
 - **Wallet** — nothing holds a balance, a card or a transaction; escrow is
   per-order and lives on the order. The tab bar ships with three tabs, not the
   design's four, until there is something to put in it.
-- **Dispatch expansion rounds** — round 1 broadcasts automatically on
-  `searching` (0042). The ladder widens after 45s of silence (§7.1) and a
-  trigger cannot wait, so rounds 2 and 3 need an Edge Function on a timer.
-  Everything else about the waiting screen is real.
-- **Provider-side offer UI** — `order_offers` is readable and updatable by the
-  provider, but the provider app has no screen for it yet. Offers stay
-  `pending` until something marks them viewed or declined, so the customer's
-  "reviewing" count will read zero in practice until that lands.
+- **The dispatch tick is not scheduled** — `supabase/functions/dispatch-tick`
+  exists and `expand_stale_searches()` is tested, but nothing calls it on a
+  timer yet. Needs a cron (~15s) and `HABBA_DISPATCH_TICK_SECRET` set. Until
+  then searches broadcast round 1 and never widen.
 - **PDF generation** — print-to-PDF only, no server-side render.
 - **Ownership transfer acceptance** — `accept_ownership_transfer()` exists
   (0037) with OTP verification, atomic claim, privileged owner reassignment and
