@@ -172,6 +172,55 @@ select test.assert_eq(
 reset role;
 
 
+-- Responding through the functions -------------------------------------------
+-- Reset both offers to pending so the response path can be exercised cleanly.
+update public.order_offers set outcome = 'pending', viewed_at = null, responded_at = null
+ where order_id = 'f0000000-0000-4000-c000-000000000001';
+
+set role authenticated;
+select test.become('22222222-0000-4000-c000-000000000002');
+
+select test.assert(
+  public.mark_offer_viewed('f0000000-0000-4000-c000-000000000001'),
+  'opening a job records that the provider looked');
+
+select test.assert_eq(
+  public.mark_offer_viewed('f0000000-0000-4000-c000-000000000001'),
+  false,
+  'and opening it twice is not two people looking');
+
+select test.assert(
+  public.decline_offer('f0000000-0000-4000-c000-000000000001'),
+  'declining is cheap and explicit — a provider who cannot decline just ignores');
+
+select test.assert_eq(
+  public.mark_offer_viewed('f0000000-0000-4000-c000-000000000001'),
+  false,
+  'a declined offer does not reopen by being scrolled past again');
+
+reset role;
+
+
+-- Acceptance settles everyone else's offer ------------------------------------
+update public.order_offers set outcome = 'pending', responded_at = null
+ where order_id = 'f0000000-0000-4000-c000-000000000001';
+
+update public.orders set provider_id = 'e0000000-0000-4000-c000-000000000001'
+ where id = 'f0000000-0000-4000-c000-000000000001';
+
+select test.assert_eq(
+  (select outcome::text from public.order_offers
+    where provider_id = 'e0000000-0000-4000-c000-000000000001'),
+  'accepted',
+  'the winner''s offer is marked accepted');
+
+select test.assert_eq(
+  (select outcome::text from public.order_offers
+    where provider_id = 'e0000000-0000-4000-c000-000000000002'),
+  'expired',
+  'and everyone else expires rather than sitting pending forever');
+
+
 -- Telemetry stops once the search is over ------------------------------------
 update public.orders set status = 'quoted'
  where id = 'f0000000-0000-4000-c000-000000000001';

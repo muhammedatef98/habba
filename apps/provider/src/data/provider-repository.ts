@@ -56,6 +56,16 @@ export interface ProviderRepository {
   listOpenJobs(): Promise<readonly OpenJob[]>;
   listMyJobs(): Promise<readonly AssignedJob[]>;
   getJob(orderId: string): Promise<AssignedJob | null>;
+  /**
+   * Records that this provider opened the offer (0043).
+   *
+   * Moves the customer's "reviewing" counter, which is the whole argument of
+   * their waiting screen — a number that changes because something real
+   * happened rather than a spinner.
+   */
+  markOfferViewed(orderId: string): Promise<void>;
+  /** Declines an offer so the dispatcher can widen instead of waiting. */
+  declineOffer(orderId: string): Promise<void>;
   acceptJob(orderId: string): Promise<void>;
   advanceJob(orderId: string, toStatus: OrderStatus): Promise<void>;
   checkInVehicle(orderId: string): Promise<void>;
@@ -158,6 +168,18 @@ export class SupabaseProviderRepository implements ProviderRepository {
 
     if (error !== null) throw new Error(`getJob: ${error.message}`);
     return data === null ? null : toAssignedJob(data);
+  }
+
+  async markOfferViewed(orderId: string): Promise<void> {
+    // Deliberately not surfaced as an error to the caller. Failing to record a
+    // view must never stop a technician opening a job — the telemetry is for
+    // the customer's reassurance, not a precondition for work.
+    await this.client.rpc('mark_offer_viewed', { p_order_id: orderId });
+  }
+
+  async declineOffer(orderId: string): Promise<void> {
+    const { error } = await this.client.rpc('decline_offer', { p_order_id: orderId });
+    if (error !== null) throw new Error(`declineOffer: ${error.message}`);
   }
 
   async acceptJob(orderId: string): Promise<void> {
@@ -271,6 +293,17 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async getJob(orderId: string): Promise<AssignedJob | null> {
     return this.jobs.get(orderId) ?? null;
+  }
+
+  // No offers table in the dev build, so there is nothing to record. Silent
+  // rather than throwing: the customer-facing counter is the only thing that
+  // depends on this, and it is not worth a technician seeing an error for.
+  async markOfferViewed(): Promise<void> {
+    return;
+  }
+
+  async declineOffer(orderId: string): Promise<void> {
+    this.jobs.delete(orderId);
   }
 
   async acceptJob(orderId: string): Promise<void> {

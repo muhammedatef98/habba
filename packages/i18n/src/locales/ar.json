@@ -333,7 +333,9 @@
       "completed": "مكتمل",
       "cancelled": "ملغى",
       "disputed": "قيد النزاع"
-    }
+    },
+    "decline": "مو متاح الحين",
+    "declined": "تم رفض الطلب"
   },
   "provider": {
     "shiftTitle": "ورديتك",

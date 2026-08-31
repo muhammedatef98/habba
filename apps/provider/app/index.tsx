@@ -9,7 +9,7 @@
  * the address before acceptance, so this screen renders everything there is.
  */
 
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -28,6 +28,18 @@ export default function ShiftScreen() {
   const lastBroadcastAt = useShift((state) => state.lastBroadcastAt);
   const markBroadcast = useShift((state) => state.markBroadcast);
   const setBroadcastError = useShift((state) => state.setBroadcastError);
+
+  /**
+   * Opening a job records that this provider looked at it (0043).
+   *
+   * Fire-and-forget: the customer's "reviewing" counter is the only thing that
+   * depends on it, and a technician must never be blocked from opening a job
+   * because a telemetry write failed.
+   */
+  const openJob = useCallback((orderId: string) => {
+    void providerRepository.markOfferViewed(orderId);
+    router.push({ pathname: '/job', params: { id: orderId } });
+  }, []);
 
   const openJobs = useQuery({
     queryKey: ['open-jobs'],
@@ -117,7 +129,7 @@ export default function ShiftScreen() {
             <Pressable
               key={job.orderId}
               testID={`job-${job.orderId}`}
-              onPress={() => router.push({ pathname: '/job', params: { id: job.orderId } })}
+              onPress={() => openJob(job.orderId)}
               accessibilityRole="button"
               accessibilityLabel={job.serviceNameAr}
             >
