@@ -6,12 +6,13 @@
  * tolerable. The steps are derived from the order's real status, so the list
  * cannot claim progress the backend has not recorded.
  *
- * Evidence photos are part of the design but need the provider-side evidence
- * API, which does not exist yet on the customer read path — that row is simply
- * absent rather than stubbed.
+ * Evidence photos come from `orders.completion_media` (migration 0032), which
+ * the provider must supply before handing the job back. The strip only appears
+ * once there is something in it — an empty frame would imply the technician
+ * skipped a step the database in fact requires.
  */
 
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -45,8 +46,52 @@ export function InProgress({
 
   const providerName = provider?.businessNameAr ?? '';
 
+  const photos = order.completionMedia;
+
   const steps: readonly TimelineItem[] = [
     { key: 'arrived', title: t('tracking.stages.arrived'), state: 'done' },
+    ...(photos.length > 0
+      ? [
+          {
+            key: 'evidence',
+            title: t('tracking.evidenceTitle'),
+            state: 'done' as const,
+            children: (
+              <View
+                style={{ flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}
+              >
+                {photos.slice(0, 3).map((photo) => (
+                  <Image
+                    key={photo.url}
+                    source={{ uri: photo.url }}
+                    accessibilityLabel={photo.caption ?? t('tracking.evidenceTitle')}
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: theme.radius.md,
+                      backgroundColor: theme.colors.surfaceSunken,
+                    }}
+                  />
+                ))}
+                {photos.length > 3 ? (
+                  <View
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: theme.radius.md,
+                      backgroundColor: theme.colors.primarySubtle,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text variant="label" tone="primary">{`+${photos.length - 3}`}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ),
+          },
+        ]
+      : []),
     { key: 'working', title: t('tracking.inProgressPill'), state: 'current' },
     { key: 'handover', title: t('tracking.stages.completed'), state: 'pending' },
   ];

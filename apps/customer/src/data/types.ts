@@ -117,6 +117,17 @@ export interface ProviderSummary {
   readonly ratingCount: number;
 }
 
+/**
+ * A photo the technician captured on the job. Stored on `orders.completion_media`
+ * since migration 0032, which makes it mandatory before a job can be handed
+ * back for approval — §11: "without them the moat is empty."
+ */
+export interface CompletionMedia {
+  readonly url: string;
+  readonly kind: 'before' | 'after' | 'part';
+  readonly caption?: string | undefined;
+}
+
 export interface Order {
   readonly id: string;
   readonly status: OrderStatus;
@@ -132,6 +143,7 @@ export interface Order {
   readonly vatAmount: SarAmount | null;
   readonly totalAmount: SarAmount | null;
   readonly escrowStatus: EscrowStatus;
+  readonly completionMedia: readonly CompletionMedia[];
 }
 
 export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'refunded';

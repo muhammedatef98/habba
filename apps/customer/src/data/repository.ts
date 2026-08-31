@@ -20,6 +20,7 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { useSession } from '../state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import type {
+  JobProgress,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
@@ -84,6 +85,13 @@ export interface Repository {
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
   getOrder(orderId: string): Promise<Order | null>;
   getOrderProvider(providerId: string): Promise<ProviderSummary | null>;
+  /**
+   * Live figures for an active job — distance, ETA, and the handover code.
+   * Returns null whenever the server has nothing to report (no assigned
+   * provider, a stale position, or a job that is no longer travelling), which
+   * the tracking screens render as their reduced state rather than as zeroes.
+   */
+  getOrderProgress(orderId: string): Promise<JobProgress | null>;
   listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
   approveOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
@@ -350,6 +358,8 @@ class DevOrderSimulator {
       vatAmount: null,
       totalAmount: null,
       escrowStatus: 'authorised',
+      // The dev simulator has no technician taking photographs.
+      completionMedia: [],
     };
     this.orders.set(id, order);
 
@@ -636,6 +646,14 @@ export class InMemoryRepository implements Repository {
 
   async getOrderProvider(providerId: string) {
     return providerId === DEV_PROVIDER.id ? DEV_PROVIDER : null;
+  }
+
+  // The in-memory repository has no PostGIS and no provider moving around, so
+  // there is genuinely nothing to report. Returning null rather than sample
+  // figures keeps the dev build honest about which parts are wired: a
+  // plausible ETA here would hide the fact that the real one is not yet read.
+  async getOrderProgress(_orderId: string): Promise<JobProgress | null> {
+    return null;
   }
 
   async listOrderParts(orderId: string) {

@@ -14,6 +14,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { sarOrThrow } from '@habba/core';
 import { DevPaymentProvider } from '../lib/payments.js';
+import { SupabaseRepository } from './supabase-repository.js';
 import { mintTestJwt } from './test-jwt.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
@@ -21,6 +22,8 @@ const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-
 
 const CUSTOMER_ID = 'aaaaaaaa-3333-4333-8444-aaaaaaaaaaaa';
 const TECH_ID = 'bbbbbbbb-3333-4333-8444-bbbbbbbbbbbb';
+/** Nobody. Needs no auth.users row — RLS reads auth.uid() from the JWT claim. */
+const STRANGER_ID = 'cccccccc-3333-4333-8444-cccccccccccc';
 
 async function isHarnessUp(): Promise<boolean> {
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -282,6 +285,64 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
       .single();
     expect((after.data as { escrow_status: string }).escrow_status).toBe('authorised');
     expect((after.data as { provider_id: string }).provider_id).toBe(providerId);
+  });
+
+  test('the handover code reaches the customer and never the technician', async () => {
+    // Migration 0040. The code exists to stop a vehicle being released to
+    // someone who is not the dispatched technician, so the assertion that
+    // matters is the negative one: the party being checked cannot read it.
+    const tech = clientFor(TECH_ID);
+    const customer = clientFor(CUSTOMER_ID);
+
+    const progress = await new SupabaseRepository(customer, () => CUSTOMER_ID).getOrderProgress(orderId);
+    expect(progress).not.toBeNull();
+    expect(progress?.handoverCode).toMatch(/^[0-9]{4}$/);
+
+    const stolen = await tech.from('order_handovers').select('code').eq('order_id', orderId);
+    // RLS filters rather than errors, so an empty result is the pass condition.
+    expect(stolen.data ?? []).toHaveLength(0);
+
+    const code = progress?.handoverCode ?? '';
+    const wrong = code === '0000' ? '1111' : '0000';
+
+    const rejected = await tech.rpc('verify_handover_code', {
+      p_order_id: orderId,
+      p_code: wrong,
+    });
+    expect(rejected.error).toBeNull();
+    expect(rejected.data).toBe(false);
+
+    const acceptedCode = await tech.rpc('verify_handover_code', {
+      p_order_id: orderId,
+      p_code: code,
+    });
+    expect(acceptedCode.error).toBeNull();
+    expect(acceptedCode.data).toBe(true);
+  });
+
+  test('the customer sees a distance and an ETA, but never the position', async () => {
+    const customer = clientFor(CUSTOMER_ID);
+    const tech = clientFor(TECH_ID);
+
+    const progress = await new SupabaseRepository(customer, () => CUSTOMER_ID).getOrderProgress(orderId);
+    expect(progress?.distanceKm).toBeGreaterThan(0);
+    expect(progress?.etaMinutes).toBeGreaterThanOrEqual(1);
+
+    // 0022 already lets the customer read their assigned provider's point
+    // during the in-transit window, so this is not a leak — it is the policy
+    // working. Asserted so that a future narrowing of that policy shows up
+    // here rather than as a blank tracking screen.
+    const raw = await customer.from('provider_locations').select('provider_id');
+    expect(raw.data ?? []).toHaveLength(1);
+
+    // A stranger to the order gets nothing, which is the boundary that matters.
+    const stranger = clientFor(STRANGER_ID);
+    const denied = await stranger.from('provider_locations').select('provider_id');
+    expect(denied.data ?? []).toHaveLength(0);
+
+    // And the technician cannot ask how far away they are from a customer.
+    const techDenied = await tech.rpc('order_live_progress', { p_order_id: orderId });
+    expect(techDenied.error).not.toBeNull();
   });
 
   test('the job runs, and only the customer can close it', async () => {

@@ -15,7 +15,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sarOrThrow, type SarAmount } from '@habba/core';
 import type {
+  CompletionMedia,
   EscrowStatus,
+  JobProgress,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
@@ -31,6 +33,13 @@ import type {
   VehicleModel,
 } from './types.js';
 import type { GuestUpgradeInput, PastServiceInput, Repository } from './repository.js';
+
+/** Shape of one `order_live_progress` row (migration 0040). */
+interface LiveProgressRow {
+  readonly distance_m: number;
+  readonly eta_minutes: number;
+  readonly measured_at: string;
+}
 
 interface VehicleRow {
   id: string;
@@ -120,6 +129,7 @@ interface OrderRow {
   vat_amount: number | null;
   total_amount: number | null;
   escrow_status: EscrowStatus;
+  readonly completion_media: readonly CompletionMedia[] | null;
 }
 
 interface OrderPartRow {
@@ -175,6 +185,10 @@ function toOrder(row: OrderRow): Order {
     vatAmount: toSarOrNull(row.vat_amount),
     totalAmount: toSarOrNull(row.total_amount),
     escrowStatus: row.escrow_status,
+    // jsonb defaults to '[]' server-side, but a client that selected an older
+    // column list would see undefined — normalise rather than let a screen
+    // map over nothing.
+    completionMedia: row.completion_media ?? [],
   };
 }
 
@@ -505,7 +519,7 @@ export class SupabaseRepository implements Repository {
     const { data, error } = await this.client
       .from('orders')
       .select(
-        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status',
+        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media',
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -532,6 +546,61 @@ export class SupabaseRepository implements Repository {
       businessNameAr: data.business_name_ar,
       ratingAvg: data.rating_avg,
       ratingCount: data.rating_count,
+    };
+  }
+
+  /**
+   * Live progress for an active job (migration 0040).
+   *
+   * Two reads, both server-guarded. `order_live_progress` is a definer
+   * function that returns a distance and an ETA but never the provider's
+   * coordinates — 0018 keeps that position private, and the screens only ever
+   * needed the derived figures. It returns no row at all when the fix is stale
+   * or the journey is over, so "no data" is a real answer here rather than an
+   * error to paper over.
+   *
+   * The handover code comes from `order_handovers`, whose only read policy is
+   * the customer's: the provider being verified cannot select it. Both are
+   * allowed to come back empty and the caller renders less, never something
+   * invented.
+   */
+  async getOrderProgress(orderId: string): Promise<JobProgress | null> {
+    const [progress, handover] = await Promise.all([
+      this.client.rpc('order_live_progress', { p_order_id: orderId }),
+      this.client
+        .from('order_handovers')
+        .select('code, verified_at')
+        .eq('order_id', orderId)
+        .maybeSingle(),
+    ]);
+
+    if (progress.error !== null) {
+      throw new Error(`getOrderProgress: ${progress.error.message}`);
+    }
+    // A missing handover row is normal before acceptance, so it is not an
+    // error — but a genuine failure still has to surface.
+    if (handover.error !== null) {
+      throw new Error(`getOrderProgress (handover): ${handover.error.message}`);
+    }
+
+    const row = (progress.data as readonly LiveProgressRow[] | null)?.[0];
+    const code = handover.data?.code ?? undefined;
+
+    if (row === undefined && code === undefined) return null;
+
+    return {
+      ...(row !== undefined
+        ? {
+            distanceKm: row.distance_m / 1000,
+            etaMinutes: row.eta_minutes,
+            lastUpdateAt: row.measured_at,
+          }
+        : {}),
+      // Once verified there is nothing left to show — the technician has
+      // already proved they are the right person.
+      ...(code !== undefined && handover.data?.verified_at === null
+        ? { handoverCode: code }
+        : {}),
     };
   }
 

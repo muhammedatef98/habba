@@ -61,6 +61,19 @@ function TrackingBody() {
     enabled: order.data?.providerId !== null && order.data?.providerId !== undefined,
   });
 
+  // Distance, ETA and the handover code (migration 0040). Polled on the same
+  // cadence as the order: a position that updates faster than the status it is
+  // attached to would show a technician still approaching a job that has ended.
+  const liveProgress = useQuery({
+    queryKey: ['order-progress', id],
+    queryFn: () => repository.getOrderProgress(id ?? ''),
+    enabled: order.data?.providerId !== null && order.data?.providerId !== undefined,
+    refetchInterval: (query) => {
+      const status = query.state.data === undefined ? undefined : order.data?.status;
+      return status !== undefined && TERMINAL.includes(status) ? false : 3000;
+    },
+  });
+
   const parts = useQuery({
     queryKey: ['order-parts', id],
     queryFn: () => repository.listOrderParts(id ?? ''),
@@ -110,11 +123,12 @@ function TrackingBody() {
   const providerData = provider.data ?? null;
   const hasUnapprovedParts = (parts.data ?? []).some((line) => !line.approvedByCustomer);
 
-  // Neither of these is available from the backend yet. They are read as
-  // `undefined` deliberately rather than filled in with plausible values —
-  // see the module comment.
+  // Dispatch telemetry (screen 05's counters and log) still has nothing behind
+  // it — there is no table recording which providers were offered the job, so
+  // the counts are not derivable. Read as undefined rather than invented.
   const telemetry = undefined;
-  const progress = undefined;
+
+  const progress = liveProgress.data ?? undefined;
 
   if (SEARCHING.includes(status)) {
     return (
