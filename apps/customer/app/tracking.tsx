@@ -12,11 +12,9 @@
  * The design ships light variants of these screens, and an explicit light
  * choice in settings outranks our guess about the hour.
  *
- * The map and the live provider position are still open work (react-native-maps
- * plus a customer read of provider_locations), as is the dispatch telemetry
- * behind screen 05. Every one of those is modelled as optional data and the
- * screens render correctly without it — see DispatchTelemetry in data/types.ts
- * for why nothing here is stubbed with invented numbers.
+ * Every live figure is optional and the screens render correctly without any
+ * of it — see DispatchTelemetry in data/types.ts for why nothing here is
+ * stubbed with invented numbers.
  */
 
 import { Share, View } from 'react-native';
@@ -74,6 +72,16 @@ function TrackingBody() {
     },
   });
 
+  // Dispatch figures for the waiting screen (0042). Polled while matching and
+  // stopped the moment it ends — the server returns nothing after that anyway,
+  // and there is no reason to keep asking.
+  const dispatch = useQuery({
+    queryKey: ['order-dispatch', id],
+    queryFn: () => repository.getDispatchTelemetry(id ?? ''),
+    enabled: SEARCHING.includes(order.data?.status ?? 'draft'),
+    refetchInterval: 3000,
+  });
+
   const parts = useQuery({
     queryKey: ['order-parts', id],
     queryFn: () => repository.listOrderParts(id ?? ''),
@@ -123,11 +131,7 @@ function TrackingBody() {
   const providerData = provider.data ?? null;
   const hasUnapprovedParts = (parts.data ?? []).some((line) => !line.approvedByCustomer);
 
-  // Dispatch telemetry (screen 05's counters and log) still has nothing behind
-  // it — there is no table recording which providers were offered the job, so
-  // the counts are not derivable. Read as undefined rather than invented.
-  const telemetry = undefined;
-
+  const telemetry = dispatch.data ?? undefined;
   const progress = liveProgress.data ?? undefined;
 
   if (SEARCHING.includes(status)) {

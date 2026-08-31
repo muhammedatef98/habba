@@ -20,6 +20,7 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { useSession } from '../state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import type {
+  DispatchTelemetry,
   JobProgress,
   MaintenanceAlert,
   OrderSummary,
@@ -106,6 +107,12 @@ export interface Repository {
    * the tracking screens render as their reduced state rather than as zeroes.
    */
   getOrderProgress(orderId: string): Promise<JobProgress | null>;
+  /**
+   * Live dispatch figures while an order is being matched (§7.1).
+   * Null once matching is over — the counts are of no use to the customer
+   * afterwards, and they say how many people turned the job down.
+   */
+  getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null>;
   listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
   approveOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
@@ -714,6 +721,13 @@ export class InMemoryRepository implements Repository {
   // success here would hide that the clip went nowhere.
   async attachTriageClip(): Promise<boolean> {
     return false;
+  }
+
+  // The dev build has no matcher and no providers to offer anything to, so
+  // there is genuinely nothing to report. Null, not zeroes: "0 contacted"
+  // would be a claim, and a false one.
+  async getDispatchTelemetry(): Promise<DispatchTelemetry | null> {
+    return null;
   }
 
   // The in-memory repository has no PostGIS and no provider moving around, so

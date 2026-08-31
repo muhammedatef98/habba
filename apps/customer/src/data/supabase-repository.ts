@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { sarOrThrow, type SarAmount } from '@habba/core';
 import type {
   AlertConfidence,
+  DispatchTelemetry,
   OrderStatus,
   CompletionMedia,
   EscrowStatus,
@@ -37,6 +38,15 @@ import type {
   VehicleModel,
 } from './types.js';
 import type { GuestUpgradeInput, PastServiceInput, Repository } from './repository.js';
+
+interface DispatchTelemetryRow {
+  readonly contacted_count: number;
+  readonly reviewing_count: number;
+  readonly notified_count: number;
+  readonly busy_count: number;
+  readonly radius_m: number;
+  readonly area_median_seconds: number | null;
+}
 
 interface MaintenanceAlertRow {
   readonly id: string;
@@ -724,6 +734,34 @@ export class SupabaseRepository implements Repository {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Dispatch figures for the waiting screen (0042).
+   *
+   * Aggregates only. The offers themselves are not readable by the customer —
+   * knowing which specific technicians nearby declined them is commercially
+   * sensitive to the provider and a grudge waiting to happen — so this comes
+   * through a definer function that returns the numbers without the names.
+   */
+  async getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null> {
+    const { data, error } = await this.client.rpc('order_dispatch_telemetry', {
+      p_order_id: orderId,
+    });
+
+    if (error !== null) throw new Error(`getDispatchTelemetry: ${error.message}`);
+
+    const row = (data as readonly DispatchTelemetryRow[] | null)?.[0];
+    if (row === undefined) return null;
+
+    return {
+      contactedCount: row.contacted_count,
+      reviewingCount: row.reviewing_count,
+      respondingCount: row.notified_count,
+      busyCount: row.busy_count,
+      radiusKm: row.radius_m / 1000,
+      ...(row.area_median_seconds !== null ? { areaMedianSeconds: row.area_median_seconds } : {}),
+    };
   }
 
   async listOrderParts(orderId: string): Promise<readonly OrderPart[]> {
