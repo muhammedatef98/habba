@@ -51,7 +51,7 @@ twice consecutively. Both Expo apps bundle and the customer app runs on the iOS
 simulator. Repo is private at **github.com/muhammedatef98/habba**.
 
 ```
-44 migrations · 23 SQL suites · 2 concurrency tests · 50 customer tests
+45 migrations · 24 SQL suites · 2 concurrency tests · 50 customer tests
 90 core tests · 29 ui · 9 i18n · 4 provider · typecheck + lint green
 34 integration tests against real PostgREST + RLS
 ```
@@ -350,10 +350,10 @@ wrong call and cost more than the fix did.
 - **Booking flow (§9.1)** — placeholder screen. Backend built and tested,
   including the slot-concurrency guarantee. This is the obvious next increment.
 - **Inspection screens (Phase 5)** — backend done, no customer UI.
-- **GPS is a stub** — behind an interface (`location-provider.ts` mirrors
-  `otp-provider.ts`); swapping in the real implementation is one file. The
-  camera is now real (expo-camera, 20s cap, uploads to the `triage-media`
-  bucket).
+- **GPS and camera are both real now** — expo-location behind the same
+  interface (the stub remains for Expo Go, where a bare-workflow permission
+  request fails in a way indistinguishable from a denial), and expo-camera with
+  a 20s cap uploading to the `triage-media` bucket.
 - **No masked-call relay** — `ProviderSummary` has no phone field, so call and
   chat on the tracking screens are disabled. Needs a relay number issued per
   job, not the technician's own line.
