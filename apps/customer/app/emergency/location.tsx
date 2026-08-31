@@ -3,9 +3,10 @@
  *
  * The design fixes the pin at the centre of the screen and moves the map
  * underneath it, because dragging a small pin accurately with one thumb while
- * stressed is worse than moving the whole field. react-native-maps is not
- * wired yet, so this renders the address the device resolved plus a free-text
- * correction — the submitted coordinates are the real ones either way.
+ * stressed is worse than moving the whole field. The free-text address stays
+ * alongside the map rather than being replaced by it: a pin is exact but
+ * useless over the phone, and "after exit 9 by 300m" is what actually gets a
+ * technician to the right stretch of road.
  *
  * "Roadside" vs "in a car park" is not decoration: it changes what the
  * technician brings and whether a tow truck can physically reach the vehicle.
@@ -20,6 +21,7 @@ import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { locationProvider } from '@/lib/location';
 import { useEmergencyDraft, type PlaceKind } from '@/state/emergency-draft';
+import { LocationPicker } from '@/components/map/LocationPicker';
 
 export default function LocationConfirmScreen() {
   const { t } = useTranslation();
@@ -93,7 +95,13 @@ export default function LocationConfirmScreen() {
         </Text>
       </View>
 
-      {draft.location === null && !locationDenied ? (
+      {draft.location !== null ? (
+        <LocationPicker
+          testID="emergency-map"
+          initial={draft.location}
+          onSettled={draft.setLocation}
+        />
+      ) : !locationDenied ? (
         <Text variant="caption" tone="muted">
           {t('emergency.locatingNow')}
         </Text>
