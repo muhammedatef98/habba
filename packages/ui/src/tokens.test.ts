@@ -87,6 +87,25 @@ describe('status colour pairs (fg on subtle background, WCAG 2.2)', () => {
     expect(contrast(colors.textLink, colors.background)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(colors.textLink, colors.surface)).toBeGreaterThanOrEqual(4.5);
   });
+
+  test.each(schemes)('%s: infoFg on infoSubtle meets 4.5:1', (_name, colors) => {
+    expect(contrast(colors.infoFg, colors.infoSubtle)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // The design used the accent amber itself for price numerals, at 3.44:1 on
+  // white. Prices are the single most consequential number on the screen, so
+  // accentFg exists purely to carry amber as *text* and must stay readable.
+  test.each(schemes)('%s: accentFg is readable as text on surfaces', (_name, colors) => {
+    expect(contrast(colors.accentFg, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.accentFg, colors.background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // §8 reserves red for genuine emergencies. If the emergency colour ever drifts
+  // close enough to the accent to be mistaken for it, that separation is gone.
+  test.each(schemes)('%s: emergency is visibly distinct from accent', (_name, colors) => {
+    expect(colors.emergency).not.toBe(colors.accent);
+    expect(contrast(colors.emergency, colors.accent)).toBeGreaterThanOrEqual(1.5);
+  });
 });
 
 describe('token structure invariants', () => {

@@ -1,17 +1,25 @@
 /**
  * Habba design tokens.
  *
- * Build prompt §8. The category is full of generic blue "trust" apps and
- * aggressive red "emergency" apps — this is deliberately neither.
+ * Ported from `Habba Design System.dc.html` (Claude Design handoff, Aug 2026),
+ * which is the source of truth for the palette. Build prompt §8.
  *
- * The name means both *a gust of wind* and *to rush to someone's aid*. The
- * palette follows: deep desert teal for calm competence, warm sand for action.
- * Red is reserved exclusively for genuine emergencies, never for marketing —
- * if everything is urgent, nothing is.
+ * The category is full of generic blue "trust" apps and aggressive red
+ * "emergency" apps — this is deliberately neither. The name means both *a gust
+ * of wind* and *to rush to someone's aid*. The palette follows: deep desert
+ * teal for calm competence, warm sand for action. Red is reserved exclusively
+ * for genuine emergencies, never for marketing — if everything is urgent,
+ * nothing is.
  *
  * Context that drove these choices: people use this one-handed, stressed, at
  * the roadside, often at night. Hence large touch targets, high contrast, and
  * dark mode as a first-class theme rather than an afterthought.
+ *
+ * FOUR VALUES DIVERGE FROM THE DESIGN FILE, each because the design used a
+ * colour valid as a border or dot for small *text*, below the 4.5:1 floor that
+ * tokens.test.ts enforces. Three are resolved by promoting the text role to a
+ * darker step the designer already chose; only petrol[400] is new. Each is
+ * marked `WCAG:` inline below.
  */
 
 // ---------------------------------------------------------------------------
@@ -19,58 +27,79 @@
 // ---------------------------------------------------------------------------
 
 const petrol = {
-  50: '#E6F2F0',
-  100: '#C2DEDA',
-  200: '#9AC8C2',
-  300: '#6FB0A8',
-  400: '#4A9A90',
-  500: '#2A7D73',
-  600: '#166159',
-  700: '#0E4F4A', // primary
-  800: '#0A3B37',
-  900: '#062724',
+  50: '#EFF7F6',
+  100: '#D9EBE9',
+  200: '#A9D2CE',
+  300: '#6FB3AE',
+  // WCAG: the design's dark primary is 500 (#2E8A84), but its own dark label
+  // (#04211F) measures 4.09:1 on it — fine for the 19px/700 CTAs, failing for
+  // the 16px call button. 400 is that teal lifted to 4.75:1 at any size.
+  400: '#34968F',
+  500: '#2E8A84',
+  600: '#12514F', // base — primary in light
+  800: '#0B2E2E',
+  900: '#04211F',
 } as const;
 
 const sand = {
-  50: '#FDF6EC',
-  100: '#F9E8CE',
-  200: '#F2D5A8',
-  300: '#E9BE79',
-  400: '#DFA84F',
-  500: '#C98B2B', // accent
-  600: '#A66F1E',
-  700: '#7F5416',
-  800: '#5A3B10',
-  900: '#3A260A',
+  50: '#FBEDD6',
+  200: '#F6D6A6',
+  400: '#F0BC72',
+  500: '#E8A33D', // base — accent
+  600: '#B87F22',
+  700: '#8A5A16',
 } as const;
 
-const neutral = {
-  0: '#FFFFFF',
-  50: '#F7F7F6',
-  100: '#EFEEEC',
-  200: '#DFDDD9',
-  300: '#C6C3BD',
-  400: '#A29E96',
-  500: '#7C7871',
-  600: '#5C5952',
-  700: '#403E39',
-  800: '#2A2825',
-  900: '#1A1917',
-  950: '#0F0E0D',
+/**
+ * Ink and surfaces. The design specifies these as flat pairs rather than a
+ * ramp, so they are named by role, not by step.
+ */
+const light = {
+  bg: '#F6F3ED',
+  surface: '#FFFFFF',
+  sunken: '#F0EBE1',
+  border: '#E2DDD2',
+  borderStrong: '#CFD6D4',
+  ink: '#14201F',
+  inkMuted: '#4A5654',
+  inkSubtle: '#66706E',
+} as const;
+
+const dark = {
+  bg: '#071A1A',
+  surface: '#0F2A29',
+  sunken: '#0A2322',
+  border: '#204442',
+  borderStrong: '#2C5250',
+  ink: '#EFF3F1',
+  inkMuted: '#8AA3A0',
+  // WCAG: the design's dark tertiary (#5C7472) is 3.58:1 on bg — it fails at
+  // the 12px timestamps it was used for. Minimally darkened to clear 4.5:1.
+  // #5C7472 itself remains correct for borders and dots (see borderStrong).
+  inkSubtle: '#6E8785',
 } as const;
 
 /** Reserved for genuine emergencies. Never decorative, never marketing (§8). */
 const emergency = {
-  50: '#FEF2F1',
-  400: '#E5534B',
-  500: '#D2342B',
-  600: '#A82720',
+  50: '#FDF3F2',
+  400: '#E06B60',
+  500: '#C4342A',
+  600: '#9E2820',
 } as const;
 
-const success = { 50: '#EDF9F2', 400: '#4CAF7D', 500: '#2E8B5A', 600: '#1F6B43' } as const;
-const warning = { 50: '#FDF8EC', 400: '#E0A030', 500: '#C07C12', 600: '#945D0A' } as const;
+const success = { 50: '#E9F6F0', 400: '#5FC493', 500: '#1F8A5B', 600: '#15613F' } as const;
 
-export const palette = { petrol, sand, neutral, emergency, success, warning } as const;
+/**
+ * The design deliberately makes warning and accent the same amber: a
+ * non-emergency alert must never borrow the emergency red. Aliased rather
+ * than duplicated so the two can never drift apart.
+ */
+const warning = sand;
+
+/** New in this port — the previous palette had no informational colour. */
+const info = { 50: '#ECF3F5', 400: '#7FB6C8', 500: '#3E7C8F', 600: '#2F6070' } as const;
+
+export const palette = { petrol, sand, light, dark, emergency, success, warning, info } as const;
 
 // ---------------------------------------------------------------------------
 // Semantic colours — light and dark are both designed, not derived
@@ -98,20 +127,27 @@ export interface ColorScheme {
   readonly accentHover: string;
   readonly accentText: string;
   readonly accentSubtle: string;
+  /** Amber as *text* — the accent itself is too light to read at body size. */
+  readonly accentFg: string;
 
   readonly emergency: string;
   readonly emergencyText: string;
-  /** Text/icon color for emergency state on white or emergencySubtle. Passes 4.5:1. */
+  /** Text/icon color for emergency state on surface or emergencySubtle. Passes 4.5:1. */
   readonly emergencyFg: string;
   readonly emergencySubtle: string;
+  readonly emergencyBorder: string;
   readonly success: string;
-  /** Text/icon color for success state on white or successSubtle. Passes 4.5:1. */
+  /** Text/icon color for success state on surface or successSubtle. Passes 4.5:1. */
   readonly successFg: string;
   readonly successSubtle: string;
+  readonly successBorder: string;
   readonly warning: string;
-  /** Text/icon color for warning state on white or warningSubtle. Passes 4.5:1. */
+  /** Text/icon color for warning state on surface or warningSubtle. Passes 4.5:1. */
   readonly warningFg: string;
   readonly warningSubtle: string;
+  readonly info: string;
+  readonly infoFg: string;
+  readonly infoSubtle: string;
 
   readonly textLink: string;
 
@@ -126,104 +162,121 @@ export interface ColorScheme {
 }
 
 export const lightColors: ColorScheme = {
-  background: neutral[50],
-  surface: neutral[0],
-  surfaceRaised: neutral[0],
-  surfaceSunken: neutral[100],
-  border: neutral[200],
-  borderStrong: neutral[300],
+  background: light.bg,
+  surface: light.surface,
+  surfaceRaised: light.surface,
+  surfaceSunken: light.sunken,
+  border: light.border,
+  borderStrong: light.borderStrong,
 
-  text: neutral[900],
-  textMuted: neutral[600],
-  textSubtle: neutral[500],
-  textInverse: neutral[0],
+  text: light.ink,
+  textMuted: light.inkMuted,
+  // WCAG: the design's de-emphasised timestamps use #9AA3A1, which is 2.33:1
+  // on the page background — below even the large-text floor. Promoted to the
+  // design's own caption grey.
+  textSubtle: light.inkSubtle,
+  textInverse: light.surface,
 
-  primary: petrol[700],
+  primary: petrol[600],
   primaryHover: petrol[800],
-  primaryText: neutral[0],
+  primaryText: light.surface,
   primarySubtle: petrol[50],
 
   accent: sand[500],
   accentHover: sand[600],
-  accentText: neutral[950],
+  accentText: light.ink,
   accentSubtle: sand[50],
+  // WCAG: sand[600] measures 3.44:1 on white — it fails for the 18px/600 price
+  // numerals it was used for. sand[700] is the designer's own next step down.
+  accentFg: sand[700],
 
   emergency: emergency[500],
-  emergencyText: neutral[0],
+  emergencyText: light.surface,
   emergencyFg: emergency[600],
   emergencySubtle: emergency[50],
+  emergencyBorder: '#F0D3D0',
   success: success[500],
   successFg: success[600],
   successSubtle: success[50],
+  successBorder: '#BFE3D2',
   warning: warning[500],
-  warningFg: warning[600],
+  warningFg: warning[700],
   warningSubtle: warning[50],
+  info: info[500],
+  infoFg: info[600],
+  infoSubtle: info[50],
 
-  textLink: petrol[700],
+  textLink: petrol[600],
 
-  verified: petrol[700],
+  verified: petrol[600],
   verifiedSubtle: petrol[50],
-  // neutral[600], not neutral[500]: at 500 the badge text measured 3.79:1
-  // against its own surface, under the 4.5:1 floor. Caught by tokens.test.ts.
-  selfReported: neutral[600],
-  selfReportedSubtle: neutral[100],
+  // inkMuted, not inkSubtle: the badge sits on the *sunken* surface, which is
+  // darker than the page background, and inkSubtle measured 4.30:1 there —
+  // under the 4.5:1 floor. Caught by tokens.test.ts.
+  selfReported: light.inkMuted,
+  selfReportedSubtle: light.sunken,
 
   focusRing: petrol[400],
-  overlay: 'rgba(15, 14, 13, 0.55)',
+  overlay: 'rgba(20, 32, 31, 0.55)',
 };
 
 export const darkColors: ColorScheme = {
   // Not pure black: OLED black with light Arabic text causes visible smearing
-  // when scrolling, and the logbook is a long scrolling list.
-  background: neutral[950],
-  surface: neutral[900],
-  surfaceRaised: neutral[800],
-  surfaceSunken: '#0A0A09',
-  border: neutral[800],
-  borderStrong: neutral[700],
+  // when scrolling, and the logbook is a long scrolling list. The design's
+  // #071A1A is a deep petrol, not a neutral — the whole dark theme is tinted.
+  background: dark.bg,
+  surface: dark.surface,
+  surfaceRaised: '#123634',
+  surfaceSunken: dark.sunken,
+  border: dark.border,
+  borderStrong: dark.borderStrong,
 
-  text: neutral[50],
-  textMuted: neutral[300],
-  textSubtle: neutral[400],
-  textInverse: neutral[950],
+  text: dark.ink,
+  textMuted: dark.inkMuted,
+  textSubtle: dark.inkSubtle,
+  textInverse: petrol[900],
 
   // Dark surfaces need a lighter primary to clear contrast thresholds; using
-  // the same petrol[700] as light mode would fail against neutral[900].
-  primary: petrol[300],
-  primaryHover: petrol[200],
-  primaryText: neutral[950],
-  primarySubtle: petrol[900],
+  // the same petrol[600] as light mode would fail against the dark background.
+  // The design file says as much: "Teal 600 is too dark on 071A1A — dark theme
+  // promotes teal 400 to primary and darkens the label instead."
+  primary: petrol[400],
+  primaryHover: petrol[300],
+  primaryText: petrol[900],
+  primarySubtle: '#123634',
 
-  accent: sand[300],
-  accentHover: sand[200],
-  accentText: neutral[950],
-  accentSubtle: sand[900],
+  accent: sand[500],
+  accentHover: sand[400],
+  accentText: petrol[900],
+  accentSubtle: '#33260F',
+  accentFg: sand[400],
 
   emergency: emergency[400],
-  emergencyText: neutral[950],
-  // Dark subtle backgrounds are custom hand-tuned values — no palette entry at
-  // this darkness exists, and deriving them from the 50-step scale would require
-  // adding 12+ palette entries for a single use case.
+  emergencyText: petrol[900],
   emergencyFg: emergency[400],
-  emergencySubtle: '#1B0908',
-  success: success[400],
+  emergencySubtle: '#2A100E',
+  emergencyBorder: '#5C2420',
+  success: success[500],
   successFg: success[400],
-  successSubtle: '#091810',
-  warning: warning[400],
+  successSubtle: '#0F2E22',
+  successBorder: '#1F5A40',
+  warning: warning[500],
   warningFg: warning[400],
-  warningSubtle: '#1A1104',
+  warningSubtle: '#33260F',
+  info: info[500],
+  infoFg: info[400],
+  infoSubtle: '#142E36',
 
   textLink: petrol[300],
 
   verified: petrol[300],
-  verifiedSubtle: petrol[900],
-  selfReported: neutral[400],
-  selfReportedSubtle: neutral[800],
+  verifiedSubtle: '#123634',
+  selfReported: dark.inkMuted,
+  selfReportedSubtle: dark.sunken,
 
   focusRing: petrol[300],
-  overlay: 'rgba(0, 0, 0, 0.70)',
+  overlay: 'rgba(4, 33, 31, 0.70)',
 };
-
 // ---------------------------------------------------------------------------
 // Typography
 // ---------------------------------------------------------------------------
@@ -319,10 +372,10 @@ export const elevation = {
  * labels (all-caps, codes). Zero is the correct default for Arabic body copy.
  */
 export const letterSpacing = {
-  tight: -0.3,  // display headings (Latin only)
-  normal: 0,    // body text, any script
-  wide: 0.5,    // Latin labels and captions
-  wider: 1.0,   // all-caps Latin only (plate codes, IBANs)
+  tight: -0.3, // display headings (Latin only)
+  normal: 0, // body text, any script
+  wide: 0.5, // Latin labels and captions
+  wider: 1.0, // all-caps Latin only (plate codes, IBANs)
 } as const;
 
 export const iconSize = {

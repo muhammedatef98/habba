@@ -27,7 +27,17 @@ const VARIANTS: Record<
   label: { size: 'sm', weight: '600' },
 };
 
-export type TextTone = 'default' | 'muted' | 'subtle' | 'inverse' | 'primary' | 'emergency';
+export type TextTone =
+  | 'default'
+  | 'muted'
+  | 'subtle'
+  | 'inverse'
+  | 'primary'
+  | 'emergency'
+  | 'success'
+  | 'warning'
+  | 'accent'
+  | 'info';
 
 export interface HabbaTextProps extends TextProps {
   readonly variant?: TextVariant;
@@ -53,7 +63,13 @@ export function Text({
     subtle: theme.colors.textSubtle,
     inverse: theme.colors.textInverse,
     primary: theme.colors.primary,
-    emergency: theme.colors.emergency,
+    emergency: theme.colors.emergencyFg,
+    success: theme.colors.successFg,
+    warning: theme.colors.warningFg,
+    // accentFg, not accent: the raw amber is a fill colour and fails contrast
+    // as text. See tokens.ts.
+    accent: theme.colors.accentFg,
+    info: theme.colors.infoFg,
   }[tone];
 
   // `start`/`end` are the logical values — React Native resolves them against

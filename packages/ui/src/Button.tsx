@@ -11,7 +11,8 @@ import { ActivityIndicator, Pressable, View, type ViewStyle } from 'react-native
 import { Text } from './Text.js';
 import { useTheme } from './theme.js';
 
-export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'emergency';
+export type ButtonVariant =
+  'primary' | 'accent' | 'secondary' | 'ghost' | 'emergency' | 'emergencyOutline';
 export type ButtonSize = 'medium' | 'large';
 
 export interface ButtonProps {
@@ -62,6 +63,14 @@ export function Button({
       border: theme.colors.emergency,
       text: theme.colors.emergencyText,
     },
+    // Outlined rather than filled. Cancelling is destructive but routine, and
+    // a solid red block reads as an alarm the user has to escape — the design
+    // reserves that weight for the active-emergency bar alone.
+    emergencyOutline: {
+      background: 'transparent',
+      border: theme.colors.emergencyFg,
+      text: theme.colors.emergencyFg,
+    },
   };
 
   const surface = surfaces[variant];
@@ -70,7 +79,7 @@ export function Button({
   const base: ViewStyle = {
     minHeight: height,
     borderRadius: theme.radius.lg,
-    borderWidth: variant === 'secondary' ? 1.5 : 0,
+    borderWidth: variant === 'secondary' || variant === 'emergencyOutline' ? 1.5 : 0,
     borderColor: surface.border,
     alignItems: 'center',
     justifyContent: 'center',
