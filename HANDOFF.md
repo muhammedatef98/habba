@@ -57,8 +57,16 @@ simulator. Repo is private at **github.com/muhammedatef98/habba**.
 ```
 
 ⚠️ On macOS with PostgreSQL 17, `pg_ctl` fails with "postmaster became
-multithreaded during startup" unless `LC_ALL` is set. Use
-`LC_ALL=C pnpm verify` — without it the integration suites silently skip.
+multithreaded during startup" unless `LC_ALL` is set to a valid locale.
+Use `LC_ALL=en_US.UTF-8 pnpm verify` — without it the integration suites
+silently skip.
+
+⚠️ **Set it to `en_US.UTF-8`, not `C`.** `LC_ALL=C` satisfies Postgres but puts
+Ruby in ASCII-8BIT, and CocoaPods then dies with `Unicode Normalization not
+appropriate for ASCII-8BIT`. `pod install` crashes, Pods are never regenerated,
+and the iOS build fails much later and much less obviously with
+`ld: framework 'React' not found` — which reads like a broken checkout rather
+than a locale problem. Both tools are happy with a real UTF-8 locale.
 
 ---
 
