@@ -10,7 +10,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone } from '@habba/core';
-import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Field, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/lib/otp';
 import { repository } from '@/data/repository';
 import { useIsAuthenticated, useSession } from '@/state/session';
@@ -78,6 +78,9 @@ export default function PhoneScreen() {
     <Screen scrollable>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.sm }}>
+          {/* The one screen that introduces the brand, so the mark is labelled
+              here and decorative everywhere else. */}
+          <HabbaMark size={64} accessibilityLabel={t('common.appName')} />
           <Text variant="display">{t('auth.welcomeTitle')}</Text>
           <Text variant="body" tone="muted">
             {t('auth.welcomeSubtitle')}

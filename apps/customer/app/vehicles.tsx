@@ -12,7 +12,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { useIsAuthenticated, useIsGuest } from '@/state/session';
 
@@ -113,13 +113,18 @@ export default function VehiclesScreen() {
             borderRadius: theme.radius.xl,
           }}
         >
-          <View style={{ gap: theme.spacing.xs }}>
-            <Text variant="heading" style={{ color: theme.colors.primaryText }}>
-              {t('home.emergencyCta')}
-            </Text>
-            <Text variant="caption" style={{ color: theme.colors.primaryText, opacity: 0.85 }}>
-              {t('home.emergencySubtitle')}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.base }}>
+            {/* Design screen 01 sets the mark inside the emergency block —
+                on dark petrol, so the cream colourway. */}
+            <HabbaMark size={46} on="dark" />
+            <View style={{ flex: 1, gap: theme.spacing.xs }}>
+              <Text variant="heading" style={{ color: theme.colors.primaryText }}>
+                {t('home.emergencyCta')}
+              </Text>
+              <Text variant="caption" style={{ color: theme.colors.primaryText, opacity: 0.85 }}>
+                {t('home.emergencySubtitle')}
+              </Text>
+            </View>
           </View>
         </Card>
 

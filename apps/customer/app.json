@@ -4,8 +4,9 @@
     "slug": "habba-customer",
     "scheme": "habba",
     "version": "0.1.0",
-    "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "orientation": "portrait",
     "newArchEnabled": true,
     "locales": {
       "ar": "./locales/ar.json",
@@ -21,7 +22,11 @@
     },
     "android": {
       "package": "sa.habba.customer",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#12514F"
+      }
     },
     "plugins": ["expo-router", "expo-localization", "expo-secure-store"],
     "experiments": {
@@ -30,6 +35,9 @@
     "extra": {
       "supabaseUrl": "http://localhost:54321",
       "supabaseAnonKey": "dev-anon-key"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }
