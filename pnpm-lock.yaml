@@ -29,6 +29,9 @@ importers:
 
   apps/customer:
     dependencies:
+      '@expo-google-fonts/almarai':
+        specifier: ^0.4.1
+        version: 0.4.1
       '@expo-google-fonts/outfit':
         specifier: ^0.4.3
         version: 0.4.3
@@ -836,6 +839,9 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@expo-google-fonts/almarai@0.4.1':
+    resolution: {integrity: sha512-mbFizbbS8JapmhR6/pWYLq5YAR+CX8VFIUjPC5Z0YIYy3rKz1X10DnU4WijgRASUniCyf10V84W3ws+NvtvqCA==}
 
   '@expo-google-fonts/material-symbols@0.4.45':
     resolution: {integrity: sha512-D5gd/uFa7KfMJX9S11hvej4GpQnBl27oKiUgyIq3cLTPtyDOWBwRgmeePIdV6+PGcedlDkaCND2BnRgAkxzNaA==}
@@ -4550,6 +4556,8 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@expo-google-fonts/almarai@0.4.1': {}
 
   '@expo-google-fonts/material-symbols@0.4.45': {}
 

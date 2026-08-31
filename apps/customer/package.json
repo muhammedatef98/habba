@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@expo-google-fonts/almarai": "^0.4.1",
     "@expo-google-fonts/outfit": "^0.4.3",
     "@habba/core": "workspace:*",
     "@habba/i18n": "workspace:*",

@@ -11,6 +11,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Almarai_800ExtraBold } from '@expo-google-fonts/almarai';
 import {
   Outfit_400Regular,
   Outfit_500Medium,
@@ -46,6 +47,9 @@ export default function RootLayout() {
   // weight because React Native resolves faces by family name and does not
   // synthesise bold — a missing weight renders as regular with no warning.
   const [fontsLoaded] = useFonts({
+    // Almarai carries the wordmark only — the design sets the lockup in it, and
+    // body copy stays in IBM Plex Sans Arabic.
+    Almarai_800ExtraBold,
     Outfit_400Regular,
     Outfit_500Medium,
     Outfit_600SemiBold,

@@ -7,6 +7,7 @@ export * from './Card.js';
 export * from './Field.js';
 export * from './ProvenanceBadge.js';
 export * from './HabbaMark.js';
+export * from './HabbaWordmark.js';
 export * from './Icon.js';
 export * from './StatusPill.js';
 export * from './ProgressStages.js';
