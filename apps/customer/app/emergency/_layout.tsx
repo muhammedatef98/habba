@@ -1,11 +1,15 @@
 /**
  * The emergency request flow.
  *
- * Dark is the default for this route group rather than the device's
- * preference: the design's own rationale is that most emergencies happen after
- * sunset, and a full-brightness white screen at night on the hard shoulder is
- * hostile. The locale still comes from the session — only the light/dark
- * preference is overridden.
+ * Dark is this flow's DEFAULT, not a lock. The designer's rationale is that
+ * most emergencies happen after sunset and a full-brightness white screen on
+ * the hard shoulder is hostile — an argument about the situation, and a good
+ * one. But the design also ships light variants of these screens, and someone
+ * who explicitly chose light in settings has told us something about their eyes
+ * or their glare that outranks our guess about their evening.
+ *
+ * `system` still resolves to dark here: a device left on light at 9pm is a
+ * default nobody chose.
  *
  * ⚠️ The auth guard lives here, not on each screen. The single `emergency.tsx`
  * this replaced carried its own `isAuthenticated` check, and splitting it into
@@ -22,11 +26,12 @@ import { useIsAuthenticated, useSession } from '@/state/session';
 export default function EmergencyLayout() {
   const locale = useSession((state) => state.locale);
   const isAuthenticated = useIsAuthenticated();
+  const preference = useSession((state) => state.themePreference);
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
   return (
-    <ThemeProvider locale={locale} preference="dark">
+    <ThemeProvider locale={locale} preference={preference === 'light' ? 'light' : 'dark'}>
       <Stack screenOptions={{ headerShown: false }} />
     </ThemeProvider>
   );

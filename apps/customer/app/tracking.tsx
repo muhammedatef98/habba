@@ -8,9 +8,9 @@
  * mutations. Keeping the queries in one place means the six states cannot
  * disagree about what the order says.
  *
- * Dark is this flow's default theme rather than the device's — most emergencies
- * happen after sunset, and a white screen at night on the hard shoulder is
- * hostile. The nested ThemeProvider scopes that to this route.
+ * Dark is this flow's default rather than a lock — see emergency/_layout.tsx.
+ * The design ships light variants of these screens, and an explicit light
+ * choice in settings outranks our guess about the hour.
  *
  * The map and the live provider position are still open work (react-native-maps
  * plus a customer read of provider_locations), as is the dispatch telemetry
@@ -254,11 +254,12 @@ export default function TrackingScreen() {
   // overridden here. Pinning the locale too would silently force Arabic on an
   // English user the moment they opened a tracking screen.
   const locale = useSession((state) => state.locale);
+  const preference = useSession((state) => state.themePreference);
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
   return (
-    <ThemeProvider locale={locale} preference="dark">
+    <ThemeProvider locale={locale} preference={preference === 'light' ? 'light' : 'dark'}>
       <TrackingBody />
     </ThemeProvider>
   );
