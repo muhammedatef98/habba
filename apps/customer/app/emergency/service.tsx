@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { useEmergencyDraft } from '@/state/emergency-draft';
+import { useSession } from '@/state/session';
 import { serviceIcon } from '@/lib/service-icon';
 import { vehicleLabel } from '@/lib/vehicle-label';
 
@@ -27,6 +28,11 @@ export default function ServiceSelectionScreen() {
   const vehicleId = useEmergencyDraft((state) => state.vehicleId);
   const selectService = useEmergencyDraft((state) => state.selectService);
   const selectVehicle = useEmergencyDraft((state) => state.selectVehicle);
+
+  // Prefilled from the home screen's selection: someone who just looked at a
+  // maintenance alert for one car and hit the emergency button is almost
+  // certainly calling about that car, and re-asking is a step for nothing.
+  const homeVehicleId = useSession((state) => state.selectedVehicleId);
 
   const services = useQuery({
     queryKey: ['emergency-services'],
@@ -46,8 +52,10 @@ export default function ServiceSelectionScreen() {
     queryFn: () => repository.listVehicles(),
   });
 
+  // Effective selection: whatever the draft holds, else the home screen's car.
+  const effectiveVehicleId = vehicleId ?? homeVehicleId;
   const requiresVehicle = service?.requiresVehicle ?? false;
-  const canContinue = service !== null && (!requiresVehicle || vehicleId !== null);
+  const canContinue = service !== null && (!requiresVehicle || effectiveVehicleId !== null);
 
   return (
     <Screen scrollable>
@@ -105,7 +113,7 @@ export default function ServiceSelectionScreen() {
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
             {vehicles.data?.map((vehicle) => {
-              const isSelected = vehicleId === vehicle.id;
+              const isSelected = effectiveVehicleId === vehicle.id;
               return (
                 <Card
                   key={vehicle.id}
@@ -149,7 +157,13 @@ export default function ServiceSelectionScreen() {
       <Button
         testID="emergency-continue"
         label={t('common.continue')}
-        onPress={() => router.push('/emergency/location')}
+        onPress={() => {
+          // Commit the implicit selection before leaving: the location screen
+          // reads the draft, and an inherited choice that was never written
+          // there submits an order against no vehicle at all.
+          if (vehicleId === null && effectiveVehicleId !== null) selectVehicle(effectiveVehicleId);
+          router.push('/emergency/location');
+        }}
         disabled={!canContinue}
       />
     </Screen>

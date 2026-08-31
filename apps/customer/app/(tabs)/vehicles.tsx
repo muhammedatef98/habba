@@ -14,9 +14,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
 import { MaintenanceAlertCard } from '@/components/home/MaintenanceAlertCard';
+import { VehicleSwitcher } from '@/components/home/VehicleSwitcher';
 import { RecentOrderRow } from '@/components/home/RecentOrderRow';
 import { repository } from '@/data/repository';
-import { useIsAuthenticated, useIsGuest } from '@/state/session';
+import { useIsAuthenticated, useIsGuest, useSession } from '@/state/session';
 
 export default function VehiclesScreen() {
   const { t, i18n } = useTranslation();
@@ -37,12 +38,20 @@ export default function VehiclesScreen() {
     queryFn: () => repository.listRecentOrders(1),
   });
 
-  const primaryVehicleId = vehicles.data?.[0]?.id;
+  // The car the header pill has selected, falling back to the first. The
+  // fallback matters: a household with two cars still has a most-likely one,
+  // and making someone choose before the app shows them anything is a toll on
+  // every launch.
+  const selectedVehicleId = useSession((state) => state.selectedVehicleId);
+  const selectVehicle = useSession((state) => state.selectVehicle);
 
-  // Alerts belong to the car the switcher has selected. Only the first vehicle
-  // for now — a switcher that changes which car the home screen is about is
-  // its own piece of work, and querying every vehicle's alerts to show one
-  // card would be wasteful.
+  const selectedVehicle =
+    vehicles.data?.find((vehicle) => vehicle.id === selectedVehicleId) ?? vehicles.data?.[0];
+  const primaryVehicleId = selectedVehicle?.id;
+
+  // Alerts belong to the car the switcher has selected, not to a fixed first
+  // entry — switching cars has to change what the home screen is warning about
+  // or the pill is decoration.
   const alerts = useQuery({
     queryKey: ['maintenance-alerts', primaryVehicleId],
     queryFn: () => repository.listMaintenanceAlerts(primaryVehicleId ?? ''),
@@ -79,7 +88,18 @@ export default function VehiclesScreen() {
 
   return (
     <Screen scrollable>
-      <Text variant="title">{t('vehicle.myVehicles')}</Text>
+      {selectedVehicle !== undefined ? (
+        <VehicleSwitcher
+          testID="home-vehicle-switcher"
+          vehicles={vehicles.data ?? []}
+          selected={selectedVehicle}
+          makes={makes.data}
+          models={allModels.data}
+          onSelect={selectVehicle}
+        />
+      ) : (
+        <Text variant="title">{t('vehicle.myVehicles')}</Text>
+      )}
 
       {/* Persistent but not modal: a guest is never blocked, only reminded.
           §11 — the logbook is not gated, so this asks rather than demands. */}

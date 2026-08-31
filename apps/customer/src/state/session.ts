@@ -27,6 +27,15 @@ interface SessionState {
    * because that choice is about the situation rather than the user's taste.
    */
   readonly themePreference: 'system' | 'light' | 'dark';
+  /**
+   * The car the home screen is about.
+   *
+   * Null until something selects one, and the home screen falls back to the
+   * first vehicle rather than showing nothing — a household with two cars
+   * still has a most-likely one, and making the customer choose before the app
+   * will show them anything is a toll on every launch.
+   */
+  readonly selectedVehicleId: string | null;
 
   setPendingPhone: (phone: string) => void;
   signIn: (userId: string, fullName: string) => void;
@@ -36,6 +45,7 @@ interface SessionState {
   signOut: () => void;
   setLocale: (locale: Locale) => void;
   setThemePreference: (preference: 'system' | 'light' | 'dark') => void;
+  selectVehicle: (vehicleId: string) => void;
 }
 
 export const useSession = create<SessionState>((set) => ({
@@ -45,6 +55,7 @@ export const useSession = create<SessionState>((set) => ({
   isGuest: false,
   locale: DEFAULT_LOCALE,
   themePreference: 'system',
+  selectedVehicleId: null,
 
   setPendingPhone: (phoneE164) => set({ phoneE164 }),
   signIn: (userId, fullName) => set({ userId, fullName, isGuest: false }),
@@ -56,6 +67,7 @@ export const useSession = create<SessionState>((set) => ({
   signOut: () => set({ userId: null, fullName: null, phoneE164: null, isGuest: false }),
   setLocale: (locale) => set({ locale }),
   setThemePreference: (themePreference) => set({ themePreference }),
+  selectVehicle: (selectedVehicleId) => set({ selectedVehicleId }),
 }));
 
 export const useIsAuthenticated = () => useSession((state) => state.userId !== null);
