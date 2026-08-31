@@ -18,8 +18,15 @@ import type { Service } from '@/data/types';
 /** Where the vehicle is standing. Changes what the technician brings. */
 export type PlaceKind = 'roadside' | 'parking';
 
+/** A recorded triage clip, before it has been uploaded anywhere. */
+export interface TriageClip {
+  readonly uri: string;
+  readonly seconds: number;
+}
+
 interface EmergencyDraftState {
   readonly service: Service | null;
+  readonly clip: TriageClip | null;
   readonly vehicleId: string | null;
   readonly location: DeviceLocation | null;
   readonly addressAr: string;
@@ -32,11 +39,13 @@ interface EmergencyDraftState {
   setAddress: (addressAr: string) => void;
   setPlaceKind: (placeKind: PlaceKind) => void;
   setProblem: (problem: string) => void;
+  setClip: (clip: TriageClip | null) => void;
   reset: () => void;
 }
 
 const EMPTY = {
   service: null,
+  clip: null,
   vehicleId: null,
   location: null,
   addressAr: '',
@@ -53,5 +62,6 @@ export const useEmergencyDraft = create<EmergencyDraftState>((set) => ({
   setAddress: (addressAr) => set({ addressAr }),
   setPlaceKind: (placeKind) => set({ placeKind }),
   setProblem: (problem) => set({ problem }),
+  setClip: (clip) => set({ clip }),
   reset: () => set(EMPTY),
 }));

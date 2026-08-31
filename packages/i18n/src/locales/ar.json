@@ -206,7 +206,14 @@
     "triageSkip": "تخطّي — أكمل بدون فيديو",
     "cameraPreview": "معاينة الكاميرا",
     "cameraAim": "وجّهها على المشكلة أو الصوت",
-    "triageUnavailable": "تسجيل الفيديو غير متاح على هذا الجهاز."
+    "triagePermission": "نحتاج إذن الكاميرا والمايك لتسجيل المقطع.",
+    "triageAllow": "السماح",
+    "triageRecord": "ابدأ التسجيل",
+    "triageStop": "إيقاف",
+    "triageRetake": "إعادة التصوير",
+    "triageUse": "استخدم المقطع",
+    "triageRecorded": "تم تسجيل مقطع ({{seconds}} ثانية)",
+    "triageFailed": "تعذّر التسجيل. يمكنك المتابعة بدون فيديو."
   },
   "tracking": {
     "title": "تتبّع الطلب",

@@ -11,6 +11,7 @@
  * rating rather than an action.
  */
 
+import type { ColorValue } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useTheme } from './theme.js';
 
@@ -109,8 +110,12 @@ const FILLED: ReadonlySet<IconName> = new Set<IconName>(['star']);
 export interface IconProps {
   readonly name: IconName;
   readonly size?: number;
-  /** Defaults to the current text colour, which is right for icons beside text. */
-  readonly color?: string;
+  /**
+   * Defaults to the current text colour, which is right for icons beside text.
+   * `ColorValue` rather than `string` so platform colours pass through — the
+   * tab bar hands its icons exactly that.
+   */
+  readonly color?: ColorValue;
   readonly strokeWidth?: number;
 }
 

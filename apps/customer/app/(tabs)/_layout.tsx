@@ -1,0 +1,64 @@
+/**
+ * The app's main tabs.
+ *
+ * Three, not the design's four. The design shows الرئيسية / طلباتي / المحفظة /
+ * حسابي, but nothing in the system holds a balance, a saved card, or a
+ * transaction — escrow is per-order and lives on the order. A wallet tab would
+ * open onto an empty screen and teach the customer that a quarter of the app
+ * does nothing. It goes in when there is something in it.
+ *
+ * A route group, so the URLs stay `/vehicles`, `/orders`, `/account` and every
+ * existing `router.push` keeps working.
+ */
+
+import { Tabs } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { Icon, useTheme } from '@habba/ui';
+
+export default function TabsLayout() {
+  const { t } = useTranslation();
+  const theme = useTheme();
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSubtle,
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
+        },
+        // The label is not decoration: an icon-only bar in a bilingual app
+        // makes people guess, and guessing during an emergency is the thing
+        // this product exists to remove.
+        tabBarLabelStyle: {
+          fontFamily: theme.fontFamily.arabic,
+          fontSize: theme.fontSize.xs,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="vehicles"
+        options={{
+          title: t('nav.home'),
+          tabBarIcon: ({ color }) => <Icon name="home" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: t('nav.orders'),
+          tabBarIcon: ({ color }) => <Icon name="calendar" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: t('nav.account'),
+          tabBarIcon: ({ color }) => <Icon name="person" color={color} />,
+        }}
+      />
+    </Tabs>
+  );
+}

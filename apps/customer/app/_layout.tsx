@@ -39,6 +39,7 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   const locale = useSession((state) => state.locale);
   const setLocale = useSession((state) => state.setLocale);
+  const themePreference = useSession((state) => state.themePreference);
   const [ready, setReady] = useState(false);
 
   // The design's Latin face, used for every figure in the app. Loaded by exact
@@ -91,7 +92,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <ThemeProvider locale={locale}>
+        <ThemeProvider locale={locale} preference={themePreference}>
           <StatusBar style="auto" />
           <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
         </ThemeProvider>

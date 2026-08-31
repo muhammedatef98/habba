@@ -206,7 +206,14 @@
     "triageSkip": "Skip — continue without video",
     "cameraPreview": "Camera preview",
     "cameraAim": "Point it at the problem or the sound",
-    "triageUnavailable": "Video recording isn't available on this device."
+    "triagePermission": "We need camera and microphone access to record the clip.",
+    "triageAllow": "Allow",
+    "triageRecord": "Start recording",
+    "triageStop": "Stop",
+    "triageRetake": "Record again",
+    "triageUse": "Use this clip",
+    "triageRecorded": "Clip recorded ({{seconds}}s)",
+    "triageFailed": "Recording failed. You can continue without video."
   },
   "tracking": {
     "title": "Track request",

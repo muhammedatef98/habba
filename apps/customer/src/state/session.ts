@@ -21,6 +21,12 @@ interface SessionState {
    */
   readonly isGuest: boolean;
   readonly locale: Locale;
+  /**
+   * Light/dark preference. `system` follows the device, which is the right
+   * default — but the emergency flow overrides itself to dark regardless,
+   * because that choice is about the situation rather than the user's taste.
+   */
+  readonly themePreference: 'system' | 'light' | 'dark';
 
   setPendingPhone: (phone: string) => void;
   signIn: (userId: string, fullName: string) => void;
@@ -29,6 +35,7 @@ interface SessionState {
   completeGuestUpgrade: (fullName: string) => void;
   signOut: () => void;
   setLocale: (locale: Locale) => void;
+  setThemePreference: (preference: 'system' | 'light' | 'dark') => void;
 }
 
 export const useSession = create<SessionState>((set) => ({
@@ -37,6 +44,7 @@ export const useSession = create<SessionState>((set) => ({
   fullName: null,
   isGuest: false,
   locale: DEFAULT_LOCALE,
+  themePreference: 'system',
 
   setPendingPhone: (phoneE164) => set({ phoneE164 }),
   signIn: (userId, fullName) => set({ userId, fullName, isGuest: false }),
@@ -47,6 +55,7 @@ export const useSession = create<SessionState>((set) => ({
   completeGuestUpgrade: (fullName) => set({ fullName, isGuest: false }),
   signOut: () => set({ userId: null, fullName: null, phoneE164: null, isGuest: false }),
   setLocale: (locale) => set({ locale }),
+  setThemePreference: (themePreference) => set({ themePreference }),
 }));
 
 export const useIsAuthenticated = () => useSession((state) => state.userId !== null);
