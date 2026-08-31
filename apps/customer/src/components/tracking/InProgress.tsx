@@ -152,7 +152,7 @@ export function InProgress({
         <Text variant="body" tone="muted">
           {t('tracking.agreedTotalLong')}
         </Text>
-        <Text variant="bodyStrong" style={{ fontVariant: ['tabular-nums'] }}>
+        <Text variant="bodyStrong" numeric>
           {t('emergency.priceFixed', { amount: order.totalAmount ?? '—' })}
         </Text>
       </View>

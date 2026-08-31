@@ -94,10 +94,10 @@ export function TimelineList({ items, style, testID }: TimelineListProps) {
                 <Text
                   variant="caption"
                   tone="subtle"
+                  numeric
                   style={{
                     marginTop: 3,
                     fontSize: theme.fontSize.xs,
-                    fontVariant: ['tabular-nums'],
                   }}
                 >
                   {item.timestamp}

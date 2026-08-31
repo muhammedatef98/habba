@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   ARABIC_LINE_HEIGHT_RATIO,
+  fontSize,
   darkColors,
   iconSize,
   letterSpacing,
@@ -123,6 +124,27 @@ describe('token structure invariants', () => {
 
   test('letterSpacing.normal is 0 (Arabic body copy default)', () => {
     expect(letterSpacing.normal).toBe(0);
+  });
+});
+
+describe('type scale matches the design system', () => {
+  // The scale drifted once already: 18/22/28/34/44 against the design's
+  // 20/24/32/40, close enough to look intentional and wrong enough that no
+  // heading matched the mockups. Pinned so the next drift fails here.
+  test('every step is a size the design specifies', () => {
+    expect(Object.values(fontSize)).toEqual([12, 14, 16, 20, 24, 32, 40]);
+  });
+
+  test("line heights land on the design's own pairings", () => {
+    // The design lists these explicitly; they should fall out of the 1.7 ratio
+    // rather than being maintained as a second table.
+    expect(lineHeightFor(12)).toBe(20);
+    expect(lineHeightFor(14)).toBe(24);
+    expect(lineHeightFor(16)).toBe(27);
+    expect(lineHeightFor(20)).toBe(34);
+    expect(lineHeightFor(24)).toBe(41);
+    expect(lineHeightFor(32)).toBe(54);
+    expect(lineHeightFor(40)).toBe(68);
   });
 });
 

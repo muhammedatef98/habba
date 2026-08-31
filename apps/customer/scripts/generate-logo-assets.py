@@ -104,7 +104,20 @@ def main() -> None:
     # iOS app icon. Full-bleed petrol; iOS applies its own corner mask, so
     # rounding it here would show as a dark ring inside the real corners.
     # 0.788 is the mark-to-tile ratio the design's own app-icon lockup uses.
-    draw_mark(1024, CREAM, SAND, 0.788, background=(*PETROL, 255)).save(assets / "icon.png")
+    launcher = draw_mark(1024, CREAM, SAND, 0.788, background=(*PETROL, 255))
+    launcher.save(assets / "icon.png")
+
+    # ⚠️ This project has a committed `ios/` directory (bare workflow), so
+    # `expo run:ios` never regenerates native assets from app.json — that only
+    # happens on `expo prebuild`. The asset catalog is what actually ships, and
+    # writing app.json alone leaves the default blank tile on the springboard.
+    #
+    # Flattened to RGB: the App Store rejects an icon with an alpha channel,
+    # and the simulator renders one with a black background.
+    icon_set = app / "ios" / "hbh" / "Images.xcassets" / "AppIcon.appiconset"
+    if icon_set.is_dir():
+        launcher.convert("RGB").save(icon_set / "App-Icon-1024x1024@1x.png")
+        print(f"wrote iOS asset catalog icon to {icon_set}")
 
     # Android adaptive foreground: transparent, and smaller because the
     # launcher crops to a shape that can be as tight as a circle.

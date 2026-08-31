@@ -74,12 +74,7 @@ export function Searching({ telemetry, onCancel, cancelPending }: SearchingProps
       <SearchingPulse />
 
       {radiusKm !== undefined ? (
-        <Text
-          variant="caption"
-          tone="muted"
-          align="center"
-          style={{ fontVariant: ['tabular-nums'] }}
-        >
+        <Text variant="caption" tone="muted" align="center">
           {t('tracking.searchRadius', { km: radiusKm.toFixed(1) })}
         </Text>
       ) : null}
@@ -97,7 +92,7 @@ export function Searching({ telemetry, onCancel, cancelPending }: SearchingProps
               <Text variant="caption" tone="muted">
                 {t('tracking.contactedLabel')}
               </Text>
-              <Text variant="heading" tone="primary" style={{ fontVariant: ['tabular-nums'] }}>
+              <Text variant="heading" tone="primary" numeric>
                 {t('tracking.techniciansCount', { count: contacted })}
               </Text>
             </View>

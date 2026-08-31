@@ -26,7 +26,7 @@ export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
       <Text variant="caption" tone="muted">
         {label}
       </Text>
-      <Text variant="caption" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
+      <Text variant="caption" tone="muted" numeric>
         {amount}
       </Text>
     </View>
@@ -48,7 +48,7 @@ export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text variant="bodyStrong">{t('tracking.totalLine')}</Text>
-        <Text variant="bodyStrong" style={{ fontVariant: ['tabular-nums'] }}>
+        <Text variant="bodyStrong" numeric>
           {t('emergency.priceFixed', { amount: order.totalAmount ?? '—' })}
         </Text>
       </View>

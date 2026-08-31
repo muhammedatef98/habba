@@ -61,7 +61,8 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
               <Text
                 variant="display"
                 tone="primary"
-                style={{ fontVariant: ['tabular-nums'], lineHeight: theme.fontSize['3xl'] }}
+                numeric
+                style={{ lineHeight: theme.fontSize['3xl'] }}
               >
                 {progress?.etaMinutes ?? '—'}
               </Text>

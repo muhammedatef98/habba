@@ -9,21 +9,39 @@
 
 import { Text as RNText, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 import { useTheme } from './theme.js';
-import type { FontSizeToken } from './tokens.js';
+import { latinFace, type FontSizeToken } from './tokens.js';
 
 export type TextVariant =
-  'display' | 'title' | 'heading' | 'body' | 'bodyStrong' | 'caption' | 'label';
+  | 'display'
+  | 'title'
+  | 'heading'
+  | 'subheading'
+  | 'body'
+  | 'bodyStrong'
+  | 'bodySmall'
+  | 'caption'
+  | 'label';
 
+/**
+ * Sizes and weights from the design system's type scale, one variant per step
+ * it names: display 40/600, h1 32/600, h2 24/600, h3 20/500, body 16/400,
+ * body-sm 14/400, caption 12/400.
+ *
+ * Weights are 600 at the top rather than 700: the design sets its headings in
+ * semibold, and bold at 40px in Arabic closes the counters.
+ */
 const VARIANTS: Record<
   TextVariant,
   { size: FontSizeToken; weight: '400' | '500' | '600' | '700' }
 > = {
-  display: { size: '4xl', weight: '700' },
-  title: { size: '3xl', weight: '700' },
+  display: { size: '3xl', weight: '600' },
+  title: { size: '2xl', weight: '600' },
   heading: { size: 'xl', weight: '600' },
+  subheading: { size: 'lg', weight: '500' },
   body: { size: 'base', weight: '400' },
   bodyStrong: { size: 'base', weight: '600' },
-  caption: { size: 'sm', weight: '400' },
+  bodySmall: { size: 'sm', weight: '400' },
+  caption: { size: 'xs', weight: '400' },
   label: { size: 'sm', weight: '600' },
 };
 
@@ -43,6 +61,15 @@ export interface HabbaTextProps extends TextProps {
   readonly variant?: TextVariant;
   readonly tone?: TextTone;
   readonly align?: 'start' | 'center' | 'end';
+  /**
+   * Figures: prices, ETAs, distances, timestamps, plate codes.
+   *
+   * Switches to the design's Latin face and turns on tabular figures, so a
+   * number that ticks does not make the row beside it twitch. Never use it for
+   * Arabic copy — Outfit has no Arabic glyphs, and the text would fall back
+   * mid-sentence.
+   */
+  readonly numeric?: boolean;
   readonly style?: StyleProp<TextStyle>;
 }
 
@@ -50,6 +77,7 @@ export function Text({
   variant = 'body',
   tone = 'default',
   align = 'start',
+  numeric = false,
   style,
   ...rest
 }: HabbaTextProps) {
@@ -85,7 +113,8 @@ export function Text({
           fontSize: size,
           lineHeight: theme.lineHeightFor(size),
           fontWeight: spec.weight,
-          fontFamily: theme.fontFamily.arabic,
+          fontFamily: numeric ? latinFace[spec.weight] : theme.fontFamily.arabic,
+          ...(numeric ? { fontVariant: ['tabular-nums' as const] } : {}),
           textAlign,
           writingDirection: theme.direction,
         },

@@ -50,6 +50,7 @@ export function StatCluster({ items, size = 'md', style, testID }: StatClusterPr
           <View style={{ flex: item.flex ?? 1, gap: 3, alignItems: 'center' }}>
             <Text
               variant="heading"
+              numeric
               tone={item.emphasis === 'accent' ? 'accent' : 'primary'}
               style={{
                 fontSize: valueSize,
@@ -57,7 +58,6 @@ export function StatCluster({ items, size = 'md', style, testID }: StatClusterPr
                 // numerals, and the Arabic 1.7 leading leaves the figure
                 // floating in its own row.
                 lineHeight: lineHeightFor(valueSize, 'latin'),
-                fontVariant: ['tabular-nums'],
               }}
             >
               {item.value ?? '—'}

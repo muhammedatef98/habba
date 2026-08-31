@@ -296,6 +296,28 @@ export const fontFamily = {
   mono: 'RobotoMono',
 } as const;
 
+/**
+ * Outfit, the design's Latin face, keyed by weight.
+ *
+ * The design sets every figure in it — prices, ETAs, distances, timestamps,
+ * plate codes, the uppercase section labels — 79 times across the emergency
+ * flow alone. Arabic body copy stays in IBM Plex Sans Arabic; this is for
+ * numerals and isolated Latin, which is exactly where a geometric sans reads
+ * better and where Plex's figures look soft next to the design.
+ *
+ * Keyed by weight because React Native resolves a face by exact family name:
+ * there is no synthetic bolding to fall back on, so `Outfit` alone would
+ * silently render regular at every weight.
+ */
+export const latinFace = {
+  '400': 'Outfit_400Regular',
+  '500': 'Outfit_500Medium',
+  '600': 'Outfit_600SemiBold',
+  '700': 'Outfit_700Bold',
+} as const;
+
+export type FontWeightToken = keyof typeof latinFace;
+
 export const fontWeight = {
   regular: '400',
   medium: '500',
@@ -303,15 +325,30 @@ export const fontWeight = {
   bold: '700',
 } as const;
 
+/**
+ * The design system's type scale, exactly.
+ *
+ * Every step is a size the design actually specifies — 12 / 14 / 16 / 20 / 24 /
+ * 32 / 40 — rather than a generic t-shirt ramp. The previous values (18, 22,
+ * 28, 34, 44) were close enough to look deliberate and wrong enough that no
+ * heading in the app matched the mockups.
+ *
+ * There is nothing above 40: the design tops out at display, and an unused
+ * larger step is an invitation to invent a size the design never sanctioned.
+ *
+ * Paired line heights fall out of `lineHeightFor` at the 1.7 Arabic ratio and
+ * land on the design's own numbers — 12/20, 14/24, 16/27, 20/34, 24/41, 32/54,
+ * 40/68 — so the ratio and the scale agree by construction rather than by two
+ * tables being kept in sync.
+ */
 export const fontSize = {
   xs: 12,
   sm: 14,
   base: 16,
-  lg: 18,
-  xl: 22,
-  '2xl': 28,
-  '3xl': 34,
-  '4xl': 44,
+  lg: 20,
+  xl: 24,
+  '2xl': 32,
+  '3xl': 40,
 } as const;
 
 export type FontSizeToken = keyof typeof fontSize;

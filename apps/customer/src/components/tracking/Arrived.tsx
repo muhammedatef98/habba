@@ -76,7 +76,7 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
                     justifyContent: 'center',
                   }}
                 >
-                  <Text variant="title" tone="primary" style={{ fontVariant: ['tabular-nums'] }}>
+                  <Text variant="title" tone="primary" numeric>
                     {digit}
                   </Text>
                 </View>
@@ -94,7 +94,7 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
         <Text variant="body" tone="muted">
           {t('tracking.agreedTotal')}
         </Text>
-        <Text variant="bodyStrong" style={{ fontVariant: ['tabular-nums'] }}>
+        <Text variant="bodyStrong" numeric>
           {t('emergency.priceFixed', { amount: order.totalAmount ?? '—' })}
         </Text>
       </View>

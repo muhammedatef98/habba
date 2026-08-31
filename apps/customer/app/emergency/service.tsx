@@ -133,7 +133,7 @@ export default function ServiceSelectionScreen() {
             <Text variant="caption" tone="muted">
               {t('emergency.estimatedPrice', { service: service.nameAr })}
             </Text>
-            <Text variant="bodyStrong" style={{ fontVariant: ['tabular-nums'] }}>
+            <Text variant="bodyStrong" numeric>
               {t('emergency.priceFixed', { amount: service.basePrice })}
             </Text>
           </View>
