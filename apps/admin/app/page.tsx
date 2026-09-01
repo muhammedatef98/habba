@@ -16,6 +16,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { isLive, opsRepository } from '@/data/ops-repository';
+import { opsAuth, type Operator } from '@/lib/ops-session';
+import { SignIn } from './sign-in';
 import type { ProviderReview, VerificationStatus } from '@/data/types';
 
 const QUEUES: readonly { readonly status: VerificationStatus; readonly label: string }[] = [
@@ -26,7 +28,40 @@ const QUEUES: readonly { readonly status: VerificationStatus; readonly label: st
   { status: 'suspended', label: 'موقوفون' },
 ];
 
-export default function VerificationQueue() {
+export default function Console() {
+  const [operator, setOperator] = useState<Operator | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  // Re-checked on load rather than trusted from storage: the role is read from
+  // `profiles` each time, so an operator whose access was revoked loses the
+  // console on the next visit instead of at token expiry.
+  useEffect(() => {
+    void (async () => {
+      setOperator(await opsAuth.currentOperator());
+      setChecking(false);
+    })();
+  }, []);
+
+  if (checking) {
+    return (
+      <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <p style={{ color: 'var(--color-text-muted)' }}>جارٍ التحقّق…</p>
+      </main>
+    );
+  }
+
+  if (operator === null) return <SignIn onSignedIn={setOperator} />;
+
+  return <VerificationQueue operator={operator} onSignedOut={() => setOperator(null)} />;
+}
+
+function VerificationQueue({
+  operator,
+  onSignedOut,
+}: {
+  readonly operator: Operator;
+  readonly onSignedOut: () => void;
+}) {
   const [queue, setQueue] = useState<VerificationStatus>('pending');
   const [providers, setProviders] = useState<readonly ProviderReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +85,39 @@ export default function VerificationQueue() {
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--space-xl)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 'var(--space-base)',
+          marginBottom: 'var(--space-lg)',
+          flexWrap: 'wrap',
+        }}
+      >
+        {/* Named, because every decision below is recorded against this person
+            and they should be able to see whose name is on it. */}
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+          {operator.fullName}
+          {operator.role === 'super_admin' ? ' · مشرف عام' : ''}
+        </span>
+        <button
+          onClick={() => {
+            void opsAuth.signOut().then(onSignedOut);
+          }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-text-link)',
+            fontWeight: 600,
+            fontSize: 'var(--text-sm)',
+            minHeight: 44,
+          }}
+        >
+          تسجيل الخروج
+        </button>
+      </div>
+
       <header style={{ marginBottom: 'var(--space-xl)' }}>
         <h1
           style={{

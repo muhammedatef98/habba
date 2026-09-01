@@ -349,8 +349,13 @@ wrong call and cost more than the fix did.
   verification queue, which was the blocking one: `match_providers` ignores any
   provider who is not `approved`, so nothing could dispatch until someone could
   approve. Still to build: live order map, dispute resolution, pricing tuning,
-  payout runs. No ops auth yet either — the console assumes an already-ops
-  session.
+  payout runs.
+
+  Ops sign-in exists and reads the role from `profiles` on every load rather
+  than trusting a JWT claim, so revoking someone takes effect on their next
+  visit instead of at token expiry. ⚠️ That gate is UX — `is_ops()` (0013) is
+  the boundary, and someone who bypasses the screen reaches an API that returns
+  them nothing.
 
   ⚠️ The design bundle contains NO admin screens. It specifies the palette,
   type scale, spacing, components and the RTL mirror, and `apps/admin` takes
