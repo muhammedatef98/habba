@@ -6,6 +6,8 @@ coverage/
 
 # Expo
 .expo/
+.next/
+next-env.d.ts
 .expo-shared/
 *.jks
 *.p8

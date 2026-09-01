@@ -7,6 +7,9 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      // Next's build output. Generated bundles are not source and lint them
+      // reports on webpack's own emitted require() calls.
+      '**/.next/**',
       '**/build/**',
       '**/.expo/**',
       '**/coverage/**',

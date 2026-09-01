@@ -1,0 +1,50 @@
+/*
+ * Base styles only. Every colour, size and space comes from the custom
+ * properties generated in `theme.css.ts` from @habba/ui/tokens — nothing here
+ * introduces a value of its own.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-arabic);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  /* Arabic first, and the console is Arabic too — ops read the same order
+     records the customer does, and translating them for staff would put a
+     second version of the truth on screen. */
+  direction: rtl;
+}
+
+/* Figures in the Latin face with tabular digits: the console is columns of
+   numbers, and proportional digits make a table shimmer as it refreshes. */
+.numeric {
+  font-family: var(--font-latin);
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Focus is never removed, only restyled. An ops console is a keyboard tool. */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

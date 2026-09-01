@@ -345,8 +345,19 @@ wrong call and cost more than the fix did.
 
 ## 10. Known incomplete
 
-- **Admin dashboard (§9.4, Next.js)** — not started. Provider verification
-  queue, live order map, dispute resolution, pricing tuning, payout runs.
+- **Admin dashboard (§9.4, Next.js)** — `apps/admin` exists with the provider
+  verification queue, which was the blocking one: `match_providers` ignores any
+  provider who is not `approved`, so nothing could dispatch until someone could
+  approve. Still to build: live order map, dispute resolution, pricing tuning,
+  payout runs. No ops auth yet either — the console assumes an already-ops
+  session.
+
+  ⚠️ The design bundle contains NO admin screens. It specifies the palette,
+  type scale, spacing, components and the RTL mirror, and `apps/admin` takes
+  all of that from `@habba/ui/tokens` so it cannot drift. The layout above the
+  tokens is judgement, not a mockup — do not go looking for the design file it
+  came from.
+
 - **Booking flow (§9.1)** — placeholder screen. Backend built and tested,
   including the slot-concurrency guarantee. This is the obvious next increment.
 - **Inspection screens (Phase 5)** — backend done, no customer UI.
