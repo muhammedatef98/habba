@@ -31,6 +31,8 @@ export interface VerificationEvent {
 }
 
 export interface OpsRepository {
+  /** Live orders, ordered by trouble rather than by time (0046). */
+  listBoard(): Promise<readonly BoardOrder[]>;
   listProvidersForReview(status: VerificationStatus): Promise<readonly ProviderReview[]>;
   listVerificationHistory(providerId: string): Promise<readonly VerificationEvent[]>;
   /**
@@ -39,4 +41,22 @@ export interface OpsRepository {
    * rather than after.
    */
   setVerification(providerId: string, status: VerificationStatus, note?: string): Promise<void>;
+}
+
+/** What the board is telling the operator to look at (0046). */
+export type Attention = 'none' | 'search_stuck' | 'search_slow' | 'awaiting_customer' | 'disputed';
+
+export interface BoardOrder {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly status: string;
+  readonly serviceNameAr: string;
+  readonly cityNameAr: string | null;
+  readonly providerNameAr: string | null;
+  /** Seconds in the current status, measured from the transition event. */
+  readonly statusAgeSeconds: number;
+  readonly dispatchRound: number;
+  readonly offersTotal: number;
+  readonly offersOpen: number;
+  readonly attention: Attention;
 }

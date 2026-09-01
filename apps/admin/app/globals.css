@@ -48,3 +48,40 @@ select {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+
+/*
+ * Board rows.
+ *
+ * Four columns on a desktop, which is where a dispatch board lives — but it
+ * stacks rather than shredding on anything narrower. An operator checking the
+ * queue from a phone between other things is a real case, and a four-column
+ * grid at 320px puts one word per line.
+ */
+.board-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+  align-items: start;
+}
+
+@media (min-width: 720px) {
+  .board-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto;
+    gap: var(--space-base);
+    align-items: center;
+  }
+}
+
+/* The age and the flag sit together at the end of the row on desktop, and
+   share a line above the fold on mobile. */
+.board-signals {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+@media (min-width: 720px) {
+  .board-signals {
+    justify-content: flex-end;
+  }
+}

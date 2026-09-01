@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { isLive, opsRepository } from '@/data/ops-repository';
 import { opsAuth, type Operator } from '@/lib/ops-session';
 import { SignIn } from './sign-in';
+import { Board } from './board';
 import type { ProviderReview, VerificationStatus } from '@/data/types';
 
 const QUEUES: readonly { readonly status: VerificationStatus; readonly label: string }[] = [
@@ -28,7 +29,7 @@ const QUEUES: readonly { readonly status: VerificationStatus; readonly label: st
   { status: 'suspended', label: 'موقوفون' },
 ];
 
-export default function Console() {
+export default function AdminEntry() {
   const [operator, setOperator] = useState<Operator | null>(null);
   const [checking, setChecking] = useState(true);
 
@@ -52,16 +53,94 @@ export default function Console() {
 
   if (operator === null) return <SignIn onSignedIn={setOperator} />;
 
-  return <VerificationQueue operator={operator} onSignedOut={() => setOperator(null)} />;
+  return <Console operator={operator} onSignedOut={() => setOperator(null)} />;
 }
 
-function VerificationQueue({
+type Section = 'board' | 'verification';
+
+const SECTIONS: readonly { readonly id: Section; readonly label: string }[] = [
+  // The board first: it is what an operator opens a shift on, and what they
+  // return to between everything else.
+  { id: 'board', label: 'اللوحة' },
+  { id: 'verification', label: 'مراجعة مقدّمي الخدمة' },
+];
+
+function Console({
   operator,
   onSignedOut,
 }: {
   readonly operator: Operator;
   readonly onSignedOut: () => void;
 }) {
+  const [section, setSection] = useState<Section>('board');
+
+  return (
+    <main style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--space-xl)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 'var(--space-base)',
+          marginBottom: 'var(--space-lg)',
+          flexWrap: 'wrap',
+        }}
+      >
+        <nav style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+          {SECTIONS.map((entry) => {
+            const active = entry.id === section;
+            return (
+              <button
+                key={entry.id}
+                onClick={() => setSection(entry.id)}
+                style={{
+                  padding: 'var(--space-sm) var(--space-base)',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: active ? 'var(--color-primary-subtle)' : 'transparent',
+                  color: active ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  fontWeight: 600,
+                  fontSize: 'var(--text-sm)',
+                  minHeight: 44,
+                }}
+              >
+                {entry.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-base)' }}>
+          {/* Named, because every decision in this console is recorded against
+              this person and they should see whose name is on it. */}
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            {operator.fullName}
+            {operator.role === 'super_admin' ? ' · مشرف عام' : ''}
+          </span>
+          <button
+            onClick={() => {
+              void opsAuth.signOut().then(onSignedOut);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--color-text-link)',
+              fontWeight: 600,
+              fontSize: 'var(--text-sm)',
+              minHeight: 44,
+            }}
+          >
+            تسجيل الخروج
+          </button>
+        </div>
+      </div>
+
+      {section === 'board' ? <Board /> : <VerificationQueue />}
+    </main>
+  );
+}
+
+function VerificationQueue() {
   const [queue, setQueue] = useState<VerificationStatus>('pending');
   const [providers, setProviders] = useState<readonly ProviderReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,40 +163,7 @@ function VerificationQueue({
   }, [load]);
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--space-xl)' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 'var(--space-base)',
-          marginBottom: 'var(--space-lg)',
-          flexWrap: 'wrap',
-        }}
-      >
-        {/* Named, because every decision below is recorded against this person
-            and they should be able to see whose name is on it. */}
-        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-          {operator.fullName}
-          {operator.role === 'super_admin' ? ' · مشرف عام' : ''}
-        </span>
-        <button
-          onClick={() => {
-            void opsAuth.signOut().then(onSignedOut);
-          }}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--color-text-link)',
-            fontWeight: 600,
-            fontSize: 'var(--text-sm)',
-            minHeight: 44,
-          }}
-        >
-          تسجيل الخروج
-        </button>
-      </div>
-
+    <>
       <header style={{ marginBottom: 'var(--space-xl)' }}>
         <h1
           style={{
@@ -208,7 +254,7 @@ function VerificationQueue({
           ))}
         </ul>
       )}
-    </main>
+    </>
   );
 }
 

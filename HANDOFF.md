@@ -51,7 +51,7 @@ twice consecutively. Both Expo apps bundle and the customer app runs on the iOS
 simulator. Repo is private at **github.com/muhammedatef98/habba**.
 
 ```
-45 migrations · 24 SQL suites · 2 concurrency tests · 50 customer tests
+46 migrations · 25 SQL suites · 2 concurrency tests · 50 customer tests
 90 core tests · 29 ui · 9 i18n · 4 provider · typecheck + lint green
 34 integration tests against real PostgREST + RLS
 ```

@@ -7,7 +7,13 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { OpsRepository, ProviderReview, VerificationEvent, VerificationStatus } from './types';
+import type {
+  BoardOrder,
+  OpsRepository,
+  ProviderReview,
+  VerificationEvent,
+  VerificationStatus,
+} from './types';
 
 interface ProviderRow {
   readonly id: string;
@@ -23,6 +29,39 @@ interface ProviderRow {
 
 class SupabaseOpsRepository implements OpsRepository {
   constructor(private readonly client: SupabaseClient) {}
+
+  async listBoard(): Promise<readonly BoardOrder[]> {
+    const { data, error } = await this.client.rpc('ops_active_orders');
+    if (error !== null) throw new Error(`listBoard: ${error.message}`);
+
+    return (
+      data as unknown as readonly {
+        order_id: string;
+        order_number: string;
+        status: string;
+        service_name_ar: string;
+        city_name_ar: string | null;
+        provider_name_ar: string | null;
+        status_age: string;
+        dispatch_round: number;
+        offers_total: number;
+        offers_open: number;
+        attention: BoardOrder['attention'];
+      }[]
+    ).map((row) => ({
+      orderId: row.order_id,
+      orderNumber: row.order_number,
+      status: row.status,
+      serviceNameAr: row.service_name_ar,
+      cityNameAr: row.city_name_ar,
+      providerNameAr: row.provider_name_ar,
+      statusAgeSeconds: intervalToSeconds(row.status_age),
+      dispatchRound: row.dispatch_round,
+      offersTotal: row.offers_total,
+      offersOpen: row.offers_open,
+      attention: row.attention,
+    }));
+  }
 
   async listProvidersForReview(status: VerificationStatus): Promise<readonly ProviderReview[]> {
     // ⚠️ Explicit column list, never `select()`. 0037 revoked
@@ -102,7 +141,67 @@ class SupabaseOpsRepository implements OpsRepository {
  * shape the server returns. Not a fixture pretending to be production data —
  * the console says which mode it is in.
  */
+/**
+ * PostgREST serialises an interval as `HH:MM:SS` (with days prefixed once it
+ * passes one). Parsed here rather than sent as seconds from SQL, because the
+ * interval is the honest type for "how long has this been stuck" and the
+ * board is the only thing that needs it as a number.
+ */
+function intervalToSeconds(value: string): number {
+  const days = /(\d+) days?/.exec(value);
+  const clock = /(\d+):(\d{2}):(\d{2})/.exec(value);
+  const fromDays = days !== null ? Number(days[1]) * 86_400 : 0;
+  if (clock === null) return fromDays;
+  return fromDays + Number(clock[1]) * 3600 + Number(clock[2]) * 60 + Math.floor(Number(clock[3]));
+}
+
 class InMemoryOpsRepository implements OpsRepository {
+  private readonly board: BoardOrder[] = [
+    {
+      orderId: 'ord-1',
+      orderNumber: 'HB-2026-000412',
+      status: 'searching',
+      serviceNameAr: 'ونش/سحب',
+      cityNameAr: 'الرياض',
+      providerNameAr: null,
+      statusAgeSeconds: 512,
+      dispatchRound: 3,
+      offersTotal: 4,
+      offersOpen: 0,
+      attention: 'search_stuck',
+    },
+    {
+      orderId: 'ord-2',
+      orderNumber: 'HB-2026-000418',
+      status: 'searching',
+      serviceNameAr: 'بطارية — شحن أو تبديل',
+      cityNameAr: 'الدمام',
+      providerNameAr: null,
+      statusAgeSeconds: 47,
+      dispatchRound: 1,
+      offersTotal: 3,
+      offersOpen: 3,
+      attention: 'none',
+    },
+    {
+      orderId: 'ord-3',
+      orderNumber: 'HB-2026-000401',
+      status: 'awaiting_approval',
+      serviceNameAr: 'بنشر وتبديل إطار',
+      cityNameAr: 'الرياض',
+      providerNameAr: 'ونش الشرقية السريع',
+      statusAgeSeconds: 2_640,
+      dispatchRound: 1,
+      offersTotal: 2,
+      offersOpen: 0,
+      attention: 'awaiting_customer',
+    },
+  ];
+
+  async listBoard(): Promise<readonly BoardOrder[]> {
+    return this.board;
+  }
+
   private readonly providers: ProviderReview[] = [
     {
       id: 'prov-1',
