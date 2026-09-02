@@ -100,9 +100,36 @@ export function Text({
     info: theme.colors.infoFg,
   }[tone];
 
-  // `start`/`end` are the logical values — React Native resolves them against
-  // the writing direction. Never `left`/`right` (§8).
-  const textAlign = align === 'center' ? 'center' : align === 'start' ? 'auto' : 'right';
+  /**
+   * Resolved against the LAYOUT direction, not the string's own script.
+   *
+   * The comment here used to claim `start`/`end` were logical values React
+   * Native resolves for us. They are not: RN's `textAlign` takes
+   * `left | right | center | justify | auto`, and both previous values were
+   * wrong in one direction each.
+   *
+   *  - `start` mapped to `'auto'`, which aligns by the *content's* script. An
+   *    Arabic provider name in the English app therefore right-aligned inside
+   *    a left-aligned row, leaving a gap between it and its avatar, and a
+   *    Latin string in the Arabic app did the mirror of that. Mixed-script
+   *    content is the normal case in this product — Saudi business names stay
+   *    Arabic whichever language the customer reads.
+   *  - `end` was hardcoded to `'right'`, which is the correct end in LTR and
+   *    the START in RTL, so it silently did nothing in the app's default
+   *    direction.
+   *
+   * Alignment is a property of the interface, not of the sentence.
+   */
+  const textAlign =
+    align === 'center'
+      ? ('center' as const)
+      : align === 'start'
+        ? theme.isRtl
+          ? ('right' as const)
+          : ('left' as const)
+        : theme.isRtl
+          ? ('left' as const)
+          : ('right' as const);
 
   return (
     <RNText

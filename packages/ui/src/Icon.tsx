@@ -12,47 +12,9 @@
  */
 
 import type { ColorValue } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+import { isMirroredIcon, type IconName } from './icon-names.js';
 import { useTheme } from './theme.js';
-
-export type IconName =
-  // services
-  | 'tow'
-  | 'battery'
-  | 'tyre'
-  | 'lockout'
-  | 'fuel'
-  | 'radiator'
-  // navigation
-  | 'home'
-  | 'calendar'
-  | 'wallet'
-  | 'person'
-  | 'chevronDown'
-  | 'chevronBack'
-  | 'arrow'
-  // actions and status
-  | 'phone'
-  | 'chat'
-  | 'check'
-  | 'star'
-  | 'mic'
-  | 'flipCamera'
-  | 'locate'
-  | 'edit'
-  | 'share'
-  | 'bell'
-  | 'alert'
-  | 'gauge'
-  // Bookable catalogue. The emergency set above was drawn first and these were
-  // being borrowed from it — every periodic service rendered as `gauge`, which
-  // made the booking list five identical rows with different words on them.
-  | 'oil'
-  | 'brake'
-  | 'ac'
-  | 'wash'
-  | 'inspection'
-  | 'wrench';
 
 type Shape =
   | { readonly kind: 'path'; readonly d: string }
@@ -90,7 +52,9 @@ const ICONS: Record<IconName, readonly Shape[]> = {
   wallet: [p('M5 8h14l-1 11H6z'), p('M9 8V6a3 3 0 0 1 6 0v2')],
   person: [c(12, 8, 3.5), p('M5 20c0-3.5 3-6 7-6s7 2.5 7 6')],
   chevronDown: [p('M6 9l6 6 6-6')],
+  // Drawn for LTR and mirrored under RTL, like every other glyph in MIRRORED.
   chevronBack: [p('M15 6l-6 6 6 6')],
+  chevronForward: [p('M9 6l6 6-6 6')],
   arrow: [p('M4 12h16M12 4l8 8-8 8')],
 
   phone: [
@@ -144,36 +108,44 @@ export function Icon({ name, size, color, strokeWidth = 1.8 }: IconProps) {
   const dimension = size ?? theme.iconSize.md;
   const filled = FILLED.has(name);
 
+  // Mirrored on the viewBox rather than with a `transform: scaleX(-1)` style
+  // on the host view: an SVG flipped by its own transform stays flipped if the
+  // element is later re-parented into a differently-directed subtree, and the
+  // stroke geometry is what should be reflected, not the box around it.
+  const mirror = theme.isRtl && isMirroredIcon(name);
+
   return (
     <Svg width={dimension} height={dimension} viewBox="0 0 24 24" fill="none">
-      {ICONS[name].map((shape, index) => {
-        const stroke = filled
-          ? { fill: resolved }
-          : {
-              stroke: resolved,
-              strokeWidth,
-              strokeLinecap: 'round' as const,
-              strokeLinejoin: 'round' as const,
-            };
+      <G {...(mirror ? { transform: 'translate(24, 0) scale(-1, 1)' } : {})}>
+        {ICONS[name].map((shape, index) => {
+          const stroke = filled
+            ? { fill: resolved }
+            : {
+                stroke: resolved,
+                strokeWidth,
+                strokeLinecap: 'round' as const,
+                strokeLinejoin: 'round' as const,
+              };
 
-        if (shape.kind === 'circle') {
-          return <Circle key={index} cx={shape.cx} cy={shape.cy} r={shape.r} {...stroke} />;
-        }
-        if (shape.kind === 'rect') {
-          return (
-            <Rect
-              key={index}
-              x={shape.x}
-              y={shape.y}
-              width={shape.width}
-              height={shape.height}
-              rx={shape.rx}
-              {...stroke}
-            />
-          );
-        }
-        return <Path key={index} d={shape.d} {...stroke} />;
-      })}
+          if (shape.kind === 'circle') {
+            return <Circle key={index} cx={shape.cx} cy={shape.cy} r={shape.r} {...stroke} />;
+          }
+          if (shape.kind === 'rect') {
+            return (
+              <Rect
+                key={index}
+                x={shape.x}
+                y={shape.y}
+                width={shape.width}
+                height={shape.height}
+                rx={shape.rx}
+                {...stroke}
+              />
+            );
+          }
+          return <Path key={index} d={shape.d} {...stroke} />;
+        })}
+      </G>
     </Svg>
   );
 }

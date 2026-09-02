@@ -166,7 +166,7 @@
     "themeDark": "Dark",
     "themeSystem": "System",
     "signOut": "Sign out",
-    "restartRequired": "The app will restart to apply the new text direction.",
+    "restartRequired": "Close the app and open it again to apply the language and writing direction.",
     "sectionAccount": "Account",
     "sectionPreferences": "Preferences",
     "sectionAbout": "About Habba",
@@ -179,7 +179,8 @@
     "signOutGuestWarning": "You're a guest — if you sign out now without adding a phone or email, you cannot get back to your logbook.",
     "signOutConfirm": "Yes, sign me out",
     "version": "Version",
-    "help": "Help and support"
+    "help": "Help and support",
+    "languageHint": "Changing the language changes the writing direction, which needs the app reopened."
   },
   "errors": {
     "generic": "Something went wrong.",
@@ -253,7 +254,9 @@
     "problemPlaceholder": "e.g. odd noise when braking",
     "errorSlotTaken": "That time was taken a moment ago. Choose another.",
     "errorGeneric": "We couldn't complete the booking. Please try again.",
-    "noVehicle": "Add your vehicle first so the service is recorded in its logbook."
+    "noVehicle": "Add your vehicle first so the service is recorded in its logbook.",
+    "workshopOnly": "Workshop only",
+    "mobileOnly": "Mobile only"
   },
   "emergency": {
     "title": "Emergency request",

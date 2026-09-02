@@ -172,6 +172,7 @@ interface BookingProviderRow {
   id: string;
   provider_type: BookingProvider['providerType'];
   business_name_ar: string;
+  business_name_en: string | null;
   rating_avg: number;
   rating_count: number;
   jobs_completed: number;
@@ -640,7 +641,7 @@ export class SupabaseRepository implements Repository {
     const query = this.client
       .from('providers')
       .select(
-        'id, provider_type, business_name_ar, rating_avg, rating_count, jobs_completed, workshops(address_ar), provider_services!inner(custom_price)',
+        'id, provider_type, business_name_ar, business_name_en, rating_avg, rating_count, jobs_completed, workshops(address_ar), provider_services!inner(custom_price)',
       )
       .eq('verification_status', 'approved')
       .eq('provider_services.service_id', serviceId)
@@ -665,6 +666,7 @@ export class SupabaseRepository implements Repository {
         id: row.id,
         providerType: row.provider_type,
         businessNameAr: row.business_name_ar,
+        businessNameEn: row.business_name_en,
         ratingAvg: Number(row.rating_avg),
         ratingCount: row.rating_count,
         jobsCompleted: row.jobs_completed,

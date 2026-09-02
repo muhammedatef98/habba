@@ -225,8 +225,19 @@ export default function BookingSlotScreen() {
           <Text variant="subheading">{t('booking.summaryTitle')}</Text>
 
           <View style={{ gap: theme.spacing.xs }}>
-            <SummaryRow label={service.nameAr} value={undefined} strong />
-            <SummaryRow label={provider.businessNameAr} value={undefined} />
+            <SummaryRow
+              label={i18n.language.startsWith('ar') ? service.nameAr : service.nameEn}
+              value={undefined}
+              strong
+            />
+            <SummaryRow
+              label={
+                i18n.language.startsWith('ar')
+                  ? provider.businessNameAr
+                  : (provider.businessNameEn ?? provider.businessNameAr)
+              }
+              value={undefined}
+            />
             <SummaryRow
               label={new Date(draft.slot.startsAt).toLocaleString(
                 i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,

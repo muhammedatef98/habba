@@ -25,6 +25,14 @@ export type WordmarkScript = 'arabic' | 'latin';
 export interface HabbaWordmarkProps {
   /** Height of the word itself. The gust scales with it. */
   readonly size?: number;
+  /**
+   * Which lockup to draw. Defaults to the theme's direction — Arabic in an
+   * RTL UI, Latin in an LTR one.
+   *
+   * It used to default to `'arabic'` unconditionally, so the English app
+   * opened on a screen that said "Welcome to Habba" under a wordmark reading
+   * هبّة. The Latin lockup existed and nothing ever asked for it.
+   */
   readonly script?: WordmarkScript;
   /** Defaults to the theme's primary. The gust is always the accent. */
   readonly color?: string;
@@ -35,12 +43,12 @@ export interface HabbaWordmarkProps {
 const LEAD = 'M116 40 C 86 14, 46 8, 4 12 C 42 22, 80 30, 108 52 C 115 52, 119 46, 116 40 Z';
 const TRAIL = 'M96 58 C 72 42, 46 36, 16 34 C 44 44, 68 52, 86 68 C 93 68, 98 63, 96 58 Z';
 
-export function HabbaWordmark({ size = 48, script = 'arabic', color, accent }: HabbaWordmarkProps) {
+export function HabbaWordmark({ size = 48, script, color, accent }: HabbaWordmarkProps) {
   const theme = useTheme();
   const ink = color ?? theme.colors.primary;
   const gust = accent ?? theme.colors.accent;
 
-  const isArabic = script === 'arabic';
+  const isArabic = (script ?? (theme.isRtl ? 'arabic' : 'latin')) === 'arabic';
   const word = isArabic ? 'هبة' : 'Habba';
 
   /**

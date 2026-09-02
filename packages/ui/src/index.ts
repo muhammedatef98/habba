@@ -9,6 +9,7 @@ export * from './CodeInput.js';
 export * from './ProvenanceBadge.js';
 export * from './HabbaMark.js';
 export * from './HabbaWordmark.js';
+export * from './icon-names.js';
 export * from './Icon.js';
 export * from './StatusPill.js';
 export * from './ProgressStages.js';

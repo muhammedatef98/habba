@@ -26,9 +26,17 @@ import { formatSarDisplay } from '@/lib/money-format';
 import { vehicleLabel } from '@/lib/vehicle-label';
 import { useBookingDraft } from '@/state/booking-draft';
 import { useSession } from '@/state/session';
-import type { BookingMode } from '@/data/types';
+import type { BookingMode, Service } from '@/data/types';
 
 const BOOKING_MODES: readonly BookingMode[] = ['mobile_scheduled', 'workshop'];
+
+/** The single mode a service supports, or null when it supports both. */
+function onlyMode(service: Service): BookingMode | null {
+  const bookable = service.supportedModes.filter((mode): mode is BookingMode =>
+    (BOOKING_MODES as readonly string[]).includes(mode),
+  );
+  return bookable.length === 1 ? (bookable[0] as BookingMode) : null;
+}
 
 export default function BookingServiceScreen() {
   const { t, i18n } = useTranslation();
@@ -125,14 +133,38 @@ export default function BookingServiceScreen() {
 
               <View style={{ flex: 1, gap: 2 }}>
                 <Text variant="bodyStrong">{isArabic ? option.nameAr : option.nameEn}</Text>
+
+                {/* `services.description_ar` has no English counterpart in the
+                    schema, so the English list would otherwise carry nothing
+                    but a name — including for the one service that can only
+                    happen in a workshop. That constraint is structured data
+                    (`supported_modes`), so it is stated from the data rather
+                    than left to a description only half the audience can read. */}
                 {option.descriptionAr !== null && isArabic ? (
                   <Text variant="caption" tone="muted" numberOfLines={2}>
                     {option.descriptionAr}
                   </Text>
                 ) : null}
-                <Text variant="caption" tone="subtle" numeric>
-                  {t('booking.durationMinutes', { minutes: option.estDurationMin })}
-                </Text>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <Text variant="caption" tone="subtle" numeric>
+                    {t('booking.durationMinutes', { minutes: option.estDurationMin })}
+                  </Text>
+                  {onlyMode(option) !== null ? (
+                    <Text variant="caption" tone="muted">
+                      {onlyMode(option) === 'workshop'
+                        ? t('booking.workshopOnly')
+                        : t('booking.mobileOnly')}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
 
               <Text variant="bodyStrong" tone="accent" numeric>

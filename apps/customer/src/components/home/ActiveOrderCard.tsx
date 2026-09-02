@@ -63,12 +63,7 @@ export function ActiveOrderCard({ order, onPress, testID }: ActiveOrderCardProps
               {t('home.activeTrack')}
             </Text>
           </View>
-          {/* `chevronBack` draws a fixed left-pointing chevron; Icon does not
-              mirror. In an RTL layout it therefore sits at the row's end and
-              points onward, which is what is wanted — the same reason
-              RecentOrderRow uses it. It is the wrong way round in English, a
-              design-system gap that belongs in Icon, not here. */}
-          <Icon name="chevronBack" size={theme.iconSize.md} color={theme.colors.primary} />
+          <Icon name="chevronForward" size={theme.iconSize.md} color={theme.colors.primary} />
         </View>
       </View>
     </Card>

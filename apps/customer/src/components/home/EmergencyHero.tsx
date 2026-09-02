@@ -77,10 +77,19 @@ export function EmergencyHero({ onPress, testID }: EmergencyHeroProps) {
     >
       {/* Diagonal, not vertical: a flat vertical fade on a wide block reads as
           a rendering artefact, while the diagonal gives the slab a light
-          source and keeps the dark corner behind the gust. */}
+          source and keeps the dark corner behind the gust.
+          The light comes from the reading start, so the dark corner and the
+          gust land together in both directions — pinned to one diagonal, the
+          two coincided in English and sat on opposite sides in Arabic. */}
       <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
         <Defs>
-          <LinearGradient id="heroFade" x1="0" y1="0" x2="1" y2="1">
+          <LinearGradient
+            id="heroFade"
+            x1={theme.isRtl ? '1' : '0'}
+            y1="0"
+            x2={theme.isRtl ? '0' : '1'}
+            y2="1"
+          >
             <Stop offset="0" stopColor={palette.petrol[600]} />
             <Stop offset="1" stopColor={palette.petrol[800]} />
           </LinearGradient>
@@ -98,10 +107,16 @@ export function EmergencyHero({ onPress, testID }: EmergencyHeroProps) {
         on="dark"
         style={{
           position: 'absolute',
-          // Physical, not logical: a decorative bleed anchored to the slab's
-          // corner should stay in the same corner in both directions rather
-          // than flipping with the text.
-          left: -26,
+          // `end`, the logical edge, rather than a physical one or a
+          // hand-rolled `isRtl ? left : right`. React Native's handling of
+          // `left`/`right` on an absolutely positioned child under RTL is not
+          // something to reason about from first principles — I got it
+          // backwards twice — and `end` states the intent directly: the gust
+          // belongs in the corner the text does NOT start from, so it always
+          // sits in the empty half of the slab. Pinning it physically was fine
+          // while the app was Arabic-only; in English the heading starts on the
+          // left and ran straight over it.
+          end: -26,
           bottom: -34,
           opacity: 0.13,
         }}
@@ -141,7 +156,7 @@ export function EmergencyHero({ onPress, testID }: EmergencyHeroProps) {
             backgroundColor: 'rgba(246, 243, 237, 0.14)',
           }}
         >
-          <Icon name="chevronBack" size={theme.iconSize.md} color={INK} />
+          <Icon name="chevronForward" size={theme.iconSize.md} color={INK} />
         </View>
       </View>
     </Pressable>

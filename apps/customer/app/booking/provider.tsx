@@ -23,6 +23,7 @@ import { repository } from '@/data/repository';
 import { formatCount } from '@/lib/format-number';
 import { formatSarDisplay } from '@/lib/money-format';
 import { useBookingDraft } from '@/state/booking-draft';
+import type { BookingProvider } from '@/data/types';
 
 export default function BookingProviderScreen() {
   const { t, i18n } = useTranslation();
@@ -31,6 +32,12 @@ export default function BookingProviderScreen() {
   const draft = useBookingDraft();
   const service = draft.service;
   const mode = draft.mode;
+
+  const isArabic = i18n.language.startsWith('ar');
+  // Arabic name unless there is an English one, which many workshops do not
+  // have — a transliteration invented here would be worse than the real name.
+  const nameOf = (provider: BookingProvider) =>
+    isArabic ? provider.businessNameAr : (provider.businessNameEn ?? provider.businessNameAr);
 
   const providers = useQuery({
     queryKey: ['booking-providers', service?.id, mode],
@@ -76,7 +83,7 @@ export default function BookingProviderScreen() {
                   draft.selectProvider(provider);
                   router.push('/booking/slot');
                 }}
-                accessibilityLabel={provider.businessNameAr}
+                accessibilityLabel={nameOf(provider)}
                 style={{
                   gap: theme.spacing.md,
                   backgroundColor: theme.colors.surface,
@@ -98,13 +105,13 @@ export default function BookingProviderScreen() {
                     }}
                   >
                     <Text variant="bodyStrong" tone="primary">
-                      {provider.businessNameAr.trim().slice(0, 1)}
+                      {nameOf(provider).trim().slice(0, 1)}
                     </Text>
                   </View>
 
                   <View style={{ flex: 1, gap: theme.spacing.xs }}>
                     <Text variant="bodyStrong" numberOfLines={2}>
-                      {provider.businessNameAr}
+                      {nameOf(provider)}
                     </Text>
 
                     <View
@@ -159,7 +166,7 @@ export default function BookingProviderScreen() {
                     {provider.addressAr ?? t('booking.providerComesToYou')}
                   </Text>
                   <Icon
-                    name="chevronBack"
+                    name="chevronForward"
                     size={theme.iconSize.sm}
                     color={theme.colors.textSubtle}
                   />

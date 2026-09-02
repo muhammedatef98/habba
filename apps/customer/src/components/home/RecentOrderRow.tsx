@@ -76,7 +76,7 @@ export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) 
         </Text>
       ) : null}
 
-      <Icon name="chevronBack" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
+      <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
     </Pressable>
   );
 }

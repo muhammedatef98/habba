@@ -49,8 +49,8 @@ export function BookingSteps({ current, title, subtitle, testID }: BookingStepsP
               pressed ? { opacity: 0.6 } : null,
             ]}
           >
-            {/* Points the way back, which in an RTL layout is where this glyph
-                already points — see the note in ActiveOrderCard. */}
+            {/* `chevronBack` means "go back", and Icon mirrors it, so it
+                points right in Arabic and left in English. */}
             <Icon name="chevronBack" size={theme.iconSize.sm} color={theme.colors.text} />
           </Pressable>
         ) : null}

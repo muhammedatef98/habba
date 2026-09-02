@@ -126,6 +126,12 @@ export interface BookingProvider {
   readonly id: string;
   readonly providerType: 'individual' | 'workshop';
   readonly businessNameAr: string;
+  /**
+   * `providers.business_name_en`, which is nullable — plenty of Saudi
+   * workshops trade under an Arabic name only. The English UI falls back to
+   * the Arabic one rather than to a transliteration nobody uses.
+   */
+  readonly businessNameEn: string | null;
   readonly ratingAvg: number;
   readonly ratingCount: number;
   readonly jobsCompleted: number;

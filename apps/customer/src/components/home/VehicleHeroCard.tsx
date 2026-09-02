@@ -177,7 +177,7 @@ export function VehicleHeroCard({
           <Text variant="label" tone="primary" style={{ flex: 1 }}>
             {t('home.openLogbook')}
           </Text>
-          <Icon name="chevronBack" size={theme.iconSize.sm} color={theme.colors.primary} />
+          <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.primary} />
         </View>
       </Card>
 

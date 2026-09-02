@@ -30,9 +30,9 @@ import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/components/home/SectionHeader';
 import { repository } from '@/data/repository';
 import { formatCount } from '@/lib/format-number';
+import { applyLocale } from '@/lib/locale-switch';
+import { writeStoredTheme, type ThemePreference } from '@/lib/preferences';
 import { useIsAuthenticated, useSession } from '@/state/session';
-
-type ThemePreference = 'system' | 'light' | 'dark';
 
 export default function AccountScreen() {
   const { t, i18n } = useTranslation();
@@ -47,6 +47,33 @@ export default function AccountScreen() {
   const isGuest = useSession((state) => state.isGuest);
 
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+
+  /**
+   * The language the customer has chosen but not yet restarted into.
+   *
+   * Kept separate from `locale` because `locale` is what the app is currently
+   * *rendering* — flipping it early would swap the copy while the layout stays
+   * mirrored, which is the one state worse than waiting.
+   */
+  const [pendingLocale, setPendingLocale] = useState<Locale | null>(null);
+
+  async function chooseLocale(next: Locale) {
+    if (next === locale) {
+      setPendingLocale(null);
+      return;
+    }
+
+    const { needsRestart } = await applyLocale(next, locale);
+
+    if (needsRestart) {
+      setPendingLocale(next);
+      return;
+    }
+
+    // Same-direction change: nothing to wait for, so it is already live.
+    setPendingLocale(null);
+    setLocale(next);
+  }
 
   const profile = useQuery({ queryKey: ['profile'], queryFn: () => repository.getProfile() });
   const vehicles = useQuery({ queryKey: ['vehicles'], queryFn: () => repository.listVehicles() });
@@ -66,7 +93,21 @@ export default function AccountScreen() {
 
   const person = profile.data ?? null;
   const contact = person?.phone ?? person?.email ?? null;
-  const initial = (person?.fullName ?? t('settings.guestLabel')).trim().slice(0, 1);
+
+  /**
+   * A guest's stored name is a placeholder, not a name.
+   *
+   * `signInAsGuest` writes the literal string "ضيف", so the English app
+   * greeted an English-speaking guest in Arabic — and the existing
+   * `?? t('settings.guestLabel')` fallback could never fire, because the field
+   * was never null. Translating at the point of display is the fix; the
+   * alternative, storing a localised string in the profile, puts UI copy in
+   * the database and freezes it at whatever language the account was made in.
+   */
+  const displayName = isGuest ? t('settings.guestLabel') : (person?.fullName ?? '');
+  const initial = (displayName.length > 0 ? displayName : t('settings.guestLabel'))
+    .trim()
+    .slice(0, 1);
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
@@ -94,7 +135,7 @@ export default function AccountScreen() {
 
             <View style={{ flex: 1, gap: 2 }}>
               <Text variant="bodyStrong" numberOfLines={1}>
-                {person?.fullName ?? t('settings.guestLabel')}
+                {displayName}
               </Text>
               {contact !== null ? (
                 <Text variant="bodySmall" tone="muted" numeric numberOfLines={1}>
@@ -142,7 +183,7 @@ export default function AccountScreen() {
               count: formatCount(vehicles.data?.length ?? 0, i18n.language),
             })}
           </Text>
-          <Icon name="chevronBack" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
+          <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
         </Card>
       </View>
 
@@ -159,13 +200,37 @@ export default function AccountScreen() {
             </Text>
             <SegmentedRow
               options={locales.map((option) => ({ key: option.value, label: option.label }))}
-              selected={locale}
-              onSelect={(value) => setLocale(value as Locale)}
+              selected={pendingLocale ?? locale}
+              onSelect={(value) => void chooseLocale(value as Locale)}
               testIdPrefix="locale"
             />
-            <Text variant="caption" tone="subtle">
-              {t('settings.restartRequired')}
-            </Text>
+
+            {/* The old caption said the app would restart. It never did, and
+                nothing applied the choice either. Now the choice is saved and
+                staged, and this says exactly what is true: it takes effect the
+                next time the app is opened. */}
+            {pendingLocale !== null ? (
+              <Card
+                testID="locale-restart-notice"
+                elevation="none"
+                style={{
+                  flexDirection: 'row',
+                  gap: theme.spacing.sm,
+                  backgroundColor: theme.colors.accentSubtle,
+                  borderColor: theme.colors.accent,
+                  borderWidth: 1,
+                }}
+              >
+                <Icon name="alert" size={theme.iconSize.sm} color={theme.colors.accentFg} />
+                <Text variant="caption" style={{ flex: 1, color: theme.colors.accentText }}>
+                  {t('settings.restartRequired')}
+                </Text>
+              </Card>
+            ) : (
+              <Text variant="caption" tone="subtle">
+                {t('settings.languageHint')}
+              </Text>
+            )}
           </View>
 
           <View style={{ gap: theme.spacing.sm }}>
@@ -175,7 +240,12 @@ export default function AccountScreen() {
             <SegmentedRow
               options={themes.map((option) => ({ key: option.value, label: option.label }))}
               selected={themePreference}
-              onSelect={(value) => setThemePreference(value as ThemePreference)}
+              onSelect={(value) => {
+                const next = value as ThemePreference;
+                setThemePreference(next);
+                // No restart: a theme is a render-time choice, unlike direction.
+                void writeStoredTheme(next);
+              }}
               testIdPrefix="theme"
             />
           </View>

@@ -17,6 +17,7 @@
 import { Pressable, View } from 'react-native';
 import { Icon, Text, useTheme } from '@habba/ui';
 import { serviceIcon } from '@/lib/service-icon';
+import { shortServiceName } from '@/lib/service-label';
 import type { Service } from '@/data/types';
 
 /** Four fits one thumb-width row at 375dp without the names truncating. */
@@ -39,6 +40,9 @@ export function QuickServices({ services, onSelect, isArabic, testID }: QuickSer
     <View testID={testID} style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
       {shown.map((service) => {
         const name = isArabic ? service.nameAr : service.nameEn;
+        // The tile shows the subject; the icon beside it already carries the
+        // qualifier. The full name stays on the accessibility label.
+        const tileLabel = shortServiceName(name);
 
         return (
           <Pressable
@@ -83,7 +87,7 @@ export function QuickServices({ services, onSelect, isArabic, testID }: QuickSer
             </View>
 
             <Text variant="caption" align="center" numberOfLines={2}>
-              {name}
+              {tileLabel}
             </Text>
           </Pressable>
         );

@@ -21,6 +21,7 @@ import {
 } from '@expo-google-fonts/outfit';
 import { ThemeProvider, lightColors } from '@habba/ui';
 import { detectDeviceLocale, initI18n } from '@/lib/i18n';
+import { readStoredLocale, readStoredTheme } from '@/lib/preferences';
 import { syncLayoutDirection } from '@/lib/rtl';
 import { useSession } from '@/state/session';
 
@@ -41,6 +42,7 @@ export default function RootLayout() {
   const locale = useSession((state) => state.locale);
   const setLocale = useSession((state) => state.setLocale);
   const themePreference = useSession((state) => state.themePreference);
+  const setThemePreference = useSession((state) => state.setThemePreference);
   const [ready, setReady] = useState(false);
 
   // The design's Latin face, used for every figure in the app. Loaded by exact
@@ -60,12 +62,22 @@ export default function RootLayout() {
     let cancelled = false;
 
     void (async () => {
-      const detected = detectDeviceLocale();
-      syncLayoutDirection(detected);
-      await initI18n(detected);
+      // The customer's own choice outranks the device. Boot used to read the
+      // device locale unconditionally, which meant a saved preference was
+      // overwritten on every launch — the language switcher could not have
+      // worked even if something had been listening to it.
+      const [storedLocale, storedTheme] = await Promise.all([
+        readStoredLocale(),
+        readStoredTheme(),
+      ]);
+      const effective = storedLocale ?? detectDeviceLocale();
+
+      syncLayoutDirection(effective);
+      await initI18n(effective);
 
       if (!cancelled) {
-        setLocale(detected);
+        setLocale(effective);
+        if (storedTheme !== null) setThemePreference(storedTheme);
         setReady(true);
       }
     })();
@@ -73,7 +85,7 @@ export default function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, [setLocale]);
+  }, [setLocale, setThemePreference]);
 
   // Gate on the fonts too: rendering before Outfit resolves shows every figure
   // in the fallback face and then reflows, which on the tracking screen means
