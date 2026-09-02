@@ -58,6 +58,24 @@ const STATUS_AR: Record<string, string> = {
   disputed: 'نزاع',
 };
 
+/**
+ * The counts an operator reads before reading any single row.
+ *
+ * A board sorted by trouble already puts the worst case first, which answers
+ * "what do I do next". It does not answer "how bad is it" — and the difference
+ * between one stuck search and six is the difference between handling it and
+ * escalating. Derived rather than fetched: the board rows already carry
+ * everything, and a second query could disagree with the list under it.
+ */
+function summarise(orders: readonly BoardOrder[]) {
+  return {
+    active: orders.length,
+    attention: orders.filter((order) => order.attention !== 'none').length,
+    searching: orders.filter((order) => order.status === 'searching').length,
+    awaitingCustomer: orders.filter((order) => order.status === 'awaiting_approval').length,
+  };
+}
+
 /** Minutes and seconds — the unit an operator thinks in during a shift. */
 function age(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -106,97 +124,160 @@ export function Board() {
     );
   }
 
+  const totals = summarise(orders);
+
   return (
-    <ul
-      style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 'var(--space-sm)' }}
-    >
-      {orders.map((order) => {
-        const flag = ATTENTION[order.attention];
-        return (
-          <li
-            key={order.orderId}
-            className="board-row"
-            style={{
-              padding: 'var(--space-md) var(--space-base)',
-              border: '1px solid var(--color-border)',
-              // A left edge in the flag colour rather than a tinted row: the
-              // board is scanned down its start edge, and a fully coloured row
-              // makes the text underneath it harder to read at a glance.
-              borderInlineStartWidth: flag === null ? 1 : 4,
-              borderInlineStartColor: flag === null ? 'var(--color-border)' : flag.fg,
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-surface)',
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600 }}>{order.serviceNameAr}</div>
-              <div
-                className="numeric"
-                style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}
-              >
-                {order.orderNumber}
-                {order.cityNameAr !== null ? ` · ${order.cityNameAr}` : ''}
-              </div>
-            </div>
+    <>
+      <div className="board-summary">
+        <Stat label="طلبات نشطة" value={totals.active} />
+        <Stat
+          label="تحتاج تدخّل"
+          value={totals.attention}
+          tone={totals.attention > 0 ? 'var(--color-emergency-fg)' : undefined}
+        />
+        <Stat label="جارٍ البحث" value={totals.searching} />
+        <Stat label="بانتظار العميل" value={totals.awaitingCustomer} />
+      </div>
 
-            <div
-              style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', minWidth: 0 }}
-            >
-              {STATUS_AR[order.status] ?? order.status}
-              {order.providerNameAr !== null ? (
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
-                  {order.providerNameAr}
-                </div>
-              ) : null}
-            </div>
+      {/* Column headings. The row carries three unlabelled numbers — the
+          dispatch round, the open-over-total offers, and the age — and an
+          operator should not have to learn what each position means by
+          watching it change. */}
+      <div className="board-head" aria-hidden="true">
+        <span>الطلب</span>
+        <span>الحالة</span>
+        <span style={{ textAlign: 'center', minWidth: 88 }}>الإرسال</span>
+        <span style={{ textAlign: 'end' }}>منذ</span>
+      </div>
 
-            {/* Dispatch state only while it means something. On an accepted job
-                "round 1, 3 offers" is history the operator does not need. */}
-            <div
-              className="numeric"
+      <ul
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'grid',
+          gap: 'var(--space-sm)',
+        }}
+      >
+        {orders.map((order) => {
+          const flag = ATTENTION[order.attention];
+          return (
+            <li
+              key={order.orderId}
+              className="board-row"
               style={{
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-text-subtle)',
-                textAlign: 'center',
-                minWidth: 88,
+                padding: 'var(--space-md) var(--space-base)',
+                border: '1px solid var(--color-border)',
+                // A left edge in the flag colour rather than a tinted row: the
+                // board is scanned down its start edge, and a fully coloured row
+                // makes the text underneath it harder to read at a glance.
+                borderInlineStartWidth: flag === null ? 1 : 4,
+                borderInlineStartColor: flag === null ? 'var(--color-border)' : flag.fg,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
               }}
             >
-              {order.status === 'searching'
-                ? `جولة ${order.dispatchRound} · ${order.offersOpen}/${order.offersTotal}`
-                : ''}
-            </div>
-
-            <div className="board-signals">
-              {flag !== null ? (
-                <span
-                  style={{
-                    fontSize: 'var(--text-xs)',
-                    padding: '4px var(--space-sm)',
-                    borderRadius: 'var(--radius-full)',
-                    background: flag.bg,
-                    color: flag.fg,
-                    whiteSpace: 'nowrap',
-                  }}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600 }}>{order.serviceNameAr}</div>
+                <div
+                  className="numeric"
+                  style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}
                 >
-                  {flag.label}
-                </span>
-              ) : null}
-              <span
-                className="numeric"
+                  {order.orderNumber}
+                  {order.cityNameAr !== null ? ` · ${order.cityNameAr}` : ''}
+                </div>
+              </div>
+
+              <div
                 style={{
                   fontSize: 'var(--text-sm)',
-                  fontWeight: 600,
-                  color: flag === null ? 'var(--color-text-muted)' : flag.fg,
-                  minWidth: 48,
-                  textAlign: 'end',
+                  color: 'var(--color-text-muted)',
+                  minWidth: 0,
                 }}
               >
-                {age(order.statusAgeSeconds)}
-              </span>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+                {STATUS_AR[order.status] ?? order.status}
+                {order.providerNameAr !== null ? (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
+                    {order.providerNameAr}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Dispatch state only while it means something. On an accepted job
+                "round 1, 3 offers" is history the operator does not need. */}
+              <div
+                className="numeric"
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-subtle)',
+                  textAlign: 'center',
+                  minWidth: 88,
+                }}
+              >
+                {order.status === 'searching'
+                  ? `جولة ${order.dispatchRound} · ${order.offersOpen}/${order.offersTotal}`
+                  : ''}
+              </div>
+
+              <div className="board-signals">
+                {flag !== null ? (
+                  <span
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      padding: '4px var(--space-sm)',
+                      borderRadius: 'var(--radius-full)',
+                      background: flag.bg,
+                      color: flag.fg,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {flag.label}
+                  </span>
+                ) : null}
+                <span
+                  className="numeric"
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 600,
+                    color: flag === null ? 'var(--color-text-muted)' : flag.fg,
+                    minWidth: 48,
+                    textAlign: 'end',
+                  }}
+                >
+                  {age(order.statusAgeSeconds)}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  readonly label: string;
+  readonly value: number;
+  readonly tone?: string | undefined;
+}) {
+  return (
+    <div className="board-stat">
+      <div
+        className="numeric"
+        style={{
+          fontSize: 'var(--text-xl)',
+          fontWeight: 600,
+          color: tone ?? 'var(--color-text)',
+          lineHeight: 1.2,
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>{label}</div>
+    </div>
   );
 }

@@ -85,3 +85,43 @@ select {
     justify-content: flex-end;
   }
 }
+
+/*
+ * The header row that names the board's columns.
+ *
+ * Shares `.board-row`'s track definition so a heading can never drift out of
+ * alignment with the rows beneath it — the alternative, a second
+ * `grid-template-columns` declaration, is two sources of truth for one grid.
+ * Hidden below the breakpoint where the rows stack, because a column header
+ * over a stacked list labels nothing.
+ */
+.board-head {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .board-head {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto;
+    gap: var(--space-base);
+    align-items: center;
+    padding: 0 var(--space-base) var(--space-xs);
+    font-size: var(--text-xs);
+    color: var(--color-text-subtle);
+  }
+}
+
+/* Shift summary: counts an operator reads before reading any single row. */
+.board-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.board-stat {
+  padding: var(--space-md) var(--space-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
