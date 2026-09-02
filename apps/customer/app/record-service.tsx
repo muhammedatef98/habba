@@ -17,7 +17,9 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
+import { ChipRow } from '@/components/form/ChipRow';
 import { repository } from '@/data/repository';
+import { daysInMonth, serviceYears, toServiceDate } from '@/lib/calendar';
 import { useIsAuthenticated } from '@/state/session';
 
 interface FieldErrors {
@@ -26,23 +28,40 @@ interface FieldErrors {
   mileage?: string | undefined;
 }
 
-/** Accepts YYYY-MM-DD, the format the date field asks for. */
-function parseDate(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T12:00:00Z`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+/**
+ * Month names for the picker, in the UI locale.
+ *
+ * Built from `Intl` rather than a hardcoded list so Arabic gets its own month
+ * names rather than transliterated English ones, and so the list cannot drift
+ * from the locale the rest of the screen is in.
+ */
+function monthNames(locale: string): readonly string[] {
+  const tag = locale.startsWith('ar') ? 'ar-u-nu-latn' : locale;
+  return Array.from({ length: 12 }, (_, index) =>
+    new Date(2026, index, 1).toLocaleDateString(tag, { month: 'long' }),
+  );
 }
 
 export default function RecordServiceScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
   const { id } = useLocalSearchParams<{ id: string }>();
 
+  const years = serviceYears();
+  const months = monthNames(i18n.language);
+
   const [summary, setSummary] = useState('');
-  const [when, setWhen] = useState('');
   const [mileage, setMileage] = useState('');
+
+  // Three chip rows rather than a free-text `YYYY-MM-DD` field. Asking someone
+  // to type a date in an exact format, on a numeric keypad, in an RTL layout,
+  // to record something they did last spring, is the most avoidable failure on
+  // this screen — and the format was only enforced after they hit save.
+  const [year, setYear] = useState<number | null>(null);
+  const [month, setMonth] = useState<number | null>(null);
+  const [day, setDay] = useState<number | null>(null);
 
   // Explicit `| undefined` rather than optional properties: under
   // exactOptionalPropertyTypes, clearing a field by assigning undefined is not
@@ -50,9 +69,11 @@ export default function RecordServiceScreen() {
   // every keystroke.
   const [errors, setErrors] = useState<FieldErrors>({});
 
+  const occurredAt =
+    year === null || month === null || day === null ? null : toServiceDate(year, month, day);
+
   const save = useMutation({
     mutationFn: async () => {
-      const occurredAt = parseDate(when);
       if (occurredAt === null) throw new Error('bad_date');
 
       await repository.recordPastService({
@@ -87,10 +108,9 @@ export default function RecordServiceScreen() {
 
     if (summary.trim().length === 0) next.summary = t('logbook.errors.descriptionRequired');
 
-    const parsed = parseDate(when);
-    if (parsed === null) {
+    if (occurredAt === null) {
       next.when = t('vehicle.errors.required');
-    } else if (parsed.getTime() > Date.now()) {
+    } else if (occurredAt.getTime() > Date.now()) {
       next.when = t('logbook.errors.futureDate');
     }
 
@@ -129,19 +149,63 @@ export default function RecordServiceScreen() {
         multiline
       />
 
-      <Field
-        testID="service-date"
-        label={t('logbook.recordWhen')}
-        value={when}
-        onChangeText={(value) => {
-          setWhen(value);
-          setErrors((prev) => ({ ...prev, when: undefined }));
-        }}
-        placeholder="2025-05-14"
-        error={errors.when}
-        keyboardType="numbers-and-punctuation"
-        forceLtrInput
-      />
+      <View style={{ gap: theme.spacing.md }}>
+        <Text variant="label" tone="muted">
+          {t('logbook.recordWhen')}
+        </Text>
+
+        <ChipRow
+          testIdPrefix="service-year"
+          label={t('logbook.recordYear')}
+          options={years.map((value) => ({ key: String(value), label: String(value) }))}
+          selected={year === null ? null : String(year)}
+          onSelect={(key) => {
+            setYear(Number(key));
+            setErrors((prev) => ({ ...prev, when: undefined }));
+          }}
+        />
+
+        {year !== null ? (
+          <ChipRow
+            testIdPrefix="service-month"
+            label={t('logbook.recordMonth')}
+            options={months.map((name, index) => ({ key: String(index + 1), label: name }))}
+            selected={month === null ? null : String(month)}
+            onSelect={(key) => {
+              const next = Number(key);
+              setMonth(next);
+              // A day that does not exist in the newly chosen month has to go,
+              // or 31 March silently becomes an invalid 31 April.
+              setDay((current) =>
+                current !== null && current > daysInMonth(year, next) ? null : current,
+              );
+              setErrors((prev) => ({ ...prev, when: undefined }));
+            }}
+          />
+        ) : null}
+
+        {year !== null && month !== null ? (
+          <ChipRow
+            testIdPrefix="service-day"
+            label={t('logbook.recordDay')}
+            options={Array.from({ length: daysInMonth(year, month) }, (_, index) => ({
+              key: String(index + 1),
+              label: String(index + 1),
+            }))}
+            selected={day === null ? null : String(day)}
+            onSelect={(key) => {
+              setDay(Number(key));
+              setErrors((prev) => ({ ...prev, when: undefined }));
+            }}
+          />
+        ) : null}
+
+        {errors.when !== undefined ? (
+          <Text variant="caption" tone="emergency">
+            {errors.when}
+          </Text>
+        ) : null}
+      </View>
 
       <Field
         testID="service-mileage"
@@ -161,7 +225,7 @@ export default function RecordServiceScreen() {
         label={t('common.save')}
         onPress={handleSave}
         loading={save.isPending}
-        disabled={summary.trim().length === 0 || when.length === 0}
+        disabled={summary.trim().length === 0 || occurredAt === null}
       />
 
       <Button label={t('common.cancel')} variant="ghost" onPress={() => router.back()} />

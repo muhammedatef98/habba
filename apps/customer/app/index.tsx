@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { parseSaudiPhone } from '@habba/core';
+import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
 import { Button, Field, HabbaWordmark, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/lib/otp';
 import { repository } from '@/data/repository';
@@ -103,7 +103,12 @@ export default function PhoneScreen() {
           textContentType="telephoneNumber"
           autoComplete="tel"
           maxLength={16}
-          // Phone numbers read left-to-right even in an Arabic UI.
+          // The dialling code, shown rather than assumed. `parseSaudiPhone`
+          // accepts 05…, 5…, +966… and 00966… equally, so this is not
+          // validation — it is the app answering "do I type the zero?" before
+          // the question is asked, on the very first screen. The prefix is not
+          // part of the value, so every form the parser accepts still works.
+          prefix={`+${SAUDI_COUNTRY_CODE}`}
           forceLtrInput
         />
 

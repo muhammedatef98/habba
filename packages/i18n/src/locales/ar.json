@@ -25,7 +25,7 @@
     "phoneHint": "سنرسل لك رمز تحقّق برسالة نصية",
     "sendCode": "إرسال الرمز",
     "otpTitle": "أدخل رمز التحقّق",
-    "otpSubtitle": "أرسلنا رمزاً مكوّناً من ٤ أرقام إلى {{phone}}",
+    "otpSubtitle": "أرسلنا رمزاً مكوّناً من {{length}} أرقام إلى {{phone}}",
     "resendIn": "إعادة الإرسال خلال {{seconds}} ثانية",
     "resend": "إعادة إرسال الرمز",
     "verify": "تحقّق",
@@ -65,7 +65,9 @@
       "unknownEmail": "لا يوجد حساب بهذا البريد. أنشئ حساباً جديداً.",
       "wrongPassword": "كلمة المرور غير صحيحة.",
       "guestNeedsIdentity": "أضف رقم جوال أو بريد إلكتروني لحفظ الحساب."
-    }
+    },
+    "otpLabel": "رمز التحقّق",
+    "changePhone": "تغيير رقم الجوال"
   },
   "vehicle": {
     "addTitle": "أضف سيارتك",
@@ -147,7 +149,10 @@
     "filterMileage": "العداد",
     "filterEmpty": "ما فيه سجلات بهذا التصنيف.",
     "recordsCount": "{{count}} سجل",
-    "vehicleUnknown": "سيارتك"
+    "vehicleUnknown": "سيارتك",
+    "recordMonth": "الشهر",
+    "recordDay": "اليوم",
+    "recordYear": "السنة"
   },
   "settings": {
     "title": "الإعدادات",
@@ -383,7 +388,9 @@
     "vatLabel": "ضريبة القيمة المضافة",
     "totalLabel": "الإجمالي",
     "allApprovedHint": "بعد الموافقة على كل القطع سيُرسَل العمل لتأكيد الإنجاز.",
-    "pendingHint": "لم تتم الموافقة على كل القطع بعد."
+    "pendingHint": "لم تتم الموافقة على كل القطع بعد.",
+    "pendingBadge": "{{count}} بانتظار موافقتك",
+    "allApprovedBadge": "تمت الموافقة"
   },
   "job": {
     "accept": "قبول الطلب",

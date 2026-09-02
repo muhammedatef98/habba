@@ -11,8 +11,8 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { maskPhone } from '@habba/core';
-import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
+import { ltrIsolate, maskPhone } from '@habba/core';
+import { Button, CodeInput, Field, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
 import { OTP_LENGTH, OTP_RESEND_COOLDOWN_SECONDS } from '@/lib/otp-provider';
 import { otpProvider } from '@/lib/otp';
 import { repository } from '@/data/repository';
@@ -89,27 +89,33 @@ export default function VerifyScreen() {
     <Screen scrollable>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.sm }}>
+          <HabbaMark size={40} />
           <Text variant="title">{t('auth.otpTitle')}</Text>
           <Text variant="body" tone="muted">
-            {/* Masked: a full number should not sit on screen unnecessarily. */}
-            {t('auth.otpSubtitle', { phone: maskPhone(phoneE164) })}
+            {/* Masked: a full number should not sit on screen unnecessarily.
+                Isolated: inside an RTL sentence the bidi algorithm reorders the
+                neutral characters in `05• •••• •67` and renders it as
+                `670••••050`, which reads as the app showing the wrong number. */}
+            {t('auth.otpSubtitle', {
+              length: OTP_LENGTH,
+              phone: ltrIsolate(maskPhone(phoneE164)),
+            })}
           </Text>
         </View>
 
-        <Field
+        {/* The label was `auth.verify` — "تحقّق" — which is the button's
+            words, not the field's. A field labelled with its own submit action
+            tells a screen-reader user nothing about what to type. */}
+        <CodeInput
           testID="otp-input"
-          label={t('auth.verify')}
+          label={t('auth.otpLabel')}
           value={code}
           onChangeText={(value) => {
-            setCode(value.replace(/\D/g, '').slice(0, OTP_LENGTH));
+            setCode(value);
             if (error !== undefined) setError(undefined);
           }}
+          length={OTP_LENGTH}
           error={error}
-          keyboardType="number-pad"
-          textContentType="oneTimeCode"
-          autoComplete="sms-otp"
-          maxLength={OTP_LENGTH}
-          forceLtrInput
         />
 
         <Field
@@ -133,6 +139,17 @@ export default function VerifyScreen() {
           variant="ghost"
           onPress={() => void handleResend()}
           disabled={cooldown > 0}
+        />
+
+        {/* There was no way back from here. A mistyped digit in the phone
+            number left the customer waiting for an SMS that was never coming,
+            with the app offering only "resend" to the same wrong number. */}
+        <Button
+          testID="change-phone"
+          label={t('auth.changePhone')}
+          variant="ghost"
+          size="medium"
+          onPress={() => router.replace('/')}
         />
       </View>
     </Screen>

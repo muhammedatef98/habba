@@ -8,12 +8,13 @@
  */
 
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { normalisePlate } from '@habba/core';
 import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
+import { ChipRow } from '@/components/form/ChipRow';
 import { repository } from '@/data/repository';
 import { useIsAuthenticated } from '@/state/session';
 
@@ -103,6 +104,7 @@ export default function AddVehicleScreen() {
       </View>
 
       <ChipRow
+        testIdPrefix="chip"
         label={t('vehicle.makeLabel')}
         options={(makes.data ?? []).map((make) => ({
           key: make.id,
@@ -117,6 +119,7 @@ export default function AddVehicleScreen() {
 
       {makeId !== null ? (
         <ChipRow
+          testIdPrefix="chip"
           label={t('vehicle.modelLabel')}
           options={(models.data ?? []).map((model) => ({
             key: model.id,
@@ -129,6 +132,7 @@ export default function AddVehicleScreen() {
 
       {modelId !== null ? (
         <ChipRow
+          testIdPrefix="chip"
           label={t('vehicle.yearLabel')}
           options={YEARS.map((value) => ({ key: String(value), label: String(value) }))}
           selected={year === null ? null : String(year)}
@@ -188,59 +192,5 @@ export default function AddVehicleScreen() {
         loading={addVehicle.isPending}
       />
     </Screen>
-  );
-}
-
-interface ChipRowProps {
-  readonly label: string;
-  readonly options: ReadonlyArray<{ key: string; label: string }>;
-  readonly selected: string | null;
-  readonly onSelect: (key: string) => void;
-}
-
-function ChipRow({ label, options, selected, onSelect }: ChipRowProps) {
-  const theme = useTheme();
-
-  return (
-    <View style={{ gap: theme.spacing.sm }}>
-      <Text variant="label" tone="muted">
-        {label}
-      </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: theme.spacing.sm, paddingVertical: theme.spacing.xs }}
-      >
-        {options.map((option) => {
-          const isSelected = option.key === selected;
-          return (
-            <Pressable
-              key={option.key}
-              testID={`chip-${option.key}`}
-              onPress={() => onSelect(option.key)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={option.label}
-              style={{
-                minHeight: theme.minTouchTarget,
-                justifyContent: 'center',
-                paddingHorizontal: theme.spacing.base,
-                borderRadius: theme.radius.full,
-                borderWidth: 1.5,
-                borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                backgroundColor: isSelected ? theme.colors.primarySubtle : theme.colors.surface,
-              }}
-            >
-              <Text
-                variant={isSelected ? 'bodyStrong' : 'body'}
-                style={{ color: isSelected ? theme.colors.primary : theme.colors.text }}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
   );
 }

@@ -294,7 +294,9 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     const tech = clientFor(TECH_ID);
     const customer = clientFor(CUSTOMER_ID);
 
-    const progress = await new SupabaseRepository(customer, () => CUSTOMER_ID).getOrderProgress(orderId);
+    const progress = await new SupabaseRepository(customer, () => CUSTOMER_ID).getOrderProgress(
+      orderId,
+    );
     expect(progress).not.toBeNull();
     expect(progress?.handoverCode).toMatch(/^[0-9]{4}$/);
 
@@ -324,7 +326,9 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     const customer = clientFor(CUSTOMER_ID);
     const tech = clientFor(TECH_ID);
 
-    const progress = await new SupabaseRepository(customer, () => CUSTOMER_ID).getOrderProgress(orderId);
+    const progress = await new SupabaseRepository(customer, () => CUSTOMER_ID).getOrderProgress(
+      orderId,
+    );
     expect(progress?.distanceKm).toBeGreaterThan(0);
     expect(progress?.etaMinutes).toBeGreaterThanOrEqual(1);
 

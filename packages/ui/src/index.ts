@@ -5,6 +5,7 @@ export * from './Button.js';
 export * from './Screen.js';
 export * from './Card.js';
 export * from './Field.js';
+export * from './CodeInput.js';
 export * from './ProvenanceBadge.js';
 export * from './HabbaMark.js';
 export * from './HabbaWordmark.js';

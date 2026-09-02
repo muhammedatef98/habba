@@ -42,7 +42,10 @@ export function RatingStars({ onRate, disabled = false }: RatingStarsProps) {
               justifyContent: 'center',
             }}
           >
-            <Text variant="title" style={{ color: filled ? theme.colors.accent : theme.colors.border }}>
+            <Text
+              variant="title"
+              style={{ color: filled ? theme.colors.accent : theme.colors.border }}
+            >
               ★
             </Text>
           </Pressable>

@@ -128,7 +128,11 @@ export default function EmailScreen() {
             setPassword(value);
             if (error !== undefined) setError(undefined);
           }}
-          hint={mode === 'register' ? t('auth.passwordHint', { length: MIN_PASSWORD_LENGTH }) : undefined}
+          hint={
+            mode === 'register'
+              ? t('auth.passwordHint', { length: MIN_PASSWORD_LENGTH })
+              : undefined
+          }
           error={error}
           secureTextEntry
           textContentType={mode === 'register' ? 'newPassword' : 'password'}

@@ -25,7 +25,7 @@
     "phoneHint": "We'll text you a verification code",
     "sendCode": "Send code",
     "otpTitle": "Enter your code",
-    "otpSubtitle": "We sent a 4-digit code to {{phone}}",
+    "otpSubtitle": "We sent a {{length}}-digit code to {{phone}}",
     "resendIn": "Resend in {{seconds}}s",
     "resend": "Resend code",
     "verify": "Verify",
@@ -65,7 +65,9 @@
       "unknownEmail": "No account uses that email. Create one instead.",
       "wrongPassword": "That password isn't right.",
       "guestNeedsIdentity": "Add a mobile number or email to save the account."
-    }
+    },
+    "otpLabel": "Verification code",
+    "changePhone": "Change phone number"
   },
   "vehicle": {
     "addTitle": "Add your vehicle",
@@ -147,7 +149,10 @@
     "filterMileage": "Odometer",
     "filterEmpty": "No records in this category.",
     "recordsCount": "{{count}} records",
-    "vehicleUnknown": "Your vehicle"
+    "vehicleUnknown": "Your vehicle",
+    "recordMonth": "Month",
+    "recordDay": "Day",
+    "recordYear": "Year"
   },
   "settings": {
     "title": "Settings",
@@ -383,7 +388,9 @@
     "vatLabel": "VAT",
     "totalLabel": "Total",
     "allApprovedHint": "Once every part is approved, the work moves to completion confirmation.",
-    "pendingHint": "Not every part is approved yet."
+    "pendingHint": "Not every part is approved yet.",
+    "pendingBadge": "{{count}} awaiting you",
+    "allApprovedBadge": "All approved"
   },
   "job": {
     "accept": "Accept job",
