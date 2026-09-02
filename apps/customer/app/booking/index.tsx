@@ -47,11 +47,7 @@ export default function BookingServiceScreen() {
   const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
   const models = useQuery({
     queryKey: ['models', 'all'],
-    queryFn: async () => {
-      const makeList = await repository.listMakes();
-      const lists = await Promise.all(makeList.map((make) => repository.listModels(make.id)));
-      return lists.flat();
-    },
+    queryFn: () => repository.listAllModels(),
   });
 
   const service = draft.service;

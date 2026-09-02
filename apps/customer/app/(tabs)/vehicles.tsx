@@ -96,11 +96,7 @@ export default function HomeScreen() {
 
   const allModels = useQuery({
     queryKey: ['models', 'all'],
-    queryFn: async () => {
-      const makeList = await repository.listMakes();
-      const lists = await Promise.all(makeList.map((make) => repository.listModels(make.id)));
-      return lists.flat();
-    },
+    queryFn: () => repository.listAllModels(),
   });
 
   const recentOrders = useQuery({

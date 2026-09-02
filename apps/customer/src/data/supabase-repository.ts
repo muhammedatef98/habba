@@ -357,6 +357,29 @@ export class SupabaseRepository implements Repository {
     }));
   }
 
+  async listAllModels(): Promise<readonly VehicleModel[]> {
+    // One query rather than one per make: the catalogue is small and bounded,
+    // and the screens that need it need all of it before they can name a
+    // vehicle at all.
+    const rows = unwrap(
+      await this.client
+        .from('vehicle_models')
+        .select('id, make_id, name_ar, name_en, year_from, year_to')
+        .eq('is_active', true)
+        .order('name_en'),
+      'listAllModels',
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      makeId: row.make_id,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      yearFrom: row.year_from,
+      yearTo: row.year_to,
+    }));
+  }
+
   async listVehicles(): Promise<readonly Vehicle[]> {
     // No owner filter: RLS decides. See the note at the top of this file.
     const rows = unwrap(

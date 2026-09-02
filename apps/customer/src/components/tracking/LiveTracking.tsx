@@ -15,6 +15,7 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, ProgressStages, StatCluster, Text, useTheme, type ProgressStage } from '@habba/ui';
+import { agreedTotal } from '@/lib/order-price';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, OrderStatus, ProviderSummary } from '@/data/types';
 
@@ -81,7 +82,7 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
               },
               {
                 key: 'price',
-                value: order.totalAmount ?? undefined,
+                value: agreedTotal(order) ?? undefined,
                 label: t('tracking.price'),
                 emphasis: 'accent',
               },

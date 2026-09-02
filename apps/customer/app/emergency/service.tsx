@@ -44,7 +44,7 @@ export default function ServiceSelectionScreen() {
   const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
   const allModels = useQuery({
     queryKey: ['models', 'all'],
-    queryFn: () => repository.listModels(''),
+    queryFn: () => repository.listAllModels(),
   });
 
   const vehicles = useQuery({

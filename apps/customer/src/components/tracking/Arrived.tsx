@@ -14,6 +14,7 @@
 import { I18nManager, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, Text, useTheme } from '@habba/ui';
+import { agreedTotal } from '@/lib/order-price';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/data/types';
 
@@ -95,7 +96,7 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
           {t('tracking.agreedTotal')}
         </Text>
         <Text variant="bodyStrong" numeric>
-          {t('emergency.priceFixed', { amount: order.totalAmount ?? '—' })}
+          {t('emergency.priceFixed', { amount: agreedTotal(order) ?? '—' })}
         </Text>
       </View>
     </View>

@@ -11,6 +11,7 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, StatCluster, Text, useTheme } from '@habba/ui';
+import { agreedTotal } from '@/lib/order-price';
 import { PriceBreakdown } from './PriceBreakdown';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/data/types';
@@ -83,7 +84,7 @@ export function Matched({
                 },
                 {
                   key: 'total',
-                  value: order.totalAmount ?? undefined,
+                  value: agreedTotal(order) ?? undefined,
                   label: t('tracking.totalWithVat'),
                   emphasis: 'accent',
                   flex: 1.2,
@@ -108,10 +109,10 @@ export function Matched({
         {onAccept !== undefined ? (
           <Button
             testID="accept-quote"
-            label={t('tracking.acceptWithAmount', { amount: order.totalAmount ?? '—' })}
+            label={t('tracking.acceptWithAmount', { amount: agreedTotal(order) ?? '—' })}
             onPress={onAccept}
             loading={acceptPending ?? false}
-            disabled={order.totalAmount === null}
+            disabled={agreedTotal(order) === null}
           />
         ) : null}
         <Button

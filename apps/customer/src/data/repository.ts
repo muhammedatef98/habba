@@ -66,6 +66,20 @@ export interface PastServiceInput {
 export interface Repository {
   listMakes(): Promise<readonly VehicleMake[]>;
   listModels(makeId: string): Promise<readonly VehicleModel[]>;
+  /**
+   * Every model across every make, for the screens that name a vehicle they
+   * did not pick the make for.
+   *
+   * Four screens needed this and none had it. Three fanned out over
+   * `listMakes()` and called `listModels` once per make; the emergency service
+   * screen called `listModels('')`, which matches no make and therefore always
+   * returned nothing — so the one screen where the customer most needs to be
+   * certain which car they are calling help for could never show its make and
+   * model, and silently fell back to the plate. Worse, both spellings shared
+   * the query key `['models', 'all']`, so whichever screen mounted first
+   * decided what the other one saw.
+   */
+  listAllModels(): Promise<readonly VehicleModel[]>;
   listVehicles(): Promise<readonly Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | null>;
   addVehicle(input: NewVehicleInput): Promise<Vehicle>;
@@ -800,6 +814,10 @@ export class InMemoryRepository implements Repository {
 
   async listModels(makeId: string) {
     return MODELS.filter((model) => model.makeId === makeId);
+  }
+
+  async listAllModels() {
+    return MODELS;
   }
 
   async listVehicles() {

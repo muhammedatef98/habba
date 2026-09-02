@@ -23,6 +23,7 @@ import {
   useTheme,
   type TimelineItem,
 } from '@habba/ui';
+import { agreedTotal } from '@/lib/order-price';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/data/types';
 
@@ -153,7 +154,7 @@ export function InProgress({
           {t('tracking.agreedTotalLong')}
         </Text>
         <Text variant="bodyStrong" numeric>
-          {t('emergency.priceFixed', { amount: order.totalAmount ?? '—' })}
+          {t('emergency.priceFixed', { amount: agreedTotal(order) ?? '—' })}
         </Text>
       </View>
     </View>

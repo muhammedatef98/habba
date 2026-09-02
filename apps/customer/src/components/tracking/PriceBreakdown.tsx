@@ -10,6 +10,7 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text, useTheme } from '@habba/ui';
+import { agreedTotal } from '@/lib/order-price';
 import type { Order } from '@/data/types';
 
 export interface PriceBreakdownProps {
@@ -49,7 +50,7 @@ export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text variant="bodyStrong">{t('tracking.totalLine')}</Text>
         <Text variant="bodyStrong" numeric>
-          {t('emergency.priceFixed', { amount: order.totalAmount ?? '—' })}
+          {t('emergency.priceFixed', { amount: agreedTotal(order) ?? '—' })}
         </Text>
       </View>
     </View>
