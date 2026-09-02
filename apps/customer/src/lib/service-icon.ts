@@ -17,10 +17,13 @@ const BY_CATALOGUE_NAME: Readonly<Record<string, IconName>> = {
   key: 'lockout',
   fuel: 'fuel',
   thermometer: 'radiator',
-  oil: 'gauge',
-  filter: 'gauge',
-  brake: 'tyre',
-  snowflake: 'gauge',
+  oil: 'oil',
+  filter: 'wrench',
+  brake: 'brake',
+  snowflake: 'ac',
+  wash: 'wash',
+  inspection: 'inspection',
+  wrench: 'wrench',
 };
 
 /**

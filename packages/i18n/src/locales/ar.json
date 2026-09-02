@@ -14,7 +14,8 @@
     "search": "بحث",
     "later": "لاحقاً",
     "share": "مشاركة",
-    "verified": "موثّق"
+    "verified": "موثّق",
+    "sar": "{{amount}} ر.س"
   },
   "auth": {
     "welcomeTitle": "أهلاً بك في هبّة",
@@ -184,13 +185,44 @@
     "switchVehicle": "تبديل",
     "otherVehicles": "سياراتك الأخرى",
     "statEmpty": "—",
-    "emergencyBadge": "متاح الآن",
-    "amount": "{{amount}} ر.س"
+    "emergencyBadge": "متاح الآن"
   },
   "booking": {
     "title": "حجز موعد",
-    "comingSoonTitle": "الحجز قريباً",
-    "comingSoonBody": "حجز المواعيد والورش قادم في المرحلة التالية. للحالات الطارئة استخدم «طلب طارئ» من الشاشة الرئيسية."
+    "stepService": "الخدمة",
+    "stepProvider": "مقدّم الخدمة",
+    "stepSlot": "الموعد",
+    "serviceHeadline": "وش تحتاج؟",
+    "serviceSubhead": "احجز في وقت يناسبك — بدون استعجال.",
+    "durationMinutes": "{{minutes}} دقيقة",
+    "vehicleLabel": "لأي سيارة؟",
+    "modeLabel": "وين تبي الخدمة؟",
+    "modeMobile": "يجيك لموقعك",
+    "modeWorkshop": "في الورشة",
+    "modeLockedWorkshop": "هذه الخدمة تحتاج رافعة، فتتم في الورشة فقط.",
+    "modeLockedMobile": "هذه الخدمة متاحة كخدمة متنقّلة فقط.",
+    "providerHeadline": "اختر مقدّم الخدمة",
+    "providerSubhead": "الأعلى تقييماً أولاً. السعر شامل الخدمة قبل الضريبة.",
+    "providerJobs": "{{jobs}} خدمة منجزة",
+    "providerComesToYou": "يجيك لموقعك",
+    "providerNone": "ما فيه مقدّم خدمة متاح لهذه الخدمة بهذه الطريقة حالياً. جرّب الطريقة الثانية.",
+    "slotHeadline": "متى يناسبك؟",
+    "slotSubhead": "المواعيد المتاحة خلال الأسبوع القادم.",
+    "slotNone": "ما فيه مواعيد متاحة عند هذا المقدّم. ارجع واختر غيره.",
+    "slotToday": "اليوم",
+    "slotTomorrow": "بكرة",
+    "slotLastOne": "آخر موعد",
+    "summaryTitle": "ملخّص الحجز",
+    "summarySubtotal": "الخدمة",
+    "summaryVat": "ضريبة القيمة المضافة ١٥٪",
+    "summaryTotal": "الإجمالي",
+    "confirm": "تأكيد الحجز",
+    "confirmed": "تم الحجز",
+    "problemLabel": "تفاصيل تساعد الفنّي — اختياري",
+    "problemPlaceholder": "مثال: صوت غريب عند الفرملة",
+    "errorSlotTaken": "انحجز هذا الموعد قبل شوي. اختر موعداً ثانياً.",
+    "errorGeneric": "ما قدرنا نكمل الحجز. جرّب مرة ثانية.",
+    "noVehicle": "أضف سيارتك أولاً عشان نسجّل الخدمة في دفترها."
   },
   "emergency": {
     "title": "طلب طارئ",
@@ -395,5 +427,10 @@
     "orders": "طلباتي",
     "wallet": "المحفظة",
     "account": "حسابي"
+  },
+  "orders": {
+    "liveTitle": "جارٍ الآن",
+    "pastTitle": "السجل",
+    "emptyBody": "أول طلب لك بيظهر هنا، ويتسجّل في دفتر سيارتك."
   }
 }

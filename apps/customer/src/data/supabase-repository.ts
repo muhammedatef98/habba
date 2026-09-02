@@ -16,13 +16,18 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { sarOrThrow, type SarAmount } from '@habba/core';
 import type {
   AlertConfidence,
+  AppointmentSlot,
+  BookingMode,
+  BookingProvider,
   DispatchTelemetry,
+  FulfilmentMode,
   OrderStatus,
   CompletionMedia,
   EscrowStatus,
   JobProgress,
   MaintenanceAlert,
   OrderSummary,
+  NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
@@ -139,6 +144,16 @@ function toVehicle(row: VehicleRow): Vehicle {
   };
 }
 
+/**
+ * Every column the app's `Service` needs, named once.
+ *
+ * Explicit rather than `select()` for the same reason as `providers` (0037):
+ * asking for every column couples the client to whatever the table grows next,
+ * and a single revoked column fails the whole query rather than one field.
+ */
+const SERVICE_COLUMNS =
+  'id, category, name_ar, name_en, description_ar, icon, base_price, requires_vehicle, supported_modes, est_duration_min, requires_lift';
+
 interface ServiceRow {
   id: string;
   category: ServiceCategory;
@@ -148,6 +163,29 @@ interface ServiceRow {
   icon: string | null;
   base_price: number;
   requires_vehicle: boolean;
+  supported_modes: FulfilmentMode[];
+  est_duration_min: number;
+  requires_lift: boolean;
+}
+
+interface BookingProviderRow {
+  id: string;
+  provider_type: BookingProvider['providerType'];
+  business_name_ar: string;
+  rating_avg: number;
+  rating_count: number;
+  jobs_completed: number;
+  workshops: { address_ar: string } | { address_ar: string }[] | null;
+  provider_services: { custom_price: number | null }[] | null;
+}
+
+interface SlotRow {
+  id: string;
+  provider_id: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+  booked_count: number;
 }
 
 interface OrderRow {
@@ -202,6 +240,9 @@ function toService(row: ServiceRow): Service {
     icon: row.icon,
     basePrice: toSar(row.base_price),
     requiresVehicle: row.requires_vehicle,
+    supportedModes: row.supported_modes,
+    estDurationMin: row.est_duration_min,
+    requiresLift: row.requires_lift,
   };
 }
 
@@ -526,9 +567,7 @@ export class SupabaseRepository implements Repository {
     const rows = unwrap(
       await this.client
         .from('services')
-        .select(
-          'id, category, name_ar, name_en, description_ar, icon, base_price, requires_vehicle',
-        )
+        .select(SERVICE_COLUMNS)
         .eq('category', 'emergency')
         .eq('is_active', true)
         .order('sort_order'),
@@ -550,6 +589,118 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`createEmergencyOrder: ${error.message}`);
+    return data as string;
+  }
+
+  async listBookableServices(): Promise<readonly Service[]> {
+    const rows = unwrap(
+      await this.client
+        .from('services')
+        .select(SERVICE_COLUMNS)
+        .neq('category', 'emergency')
+        .eq('is_active', true)
+        .order('sort_order'),
+      'listBookableServices',
+    );
+
+    return (rows as ServiceRow[]).map(toService);
+  }
+
+  async listBookingProviders(
+    serviceId: string,
+    mode: BookingMode,
+  ): Promise<readonly BookingProvider[]> {
+    // A workshop booking needs a workshop row for the address; a scheduled
+    // mobile visit needs a provider who is NOT a workshop. `provider_type` is
+    // the discriminator either way, so the mode maps straight onto it rather
+    // than needing a separate capability table.
+    const query = this.client
+      .from('providers')
+      .select(
+        'id, provider_type, business_name_ar, rating_avg, rating_count, jobs_completed, workshops(address_ar), provider_services!inner(custom_price)',
+      )
+      .eq('verification_status', 'approved')
+      .eq('provider_services.service_id', serviceId)
+      .order('rating_avg', { ascending: false });
+
+    const rows = unwrap(
+      await (mode === 'workshop'
+        ? query.eq('provider_type', 'workshop')
+        : query.eq('provider_type', 'individual')),
+      'listBookingProviders',
+    );
+
+    // The catalogue price is the fallback: `custom_price` is null for every
+    // fixed-price service (0018's price guard), which is most of them.
+    const service = await this.serviceById(serviceId);
+
+    return (rows as BookingProviderRow[]).map((row) => {
+      const workshop = Array.isArray(row.workshops) ? row.workshops[0] : row.workshops;
+      const custom = row.provider_services?.[0]?.custom_price ?? null;
+
+      return {
+        id: row.id,
+        providerType: row.provider_type,
+        businessNameAr: row.business_name_ar,
+        ratingAvg: Number(row.rating_avg),
+        ratingCount: row.rating_count,
+        jobsCompleted: row.jobs_completed,
+        addressAr: workshop?.address_ar ?? null,
+        price: custom === null ? (service?.basePrice ?? toSar(0)) : toSar(custom),
+      };
+    });
+  }
+
+  private async serviceById(serviceId: string): Promise<Service | null> {
+    const { data, error } = await this.client
+      .from('services')
+      .select(SERVICE_COLUMNS)
+      .eq('id', serviceId)
+      .maybeSingle();
+
+    if (error !== null) throw new Error(`serviceById: ${error.message}`);
+    return data === null ? null : toService(data as ServiceRow);
+  }
+
+  async listSlots(providerId: string): Promise<readonly AppointmentSlot[]> {
+    // `starts_at > now()` and the capacity check mirror `book_appointment`'s
+    // own claim clause (0024). Listing a slot the RPC would then refuse is how
+    // a booking flow earns a reputation for randomly failing.
+    const rows = unwrap(
+      await this.client
+        .from('appointment_slots')
+        .select('id, provider_id, starts_at, ends_at, capacity, booked_count')
+        .eq('provider_id', providerId)
+        .eq('is_blocked', false)
+        .gt('starts_at', new Date().toISOString())
+        .order('starts_at'),
+      'listSlots',
+    );
+
+    return (rows as SlotRow[])
+      .filter((row) => row.booked_count < row.capacity)
+      .map((row) => ({
+        id: row.id,
+        providerId: row.provider_id,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        remaining: row.capacity - row.booked_count,
+      }));
+  }
+
+  async bookAppointment(input: NewBookingInput): Promise<string> {
+    const { data, error } = await this.client.rpc('book_appointment', {
+      p_slot_id: input.slotId,
+      p_service_id: input.serviceId,
+      p_vehicle_id: input.vehicleId ?? null,
+      p_problem: input.problem ?? null,
+      p_mileage: input.mileage ?? null,
+      p_lon: input.lon ?? null,
+      p_lat: input.lat ?? null,
+      p_address_ar: input.addressAr ?? null,
+    });
+
+    if (error !== null) throw new Error(`bookAppointment: ${error.message}`);
     return data as string;
   }
 

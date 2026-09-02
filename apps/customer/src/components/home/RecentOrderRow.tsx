@@ -16,6 +16,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Icon, StatusPill, Text, useTheme, type StatusTone } from '@habba/ui';
 import { formatShortDate } from '@/lib/format-number';
+import { formatSarDisplay } from '@/lib/money-format';
 import type { OrderStatus, OrderSummary } from '@/data/types';
 
 export interface RecentOrderRowProps {
@@ -71,7 +72,7 @@ export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) 
 
       {order.totalAmount !== null ? (
         <Text variant="caption" tone="muted" numeric>
-          {t('home.amount', { amount: order.totalAmount })}
+          {t('common.sar', { amount: formatSarDisplay(order.totalAmount) })}
         </Text>
       ) : null}
 

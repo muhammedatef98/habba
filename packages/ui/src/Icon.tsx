@@ -43,7 +43,16 @@ export type IconName =
   | 'share'
   | 'bell'
   | 'alert'
-  | 'gauge';
+  | 'gauge'
+  // Bookable catalogue. The emergency set above was drawn first and these were
+  // being borrowed from it — every periodic service rendered as `gauge`, which
+  // made the booking list five identical rows with different words on them.
+  | 'oil'
+  | 'brake'
+  | 'ac'
+  | 'wash'
+  | 'inspection'
+  | 'wrench';
 
 type Shape =
   | { readonly kind: 'path'; readonly d: string }
@@ -101,7 +110,17 @@ const ICONS: Record<IconName, readonly Shape[]> = {
   share: [p('M12 3v12M8 11l4 4 4-4M5 20h14')],
   bell: [p('M12 3a6 6 0 0 0-6 6c0 5-2 6-2 6h16s-2-1-2-6a6 6 0 0 0-6-6zM10 20a2 2 0 0 0 4 0')],
   alert: [c(12, 12, 9), p('M12 8v5M12 16.5v.5')],
-  gauge: [p('M12 3v10M8 9l4 4 4-4M5 19h14')],
+  // ⚠️ `gauge` was `M12 3v10M8 9l4 4 4-4M5 19h14` — a download arrow. It is
+  // used for odometer readings, where a downward arrow says nothing at all.
+  // Now a dial: an arc, a needle, and the two end ticks.
+  gauge: [p('M4 17a8 8 0 0 1 16 0'), p('M12 17l4.5-4.5'), p('M4 17h1.5M18.5 17H20')],
+
+  oil: [p('M12 3.5c3 3.5 5 6.5 5 8.8a5 5 0 0 1-10 0c0-2.3 2-5.3 5-8.8z')],
+  brake: [c(12, 12, 7.5), c(12, 12, 2.5), r(16.5, 9, 4, 6, 1)],
+  ac: [p('M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9')],
+  wash: [c(9.5, 14.5, 4), c(16, 10, 3), c(17, 17.5, 2)],
+  inspection: [r(6, 4, 12, 16, 2), p('M9.5 4h5v2.5h-5z'), p('M9.5 13l2 2 3.5-3.5')],
+  wrench: [p('M19.5 4.5a4.5 4.5 0 0 1-6 6L6.5 17.5l-2-2L11.5 8.5a4.5 4.5 0 0 1 6-6l-3 3 2 2 3-3z')],
 };
 
 /** Filled rather than stroked — a rating, not an action. */

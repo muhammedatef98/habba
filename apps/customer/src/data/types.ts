@@ -97,6 +97,63 @@ export interface Service {
   /** CLAUDE.md §2.5: never a float — see @habba/core's money module (ADR-0007). */
   readonly basePrice: SarAmount;
   readonly requiresVehicle: boolean;
+  /**
+   * Which fulfilment modes the service can actually be delivered in
+   * (`services.supported_modes`). The booking flow offers exactly these — a
+   * mode picker that lists workshop for a service no workshop performs is a
+   * dead end two screens deep.
+   */
+  readonly supportedModes: readonly FulfilmentMode[];
+  /** Minutes, for the slot picker. `services.est_duration_min`. */
+  readonly estDurationMin: number;
+  /** A job needing a lift can only ever be a workshop booking. */
+  readonly requiresLift: boolean;
+}
+
+/** The two modes a customer can *book* ahead in; on-demand is the other flow. */
+export type BookingMode = Extract<FulfilmentMode, 'mobile_scheduled' | 'workshop'>;
+
+/**
+ * A provider offering a bookable service, as the customer picks between them.
+ *
+ * Deliberately not `ProviderSummary` extended: that type exists to name the
+ * provider on an order that already has one, and 0037 restricts what a
+ * customer may read about a provider they have no relationship with. Every
+ * field here is public by policy (0022) — nothing about KYC, nothing about
+ * position.
+ */
+export interface BookingProvider {
+  readonly id: string;
+  readonly providerType: 'individual' | 'workshop';
+  readonly businessNameAr: string;
+  readonly ratingAvg: number;
+  readonly ratingCount: number;
+  readonly jobsCompleted: number;
+  /** The workshop's address. Null for a mobile technician, who comes to you. */
+  readonly addressAr: string | null;
+  /** What this provider charges — their own price where allowed, else the catalogue's. */
+  readonly price: SarAmount;
+}
+
+/** One bookable window. `remaining` is capacity minus what is already booked. */
+export interface AppointmentSlot {
+  readonly id: string;
+  readonly providerId: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly remaining: number;
+}
+
+export interface NewBookingInput {
+  readonly slotId: string;
+  readonly serviceId: string;
+  readonly vehicleId?: string | undefined;
+  readonly problem?: string | undefined;
+  readonly mileage?: number | undefined;
+  /** Where the technician should come. Ignored for a workshop booking (0024). */
+  readonly lon?: number | undefined;
+  readonly lat?: number | undefined;
+  readonly addressAr?: string | undefined;
 }
 
 export interface NewEmergencyOrderInput {

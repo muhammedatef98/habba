@@ -14,7 +14,8 @@
     "search": "Search",
     "later": "Later",
     "share": "Share",
-    "verified": "Verified"
+    "verified": "Verified",
+    "sar": "{{amount}} SAR"
   },
   "auth": {
     "welcomeTitle": "Welcome to Habba",
@@ -184,13 +185,44 @@
     "switchVehicle": "Switch",
     "otherVehicles": "Your other vehicles",
     "statEmpty": "—",
-    "emergencyBadge": "Available now",
-    "amount": "{{amount}} SAR"
+    "emergencyBadge": "Available now"
   },
   "booking": {
     "title": "Book an appointment",
-    "comingSoonTitle": "Booking is coming soon",
-    "comingSoonBody": "Scheduled and workshop bookings arrive in the next phase. For emergencies, use \"Emergency request\" from the home screen."
+    "stepService": "Service",
+    "stepProvider": "Provider",
+    "stepSlot": "Time",
+    "serviceHeadline": "What do you need?",
+    "serviceSubhead": "Book a time that suits you — no rush.",
+    "durationMinutes": "{{minutes}} min",
+    "vehicleLabel": "Which vehicle?",
+    "modeLabel": "Where would you like it?",
+    "modeMobile": "They come to you",
+    "modeWorkshop": "At the workshop",
+    "modeLockedWorkshop": "This service needs a lift, so it is workshop-only.",
+    "modeLockedMobile": "This service is available as a mobile visit only.",
+    "providerHeadline": "Choose a provider",
+    "providerSubhead": "Highest rated first. Price is for the service, before VAT.",
+    "providerJobs": "{{jobs}} jobs completed",
+    "providerComesToYou": "Comes to you",
+    "providerNone": "No provider offers this service that way right now. Try the other option.",
+    "slotHeadline": "When suits you?",
+    "slotSubhead": "Available times over the next week.",
+    "slotNone": "This provider has no free times. Go back and pick another.",
+    "slotToday": "Today",
+    "slotTomorrow": "Tomorrow",
+    "slotLastOne": "Last one",
+    "summaryTitle": "Booking summary",
+    "summarySubtotal": "Service",
+    "summaryVat": "VAT 15%",
+    "summaryTotal": "Total",
+    "confirm": "Confirm booking",
+    "confirmed": "Booked",
+    "problemLabel": "Anything that helps the technician — optional",
+    "problemPlaceholder": "e.g. odd noise when braking",
+    "errorSlotTaken": "That time was taken a moment ago. Choose another.",
+    "errorGeneric": "We couldn't complete the booking. Please try again.",
+    "noVehicle": "Add your vehicle first so the service is recorded in its logbook."
   },
   "emergency": {
     "title": "Emergency request",
@@ -395,5 +427,10 @@
     "orders": "Orders",
     "wallet": "Wallet",
     "account": "Account"
+  },
+  "orders": {
+    "liveTitle": "Happening now",
+    "pastTitle": "History",
+    "emptyBody": "Your first request will appear here, and be written into your vehicle's logbook."
   }
 }
