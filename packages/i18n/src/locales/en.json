@@ -67,7 +67,9 @@
       "guestNeedsIdentity": "Add a mobile number or email to save the account."
     },
     "otpLabel": "Verification code",
-    "changePhone": "Change phone number"
+    "changePhone": "Change phone number",
+    "showPassword": "Show",
+    "hidePassword": "Hide"
   },
   "vehicle": {
     "addTitle": "Add your vehicle",

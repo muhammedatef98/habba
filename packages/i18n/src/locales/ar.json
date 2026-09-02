@@ -67,7 +67,9 @@
       "guestNeedsIdentity": "أضف رقم جوال أو بريد إلكتروني لحفظ الحساب."
     },
     "otpLabel": "رمز التحقّق",
-    "changePhone": "تغيير رقم الجوال"
+    "changePhone": "تغيير رقم الجوال",
+    "showPassword": "إظهار",
+    "hidePassword": "إخفاء"
   },
   "vehicle": {
     "addTitle": "أضف سيارتك",

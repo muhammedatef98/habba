@@ -135,6 +135,7 @@ export default function EmailScreen() {
           }
           error={error}
           secureTextEntry
+          revealLabels={{ show: t('auth.showPassword'), hide: t('auth.hidePassword') }}
           textContentType={mode === 'register' ? 'newPassword' : 'password'}
           autoCapitalize="none"
           forceLtrInput

@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { parseSaudiPhone } from '@habba/core';
+import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
 import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
 import { isValidEmail, normaliseEmail } from '@/lib/email-auth-provider';
 import { repository } from '@/data/repository';
@@ -135,6 +135,10 @@ export default function SaveAccountScreen() {
           }}
           placeholder={t('auth.phonePlaceholder')}
           error={error}
+          // Same affix as the sign-in screen: a guest attaching a number here
+          // is answering the same question, and answering it differently on
+          // two screens is how a product stops feeling like one product.
+          prefix={`+${SAUDI_COUNTRY_CODE}`}
           keyboardType="phone-pad"
           autoComplete="tel"
           maxLength={16}

@@ -6,7 +6,14 @@
  * inline next to the field rather than as a toast the user can miss.
  */
 
-import { TextInput, View, type KeyboardTypeOptions, type TextInputProps } from 'react-native';
+import { useState } from 'react';
+import {
+  Pressable,
+  TextInput,
+  View,
+  type KeyboardTypeOptions,
+  type TextInputProps,
+} from 'react-native';
 import { Text } from './Text.js';
 import { useTheme } from './theme.js';
 
@@ -31,6 +38,20 @@ export interface FieldProps extends Omit<TextInputProps, 'style' | 'onChangeText
    * value, so the parser still sees exactly what the customer typed.
    */
   readonly prefix?: string | undefined;
+  /**
+   * Words for the reveal control on a `secureTextEntry` field. Supplying them
+   * is what turns the control on.
+   *
+   * Typing a password blind on a phone keyboard is the most common reason a
+   * correct password is rejected, and the cost of a mistyped one is a lockout
+   * counter the customer cannot see. Opt-in rather than automatic, because not
+   * every masked field wants it — a PIN entered in public does not.
+   *
+   * The labels are props because @habba/ui carries no copy: a design system
+   * that reached for a translation function would be a design system with a
+   * locale, which is the app's concern (§2.1).
+   */
+  readonly revealLabels?: { readonly show: string; readonly hide: string } | undefined;
   readonly testID?: string;
 }
 
@@ -42,11 +63,15 @@ export function Field({
   hint,
   forceLtrInput = false,
   prefix,
+  revealLabels,
   testID,
   ...rest
 }: FieldProps) {
   const theme = useTheme();
   const hasError = error !== undefined && error.length > 0;
+  const [revealed, setRevealed] = useState(false);
+  const showReveal = revealLabels !== undefined && rest.secureTextEntry === true;
+  const revealLabel = revealed ? revealLabels?.hide : revealLabels?.show;
 
   return (
     <View style={{ gap: theme.spacing.xs }}>
@@ -100,10 +125,11 @@ export function Field({
           placeholderTextColor={theme.colors.textSubtle}
           accessibilityLabel={label}
           accessibilityHint={hint}
+          secureTextEntry={rest.secureTextEntry === true && !revealed}
           style={{
             flex: 1,
             minHeight: theme.minTouchTarget,
-            paddingEnd: prefix === undefined ? 0 : theme.spacing.md,
+            paddingEnd: prefix === undefined || showReveal ? 0 : theme.spacing.md,
             color: theme.colors.text,
             fontSize: theme.fontSize.base,
             fontFamily: theme.fontFamily.arabic,
@@ -112,6 +138,24 @@ export function Field({
             writingDirection: forceLtrInput || prefix !== undefined ? 'ltr' : theme.direction,
           }}
         />
+
+        {showReveal ? (
+          <Pressable
+            testID={testID === undefined ? undefined : `${testID}-reveal`}
+            onPress={() => setRevealed((value) => !value)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: revealed }}
+            accessibilityLabel={revealLabel ?? ''}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            style={({ pressed }) => [
+              { paddingHorizontal: theme.spacing.md, opacity: pressed ? 0.6 : 1 },
+            ]}
+          >
+            <Text variant="caption" tone="primary">
+              {revealLabel}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {hasError ? (
