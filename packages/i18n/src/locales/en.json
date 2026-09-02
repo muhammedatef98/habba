@@ -88,8 +88,10 @@
       "yearTooOld": "Year must be 1970 or later.",
       "yearTooNew": "That year isn't valid.",
       "vinInvalid": "A VIN is 17 characters and never contains I, O or Q.",
-      "required": "This field is required."
-    }
+      "required": "This field is required.",
+      "mileageImplausible": "Check that reading — the number doesn't look right."
+    },
+    "mileageHint": "Helps us predict when the next service is due"
   },
   "logbook": {
     "title": "Vehicle logbook",
@@ -136,7 +138,16 @@
       "mileageTooLow": "That reading is below the recorded {{current}} km. Check the number.",
       "reportChainBroken": "The report could not be issued because this logbook failed verification. Contact support.",
       "reportFailed": "The report could not be issued. Try again."
-    }
+    },
+    "coverageTitle": "Logbook verification",
+    "coverageBody": "Every service Habba performs is added verified. The more verified the record, the more the car is worth when you sell it.",
+    "filterAll": "All",
+    "filterService": "Service",
+    "filterInspection": "Inspection",
+    "filterMileage": "Odometer",
+    "filterEmpty": "No records in this category.",
+    "recordsCount": "{{count}} records",
+    "vehicleUnknown": "Your vehicle"
   },
   "settings": {
     "title": "Settings",
@@ -148,7 +159,20 @@
     "themeDark": "Dark",
     "themeSystem": "System",
     "signOut": "Sign out",
-    "restartRequired": "The app will restart to apply the new text direction."
+    "restartRequired": "The app will restart to apply the new text direction.",
+    "sectionAccount": "Account",
+    "sectionPreferences": "Preferences",
+    "sectionAbout": "About Habba",
+    "guestLabel": "Guest",
+    "noContact": "No phone or email added yet",
+    "myVehicles": "My vehicles",
+    "vehiclesCount": "{{count}} vehicles",
+    "signOutConfirmTitle": "Sign out?",
+    "signOutConfirmBody": "Your vehicle data is saved, and the same phone or email brings you back to it.",
+    "signOutGuestWarning": "You're a guest — if you sign out now without adding a phone or email, you cannot get back to your logbook.",
+    "signOutConfirm": "Yes, sign me out",
+    "version": "Version",
+    "help": "Help and support"
   },
   "errors": {
     "generic": "Something went wrong.",

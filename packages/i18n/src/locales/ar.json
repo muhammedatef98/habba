@@ -88,8 +88,10 @@
       "yearTooOld": "سنة الصنع يجب أن تكون ١٩٧٠ أو بعدها.",
       "yearTooNew": "سنة الصنع غير صحيحة.",
       "vinInvalid": "رقم الهيكل يجب أن يتكوّن من ١٧ خانة بدون الأحرف I أو O أو Q.",
-      "required": "هذا الحقل مطلوب."
-    }
+      "required": "هذا الحقل مطلوب.",
+      "mileageImplausible": "تحقّق من القراءة — الرقم غير منطقي."
+    },
+    "mileageHint": "يساعدنا نتوقّع مواعيد الصيانة القادمة"
   },
   "logbook": {
     "title": "دفتر السيارة",
@@ -136,7 +138,16 @@
       "mileageTooLow": "القراءة أقل من العداد المسجّل ({{current}} كم). تحقّق من الرقم.",
       "reportChainBroken": "تعذّر إصدار التقرير لأن سجل السيارة لم يجتز التحقّق. تواصل مع الدعم.",
       "reportFailed": "تعذّر إصدار التقرير. حاول مرة أخرى."
-    }
+    },
+    "coverageTitle": "توثيق الدفتر",
+    "coverageBody": "كل خدمة تنفّذها هبّة تُضاف موثّقة. كل ما زاد التوثيق، زادت قيمة سيارتك عند البيع.",
+    "filterAll": "الكل",
+    "filterService": "صيانة",
+    "filterInspection": "فحص",
+    "filterMileage": "العداد",
+    "filterEmpty": "ما فيه سجلات بهذا التصنيف.",
+    "recordsCount": "{{count}} سجل",
+    "vehicleUnknown": "سيارتك"
   },
   "settings": {
     "title": "الإعدادات",
@@ -148,7 +159,20 @@
     "themeDark": "داكن",
     "themeSystem": "حسب النظام",
     "signOut": "تسجيل الخروج",
-    "restartRequired": "سيُعاد تشغيل التطبيق لتطبيق اتجاه الكتابة الجديد."
+    "restartRequired": "سيُعاد تشغيل التطبيق لتطبيق اتجاه الكتابة الجديد.",
+    "sectionAccount": "الحساب",
+    "sectionPreferences": "التفضيلات",
+    "sectionAbout": "عن هبّة",
+    "guestLabel": "ضيف",
+    "noContact": "ما أضفت رقم أو بريد بعد",
+    "myVehicles": "سياراتي",
+    "vehiclesCount": "{{count}} سيارة",
+    "signOutConfirmTitle": "تسجيل الخروج؟",
+    "signOutConfirmBody": "بيانات سيارتك محفوظة، وترجع لها بنفس الرقم أو البريد.",
+    "signOutGuestWarning": "أنت ضيف — لو خرجت الآن بدون ما تضيف رقمك أو بريدك، ما تقدر ترجع لدفتر سيارتك.",
+    "signOutConfirm": "نعم، سجّل خروجي",
+    "version": "الإصدار",
+    "help": "المساعدة والدعم"
   },
   "errors": {
     "generic": "حدث خطأ غير متوقّع.",
