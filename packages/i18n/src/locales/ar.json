@@ -451,7 +451,20 @@
     "stillNeeded": "ناقص:",
     "gapMileage": "قراءة العداد",
     "gapBefore": "صورة قبل العمل",
-    "gapAfter": "صورة بعد العمل"
+    "gapAfter": "صورة بعد العمل",
+    "navShift": "الوردية",
+    "navJobs": "طلباتي",
+    "statusOnline": "أنت متاح الآن",
+    "statusOffline": "أنت غير متاح",
+    "shiftSubtitleOnline": "يُشارك موقعك أثناء العمل فقط، ويتوقّف فور إيقاف الاستقبال.",
+    "openJobsCount": "{{count}} طلب قريب",
+    "hasVideo": "فيه فيديو",
+    "payoutLabel": "العائد المتوقّع",
+    "distanceLabel": "المسافة",
+    "activeJobsTitle": "جارٍ العمل عليها",
+    "noMyJobs": "ما عندك طلبات جارية. الطلبات القريبة تظهر في شاشة الوردية.",
+    "goToShift": "افتح الوردية",
+    "sarSuffix": "ر.س"
   },
   "nav": {
     "home": "الرئيسية",

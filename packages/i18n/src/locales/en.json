@@ -451,7 +451,20 @@
     "stillNeeded": "Still needed:",
     "gapMileage": "Odometer reading",
     "gapBefore": "Photo before the work",
-    "gapAfter": "Photo after the work"
+    "gapAfter": "Photo after the work",
+    "navShift": "Shift",
+    "navJobs": "My jobs",
+    "statusOnline": "You're available",
+    "statusOffline": "You're not available",
+    "shiftSubtitleOnline": "Your location is shared only while you're working, and stops the moment you go offline.",
+    "openJobsCount": "{{count}} nearby",
+    "hasVideo": "Has video",
+    "payoutLabel": "Estimated payout",
+    "distanceLabel": "Distance",
+    "activeJobsTitle": "In progress",
+    "noMyJobs": "No jobs in progress. Nearby requests appear on the shift screen.",
+    "goToShift": "Open shift",
+    "sarSuffix": "SAR"
   },
   "nav": {
     "home": "Home",
