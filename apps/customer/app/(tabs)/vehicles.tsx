@@ -1,30 +1,91 @@
 /**
- * Vehicle list — the home screen.
+ * Home.
  *
- * §9.1 Home: vehicle switcher at top, two primary actions (طلب طارئ one tap /
- * حجز موعد). طلب طارئ jumps straight into the emergency flow rather than a
- * menu — that is the "one tap" the spec asks for. حجز موعد is a real route
- * today, but Phase 4 (slots, workshops) is not built yet, so it explains that
- * honestly instead of presenting a dead or fake button.
+ * §9.1 asks for a vehicle switcher, two primary actions, and predictive alerts.
+ * It got all three before this rewrite — as eight blocks of near-identical
+ * visual weight separated by one uniform gap, which meant the screen had the
+ * right contents and no hierarchy at all. Three things were actually wrong:
+ *
+ *  1. A live emergency appeared as a hairline row *below* the button that
+ *     starts a new one. Reopening the app mid-job offered to start a second
+ *     emergency before it offered to show you the first.
+ *  2. The loudest object on the screen was the guest account-upsell — a filled
+ *     amber block above a flat teal one. On an emergency app.
+ *  3. Every car was drawn twice: once as a pill at the top, once as a card in a
+ *     list below, neither with enough weight to be the subject of anything.
+ *
+ * The order below is the fix, and it is an order of urgency rather than of
+ * feature importance: what is happening now, what you might need to start,
+ * what your car is warning you about, what your car *is*, and only then the
+ * account nudge and the history.
+ *
+ * Rhythm is explicit here. `Screen`'s uniform gap is switched off and each
+ * section carries its own top margin, so grouped things (hero + quick
+ * services) sit close and unrelated things sit far apart — §8's "intentional
+ * rhythm in spacing, not uniform padding everywhere".
  */
 
+import { useCallback } from 'react';
 import { View } from 'react-native';
-import { Redirect, router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { Redirect, router, useFocusEffect } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
+import { isActiveJob } from '@habba/core';
+import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { ActiveOrderCard } from '@/components/home/ActiveOrderCard';
+import { EmergencyHero } from '@/components/home/EmergencyHero';
+import { HomeHeader } from '@/components/home/HomeHeader';
 import { MaintenanceAlertCard } from '@/components/home/MaintenanceAlertCard';
-import { VehicleSwitcher } from '@/components/home/VehicleSwitcher';
+import { QuickServices } from '@/components/home/QuickServices';
 import { RecentOrderRow } from '@/components/home/RecentOrderRow';
+import { SectionHeader } from '@/components/home/SectionHeader';
+import { VehicleHeroCard } from '@/components/home/VehicleHeroCard';
 import { repository } from '@/data/repository';
+import { formatShortDate } from '@/lib/format-number';
+import { summariseLogbook } from '@/lib/logbook-summary';
+import { useEmergencyDraft } from '@/state/emergency-draft';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/state/session';
+import type { Service } from '@/data/types';
 
-export default function VehiclesScreen() {
+/** Enough to find a live job and still have a short tail of history under it. */
+const RECENT_ORDER_LOOKBACK = 5;
+const RECENT_ORDERS_SHOWN = 3;
+
+export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
   const isGuest = useIsGuest();
-  const isArabic = i18n.language === 'ar';
+  const isArabic = i18n.language.startsWith('ar');
+
+  const fullName = useSession((state) => state.fullName);
+  const selectedVehicleId = useSession((state) => state.selectedVehicleId);
+  const selectVehicle = useSession((state) => state.selectVehicle);
+
+  const selectDraftService = useEmergencyDraft((state) => state.selectService);
+  const selectDraftVehicle = useEmergencyDraft((state) => state.selectVehicle);
+
+  const queryClient = useQueryClient();
+
+  /**
+   * Refetch the live data every time this tab comes back into view.
+   *
+   * A tab screen is never unmounted, so without this the home screen keeps
+   * whatever it fetched on first launch: coming back from a just-created
+   * emergency showed no live job at all, which defeats the entire point of the
+   * card at the top. Invalidating at the mutation would not be enough either —
+   * an order's status changes on the *server* as the provider accepts, drives
+   * and arrives, and none of that passes through this app.
+   *
+   * Scoped to the two queries that actually go stale. The catalogue, the makes
+   * and the models do not change while someone is looking at their phone.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: ['recent-orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+    }, [queryClient]),
+  );
 
   const vehicles = useQuery({
     queryKey: ['vehicles'],
@@ -33,30 +94,6 @@ export default function VehiclesScreen() {
 
   const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
 
-  const recentOrders = useQuery({
-    queryKey: ['recent-orders'],
-    queryFn: () => repository.listRecentOrders(1),
-  });
-
-  // The car the header pill has selected, falling back to the first. The
-  // fallback matters: a household with two cars still has a most-likely one,
-  // and making someone choose before the app shows them anything is a toll on
-  // every launch.
-  const selectedVehicleId = useSession((state) => state.selectedVehicleId);
-  const selectVehicle = useSession((state) => state.selectVehicle);
-
-  const selectedVehicle =
-    vehicles.data?.find((vehicle) => vehicle.id === selectedVehicleId) ?? vehicles.data?.[0];
-  const primaryVehicleId = selectedVehicle?.id;
-
-  // Alerts belong to the car the switcher has selected, not to a fixed first
-  // entry — switching cars has to change what the home screen is warning about
-  // or the pill is decoration.
-  const alerts = useQuery({
-    queryKey: ['maintenance-alerts', primaryVehicleId],
-    queryFn: () => repository.listMaintenanceAlerts(primaryVehicleId ?? ''),
-    enabled: primaryVehicleId !== undefined,
-  });
   const allModels = useQuery({
     queryKey: ['models', 'all'],
     queryFn: async () => {
@@ -66,19 +103,55 @@ export default function VehiclesScreen() {
     },
   });
 
-  if (!isAuthenticated) return <Redirect href="/" />;
+  const recentOrders = useQuery({
+    queryKey: ['recent-orders'],
+    queryFn: () => repository.listRecentOrders(RECENT_ORDER_LOOKBACK),
+  });
 
-  const describe = (makeId: string, modelId: string) => {
-    const make = makes.data?.find((m) => m.id === makeId);
-    const model = allModels.data?.find((m) => m.id === modelId);
-    const makeName = isArabic ? make?.nameAr : make?.nameEn;
-    const modelName = isArabic ? model?.nameAr : model?.nameEn;
-    return [makeName, modelName].filter(Boolean).join(' ');
-  };
+  const services = useQuery({
+    queryKey: ['emergency-services'],
+    queryFn: () => repository.listEmergencyServices(),
+  });
+
+  // The car the switcher has selected, falling back to the first. The fallback
+  // matters: a household with two cars still has a most-likely one, and making
+  // someone choose before the app shows them anything is a toll on every launch.
+  const selectedVehicle =
+    vehicles.data?.find((vehicle) => vehicle.id === selectedVehicleId) ?? vehicles.data?.[0];
+  const primaryVehicleId = selectedVehicle?.id;
+
+  // Alerts and logbook figures belong to the *selected* car, not a fixed first
+  // entry — switching cars has to change them or the switcher is decoration.
+  const alerts = useQuery({
+    queryKey: ['maintenance-alerts', primaryVehicleId],
+    queryFn: () => repository.listMaintenanceAlerts(primaryVehicleId ?? ''),
+    enabled: primaryVehicleId !== undefined,
+  });
+
+  const timeline = useQuery({
+    queryKey: ['timeline', primaryVehicleId],
+    queryFn: () => repository.listTimeline(primaryVehicleId ?? ''),
+    enabled: primaryVehicleId !== undefined,
+  });
+
+  if (!isAuthenticated) return <Redirect href="/" />;
 
   const hasVehicles = (vehicles.data?.length ?? 0) > 0;
 
-  function handleEmergency() {
+  // One live job at most is shown. If somehow there are several, the newest is
+  // the one being lived through right now.
+  const activeOrder = recentOrders.data?.find((order) => isActiveJob(order.status));
+  const pastOrders = (recentOrders.data ?? [])
+    .filter((order) => order.id !== activeOrder?.id)
+    .slice(0, RECENT_ORDERS_SHOWN);
+
+  const logbook = timeline.data === undefined ? undefined : summariseLogbook(timeline.data);
+  const lastServiceLabel =
+    logbook?.lastServiceAt != null
+      ? formatShortDate(logbook.lastServiceAt, i18n.language)
+      : undefined;
+
+  function openEmergency() {
     if (!hasVehicles) {
       router.push('/add-vehicle');
       return;
@@ -86,155 +159,175 @@ export default function VehiclesScreen() {
     router.push('/emergency/service');
   }
 
-  return (
-    <Screen scrollable>
-      {selectedVehicle !== undefined ? (
-        <VehicleSwitcher
-          testID="home-vehicle-switcher"
-          vehicles={vehicles.data ?? []}
-          selected={selectedVehicle}
-          makes={makes.data}
-          models={allModels.data}
-          onSelect={selectVehicle}
-        />
-      ) : (
-        <Text variant="title">{t('vehicle.myVehicles')}</Text>
-      )}
+  /**
+   * A quick tile answers screen 02 on the way in, so the flow opens at the
+   * location step. The vehicle has to be pushed into the draft as well:
+   * `location.tsx` reads `draft.vehicleId` directly and refuses to submit
+   * without it when the service needs one — skipping the service screen skips
+   * where that was being set.
+   */
+  function startQuickService(service: Service) {
+    if (service.requiresVehicle && primaryVehicleId === undefined) {
+      router.push('/add-vehicle');
+      return;
+    }
 
-      {/* Persistent but not modal: a guest is never blocked, only reminded.
-          §11 — the logbook is not gated, so this asks rather than demands. */}
+    selectDraftService(service);
+    if (primaryVehicleId !== undefined) selectDraftVehicle(primaryVehicleId);
+    router.push('/emergency/location');
+  }
+
+  return (
+    <Screen scrollable style={{ gap: 0 }}>
+      <HomeHeader
+        testID="home-header"
+        {...(!isGuest && fullName !== null ? { name: fullName } : {})}
+      />
+
+      {activeOrder !== undefined ? (
+        <View style={{ marginTop: theme.spacing.lg }}>
+          <ActiveOrderCard
+            testID="home-active-order"
+            order={activeOrder}
+            onPress={() => router.push({ pathname: '/tracking', params: { id: activeOrder.id } })}
+          />
+        </View>
+      ) : null}
+
+      <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+        <EmergencyHero testID="home-emergency" onPress={openEmergency} />
+
+        <QuickServices
+          testID="home-quick-services"
+          services={services.data ?? []}
+          isArabic={isArabic}
+          onSelect={startQuickService}
+        />
+
+        {/* §9.1's second primary action, with its own breathing room: the
+            hero and the tiles are one group (start an emergency now), and
+            booking ahead is a different intent that should not read as a
+            fifth tile. */}
+        <View style={{ marginTop: theme.spacing.sm }}>
+          <Button
+            testID="home-booking"
+            label={t('home.bookAppointment')}
+            variant="secondary"
+            onPress={() => router.push('/booking')}
+          />
+        </View>
+      </View>
+
+      {(alerts.data ?? []).slice(0, 1).map((alert) => (
+        <View key={alert.id} style={{ marginTop: theme.spacing.xl }}>
+          <MaintenanceAlertCard
+            testID="home-maintenance-alert"
+            alert={alert}
+            onBook={() => router.push('/booking')}
+          />
+        </View>
+      ))}
+
+      <View style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}>
+        <SectionHeader
+          title={hasVehicles ? t('home.vehicleTitle') : t('vehicle.myVehicles')}
+          {...(hasVehicles
+            ? {
+                actionLabel: t('vehicle.addAnother'),
+                onAction: () => router.push('/add-vehicle'),
+              }
+            : {})}
+        />
+
+        {selectedVehicle !== undefined ? (
+          <VehicleHeroCard
+            testID="home-vehicle"
+            vehicles={vehicles.data ?? []}
+            selected={selectedVehicle}
+            makes={makes.data}
+            models={allModels.data}
+            {...(logbook !== undefined ? { recordCount: logbook.recordCount } : {})}
+            {...(lastServiceLabel !== undefined ? { lastServiceLabel } : {})}
+            onSelect={selectVehicle}
+            onOpenLogbook={() =>
+              router.push({ pathname: '/logbook', params: { id: selectedVehicle.id } })
+            }
+          />
+        ) : (
+          <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
+            <View style={{ gap: theme.spacing.md }}>
+              <Text variant="heading">{t('logbook.emptyTitle')}</Text>
+              <Text variant="body" tone="muted">
+                {t('logbook.emptyBody')}
+              </Text>
+              <Button
+                testID="add-vehicle"
+                label={t('vehicle.addTitle')}
+                onPress={() => router.push('/add-vehicle')}
+              />
+            </View>
+          </Card>
+        )}
+      </View>
+
+      {/* Demoted, on purpose. §11 says the logbook is never gated and the
+          prompt should ask rather than demand — a filled amber block above the
+          emergency CTA was demanding. It keeps its own colour and its place on
+          every launch; it just no longer outranks the reason the app exists. */}
       {isGuest ? (
-        <Card
-          testID="guest-banner"
-          elevation="none"
-          style={{ backgroundColor: theme.colors.accentSubtle }}
-        >
-          <View style={{ gap: theme.spacing.sm }}>
+        <View style={{ marginTop: theme.spacing.xl }}>
+          <Card
+            testID="guest-banner"
+            elevation="none"
+            onPress={() => router.push('/save-account')}
+            accessibilityLabel={t('auth.guestBannerAction')}
+            style={{
+              backgroundColor: theme.colors.accentSubtle,
+              borderColor: theme.colors.accent,
+              borderWidth: 1,
+              gap: theme.spacing.xs,
+            }}
+          >
             <Text variant="bodyStrong" style={{ color: theme.colors.accentText }}>
               {t('auth.guestBannerTitle')}
             </Text>
             <Text variant="caption" style={{ color: theme.colors.accentText }}>
               {t('auth.guestBannerBody')}
             </Text>
-            <Button
-              testID="guest-save-account"
-              label={t('auth.guestBannerAction')}
-              variant="accent"
-              size="medium"
-              onPress={() => router.push('/save-account')}
-            />
-          </View>
-        </Card>
-      ) : null}
-
-      {(alerts.data ?? []).slice(0, 1).map((alert) => (
-        <MaintenanceAlertCard
-          key={alert.id}
-          testID="home-maintenance-alert"
-          alert={alert}
-          onBook={() => router.push('/booking')}
-        />
-      ))}
-
-      {/*
-        Teal, not red, and deliberately so. §8 reserves red for a genuine
-        emergency that is already under way — the design does not let it appear
-        before the sixth screen of the flow. A red button sitting on the home
-        screen at all times is exactly the "everything is urgent" failure the
-        palette exists to prevent, and it would leave nothing louder to say
-        when something actually is wrong.
-
-        Given weight instead through size: the primary action is a full-width
-        block roughly twice the height of the secondary one.
-      */}
-      <View style={{ gap: theme.spacing.md }}>
-        <Card
-          testID="home-emergency"
-          elevation="md"
-          onPress={handleEmergency}
-          accessibilityLabel={t('home.emergencyCta')}
-          style={{
-            minHeight: 88,
-            justifyContent: 'center',
-            backgroundColor: theme.colors.primary,
-            borderColor: theme.colors.primary,
-            borderRadius: theme.radius.xl,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.base }}>
-            {/* Design screen 01 sets the mark inside the emergency block —
-                on dark petrol, so the cream colourway. */}
-            <HabbaMark size={46} on="dark" />
-            <View style={{ flex: 1, gap: theme.spacing.xs }}>
-              <Text variant="heading" style={{ color: theme.colors.primaryText }}>
-                {t('home.emergencyCta')}
-              </Text>
-              <Text variant="caption" style={{ color: theme.colors.primaryText, opacity: 0.85 }}>
-                {t('home.emergencySubtitle')}
-              </Text>
-            </View>
-          </View>
-        </Card>
-
-        <Button
-          testID="home-booking"
-          label={t('home.bookAppointment')}
-          variant="secondary"
-          onPress={() => router.push('/booking')}
-        />
-
-        {(recentOrders.data ?? []).map((order) => (
-          <RecentOrderRow
-            key={order.id}
-            testID="home-recent-order"
-            order={order}
-            onPress={() => router.push({ pathname: '/tracking', params: { id: order.id } })}
-          />
-        ))}
-      </View>
-
-      {vehicles.data?.length === 0 ? (
-        <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
-          <View style={{ gap: theme.spacing.sm }}>
-            <Text variant="heading">{t('logbook.emptyTitle')}</Text>
-            <Text variant="body" tone="muted">
-              {t('logbook.emptyBody')}
+            <Text variant="label" tone="accent" style={{ marginTop: theme.spacing.xs }}>
+              {t('auth.guestBannerAction')}
             </Text>
-          </View>
-        </Card>
+          </Card>
+        </View>
       ) : null}
 
-      <View style={{ gap: theme.spacing.md }}>
-        {vehicles.data?.map((vehicle) => (
-          <Card
-            key={vehicle.id}
-            testID={`vehicle-${vehicle.id}`}
-            onPress={() => router.push({ pathname: '/logbook', params: { id: vehicle.id } })}
-            accessibilityLabel={describe(vehicle.makeId, vehicle.modelId)}
-          >
-            <View style={{ gap: theme.spacing.xs }}>
-              <Text variant="heading">
-                {vehicle.nickname ?? describe(vehicle.makeId, vehicle.modelId)}
-              </Text>
-              <Text variant="caption" tone="muted">
-                {describe(vehicle.makeId, vehicle.modelId)} · {vehicle.year}
-              </Text>
-              {vehicle.plateNormalised !== null ? (
-                <Text variant="caption" tone="subtle">
-                  {vehicle.plateNormalised}
-                </Text>
-              ) : null}
-            </View>
-          </Card>
-        ))}
-      </View>
-
-      <Button
-        testID="add-vehicle"
-        label={vehicles.data?.length === 0 ? t('vehicle.addTitle') : t('vehicle.addAnother')}
-        onPress={() => router.push('/add-vehicle')}
-        variant={vehicles.data?.length === 0 ? 'primary' : 'secondary'}
-      />
+      {pastOrders.length > 0 ? (
+        <View style={{ marginTop: theme.spacing.xl }}>
+          <SectionHeader
+            title={t('home.recentTitle')}
+            actionLabel={t('home.quickAll')}
+            onAction={() => router.push('/orders')}
+          />
+          <View style={{ marginTop: theme.spacing.xs }}>
+            {pastOrders.map((order, index) => (
+              <View
+                key={order.id}
+                style={
+                  index === 0
+                    ? undefined
+                    : { borderTopWidth: 1, borderTopColor: theme.colors.border }
+                }
+              >
+                <RecentOrderRow
+                  testID="home-recent-order"
+                  order={order}
+                  onPress={() => router.push({ pathname: '/tracking', params: { id: order.id } })}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
     </Screen>
   );
 }

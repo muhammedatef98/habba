@@ -1,15 +1,21 @@
 /**
  * One line of order history on the home screen.
  *
- * The design puts a single most-recent order here rather than a list: the home
- * screen's job is the next action, and a full history belongs behind its own
- * tab. Status is carried by the pill, so the row stays readable at a glance
- * without the customer parsing a sentence.
+ * The home screen's job is the next action, so history here is a short tail
+ * under its own heading rather than a second orders tab. Status is carried by
+ * the pill so the row reads at a glance without parsing a sentence.
+ *
+ * ⚠️ This was a `View` with `onTouchEnd`, which is not a button: it gave no
+ * press feedback, ignored `accessibilityRole` for actual activation, and fired
+ * on the release of a scroll gesture that happened to end on the row — so
+ * flicking the home screen could navigate you into an old order. `Pressable`
+ * defers to the scroll responder, which is the whole difference.
  */
 
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Icon, StatusPill, Text, useTheme, type StatusTone } from '@habba/ui';
+import { formatShortDate } from '@/lib/format-number';
 import type { OrderStatus, OrderSummary } from '@/data/types';
 
 export interface RecentOrderRowProps {
@@ -29,25 +35,24 @@ export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) 
   const { t, i18n } = useTranslation();
   const theme = useTheme();
 
-  const when = new Date(order.createdAt).toLocaleDateString(i18n.language, {
-    day: 'numeric',
-    month: 'short',
-  });
+  const when = formatShortDate(order.createdAt, i18n.language);
 
   return (
-    <View
+    <Pressable
       testID={testID}
+      onPress={onPress}
       accessibilityRole="button"
-      onTouchEnd={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        minHeight: theme.minTouchTarget,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
-        paddingTop: theme.spacing.md,
-      }}
+      accessibilityLabel={`${order.serviceNameAr} — ${t(`job.status.${order.status}`)}`}
+      style={({ pressed }) => [
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.md,
+          minHeight: theme.minTouchTarget,
+          paddingVertical: theme.spacing.sm,
+        },
+        pressed ? { opacity: 0.6 } : null,
+      ]}
     >
       <StatusPill
         tone={toneFor(order.status)}
@@ -56,20 +61,21 @@ export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) 
       />
 
       <View style={{ flex: 1 }}>
-        <Text variant="caption" tone="muted">
+        <Text variant="bodySmall" numberOfLines={1}>
           {order.serviceNameAr}
-          {' · '}
+        </Text>
+        <Text variant="caption" tone="subtle">
           {when}
         </Text>
       </View>
 
       {order.totalAmount !== null ? (
         <Text variant="caption" tone="muted" numeric>
-          {t('emergency.priceFixed', { amount: order.totalAmount })}
+          {t('home.amount', { amount: order.totalAmount })}
         </Text>
       ) : null}
 
       <Icon name="chevronBack" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
-    </View>
+    </Pressable>
   );
 }

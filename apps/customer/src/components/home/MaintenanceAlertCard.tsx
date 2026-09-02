@@ -14,6 +14,7 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, Icon, Text, useTheme } from '@habba/ui';
+import { formatCount } from '@/lib/format-number';
 import type { MaintenanceAlert } from '@/data/types';
 
 export interface MaintenanceAlertCardProps {
@@ -64,7 +65,7 @@ export function MaintenanceAlertCard({ alert, onBook, testID }: MaintenanceAlert
 
           {alert.estimatedKm !== null ? (
             <Text variant="caption" tone="muted" numeric>
-              {t('home.lastReading', { km: alert.estimatedKm.toLocaleString(i18n.language) })}
+              {t('home.lastReading', { km: formatCount(alert.estimatedKm, i18n.language) })}
             </Text>
           ) : null}
 
