@@ -19,7 +19,7 @@
 
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, Icon, StatusPill, Text, useTheme } from '@habba/ui';
+import { Card, Icon, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { OpenJob } from '@/data/provider-repository';
 
 export interface OpenJobCardProps {
@@ -41,7 +41,13 @@ export function OpenJobCard({ job, onPress, testID }: OpenJobCardProps) {
       style={({ pressed }) => [pressed ? { opacity: 0.9, transform: [{ scale: 0.99 }] } : null]}
     >
       <Card elevation="sm" style={{ gap: theme.spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'flex-start',
+            gap: theme.spacing.sm,
+          }}
+        >
           <View style={{ flex: 1, gap: theme.spacing.xs }}>
             <Text variant="heading" numberOfLines={2}>
               {job.serviceNameAr}
@@ -49,7 +55,7 @@ export function OpenJobCard({ job, onPress, testID }: OpenJobCardProps) {
 
             <View
               style={{
-                flexDirection: 'row',
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                 alignItems: 'center',
                 gap: theme.spacing.sm,
                 flexWrap: 'wrap',
@@ -76,7 +82,7 @@ export function OpenJobCard({ job, onPress, testID }: OpenJobCardProps) {
 
         <View
           style={{
-            flexDirection: 'row',
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
             alignItems: 'baseline',
             gap: theme.spacing.sm,
             borderTopWidth: 1,

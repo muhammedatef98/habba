@@ -29,7 +29,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { CoverageBar } from '@/components/logbook/CoverageBar';
 import { LogbookTimeline } from '@/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/components/home/SectionHeader';
@@ -129,7 +129,13 @@ export default function LogbookScreen() {
           {t('logbook.title')}
         </Text>
         <Text variant="title">{heading}</Text>
-        <View style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'center' }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            gap: theme.spacing.sm,
+            alignItems: 'center',
+          }}
+        >
           {car?.plateNormalised != null ? (
             <Text variant="bodySmall" tone="muted" numeric>
               {car.plateNormalised}
@@ -191,7 +197,13 @@ export default function LogbookScreen() {
                   paddingTop: theme.spacing.md,
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                <View
+                  style={{
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
                   <Icon name="check" size={theme.iconSize.sm} color={theme.colors.successFg} />
                   <Text variant="bodyStrong" tone="success">
                     {t('logbook.reportReady')}
@@ -228,7 +240,13 @@ export default function LogbookScreen() {
 
             {/* A filter with nothing behind it is a control that punishes
                 curiosity, so an empty bucket is not offered. */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            <View
+              style={{
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                flexWrap: 'wrap',
+                gap: theme.spacing.sm,
+              }}
+            >
               {LOGBOOK_FILTERS.filter((option) => counts[option] > 0).map((option) => {
                 const selected = filter === option;
                 return (

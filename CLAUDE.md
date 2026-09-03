@@ -157,7 +157,7 @@ commit, not after the push: a branch that is red on GitHub is worse than a branc
 that is behind.
 
 **RTL is resolved against two directions, never one.** `I18nManager.isRTL` is
-what Yoga lays out with, and `forceRTL` only changes it on the *next* process
+what Yoga lays out with, and `forceRTL` only changes it on the _next_ process
 start — so on a first Arabic launch, and for one session after any language
 switch, the platform disagrees with the locale. Anything that could be mirrored
 is computed from both (`packages/ui/src/direction.ts`):
@@ -165,7 +165,7 @@ is computed from both (`packages/ui/src/direction.ts`):
 - text alignment comes from the layout direction, never from the string's script
 - horizontal stacks use `<Row>`, never a hand-written `flexDirection: 'row'`
 - where the container is a navigator's and its direction is not ours to set, the
-  *order* carries the direction (`readingOrder`)
+  _order_ carries the direction (`readingOrder`)
 
 In Arabic that means: headings on the right, الرئيسية at the right end of the tab
 bar and حسابي at the left. In English, the mirror of it.

@@ -20,8 +20,9 @@ import {
   StatusPill,
   Text,
   TimelineList,
-  useTheme,
+  rowDirectionFor,
   type TimelineItem,
+  useTheme,
 } from '@habba/ui';
 import { SearchingPulse } from './SearchingPulse';
 import type { DispatchTelemetry } from '@/data/types';
@@ -84,7 +85,7 @@ export function Searching({ telemetry, onCancel, cancelPending }: SearchingProps
           <View style={{ gap: theme.spacing.base }}>
             <View
               style={{
-                flexDirection: 'row',
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
@@ -97,7 +98,13 @@ export function Searching({ telemetry, onCancel, cancelPending }: SearchingProps
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md, flexWrap: 'wrap' }}>
+            <View
+              style={{
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                gap: theme.spacing.md,
+                flexWrap: 'wrap',
+              }}
+            >
               {telemetry?.reviewingCount !== undefined ? (
                 <StatusPill
                   tone="success"

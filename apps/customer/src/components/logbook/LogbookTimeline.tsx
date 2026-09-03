@@ -22,7 +22,7 @@
 import { Fragment } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, ProvenanceBadge, Text, useTheme } from '@habba/ui';
+import { Card, ProvenanceBadge, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { formatCount } from '@/lib/format-number';
 import { formatGregorianDate, formatHijriDate, formatMonthLabel, monthKey } from '@/lib/dates';
 import type { Provenance, TimelineEvent } from '@/data/types';
@@ -80,7 +80,12 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
               </Text>
             ) : null}
 
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+            <View
+              style={{
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                gap: theme.spacing.md,
+              }}
+            >
               {/* The rail. Drawn per row rather than as one absolute line so
                   rows can be any height — an entry with a mileage reading and
                   a late-record note is taller than a bare one. */}
@@ -119,7 +124,7 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
               >
                 <View
                   style={{
-                    flexDirection: 'row',
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                     alignItems: 'flex-start',
                     gap: theme.spacing.sm,
                   }}

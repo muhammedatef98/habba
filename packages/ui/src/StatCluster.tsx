@@ -10,6 +10,7 @@
 import { Fragment } from 'react';
 import { View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
 import { lineHeightFor } from './tokens.js';
 
@@ -35,7 +36,16 @@ export function StatCluster({ items, size = 'md', style, testID }: StatClusterPr
   const valueSize = size === 'lg' ? theme.fontSize['2xl'] : theme.fontSize.lg;
 
   return (
-    <View testID={testID} style={[{ flexDirection: 'row', alignItems: 'stretch' }, style]}>
+    <View
+      testID={testID}
+      style={[
+        {
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          alignItems: 'stretch',
+        },
+        style,
+      ]}
+    >
       {items.map((item, index) => (
         <Fragment key={item.key}>
           {index > 0 ? (

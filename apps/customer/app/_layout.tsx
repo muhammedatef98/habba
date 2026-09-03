@@ -13,6 +13,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Almarai_800ExtraBold } from '@expo-google-fonts/almarai';
 import {
+  IBMPlexSansArabic_400Regular,
+  IBMPlexSansArabic_500Medium,
+  IBMPlexSansArabic_600SemiBold,
+  IBMPlexSansArabic_700Bold,
+} from '@expo-google-fonts/ibm-plex-sans-arabic';
+import {
   Outfit_400Regular,
   Outfit_500Medium,
   Outfit_600SemiBold,
@@ -53,6 +59,14 @@ export default function RootLayout() {
     // Almarai carries the wordmark only — the design sets the lockup in it, and
     // body copy stays in IBM Plex Sans Arabic.
     Almarai_800ExtraBold,
+    // The app's body face (§8). Every weight, because React Native matches a
+    // face by exact family name and does not synthesise bold — and because
+    // nothing loaded it before, every line of Arabic was silently rendering in
+    // the system font (tokens.ts).
+    IBMPlexSansArabic_400Regular,
+    IBMPlexSansArabic_500Medium,
+    IBMPlexSansArabic_600SemiBold,
+    IBMPlexSansArabic_700Bold,
     Outfit_400Regular,
     Outfit_500Medium,
     Outfit_600SemiBold,

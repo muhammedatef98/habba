@@ -14,7 +14,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { HabbaMark, Text, useTheme } from '@habba/ui';
+import { HabbaMark, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { greetingKeyNow } from '@/lib/greeting';
 
 export interface HomeHeaderProps {
@@ -33,7 +33,7 @@ export function HomeHeader({ name, testID }: HomeHeaderProps) {
     <View
       testID={testID}
       style={{
-        flexDirection: 'row',
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: theme.spacing.md,

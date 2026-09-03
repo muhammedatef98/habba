@@ -9,6 +9,7 @@
 
 import { View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
 
 export interface ProgressStage {
@@ -40,7 +41,14 @@ export function ProgressStages({
       testID={testID}
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: stages.length, now: currentIndex }}
-      style={[{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }, style]}
+      style={[
+        {
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          alignItems: 'center',
+          gap: theme.spacing.sm,
+        },
+        style,
+      ]}
     >
       {stages.map((stage, index) => {
         const isDone = index < currentIndex;

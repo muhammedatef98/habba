@@ -20,8 +20,9 @@ import {
   StatusPill,
   Text,
   TimelineList,
-  useTheme,
+  rowDirectionFor,
   type TimelineItem,
+  useTheme,
 } from '@habba/ui';
 import { agreedTotal } from '@/lib/order-price';
 import { ProviderRow } from './ProviderRow';
@@ -59,7 +60,11 @@ export function InProgress({
             state: 'done' as const,
             children: (
               <View
-                style={{ flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}
+                style={{
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                  gap: theme.spacing.sm,
+                  marginTop: theme.spacing.sm,
+                }}
               >
                 {photos.slice(0, 3).map((photo) => (
                   <Image
@@ -143,7 +148,7 @@ export function InProgress({
 
       <View
         style={{
-          flexDirection: 'row',
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
           justifyContent: 'space-between',
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,

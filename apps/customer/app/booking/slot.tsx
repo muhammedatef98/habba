@@ -24,7 +24,7 @@ import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { addSar, applyRate, SAUDI_VAT_RATE, type SarAmount } from '@habba/core';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { BookingSteps } from '@/components/booking/BookingSteps';
 import { repository } from '@/data/repository';
 import { daysFromToday, groupSlotsByDay } from '@/lib/slot-days';
@@ -148,7 +148,13 @@ export default function BookingSlotScreen() {
         </Card>
       ) : (
         <View style={{ gap: theme.spacing.base }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}
+          >
             {days.map((day) => {
               const selected = day.key === activeKey;
               return (
@@ -181,7 +187,13 @@ export default function BookingSlotScreen() {
             })}
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}
+          >
             {activeDay?.slots.map((slot) => {
               const selected = draft.slot?.id === slot.id;
               return (
@@ -295,9 +307,16 @@ function SummaryRow({
   readonly strong?: boolean;
 }) {
   const { t } = useTranslation();
+  const theme = useTheme();
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <View
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        alignItems: 'center',
+        gap: theme.spacing.md,
+      }}
+    >
       <Text
         variant={strong ? 'bodyStrong' : 'bodySmall'}
         tone={strong ? 'default' : 'muted'}

@@ -15,7 +15,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, Icon, StatusPill, Text, useTheme } from '@habba/ui';
+import { Card, Icon, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { LivePulseDot } from './LivePulseDot';
 import type { OrderSummary } from '@/data/types';
 
@@ -46,7 +46,13 @@ export function ActiveOrderCard({ order, onPress, testID }: ActiveOrderCardProps
       }}
     >
       <View style={{ gap: theme.spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+          }}
+        >
           <LivePulseDot color={theme.colors.primary} />
           <Text variant="label" tone="primary" style={{ flex: 1 }}>
             {t('home.activeTitle')}
@@ -54,7 +60,13 @@ export function ActiveOrderCard({ order, onPress, testID }: ActiveOrderCardProps
           <StatusPill tone="active" showDot={false} label={t(`job.status.${order.status}`)} />
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+          }}
+        >
           <View style={{ flex: 1 }}>
             <Text variant="bodyStrong" numberOfLines={1}>
               {order.serviceNameAr}

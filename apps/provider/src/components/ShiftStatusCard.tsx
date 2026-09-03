@@ -24,7 +24,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Text, useTheme } from '@habba/ui';
+import { Button, Card, Text, rowDirectionFor, useTheme } from '@habba/ui';
 
 export interface ShiftStatusCardProps {
   readonly isOnline: boolean;
@@ -48,7 +48,13 @@ export function ShiftStatusCard({ isOnline, busy, onToggle, testID }: ShiftStatu
         borderWidth: 1,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          alignItems: 'center',
+          gap: theme.spacing.md,
+        }}
+      >
         <BroadcastDot active={isOnline} />
 
         <View style={{ flex: 1, gap: 2 }}>

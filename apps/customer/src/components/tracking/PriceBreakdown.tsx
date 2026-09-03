@@ -9,7 +9,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Text, useTheme } from '@habba/ui';
+import { Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { agreedTotal } from '@/lib/order-price';
 import type { Order } from '@/data/types';
 
@@ -23,7 +23,13 @@ export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
   const theme = useTheme();
 
   const row = (label: string, amount: string) => (
-    <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+    <View
+      key={label}
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        justifyContent: 'space-between',
+      }}
+    >
       <Text variant="caption" tone="muted">
         {label}
       </Text>
@@ -47,7 +53,12 @@ export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
         }}
       />
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          justifyContent: 'space-between',
+        }}
+      >
         <Text variant="bodyStrong">{t('tracking.totalLine')}</Text>
         <Text variant="bodyStrong" numeric>
           {t('emergency.priceFixed', { amount: agreedTotal(order) ?? '—' })}

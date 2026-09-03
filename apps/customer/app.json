@@ -28,7 +28,18 @@
         "backgroundColor": "#12514F"
       }
     },
-    "plugins": ["expo-router", "expo-localization", "expo-secure-store", "expo-font"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": true
+        }
+      ],
+      "expo-secure-store",
+      "expo-font"
+    ],
     "experiments": {
       "typedRoutes": true
     },

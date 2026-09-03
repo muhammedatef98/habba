@@ -25,7 +25,7 @@ import Constants from 'expo-constants';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/components/home/SectionHeader';
 import { repository } from '@/data/repository';
@@ -117,7 +117,13 @@ export default function AccountScreen() {
         <SectionHeader title={t('settings.sectionAccount')} />
 
         <Card elevation="sm" style={{ gap: theme.spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              alignItems: 'center',
+              gap: theme.spacing.md,
+            }}
+          >
             <View
               style={{
                 width: 52,
@@ -166,7 +172,7 @@ export default function AccountScreen() {
           onPress={() => router.push('/vehicles')}
           accessibilityLabel={t('settings.myVehicles')}
           style={{
-            flexDirection: 'row',
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
             alignItems: 'center',
             gap: theme.spacing.md,
             minHeight: theme.minTouchTarget,
@@ -214,7 +220,7 @@ export default function AccountScreen() {
                 testID="locale-restart-notice"
                 elevation="none"
                 style={{
-                  flexDirection: 'row',
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                   gap: theme.spacing.sm,
                   backgroundColor: theme.colors.accentSubtle,
                   borderColor: theme.colors.accent,
@@ -256,7 +262,13 @@ export default function AccountScreen() {
         <SectionHeader title={t('settings.sectionAbout')} />
 
         <Card elevation="none" style={{ borderColor: theme.colors.border, borderWidth: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              alignItems: 'center',
+              gap: theme.spacing.md,
+            }}
+          >
             <Text variant="bodySmall" tone="muted" style={{ flex: 1 }}>
               {t('settings.version')}
             </Text>
@@ -289,7 +301,12 @@ export default function AccountScreen() {
                 back with. Saying the same thing to both would be a lie to one. */}
             {isGuest ? t('settings.signOutGuestWarning') : t('settings.signOutConfirmBody')}
           </Text>
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              gap: theme.spacing.sm,
+            }}
+          >
             <View style={{ flex: 1 }}>
               <Button
                 testID="sign-out-cancel"
@@ -349,7 +366,7 @@ function SegmentedRow({
     <View
       accessibilityRole="radiogroup"
       style={{
-        flexDirection: 'row',
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
         gap: 4,
         padding: 4,
         borderRadius: theme.radius.md,

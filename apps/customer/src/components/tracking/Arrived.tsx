@@ -13,7 +13,7 @@
 
 import { I18nManager, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, Text, useTheme } from '@habba/ui';
+import { Card, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { agreedTotal } from '@/lib/order-price';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/data/types';
@@ -91,7 +91,12 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
 
       <View style={{ flex: 1 }} />
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          justifyContent: 'space-between',
+        }}
+      >
         <Text variant="body" tone="muted">
           {t('tracking.agreedTotal')}
         </Text>

@@ -19,7 +19,7 @@
 
 import { Linking, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Button, Text, useTheme } from '@habba/ui';
+import { Button, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { ProviderSummary } from '@/data/types';
 
 export interface ProviderRowProps {
@@ -49,7 +49,13 @@ export function ProviderRow({
 
   return (
     <View testID={testID} style={{ gap: theme.spacing.base }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.base }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          alignItems: 'center',
+          gap: theme.spacing.base,
+        }}
+      >
         <View
           style={{
             width: 56,
@@ -66,7 +72,13 @@ export function ProviderRow({
         </View>
 
         <View style={{ flex: 1, gap: theme.spacing.xs }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              alignItems: 'center',
+              gap: theme.spacing.sm,
+            }}
+          >
             <Text variant="bodyStrong">{provider.businessNameAr}</Text>
             <View
               style={{
@@ -99,7 +111,12 @@ export function ProviderRow({
 
       {showActions ? (
         <View style={{ gap: theme.spacing.sm }}>
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              gap: theme.spacing.sm,
+            }}
+          >
             <View style={{ flex: 1 }}>
               <Button
                 testID="tracking-call"

@@ -17,7 +17,7 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isEvidenceComplete } from '@habba/core';
-import { Button, Card, Icon, Screen, StatusPill, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { providerRepository } from '@/data/provider-repository';
 import { Pressable } from 'react-native';
 
@@ -103,7 +103,11 @@ export default function MyJobsScreen() {
                 }}
               >
                 <View
-                  style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}
+                  style={{
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                    alignItems: 'flex-start',
+                    gap: theme.spacing.sm,
+                  }}
                 >
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text variant="heading" numberOfLines={2}>
@@ -124,7 +128,7 @@ export default function MyJobsScreen() {
                 {needsEvidence ? (
                   <View
                     style={{
-                      flexDirection: 'row',
+                      flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                       alignItems: 'center',
                       gap: theme.spacing.sm,
                       borderTopWidth: 1,

@@ -10,6 +10,7 @@
 import type { ReactNode } from 'react';
 import { View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
 
 export type TimelineState = 'done' | 'current' | 'pending';
@@ -45,7 +46,13 @@ export function TimelineList({ items, style, testID }: TimelineListProps) {
               : theme.colors.borderStrong;
 
         return (
-          <View key={item.key} style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+          <View
+            key={item.key}
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              gap: theme.spacing.md,
+            }}
+          >
             <View style={{ width: 24, alignItems: 'center' }}>
               <View
                 style={{

@@ -13,7 +13,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, Icon, Text, useTheme } from '@habba/ui';
+import { Card, Icon, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { formatCount } from '@/lib/format-number';
 import type { MaintenanceAlert } from '@/data/types';
 
@@ -44,7 +44,13 @@ export function MaintenanceAlertCard({ alert, onBook, testID }: MaintenanceAlert
         borderWidth: 1,
       }}
     >
-      <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-start' }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          gap: theme.spacing.md,
+          alignItems: 'flex-start',
+        }}
+      >
         <View
           style={{
             width: 36,

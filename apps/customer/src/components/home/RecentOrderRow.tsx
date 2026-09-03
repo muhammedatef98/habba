@@ -14,7 +14,7 @@
 
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Icon, StatusPill, Text, useTheme, type StatusTone } from '@habba/ui';
+import { Icon, StatusPill, Text, rowDirectionFor, type StatusTone, useTheme } from '@habba/ui';
 import { formatShortDate } from '@/lib/format-number';
 import { formatSarDisplay } from '@/lib/money-format';
 import type { OrderStatus, OrderSummary } from '@/data/types';
@@ -46,7 +46,7 @@ export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) 
       accessibilityLabel={`${order.serviceNameAr} — ${t(`job.status.${order.status}`)}`}
       style={({ pressed }) => [
         {
-          flexDirection: 'row',
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
           alignItems: 'center',
           gap: theme.spacing.md,
           minHeight: theme.minTouchTarget,

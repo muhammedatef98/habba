@@ -12,7 +12,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { useEmergencyDraft } from '@/state/emergency-draft';
 import { useSession } from '@/state/session';
@@ -66,7 +66,13 @@ export default function ServiceSelectionScreen() {
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          flexWrap: 'wrap',
+          gap: theme.spacing.md,
+        }}
+      >
         {services.data?.map((option) => {
           const isSelected = service?.id === option.id;
           return (
@@ -111,7 +117,13 @@ export default function ServiceSelectionScreen() {
           <Text variant="label" tone="muted">
             {t('vehicle.myVehicles')}
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}
+          >
             {vehicles.data?.map((vehicle) => {
               const isSelected = effectiveVehicleId === vehicle.id;
               return (
@@ -142,7 +154,11 @@ export default function ServiceSelectionScreen() {
       {service !== null ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
           <View
-            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
           >
             <Text variant="caption" tone="muted">
               {t('emergency.estimatedPrice', { service: service.nameAr })}

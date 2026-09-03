@@ -18,7 +18,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { BookingSteps } from '@/components/booking/BookingSteps';
 import { repository } from '@/data/repository';
 import { serviceIcon } from '@/lib/service-icon';
@@ -106,7 +106,7 @@ export default function BookingServiceScreen() {
               onPress={() => draft.selectService(option)}
               accessibilityLabel={isArabic ? option.nameAr : option.nameEn}
               style={{
-                flexDirection: 'row',
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                 alignItems: 'center',
                 gap: theme.spacing.md,
                 backgroundColor: selected ? theme.colors.primarySubtle : theme.colors.surface,
@@ -148,7 +148,7 @@ export default function BookingServiceScreen() {
 
                 <View
                   style={{
-                    flexDirection: 'row',
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                     alignItems: 'center',
                     gap: theme.spacing.sm,
                     flexWrap: 'wrap',
@@ -190,7 +190,12 @@ export default function BookingServiceScreen() {
               </Text>
             </Card>
           ) : (
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <View
+              style={{
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                gap: theme.spacing.sm,
+              }}
+            >
               {available?.map((mode) => {
                 const selected = draft.mode === mode;
                 return (
@@ -243,7 +248,13 @@ export default function BookingServiceScreen() {
               </View>
             </Card>
           ) : (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            <View
+              style={{
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                flexWrap: 'wrap',
+                gap: theme.spacing.sm,
+              }}
+            >
               {vehicles.data?.map((vehicle) => {
                 const selected = effectiveVehicleId === vehicle.id;
                 return (

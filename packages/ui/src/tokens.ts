@@ -291,9 +291,32 @@ export const LATIN_LINE_HEIGHT_RATIO = 1.45;
 export const fontFamily = {
   // §8 names IBM Plex Sans Arabic or Tajawal. Both carry Latin glyphs, so one
   // family covers both scripts — no mixed-family fallback seams mid-sentence.
-  arabic: 'IBMPlexSansArabic',
-  latin: 'IBMPlexSansArabic',
+  //
+  // The bare family name is the 400 face, for the few places that set a family
+  // without a weight. Anything that renders text should go through
+  // `arabicFace[weight]` instead — see below.
+  arabic: 'IBMPlexSansArabic_400Regular',
+  latin: 'IBMPlexSansArabic_400Regular',
   mono: 'RobotoMono',
+} as const;
+
+/**
+ * IBM Plex Sans Arabic, keyed by weight — the same treatment `latinFace` gets,
+ * and for the same reason: React Native resolves a face by exact family name
+ * and does not synthesise bold.
+ *
+ * This was the bug. `fontFamily.arabic` was `'IBMPlexSansArabic'`, a name no
+ * loaded face answered to, because the app only ever loaded Almarai and Outfit.
+ * React Native does not warn about that — it silently falls back to the system
+ * font — so every line of Arabic in the app was rendering in San Francisco or
+ * Roboto while the design system said otherwise, and every `fontWeight` was
+ * being applied to the wrong typeface.
+ */
+export const arabicFace = {
+  '400': 'IBMPlexSansArabic_400Regular',
+  '500': 'IBMPlexSansArabic_500Medium',
+  '600': 'IBMPlexSansArabic_600SemiBold',
+  '700': 'IBMPlexSansArabic_700Bold',
 } as const;
 
 /**

@@ -15,7 +15,9 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { Text } from './Text.js';
+import { rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
+import { arabicFace } from './tokens.js';
 
 export interface FieldProps extends Omit<TextInputProps, 'style' | 'onChangeText'> {
   readonly label: string;
@@ -81,7 +83,11 @@ export function Field({
 
       <View
         style={{
-          flexDirection: 'row',
+          // A prefixed field pins itself LTR further down, so it must not be
+          // reversed here as well — that would put the dialling code back on
+          // the wrong side of the caret.
+          flexDirection:
+            prefix === undefined ? rowDirectionFor(theme.direction, theme.nativeDirection) : 'row',
           alignItems: 'center',
           minHeight: theme.minTouchTarget,
           borderWidth: 1.5,
@@ -132,7 +138,7 @@ export function Field({
             paddingEnd: prefix === undefined || showReveal ? 0 : theme.spacing.md,
             color: theme.colors.text,
             fontSize: theme.fontSize.base,
-            fontFamily: theme.fontFamily.arabic,
+            fontFamily: arabicFace['400'],
             textAlign:
               forceLtrInput || prefix !== undefined ? 'left' : theme.isRtl ? 'right' : 'left',
             writingDirection: forceLtrInput || prefix !== undefined ? 'ltr' : theme.direction,

@@ -15,7 +15,7 @@
  */
 
 import { Pressable, View } from 'react-native';
-import { Icon, Text, useTheme } from '@habba/ui';
+import { Icon, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { serviceIcon } from '@/lib/service-icon';
 import { shortServiceName } from '@/lib/service-label';
 import type { Service } from '@/data/types';
@@ -37,7 +37,13 @@ export function QuickServices({ services, onSelect, isArabic, testID }: QuickSer
   if (shown.length === 0) return null;
 
   return (
-    <View testID={testID} style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+    <View
+      testID={testID}
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        gap: theme.spacing.sm,
+      }}
+    >
       {shown.map((service) => {
         const name = isArabic ? service.nameAr : service.nameEn;
         // The tile shows the subject; the icon beside it already carries the

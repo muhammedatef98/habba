@@ -11,6 +11,13 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  IBMPlexSansArabic_400Regular,
+  IBMPlexSansArabic_500Medium,
+  IBMPlexSansArabic_600SemiBold,
+  IBMPlexSansArabic_700Bold,
+  useFonts,
+} from '@expo-google-fonts/ibm-plex-sans-arabic';
 import { ThemeProvider, lightColors } from '@habba/ui';
 import { DEFAULT_LOCALE, resolveLocale, type Locale } from '@habba/i18n';
 import { getLocales } from 'expo-localization';
@@ -41,6 +48,16 @@ function detectLocale(): Locale {
 export default function ProviderRootLayout() {
   const [locale, setLocale] = useState<Locale | null>(null);
 
+  // The design system's body face. Loaded here for the same reason as in the
+  // customer app: `fontFamily.arabic` names a face, and an unloaded face falls
+  // back to the system font with no warning (packages/ui/src/tokens.ts).
+  const [fontsLoaded] = useFonts({
+    IBMPlexSansArabic_400Regular,
+    IBMPlexSansArabic_500Medium,
+    IBMPlexSansArabic_600SemiBold,
+    IBMPlexSansArabic_700Bold,
+  });
+
   useEffect(() => {
     let cancelled = false;
 
@@ -60,7 +77,7 @@ export default function ProviderRootLayout() {
     };
   }, []);
 
-  if (locale === null) {
+  if (locale === null || !fontsLoaded) {
     return (
       <View
         style={{

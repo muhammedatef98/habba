@@ -17,7 +17,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Field, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { locationProvider } from '@/lib/location';
 import { useEmergencyDraft, type PlaceKind } from '@/state/emergency-draft';
@@ -116,7 +116,12 @@ export default function LocationConfirmScreen() {
         multiline
       />
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          gap: theme.spacing.sm,
+        }}
+      >
         {places.map((place) => {
           const isSelected = draft.placeKind === place.kind;
           return (

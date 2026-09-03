@@ -14,7 +14,15 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, ProgressStages, StatCluster, Text, useTheme, type ProgressStage } from '@habba/ui';
+import {
+  Card,
+  ProgressStages,
+  StatCluster,
+  Text,
+  rowDirectionFor,
+  type ProgressStage,
+  useTheme,
+} from '@habba/ui';
 import { agreedTotal } from '@/lib/order-price';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, OrderStatus, ProviderSummary } from '@/data/types';
@@ -53,12 +61,24 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
   return (
     <View style={{ gap: theme.spacing.base, flex: 1 }}>
       <Card testID="live-headline" elevation="md">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.base }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.base,
+          }}
+        >
           <View style={{ flex: 1, gap: 2 }}>
             <Text variant="caption" tone="muted">
               {t('tracking.arrivesIn')}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.xs }}>
+            <View
+              style={{
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                alignItems: 'baseline',
+                gap: theme.spacing.xs,
+              }}
+            >
               <Text
                 variant="display"
                 tone="primary"
@@ -104,7 +124,13 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
 
       <View style={{ flex: 1 }} />
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <Text variant="caption" tone="muted">
           {t('tracking.shareTrip')}
         </Text>

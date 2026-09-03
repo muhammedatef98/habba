@@ -15,7 +15,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
-import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Field, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { isValidEmail, normaliseEmail } from '@/lib/email-auth-provider';
 import { repository } from '@/data/repository';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/state/session';
@@ -89,7 +89,12 @@ export default function SaveAccountScreen() {
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          gap: theme.spacing.sm,
+        }}
+      >
         <View style={{ flex: 1 }}>
           <Button
             testID="save-method-phone"

@@ -21,7 +21,7 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, Icon, StatCluster, Text, useTheme } from '@habba/ui';
+import { Card, Icon, StatCluster, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { describeVehicleModel, vehicleLabel } from '@/lib/vehicle-label';
 import { formatCount } from '@/lib/format-number';
 import type { Vehicle, VehicleMake, VehicleModel } from '@/data/types';
@@ -100,7 +100,13 @@ export function VehicleHeroCard({
         accessibilityLabel={`${vehicleLabel(selected, sources)} — ${t('home.openLogbook')}`}
         style={{ borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.md }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'flex-start',
+            gap: theme.spacing.md,
+          }}
+        >
           <View style={{ flex: 1, gap: 2 }}>
             <Text variant="heading" numberOfLines={1}>
               {title}
@@ -120,7 +126,7 @@ export function VehicleHeroCard({
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={({ pressed }) => [
                 {
-                  flexDirection: 'row',
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                   alignItems: 'center',
                   gap: theme.spacing.xs,
                   paddingVertical: theme.spacing.xs,
@@ -173,7 +179,13 @@ export function VehicleHeroCard({
           ]}
         />
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.xs,
+          }}
+        >
           <Text variant="label" tone="primary" style={{ flex: 1 }}>
             {t('home.openLogbook')}
           </Text>
@@ -198,7 +210,7 @@ export function VehicleHeroCard({
                   setSwitching(false);
                 }}
                 style={{
-                  flexDirection: 'row',
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                   alignItems: 'center',
                   minHeight: theme.minTouchTarget,
                   paddingVertical: theme.spacing.sm,

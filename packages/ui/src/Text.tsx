@@ -9,7 +9,7 @@
 
 import { Text as RNText, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 import { useTheme } from './theme.js';
-import { latinFace, type FontSizeToken } from './tokens.js';
+import { arabicFace, latinFace, type FontSizeToken } from './tokens.js';
 
 export type TextVariant =
   | 'display'
@@ -140,7 +140,10 @@ export function Text({
           fontSize: size,
           lineHeight: theme.lineHeightFor(size),
           fontWeight: spec.weight,
-          fontFamily: numeric ? latinFace[spec.weight] : theme.fontFamily.arabic,
+          // Both faces are chosen by weight: RN matches a face by exact family
+          // name and never synthesises bold, so a family without the weight
+          // renders regular and silently ignores `fontWeight` (tokens.ts).
+          fontFamily: numeric ? latinFace[spec.weight] : arabicFace[spec.weight],
           ...(numeric ? { fontVariant: ['tabular-nums' as const] } : {}),
           textAlign,
           writingDirection: theme.direction,

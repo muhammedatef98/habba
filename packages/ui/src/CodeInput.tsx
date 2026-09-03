@@ -17,6 +17,7 @@
 import { useRef, useState } from 'react';
 import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
 import { lineHeightFor } from './tokens.js';
 
@@ -68,7 +69,7 @@ export function CodeInput({
         // right-aligned screen reads as a layout mistake, and right-aligning
         // the group would put box one under the last digit of the heading.
         style={{
-          flexDirection: 'row',
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
           justifyContent: 'center',
           gap: theme.spacing.sm,
           direction: 'ltr',

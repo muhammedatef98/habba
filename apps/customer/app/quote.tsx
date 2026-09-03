@@ -18,7 +18,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, StatusPill, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import {
   addSar,
   applyRate,
@@ -77,7 +77,13 @@ export default function QuoteScreen() {
   return (
     <Screen scrollable>
       <View style={{ gap: theme.spacing.sm }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+          }}
+        >
           <Text variant="title" style={{ flex: 1 }}>
             {t('quote.title')}
           </Text>
@@ -120,7 +126,12 @@ export default function QuoteScreen() {
             }}
           >
             <View style={{ gap: theme.spacing.sm }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <View
+                style={{
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                  justifyContent: 'space-between',
+                }}
+              >
                 <Text variant="bodyStrong">{line.nameAr}</Text>
                 <Card
                   elevation="none"
@@ -155,7 +166,13 @@ export default function QuoteScreen() {
               </Text>
 
               {line.approvedByCustomer ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+                <View
+                  style={{
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                    alignItems: 'center',
+                    gap: theme.spacing.xs,
+                  }}
+                >
                   <Icon name="check" size={theme.iconSize.sm} color={theme.colors.successFg} />
                   <Text variant="caption" tone="success">
                     {t('quote.approvedLine')}
@@ -210,8 +227,15 @@ function SummaryRow({
   strong?: boolean;
 }) {
   const { t } = useTranslation();
+  const theme = useTheme();
+
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+    <View
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        justifyContent: 'space-between',
+      }}
+    >
       <Text variant={strong ? 'bodyStrong' : 'body'} tone={strong ? 'default' : 'muted'}>
         {label}
       </Text>

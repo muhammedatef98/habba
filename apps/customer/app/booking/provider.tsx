@@ -17,7 +17,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { BookingSteps } from '@/components/booking/BookingSteps';
 import { repository } from '@/data/repository';
 import { formatCount } from '@/lib/format-number';
@@ -92,7 +92,11 @@ export default function BookingProviderScreen() {
                 }}
               >
                 <View
-                  style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}
+                  style={{
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                    alignItems: 'flex-start',
+                    gap: theme.spacing.md,
+                  }}
                 >
                   <View
                     style={{
@@ -116,7 +120,7 @@ export default function BookingProviderScreen() {
 
                     <View
                       style={{
-                        flexDirection: 'row',
+                        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                         alignItems: 'center',
                         gap: theme.spacing.sm,
                         flexWrap: 'wrap',
@@ -149,7 +153,7 @@ export default function BookingProviderScreen() {
 
                 <View
                   style={{
-                    flexDirection: 'row',
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                     alignItems: 'center',
                     gap: theme.spacing.sm,
                     borderTopWidth: 1,

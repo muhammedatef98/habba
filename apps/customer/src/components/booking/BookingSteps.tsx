@@ -11,7 +11,7 @@
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Icon, ProgressStages, Text, useTheme } from '@habba/ui';
+import { Icon, ProgressStages, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { Pressable } from 'react-native';
 
 export type BookingStep = 0 | 1 | 2;
@@ -29,7 +29,13 @@ export function BookingSteps({ current, title, subtitle, testID }: BookingStepsP
 
   return (
     <View testID={testID} style={{ gap: theme.spacing.base }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          alignItems: 'center',
+          gap: theme.spacing.sm,
+        }}
+      >
         {router.canGoBack() ? (
           <Pressable
             testID="booking-back"

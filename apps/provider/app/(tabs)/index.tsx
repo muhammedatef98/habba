@@ -14,7 +14,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Card, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { OpenJobCard } from '@/components/OpenJobCard';
 import { ShiftStatusCard } from '@/components/ShiftStatusCard';
 import { providerRepository } from '@/data/provider-repository';
@@ -110,7 +110,7 @@ export default function ShiftScreen() {
           testID="location-stale"
           elevation="none"
           style={{
-            flexDirection: 'row',
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
             gap: theme.spacing.md,
             backgroundColor: theme.colors.warningSubtle,
             borderColor: theme.colors.warning,
@@ -126,7 +126,13 @@ export default function ShiftScreen() {
 
       {isOnline ? (
         <View style={{ gap: theme.spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              alignItems: 'baseline',
+              gap: theme.spacing.sm,
+            }}
+          >
             <Text variant="subheading" style={{ flex: 1 }}>
               {t('provider.openJobs')}
             </Text>

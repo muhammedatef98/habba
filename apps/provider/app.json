@@ -23,8 +23,23 @@
       "edgeToEdgeEnabled": true,
       "permissions": ["ACCESS_FINE_LOCATION", "CAMERA"]
     },
-    "plugins": ["expo-router", "expo-localization", "expo-secure-store"],
-    "experiments": { "typedRoutes": true },
-    "extra": { "supabaseUrl": "http://localhost:54321", "supabaseAnonKey": "dev-anon-key" }
+    "plugins": [
+      "expo-router",
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": true
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "supabaseUrl": "http://localhost:54321",
+      "supabaseAnonKey": "dev-anon-key"
+    }
   }
 }

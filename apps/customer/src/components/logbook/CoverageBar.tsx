@@ -15,7 +15,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Text, useTheme } from '@habba/ui';
+import { Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { formatCount } from '@/lib/format-number';
 
 export interface CoverageBarProps {
@@ -37,7 +37,7 @@ export function CoverageBar({ verified, selfReported, testID }: CoverageBarProps
         accessibilityRole="progressbar"
         accessibilityValue={{ min: 0, max: total, now: verified }}
         style={{
-          flexDirection: 'row',
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
           height: 8,
           borderRadius: theme.radius.full,
           overflow: 'hidden',
@@ -52,7 +52,13 @@ export function CoverageBar({ verified, selfReported, testID }: CoverageBarProps
         ) : null}
       </View>
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.base, flexWrap: 'wrap' }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          gap: theme.spacing.base,
+          flexWrap: 'wrap',
+        }}
+      >
         <Legend
           color={theme.colors.verified}
           label={t('logbook.verifiedBadge')}
@@ -80,7 +86,13 @@ function Legend({
   const theme = useTheme();
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+    <View
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        alignItems: 'center',
+        gap: theme.spacing.xs,
+      }}
+    >
       <View
         style={{ width: 8, height: 8, borderRadius: theme.radius.full, backgroundColor: color }}
       />
