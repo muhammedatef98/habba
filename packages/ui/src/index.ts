@@ -15,6 +15,7 @@ export * from './HabbaWordmark.js';
 export * from './icon-names.js';
 export * from './Icon.js';
 export * from './StatusPill.js';
+export * from './progress-stages.js';
 export * from './ProgressStages.js';
 export * from './StatCluster.js';
 export * from './TimelineList.js';

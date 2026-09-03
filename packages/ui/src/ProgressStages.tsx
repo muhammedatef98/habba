@@ -10,6 +10,7 @@
 import { View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
 import { rowDirectionFor } from './direction.js';
+import { stageAppearance } from './progress-stages.js';
 import { useTheme } from './theme.js';
 
 export interface ProgressStage {
@@ -51,29 +52,32 @@ export function ProgressStages({
       ]}
     >
       {stages.map((stage, index) => {
-        const isDone = index < currentIndex;
-        const isCurrent = index === currentIndex;
-
-        // A half-filled bar on the current stage; a flat colour otherwise.
-        // Reanimated is not involved — this reflects server state, so it
-        // should not animate on its own schedule.
-        const fillRatio = isDone ? 1 : isCurrent ? (currentProgress ?? 1) : 0;
+        // Shape, not just colour: the current stage is a taller track with a
+        // partial fill, so "you are here" and "you finished this" are still
+        // different for the roughly one man in twelve who cannot separate the
+        // two hues (progress-stages.ts). Reanimated is not involved — this
+        // reflects server state and should not animate on its own schedule.
+        const { fill, height, isDone, isCurrent } = stageAppearance(
+          index,
+          currentIndex,
+          currentProgress,
+        );
         const trackColor = isDone ? theme.colors.primary : theme.colors.borderStrong;
 
         return (
           <View key={stage.key} style={{ flex: 1, gap: 6 }}>
             <View
               style={{
-                height: 4,
+                height,
                 borderRadius: theme.radius.full,
                 backgroundColor: isCurrent ? theme.colors.borderStrong : trackColor,
                 overflow: 'hidden',
               }}
             >
-              {isCurrent && fillRatio > 0 ? (
+              {isCurrent && fill > 0 ? (
                 <View
                   style={{
-                    width: `${Math.round(Math.min(Math.max(fillRatio, 0), 1) * 100)}%`,
+                    width: `${Math.round(fill * 100)}%`,
                     height: '100%',
                     borderRadius: theme.radius.full,
                     backgroundColor: theme.colors.accent,
