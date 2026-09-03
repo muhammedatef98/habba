@@ -22,6 +22,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, Icon, StatCluster, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { PlateBadge } from '@/components/PlateBadge';
 import { describeVehicleModel, vehicleLabel } from '@/lib/vehicle-label';
 import { formatCount } from '@/lib/format-number';
 import type { Vehicle, VehicleMake, VehicleModel } from '@/data/types';
@@ -145,23 +146,7 @@ export function VehicleHeroCard({
           ) : null}
         </View>
 
-        {plate !== null ? (
-          <View
-            style={{
-              alignSelf: 'flex-start',
-              paddingVertical: theme.spacing.xs,
-              paddingHorizontal: theme.spacing.md,
-              borderRadius: theme.radius.sm,
-              borderWidth: 1,
-              borderColor: theme.colors.borderStrong,
-              backgroundColor: theme.colors.surfaceSunken,
-            }}
-          >
-            <Text variant="bodySmall" numeric>
-              {plate}
-            </Text>
-          </View>
-        ) : null}
+        {plate !== null ? <PlateBadge testID="vehicle-plate" plate={plate} /> : null}
 
         <View style={{ height: 1, backgroundColor: theme.colors.border }} />
 
@@ -225,9 +210,9 @@ export function VehicleHeroCard({
                   {vehicleLabel(vehicle, sources)}
                 </Text>
                 {vehicle.plateNormalised !== null ? (
-                  <Text variant="caption" tone="subtle" numeric>
-                    {vehicle.plateNormalised}
-                  </Text>
+                  // Compact in the switcher: one line, so a four-car list does
+                  // not become four stacked plates.
+                  <PlateBadge plate={vehicle.plateNormalised} variant="compact" />
                 ) : null}
               </Card>
             ))}
