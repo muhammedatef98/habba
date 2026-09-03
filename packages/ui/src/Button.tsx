@@ -7,8 +7,9 @@
  * drift into marketing use.
  */
 
-import { ActivityIndicator, Pressable, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, PixelRatio, Pressable, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { scaledHeight } from './font-scale.js';
 import { useTheme } from './theme.js';
 
 export type ButtonVariant =
@@ -74,7 +75,13 @@ export function Button({
   };
 
   const surface = surfaces[variant];
-  const height = size === 'large' ? 56 : theme.minTouchTarget;
+  // Grown with the device's text setting: a 56dp box cannot hold a label that
+  // the OS has scaled to 1.5×, and the clipping that follows is how "honouring
+  // the accessibility setting" turns into "unreadable" (font-scale.ts).
+  const height = scaledHeight(
+    size === 'large' ? 56 : theme.minTouchTarget,
+    PixelRatio.getFontScale(),
+  );
 
   const base: ViewStyle = {
     minHeight: height,

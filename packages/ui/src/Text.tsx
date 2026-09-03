@@ -9,6 +9,7 @@
 
 import { Text as RNText, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 import { useTheme } from './theme.js';
+import { MAX_BODY_SCALE, MAX_HEADING_SCALE } from './font-scale.js';
 import { arabicFace, latinFace, type FontSizeToken } from './tokens.js';
 
 export type TextVariant =
@@ -73,6 +74,13 @@ export interface HabbaTextProps extends TextProps {
   readonly style?: StyleProp<TextStyle>;
 }
 
+/**
+ * Display and title type is already 32–40px, so it gets the lower ceiling: the
+ * multiplier that is comfortable on a caption turns a headline into four lines
+ * (font-scale.ts).
+ */
+const HEADING_VARIANTS = new Set<TextVariant>(['display', 'title', 'heading']);
+
 export function Text({
   variant = 'body',
   tone = 'default',
@@ -134,6 +142,13 @@ export function Text({
   return (
     <RNText
       {...rest}
+      // Follows the device's text-size setting — RN's default — but capped, so
+      // an accessibility size cannot push the primary action off the screen.
+      // A caller may still override this for a specific string.
+      maxFontSizeMultiplier={
+        rest.maxFontSizeMultiplier ??
+        (HEADING_VARIANTS.has(variant) ? MAX_HEADING_SCALE : MAX_BODY_SCALE)
+      }
       style={[
         {
           color,

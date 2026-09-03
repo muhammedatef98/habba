@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import {
+  PixelRatio,
   Pressable,
   TextInput,
   View,
@@ -16,6 +17,7 @@ import {
 } from 'react-native';
 import { Text } from './Text.js';
 import { rowDirectionFor } from './direction.js';
+import { scaledHeight } from './font-scale.js';
 import { useTheme } from './theme.js';
 import { arabicFace } from './tokens.js';
 
@@ -89,7 +91,7 @@ export function Field({
           flexDirection:
             prefix === undefined ? rowDirectionFor(theme.direction, theme.nativeDirection) : 'row',
           alignItems: 'center',
-          minHeight: theme.minTouchTarget,
+          minHeight: scaledHeight(theme.minTouchTarget, PixelRatio.getFontScale()),
           borderWidth: 1.5,
           borderColor: hasError ? theme.colors.emergency : theme.colors.border,
           borderRadius: theme.radius.md,
@@ -134,7 +136,7 @@ export function Field({
           secureTextEntry={rest.secureTextEntry === true && !revealed}
           style={{
             flex: 1,
-            minHeight: theme.minTouchTarget,
+            minHeight: scaledHeight(theme.minTouchTarget, PixelRatio.getFontScale()),
             paddingEnd: prefix === undefined || showReveal ? 0 : theme.spacing.md,
             color: theme.colors.text,
             fontSize: theme.fontSize.base,
