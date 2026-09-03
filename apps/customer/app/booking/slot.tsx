@@ -24,7 +24,16 @@ import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { addSar, applyRate, SAUDI_VAT_RATE, type SarAmount } from '@habba/core';
-import { Button, Card, ErrorState, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Screen,
+  Skeleton,
+  Text,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
 import { BookingSteps } from '@/components/booking/BookingSteps';
 import { repository } from '@/data/repository';
 import { daysFromToday, groupSlotsByDay } from '@/lib/slot-days';
@@ -147,9 +156,41 @@ export default function BookingSlotScreen() {
           onRetry={() => void slots.refetch()}
         />
       ) : slots.isPending ? (
-        <Text variant="body" tone="muted">
-          {t('common.loading')}
-        </Text>
+        // Chips, because that is what arrives here — a row of days and a grid
+        // of times. A card skeleton would promise the wrong shape.
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.base }}
+        >
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              gap: theme.spacing.sm,
+            }}
+          >
+            {[0, 1, 2, 3].map((index) => (
+              <Skeleton
+                key={index}
+                testID={index === 0 ? 'slots-skeleton' : undefined}
+                height={36}
+                width={72}
+                radius="full"
+              />
+            ))}
+          </View>
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}
+          >
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <Skeleton key={index} height={56} width={96} radius="md" />
+            ))}
+          </View>
+        </View>
       ) : days.length === 0 ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
           <Text variant="body" tone="muted">

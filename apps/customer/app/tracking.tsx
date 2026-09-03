@@ -21,7 +21,16 @@ import { Share, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Screen, Text, ThemeProvider, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  Screen,
+  Skeleton,
+  SkeletonCard,
+  Text,
+  ThemeProvider,
+  useTheme,
+} from '@habba/ui';
 import { repository } from '@/data/repository';
 import { useIsAuthenticated, useSession } from '@/state/session';
 import { Arrived } from '@/components/tracking/Arrived';
@@ -110,9 +119,18 @@ function TrackingBody() {
   if (order.isLoading) {
     return (
       <Screen>
-        <Text variant="body" tone="muted">
-          {t('common.loading')}
-        </Text>
+        {/* This screen is opened by someone who wants to know where their
+            technician is. A blank screen with a word on it is the worst
+            possible answer to that; the shape of the answer is better. */}
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.base }}
+        >
+          <Skeleton testID="tracking-skeleton" height={28} width="60%" />
+          <SkeletonCard lines={1} />
+          <SkeletonCard lines={2} />
+        </View>
       </Screen>
     );
   }

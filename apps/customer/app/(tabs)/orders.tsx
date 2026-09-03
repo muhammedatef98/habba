@@ -19,7 +19,7 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, ErrorState, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Icon, Screen, SkeletonCard, Text, useTheme } from '@habba/ui';
 import { ActiveOrderCard } from '@/components/home/ActiveOrderCard';
 import { RecentOrderRow } from '@/components/home/RecentOrderRow';
 import { SectionHeader } from '@/components/home/SectionHeader';
@@ -57,9 +57,18 @@ export default function OrdersScreen() {
     return (
       <Screen>
         <Text variant="title">{t('nav.orders')}</Text>
-        <Text variant="body" tone="muted">
-          {t('common.loading')}
-        </Text>
+        {/* The shape that is about to arrive, so the screen does not jump from
+            empty to full — and one spoken announcement rather than six silent
+            boxes for a screen reader. */}
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.md }}
+        >
+          <SkeletonCard testID="orders-skeleton" />
+          <SkeletonCard />
+          <SkeletonCard />
+        </View>
       </Screen>
     );
   }

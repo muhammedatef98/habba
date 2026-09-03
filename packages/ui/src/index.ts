@@ -17,5 +17,6 @@ export * from './Icon.js';
 export * from './StatusPill.js';
 export * from './progress-stages.js';
 export * from './ProgressStages.js';
+export * from './Skeleton.js';
 export * from './StatCluster.js';
 export * from './TimelineList.js';

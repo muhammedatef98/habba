@@ -29,7 +29,17 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, ErrorState, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Icon,
+  Screen,
+  SkeletonCard,
+  Text,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
 import { CoverageBar } from '@/components/logbook/CoverageBar';
 import { LogbookTimeline } from '@/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/components/home/SectionHeader';
@@ -162,9 +172,14 @@ export default function LogbookScreen() {
           onRetry={() => void timeline.refetch()}
         />
       ) : timeline.isPending ? (
-        <Text variant="body" tone="muted">
-          {t('common.loading')}
-        </Text>
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.md }}
+        >
+          <SkeletonCard testID="logbook-skeleton" lines={3} />
+          <SkeletonCard lines={3} />
+        </View>
       ) : events.length === 0 ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
           <View style={{ gap: theme.spacing.md }}>

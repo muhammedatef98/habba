@@ -17,7 +17,16 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  Icon,
+  Screen,
+  SkeletonCard,
+  Text,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
 import { BookingSteps } from '@/components/booking/BookingSteps';
 import { repository } from '@/data/repository';
 import { formatCount } from '@/lib/format-number';
@@ -60,9 +69,15 @@ export default function BookingProviderScreen() {
       />
 
       {providers.isPending ? (
-        <Text variant="body" tone="muted">
-          {t('common.loading')}
-        </Text>
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.md }}
+        >
+          <SkeletonCard testID="providers-skeleton" />
+          <SkeletonCard />
+          <SkeletonCard />
+        </View>
       ) : rows.length === 0 ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
           <Text variant="body" tone="muted">
