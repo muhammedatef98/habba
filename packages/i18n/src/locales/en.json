@@ -188,7 +188,9 @@
     "genericAction": "Try again",
     "offline": "You're offline. We'll save what you entered and send it when you reconnect.",
     "notFound": "We couldn't find that.",
-    "forbidden": "You don't have permission to do that."
+    "forbidden": "You don't have permission to do that.",
+    "offlineTitle": "No internet connection",
+    "offlineBody": "What you see may be out of date. It will refresh on its own once you're back online."
   },
   "home": {
     "emergencyAction": "Emergency request",

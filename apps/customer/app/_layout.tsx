@@ -29,6 +29,7 @@ import { ThemeProvider, lightColors } from '@habba/ui';
 import { detectDeviceLocale, initI18n } from '@/lib/i18n';
 import { readStoredLocale, readStoredTheme } from '@/lib/preferences';
 import { syncLayoutDirection } from '@/lib/rtl';
+import { OfflineNotice } from '@/components/OfflineNotice';
 import { useSession } from '@/state/session';
 
 const queryClient = new QueryClient({
@@ -129,6 +130,14 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider locale={locale} preference={themePreference}>
           <StatusBar style="auto" />
+          {/* Above the navigator and outside it, so the notice survives every
+              screen change instead of each screen having to remember it.
+              Deliberately NOT wrapped in a SafeAreaView: <Screen> already
+              applies `insets.top` itself, and a second one here would double
+              the top padding of every screen in the app. The notice carries
+              its own inset instead, and renders nothing at all while the
+              connection is fine — so the layout is untouched when online. */}
+          <OfflineNotice testID="offline-notice" />
           <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
         </ThemeProvider>
       </SafeAreaProvider>
