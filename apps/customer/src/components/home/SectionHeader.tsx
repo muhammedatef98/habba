@@ -7,8 +7,8 @@
  * the spacing mean something.
  */
 
-import { Pressable, View } from 'react-native';
-import { Text, useTheme } from '@habba/ui';
+import { Pressable } from 'react-native';
+import { Row, Text } from '@habba/ui';
 
 export interface SectionHeaderProps {
   readonly title: string;
@@ -18,18 +18,11 @@ export interface SectionHeaderProps {
 }
 
 export function SectionHeader({ title, actionLabel, onAction, testID }: SectionHeaderProps) {
-  const theme = useTheme();
-
   return (
-    <View
-      testID={testID}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        justifyContent: 'space-between',
-        gap: theme.spacing.md,
-      }}
-    >
+    // <Row>, not a hand-written row: on the first Arabic launch Yoga is still
+    // laying out left-to-right (forceRTL applies next process start), which put
+    // every section title — التفضيلات, عن هبّة, and the rest — on the left.
+    <Row testID={testID} gap="md" align="baseline" justify="space-between">
       <Text variant="subheading">{title}</Text>
 
       {actionLabel !== undefined && onAction !== undefined ? (
@@ -48,6 +41,6 @@ export function SectionHeader({ title, actionLabel, onAction, testID }: SectionH
           )}
         </Pressable>
       ) : null}
-    </View>
+    </Row>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * The two choices a customer makes that must survive closing the app.
+ * What must survive closing the app: the two preferences, and the sign-in.
  *
  * Neither was persisted. Language and theme lived in Zustand and were rebuilt
  * from the device on every launch, so picking English in الإعدادات lasted
@@ -23,6 +23,7 @@ import { isSupportedLocale, type Locale } from '@habba/i18n';
 
 const LOCALE_KEY = 'habba.preference.locale';
 const THEME_KEY = 'habba.preference.theme';
+const SESSION_KEY = 'habba.session';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -65,6 +66,70 @@ export async function readStoredTheme(): Promise<ThemePreference | null> {
 export async function writeStoredTheme(preference: ThemePreference): Promise<void> {
   try {
     await SecureStore.setItemAsync(THEME_KEY, preference);
+  } catch {
+    // Fails soft — see the module note.
+  }
+}
+
+/**
+ * The signed-in customer, as much of them as the client is allowed to remember.
+ *
+ * Nothing here is server data — no vehicles, no orders, no logbook. Those are
+ * refetched, so a stale cache can never present itself as fact. This is only
+ * the identity needed to skip the phone screen on the next launch.
+ */
+export interface StoredSession {
+  readonly userId: string;
+  readonly fullName: string;
+  readonly phoneE164: string | null;
+  readonly isGuest: boolean;
+}
+
+function isStoredSession(value: unknown): value is StoredSession {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.userId === 'string' &&
+    candidate.userId.length > 0 &&
+    typeof candidate.fullName === 'string' &&
+    (candidate.phoneE164 === null || typeof candidate.phoneE164 === 'string') &&
+    typeof candidate.isGuest === 'boolean'
+  );
+}
+
+/**
+ * The stored session, or null when nobody is signed in — or when what was
+ * stored is not a session this build understands.
+ *
+ * Validated rather than cast for the same reason the locale is: stored state
+ * outlives the code that wrote it, and a half-shaped object here would put the
+ * app into a signed-in state with no id to fetch anything with.
+ */
+export async function readStoredSession(): Promise<StoredSession | null> {
+  try {
+    const stored = await SecureStore.getItemAsync(SESSION_KEY);
+    if (stored === null) return null;
+
+    const parsed: unknown = JSON.parse(stored);
+    return isStoredSession(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeStoredSession(session: StoredSession): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // Fails soft — see the module note. The cost is one extra sign-in.
+  }
+}
+
+/** Signing out. The identity must not outlive it on the device. */
+export async function clearStoredSession(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(SESSION_KEY);
   } catch {
     // Fails soft — see the module note.
   }

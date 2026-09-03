@@ -13,7 +13,23 @@
 
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Icon, useTheme } from '@habba/ui';
+import { Icon, readingOrder, useTheme } from '@habba/ui';
+import type { IconName } from '@habba/ui';
+
+/**
+ * Reading order: الرئيسية first, حسابي last. In Arabic "first" is the right
+ * edge, so this list is handed to the navigator in whichever order puts it
+ * there — see the note on `readingOrder` below.
+ */
+const TABS: ReadonlyArray<{
+  name: 'vehicles' | 'orders' | 'account';
+  titleKey: 'nav.home' | 'nav.orders' | 'nav.account';
+  icon: IconName;
+}> = [
+  { name: 'vehicles', titleKey: 'nav.home', icon: 'home' },
+  { name: 'orders', titleKey: 'nav.orders', icon: 'calendar' },
+  { name: 'account', titleKey: 'nav.account', icon: 'person' },
+];
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -38,27 +54,21 @@ export default function TabsLayout() {
         },
       }}
     >
-      <Tabs.Screen
-        name="vehicles"
-        options={{
-          title: t('nav.home'),
-          tabBarIcon: ({ color }) => <Icon name="home" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: t('nav.orders'),
-          tabBarIcon: ({ color }) => <Icon name="calendar" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: t('nav.account'),
-          tabBarIcon: ({ color }) => <Icon name="person" color={color} />,
-        }}
-      />
+      {/* The tab bar's own `flexDirection` is the navigator's, not ours, so the
+          only thing left to control is the order — and it has to carry the
+          direction on the first Arabic launch, when Yoga is still laying out
+          left-to-right and the bar would otherwise start with الرئيسية on the
+          left. */}
+      {readingOrder(TABS, theme.direction, theme.nativeDirection).map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: t(tab.titleKey),
+            tabBarIcon: ({ color }) => <Icon name={tab.icon} color={color} />,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }

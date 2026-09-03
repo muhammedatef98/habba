@@ -43,6 +43,7 @@ export default function RootLayout() {
   const setLocale = useSession((state) => state.setLocale);
   const themePreference = useSession((state) => state.themePreference);
   const setThemePreference = useSession((state) => state.setThemePreference);
+  const hydrate = useSession((state) => state.hydrate);
   const [ready, setReady] = useState(false);
 
   // The design's Latin face, used for every figure in the app. Loaded by exact
@@ -66,9 +67,13 @@ export default function RootLayout() {
       // device locale unconditionally, which meant a saved preference was
       // overwritten on every launch — the language switcher could not have
       // worked even if something had been listening to it.
+      // The session is read back here too, before the first frame: a launch
+      // that shows the phone screen for an instant on the way to the restored
+      // session reads as "it signed me out again".
       const [storedLocale, storedTheme] = await Promise.all([
         readStoredLocale(),
         readStoredTheme(),
+        hydrate(),
       ]);
       const effective = storedLocale ?? detectDeviceLocale();
 
@@ -85,7 +90,7 @@ export default function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, [setLocale, setThemePreference]);
+  }, [hydrate, setLocale, setThemePreference]);
 
   // Gate on the fonts too: rendering before Outfit resolves shows every figure
   // in the fallback face and then reflows, which on the tracking screen means
