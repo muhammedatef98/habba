@@ -31,7 +31,7 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Screen, Text, useTheme } from '@habba/ui';
 import { ActiveOrderCard } from '@/components/home/ActiveOrderCard';
 import { EmergencyHero } from '@/components/home/EmergencyHero';
 import { HomeHeader } from '@/components/home/HomeHeader';
@@ -235,7 +235,18 @@ export default function HomeScreen() {
             : {})}
         />
 
-        {selectedVehicle !== undefined ? (
+        {/* A failed fetch renders as "your logbook starts here" otherwise, and
+            the customer is invited to add a car they already own — into a
+            product whose whole promise is that it remembers their cars. */}
+        {vehicles.isError ? (
+          <ErrorState
+            testID="home-vehicles-error"
+            message={t('errors.offline')}
+            retryLabel={t('common.retry')}
+            retrying={vehicles.isFetching}
+            onRetry={() => void vehicles.refetch()}
+          />
+        ) : selectedVehicle !== undefined ? (
           <VehicleHeroCard
             testID="home-vehicle"
             vehicles={vehicles.data ?? []}

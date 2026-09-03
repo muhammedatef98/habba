@@ -29,7 +29,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { CoverageBar } from '@/components/logbook/CoverageBar';
 import { LogbookTimeline } from '@/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/components/home/SectionHeader';
@@ -149,7 +149,23 @@ export default function LogbookScreen() {
         </View>
       </View>
 
-      {events.length === 0 ? (
+      {/* The one screen the product cannot afford to be wrong about. Telling
+          an owner with two years of history that their logbook "starts here"
+          undermines the single thing §1 asks them to trust — and it would be a
+          dropped connection saying it, not the record. */}
+      {timeline.isError ? (
+        <ErrorState
+          testID="logbook-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={timeline.isFetching}
+          onRetry={() => void timeline.refetch()}
+        />
+      ) : timeline.isPending ? (
+        <Text variant="body" tone="muted">
+          {t('common.loading')}
+        </Text>
+      ) : events.length === 0 ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
           <View style={{ gap: theme.spacing.md }}>
             <Text variant="heading">{t('logbook.emptyTitle')}</Text>

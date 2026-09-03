@@ -12,7 +12,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { repository } from '@/data/repository';
 import { useEmergencyDraft } from '@/state/emergency-draft';
 import { useSession } from '@/state/session';
@@ -65,6 +65,19 @@ export default function ServiceSelectionScreen() {
           {t('emergency.serviceSubhead')}
         </Text>
       </View>
+
+      {/* This is the emergency flow: an empty grid here means a stranded
+          customer being shown nothing at all, with no way to tell whether the
+          app is broken or simply has no help to offer. */}
+      {services.isError ? (
+        <ErrorState
+          testID="emergency-services-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={services.isFetching}
+          onRetry={() => void services.refetch()}
+        />
+      ) : null}
 
       <View
         style={{

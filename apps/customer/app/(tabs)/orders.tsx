@@ -19,7 +19,7 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, Icon, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Icon, Screen, Text, useTheme } from '@habba/ui';
 import { ActiveOrderCard } from '@/components/home/ActiveOrderCard';
 import { RecentOrderRow } from '@/components/home/RecentOrderRow';
 import { SectionHeader } from '@/components/home/SectionHeader';
@@ -60,6 +60,24 @@ export default function OrdersScreen() {
         <Text variant="body" tone="muted">
           {t('common.loading')}
         </Text>
+      </Screen>
+    );
+  }
+
+  // A failed fetch must not render as "you have never ordered anything". The
+  // empty state below is an invitation; showing it to someone whose request is
+  // in flight right now would be a lie about their own history.
+  if (orders.isError) {
+    return (
+      <Screen>
+        <Text variant="title">{t('nav.orders')}</Text>
+        <ErrorState
+          testID="orders-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={orders.isFetching}
+          onRetry={() => void orders.refetch()}
+        />
       </Screen>
     );
   }

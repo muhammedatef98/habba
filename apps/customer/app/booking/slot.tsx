@@ -24,7 +24,7 @@ import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { addSar, applyRate, SAUDI_VAT_RATE, type SarAmount } from '@habba/core';
-import { Button, Card, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { BookingSteps } from '@/components/booking/BookingSteps';
 import { repository } from '@/data/repository';
 import { daysFromToday, groupSlotsByDay } from '@/lib/slot-days';
@@ -136,7 +136,17 @@ export default function BookingSlotScreen() {
         subtitle={t('booking.slotSubhead')}
       />
 
-      {slots.isPending ? (
+      {/* "No times available" and "we could not reach the server" are opposite
+          facts: one means pick another day, the other means try again. */}
+      {slots.isError ? (
+        <ErrorState
+          testID="booking-slots-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={slots.isFetching}
+          onRetry={() => void slots.refetch()}
+        />
+      ) : slots.isPending ? (
         <Text variant="body" tone="muted">
           {t('common.loading')}
         </Text>

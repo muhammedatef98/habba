@@ -145,6 +145,7 @@ export interface ColorScheme {
   /** Text/icon color for warning state on surface or warningSubtle. Passes 4.5:1. */
   readonly warningFg: string;
   readonly warningSubtle: string;
+  readonly warningBorder: string;
   readonly info: string;
   readonly infoFg: string;
   readonly infoSubtle: string;
@@ -202,6 +203,9 @@ export const lightColors: ColorScheme = {
   warning: warning[500],
   warningFg: warning[700],
   warningSubtle: warning[50],
+  // Completes the set: emergency and success each had a border and warning did
+  // not, so a warning surface had no way to be outlined like its siblings.
+  warningBorder: '#EBD5A8',
   info: info[500],
   infoFg: info[600],
   infoSubtle: info[50],
@@ -263,6 +267,7 @@ export const darkColors: ColorScheme = {
   warning: warning[500],
   warningFg: warning[400],
   warningSubtle: '#33260F',
+  warningBorder: '#5C4415',
   info: info[500],
   infoFg: info[400],
   infoSubtle: '#142E36',

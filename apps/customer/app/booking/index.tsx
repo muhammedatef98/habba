@@ -18,7 +18,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { BookingSteps } from '@/components/booking/BookingSteps';
 import { repository } from '@/data/repository';
 import { serviceIcon } from '@/lib/service-icon';
@@ -93,6 +93,18 @@ export default function BookingServiceScreen() {
         title={t('booking.serviceHeadline')}
         subtitle={t('booking.serviceSubhead')}
       />
+
+      {/* An unreachable catalogue renders as a screen with no services on it,
+          which reads as "Habba does not do anything" rather than "try again". */}
+      {services.isError ? (
+        <ErrorState
+          testID="booking-services-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={services.isFetching}
+          onRetry={() => void services.refetch()}
+        />
+      ) : null}
 
       <View style={{ gap: theme.spacing.sm }}>
         {services.data?.map((option) => {
