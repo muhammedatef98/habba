@@ -179,13 +179,25 @@ export default function QuoteScreen() {
                   </Text>
                 </View>
               ) : (
-                <Button
-                  testID={`approve-part-${line.id}`}
-                  label={t('quote.approveLine')}
-                  size="medium"
-                  onPress={() => approve.mutate(line.id)}
-                  loading={approve.isPending && approve.variables === line.id}
-                />
+                <View style={{ gap: theme.spacing.sm }}>
+                  <Button
+                    testID={`approve-part-${line.id}`}
+                    label={t('quote.approveLine')}
+                    size="medium"
+                    onPress={() => approve.mutate(line.id)}
+                    loading={approve.isPending && approve.variables === line.id}
+                  />
+
+                  {/* Approving a part is the customer agreeing to pay for it.
+                      A failure that says nothing leaves them believing they
+                      approved it, and the job waiting on an approval that
+                      never landed — on the line that carries the money. */}
+                  {approve.isError && approve.variables === line.id ? (
+                    <Text variant="caption" tone="emergency">
+                      {t('quote.approveFailed')}
+                    </Text>
+                  ) : null}
+                </View>
               )}
             </View>
           </Card>

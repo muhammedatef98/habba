@@ -31,6 +31,8 @@ export interface SearchingProps {
   readonly telemetry: DispatchTelemetry | undefined;
   readonly onCancel: () => void;
   readonly cancelPending: boolean;
+  /** The cancel request failed. Silence would leave a live order behind. */
+  readonly cancelFailed?: boolean | undefined;
 }
 
 function formatClock(iso: string): string {
@@ -43,7 +45,12 @@ function formatClock(iso: string): string {
   });
 }
 
-export function Searching({ telemetry, onCancel, cancelPending }: SearchingProps) {
+export function Searching({
+  telemetry,
+  onCancel,
+  cancelPending,
+  cancelFailed = false,
+}: SearchingProps) {
   const { t } = useTranslation();
   const theme = useTheme();
 
@@ -151,9 +158,18 @@ export function Searching({ telemetry, onCancel, cancelPending }: SearchingProps
           onPress={onCancel}
           loading={cancelPending}
         />
-        <Text variant="caption" tone="subtle" align="center">
-          {t('tracking.cancelFreeBeforeMatch')}
-        </Text>
+        {/* A cancel that fails without saying so is the worst kind: the
+            customer walks away believing the order is off, and a technician is
+            still on their way to them. */}
+        {cancelFailed ? (
+          <Text variant="caption" tone="emergency" align="center">
+            {t('tracking.errors.cancelFailed')}
+          </Text>
+        ) : (
+          <Text variant="caption" tone="subtle" align="center">
+            {t('tracking.cancelFreeBeforeMatch')}
+          </Text>
+        )}
       </View>
     </View>
   );

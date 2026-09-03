@@ -93,7 +93,8 @@
       "yearTooNew": "That year isn't valid.",
       "vinInvalid": "A VIN is 17 characters and never contains I, O or Q.",
       "required": "This field is required.",
-      "mileageImplausible": "Check that reading — the number doesn't look right."
+      "mileageImplausible": "Check that reading — the number doesn't look right.",
+      "saveFailed": "We couldn't save this vehicle. Check your connection and try again."
     },
     "mileageHint": "Helps us predict when the next service is due"
   },
@@ -322,7 +323,8 @@
     "errors": {
       "notFound": "We couldn't find that request.",
       "confirmFailed": "Confirmation failed. Try again.",
-      "cancelFailed": "The request could not be cancelled."
+      "cancelFailed": "The request could not be cancelled.",
+      "rateFailed": "We couldn't send your rating. Try again."
     },
     "searchingHeadline": "Finding you a technician",
     "searchingReassure": "Nothing needed from you. Keep your phone handy and we'll tell you the moment we find someone.",
@@ -395,7 +397,8 @@
     "allApprovedHint": "Once every part is approved, the work moves to completion confirmation.",
     "pendingHint": "Not every part is approved yet.",
     "pendingBadge": "{{count}} awaiting you",
-    "allApprovedBadge": "All approved"
+    "allApprovedBadge": "All approved",
+    "approveFailed": "We couldn't record your approval for this part. Check your connection and try again."
   },
   "job": {
     "accept": "Accept job",

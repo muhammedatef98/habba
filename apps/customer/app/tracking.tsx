@@ -141,6 +141,7 @@ function TrackingBody() {
           telemetry={telemetry}
           onCancel={() => cancel.mutate()}
           cancelPending={cancel.isPending}
+          cancelFailed={cancel.isError}
         />
       </Screen>
     );
@@ -233,6 +234,7 @@ function TrackingBody() {
           onRate={(stars) => rate.mutate(stars)}
           ratePending={rate.isPending}
           rateSucceeded={rate.isSuccess}
+          rateFailed={rate.isError}
           onViewLogbook={() =>
             router.push({ pathname: '/logbook', params: { id: current.vehicleId ?? '' } })
           }

@@ -184,6 +184,15 @@ export default function AddVehicleScreen() {
         placeholder={t('vehicle.nicknamePlaceholder')}
       />
 
+      {/* Silence here reads as "nothing happened": the screen stays, the form
+          stays filled, and the customer taps Save again. Saying so is also the
+          only way they learn the car is not on file yet. */}
+      {addVehicle.isError ? (
+        <Text variant="caption" tone="emergency">
+          {t('vehicle.errors.saveFailed')}
+        </Text>
+      ) : null}
+
       <Button
         testID="save-vehicle"
         label={t('common.save')}

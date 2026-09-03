@@ -21,6 +21,7 @@ export interface CompletedProps {
   readonly onRate: (stars: number) => void;
   readonly ratePending: boolean;
   readonly rateSucceeded: boolean;
+  readonly rateFailed?: boolean | undefined;
   readonly onViewLogbook: () => void;
   readonly onDismiss: () => void;
 }
@@ -31,6 +32,7 @@ export function Completed({
   onRate,
   ratePending,
   rateSucceeded,
+  rateFailed = false,
   onViewLogbook,
   onDismiss,
 }: CompletedProps) {
@@ -91,7 +93,16 @@ export function Completed({
               {t('tracking.rateThanks')}
             </Text>
           ) : (
-            <RatingStars onRate={onRate} disabled={ratePending} />
+            <>
+              <RatingStars onRate={onRate} disabled={ratePending} />
+              {/* The stars stay tappable underneath, so the message is an
+                  invitation to try again rather than a dead end. */}
+              {rateFailed ? (
+                <Text variant="caption" tone="emergency" align="center">
+                  {t('tracking.errors.rateFailed')}
+                </Text>
+              ) : null}
+            </>
           )}
         </View>
       </Card>
