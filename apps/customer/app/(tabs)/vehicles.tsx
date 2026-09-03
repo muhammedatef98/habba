@@ -295,10 +295,16 @@ export default function HomeScreen() {
               gap: theme.spacing.xs,
             }}
           >
-            <Text variant="bodyStrong" style={{ color: theme.colors.accentText }}>
+            {/* `accentText` is the label colour for a *filled* amber button —
+                near-black in light, and dark petrol in dark mode. Painted on
+                `accentSubtle` it measured 1.15:1: dark green on dark brown,
+                which is why this banner read as an unreadable green block.
+                `accentFg` is the amber-as-text token and clears 4.5:1 on this
+                surface in both schemes (tokens.ts). */}
+            <Text variant="bodyStrong" tone="accent">
               {t('auth.guestBannerTitle')}
             </Text>
-            <Text variant="caption" style={{ color: theme.colors.accentText }}>
+            <Text variant="caption" tone="accent">
               {t('auth.guestBannerBody')}
             </Text>
             <Text variant="label" tone="accent" style={{ marginTop: theme.spacing.xs }}>

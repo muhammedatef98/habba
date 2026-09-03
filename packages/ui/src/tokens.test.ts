@@ -99,6 +99,12 @@ describe('status colour pairs (fg on subtle background, WCAG 2.2)', () => {
   test.each(schemes)('%s: accentFg is readable as text on surfaces', (_name, colors) => {
     expect(contrast(colors.accentFg, colors.surface)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(colors.accentFg, colors.background)).toBeGreaterThanOrEqual(4.5);
+    // The guest banner. This pair was untested, and the screens were painting
+    // `accentText` here instead — the label colour for a *filled* amber button,
+    // which is dark petrol in dark mode. It measured 1.15:1 on this surface:
+    // dark green on dark brown, on the one banner asking a guest to save the
+    // logbook they can otherwise lose.
+    expect(contrast(colors.accentFg, colors.accentSubtle)).toBeGreaterThanOrEqual(4.5);
   });
 
   // §8 reserves red for genuine emergencies. If the emergency colour ever drifts
@@ -106,6 +112,26 @@ describe('status colour pairs (fg on subtle background, WCAG 2.2)', () => {
   test.each(schemes)('%s: emergency is visibly distinct from accent', (_name, colors) => {
     expect(colors.emergency).not.toBe(colors.accent);
     expect(contrast(colors.emergency, colors.accent)).toBeGreaterThanOrEqual(1.5);
+  });
+});
+
+describe('accentText is a button label, not body text', () => {
+  test.each(schemes)('%s: accentText is readable on a filled accent', (_name, colors) => {
+    expect(contrast(colors.accentText, colors.accent)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('in dark mode it is unusable on accentSubtle — which is how the bug shipped', () => {
+    // Light mode hides this completely: `accentText` there is near-black ink,
+    // which measures 15:1 on the cream `accentSubtle` and looks perfect. In
+    // dark mode the same token is dark petrol on dark brown — 1.15:1 — so the
+    // guest banner rendered as an unreadable green block for exactly half the
+    // users, and looked correct to anyone who checked in light mode.
+    //
+    // Asserted rather than merely commented so that if someone ever makes
+    // `accentText` safe on this surface, this test fails and tells them the
+    // note above is now stale.
+    expect(contrast(darkColors.accentText, darkColors.accentSubtle)).toBeLessThan(4.5);
+    expect(contrast(lightColors.accentText, lightColors.accentSubtle)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

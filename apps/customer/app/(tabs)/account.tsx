@@ -228,7 +228,7 @@ export default function AccountScreen() {
                 }}
               >
                 <Icon name="alert" size={theme.iconSize.sm} color={theme.colors.accentFg} />
-                <Text variant="caption" style={{ flex: 1, color: theme.colors.accentText }}>
+                <Text variant="caption" tone="accent" style={{ flex: 1 }}>
                   {t('settings.restartRequired')}
                 </Text>
               </Card>
