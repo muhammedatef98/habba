@@ -30,6 +30,7 @@ import type {
   ProviderSummary,
   Service,
   ServiceCategory,
+  TimelineAttachment,
   TimelineEvent,
   UserRole,
   Vehicle,
@@ -88,6 +89,8 @@ interface TimelineRow {
   provenance: TimelineEvent['provenance'];
   summary_ar: string;
   summary_en: string;
+  details: Record<string, unknown> | null;
+  attachments: TimelineAttachment[] | null;
 }
 
 function toVehicle(row: VehicleRow): Vehicle {
@@ -215,6 +218,8 @@ function toTimelineEvent(row: TimelineRow): TimelineEvent {
     provenance: row.provenance,
     summaryAr: row.summary_ar,
     summaryEn: row.summary_en,
+    details: row.details ?? {},
+    attachments: row.attachments ?? [],
   };
 }
 
@@ -552,6 +557,7 @@ export class SupabaseRepository implements Repository {
       p_occurred_at: input.occurredAt.toISOString(),
       p_mileage: input.mileage ?? null,
       p_details: input.details ?? {},
+      p_attachments: input.attachments ?? [],
     });
 
     if (error !== null) throw new Error(`recordPastService: ${error.message}`);

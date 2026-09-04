@@ -3,23 +3,24 @@
  *
  * Build prompt §9.1: "This is the app's soul — design it first, not last."
  *
- * Phase 1 ships the empty state and the event list. Phase 2 adds manual entry,
- * mileage tracking and تقرير هبّة. The empty state is written to explain why
- * the logbook is worth filling, because a customer who does not understand
- * that never comes back to it.
+ * Chronological, newest first, grouped by year. The grouping is not decoration:
+ * a well-kept logbook runs to dozens of entries over a car's life, and "what
+ * happened in 2024" is how an owner — and a buyer — actually reads it. The year
+ * header carries that year's entry count and its verified share, so the shape
+ * of the history is visible without opening anything.
  *
  * Every event renders its provenance (ADR-0005). A Habba-verified service and
  * an owner's recollection must never look the same.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, ProvenanceBadge, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, EmptyState, ProvenanceBadge, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
-import type { Provenance } from '@/features/shared/data/types';
+import type { Provenance, TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
 const PROVENANCE_LABEL_KEY: Record<Provenance, string> = {
@@ -31,6 +32,38 @@ const PROVENANCE_LABEL_KEY: Record<Provenance, string> = {
 
 /** Where the public report is served. Replaced by the real domain at launch. */
 const REPORT_BASE_URL = 'https://habba.sa/r';
+
+interface YearGroup {
+  readonly year: number;
+  readonly events: readonly TimelineEvent[];
+  readonly verified: number;
+}
+
+/**
+ * Groups by the year the service HAPPENED, not the year it was recorded.
+ * An owner entering ten years of history in one sitting must see ten years,
+ * not one.
+ */
+function groupByYear(events: readonly TimelineEvent[]): readonly YearGroup[] {
+  const byYear = new Map<number, TimelineEvent[]>();
+
+  for (const event of events) {
+    const year = new Date(event.occurredAt).getFullYear();
+    const bucket = byYear.get(year);
+    if (bucket === undefined) byYear.set(year, [event]);
+    else bucket.push(event);
+  }
+
+  return [...byYear.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([year, group]) => ({
+      year,
+      events: [...group].sort(
+        (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+      ),
+      verified: group.filter((event) => event.provenance === 'habba_verified').length,
+    }));
+}
 
 export default function LogbookScreen() {
   const { t, i18n } = useTranslation();
@@ -66,9 +99,10 @@ export default function LogbookScreen() {
     },
   });
 
-  if (!isAuthenticated) return <Redirect href="/" />;
+  const events = useMemo(() => timeline.data ?? [], [timeline.data]);
+  const groups = useMemo(() => groupByYear(events), [events]);
 
-  const events = timeline.data ?? [];
+  if (!isAuthenticated) return <Redirect href="/" />;
 
   const verifiedCount = events.filter((event) => event.provenance === 'habba_verified').length;
   const selfReportedCount = events.length - verifiedCount;
@@ -91,59 +125,93 @@ export default function LogbookScreen() {
       </View>
 
       {events.length === 0 ? (
-        <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
-          <View style={{ gap: theme.spacing.md }}>
-            <Text variant="heading">{t('logbook.emptyTitle')}</Text>
-            <Text variant="body" tone="muted">
-              {t('logbook.emptyBody')}
-            </Text>
-          </View>
-        </Card>
+        <EmptyState
+          testID="logbook-empty"
+          title={t('logbook.emptyTitle')}
+          body={t('logbook.emptyBody')}
+          actionLabel={t('logbook.emptyAction')}
+          onAction={() => router.push({ pathname: '/record-service', params: { id } })}
+          secondaryActionLabel={t('logbook.mileageAction')}
+          onSecondaryAction={() => router.push({ pathname: '/mileage', params: { id } })}
+        />
       ) : null}
 
-      <View style={{ gap: theme.spacing.md }}>
-        {events.map((event) => {
-          const recordedLater =
-            new Date(event.recordedAt).getTime() - new Date(event.occurredAt).getTime() >
-            60 * 60 * 1000;
+      {groups.map((group) => (
+        <View key={group.year} style={{ gap: theme.spacing.sm }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: theme.spacing.sm,
+            }}
+          >
+            <Text variant="heading">{group.year}</Text>
+            <Text variant="caption" tone="subtle">
+              {t('logbook.yearSummary', {
+                count: group.events.length,
+                verified: group.verified,
+              })}
+            </Text>
+          </View>
 
-          return (
-            <Card key={event.id} testID={`event-${event.id}`}>
-              <View style={{ gap: theme.spacing.sm }}>
-                <ProvenanceBadge
-                  provenance={event.provenance}
-                  label={t(PROVENANCE_LABEL_KEY[event.provenance])}
-                />
+          {group.events.map((event) => {
+            const recordedLater =
+              new Date(event.recordedAt).getTime() - new Date(event.occurredAt).getTime() >
+              60 * 60 * 1000;
 
-                <Text variant="bodyStrong">{isArabic ? event.summaryAr : event.summaryEn}</Text>
+            return (
+              <Card
+                key={event.id}
+                testID={`event-${event.id}`}
+                onPress={() =>
+                  router.push({ pathname: '/event', params: { id, eventId: event.id } })
+                }
+                accessibilityLabel={isArabic ? event.summaryAr : event.summaryEn}
+              >
+                <View style={{ gap: theme.spacing.sm }}>
+                  <ProvenanceBadge
+                    provenance={event.provenance}
+                    label={t(PROVENANCE_LABEL_KEY[event.provenance])}
+                  />
 
-                <View style={{ gap: theme.spacing.xs }}>
-                  <Text variant="caption" tone="subtle">
-                    {new Date(event.occurredAt).toLocaleDateString(isArabic ? 'ar-SA' : 'en-GB')}
-                    {event.mileage !== null
-                      ? ` · ${t('logbook.mileageAt', { mileage: event.mileage })}`
-                      : ''}
-                  </Text>
+                  <Text variant="bodyStrong">{isArabic ? event.summaryAr : event.summaryEn}</Text>
 
-                  {/* ADR-0012: when an event was recorded materially later than
-                      it happened, say so rather than implying live capture. */}
-                  {recordedLater ? (
+                  <View style={{ gap: theme.spacing.xs }}>
                     <Text variant="caption" tone="subtle">
-                      {t('logbook.recordedLater')}
+                      {new Date(event.occurredAt).toLocaleDateString(isArabic ? 'ar-SA' : 'en-GB')}
+                      {event.mileage !== null
+                        ? ` · ${t('logbook.mileageAt', { mileage: event.mileage })}`
+                        : ''}
                     </Text>
-                  ) : null}
+
+                    {/* ADR-0012: when an event was recorded materially later than
+                        it happened, say so rather than implying live capture. */}
+                    {recordedLater ? (
+                      <Text variant="caption" tone="subtle">
+                        {t('logbook.recordedLater')}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-            </Card>
-          );
-        })}
-      </View>
+              </Card>
+            );
+          })}
+        </View>
+      ))}
 
       <Button
         testID="record-service"
         label={t('logbook.addRecord')}
         variant={events.length === 0 ? 'primary' : 'secondary'}
         onPress={() => router.push({ pathname: '/record-service', params: { id } })}
+      />
+
+      <Button
+        testID="open-mileage"
+        label={t('logbook.mileageAction')}
+        variant="secondary"
+        onPress={() => router.push({ pathname: '/mileage', params: { id } })}
       />
 
       {/* تقرير هبّة is only meaningful once there is history to report on. */}

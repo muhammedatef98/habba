@@ -32,6 +32,7 @@ import type {
   ProviderApplicationInput,
   ProviderSummary,
   Service,
+  TimelineAttachment,
   TimelineEvent,
   UserRole,
   Vehicle,
@@ -51,6 +52,13 @@ export interface PastServiceInput {
   readonly occurredAt: Date;
   readonly mileage?: number | undefined;
   readonly details?: Readonly<Record<string, unknown>> | undefined;
+  /**
+   * Photos and receipts. These are not decoration: an entry with an attachment
+   * is `self_documented` rather than `self_reported` (ADR-0005), which is a
+   * real difference on the report a buyer reads. The server derives that — the
+   * client cannot ask for a trust level.
+   */
+  readonly attachments?: readonly TimelineAttachment[] | undefined;
 }
 
 export interface Repository {
@@ -550,6 +558,8 @@ export class InMemoryRepository implements Repository {
         provenance: 'habba_verified',
         summaryAr: 'تم تسجيل السيارة في هبّة',
         summaryEn: 'Vehicle registered with Habba',
+      details: {},
+      attachments: [],
       },
     ]);
 
@@ -610,9 +620,12 @@ export class InMemoryRepository implements Repository {
     const events = this.timeline.get(input.vehicleId) ?? [];
     const now = new Date().toISOString();
 
-    // Mirrors derive_timeline_provenance: no order, no attachments here, so
-    // always self_reported. The stub must not be more generous than the
-    // database or the UI learns the wrong lesson.
+    // Mirrors derive_timeline_provenance exactly: with no order attached, an
+    // entry is self_documented when the owner attached evidence and
+    // self_reported when they did not. The stub must not be more generous than
+    // the database, or the UI learns a trust level production will not give it.
+    const attachments = input.attachments ?? [];
+
     events.push({
       id: `evt-${input.vehicleId}-${events.length + 1}`,
       vehicleId: input.vehicleId,
@@ -620,9 +633,11 @@ export class InMemoryRepository implements Repository {
       occurredAt: input.occurredAt.toISOString(),
       recordedAt: now,
       mileage: input.mileage ?? null,
-      provenance: 'self_reported',
+      provenance: attachments.length > 0 ? 'self_documented' : 'self_reported',
       summaryAr: input.summaryAr,
       summaryEn: input.summaryAr,
+      details: input.details ?? {},
+      attachments,
     });
 
     this.timeline.set(input.vehicleId, events);
@@ -647,6 +662,8 @@ export class InMemoryRepository implements Repository {
       provenance: 'self_reported',
       summaryAr: `قراءة العداد: ${mileage} كم`,
       summaryEn: `Mileage reading: ${mileage} km`,
+      details: {},
+      attachments: [],
     });
 
     this.timeline.set(vehicleId, events);
@@ -711,6 +728,8 @@ export class InMemoryRepository implements Repository {
       provenance: 'habba_verified',
       summaryAr: 'صيانة طارئة عبر هبّة',
       summaryEn: 'Emergency service via Habba',
+      details: {},
+      attachments: [],
     });
     this.timeline.set(order.vehicleId, events);
   }

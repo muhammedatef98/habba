@@ -50,6 +50,13 @@ export interface Vehicle {
   readonly currentMileage: number;
 }
 
+/** One attachment on a timeline event: a photo, an invoice, a report. */
+export interface TimelineAttachment {
+  readonly url: string;
+  readonly kind: string;
+  readonly caption?: string | undefined;
+}
+
 export interface TimelineEvent {
   readonly id: string;
   readonly vehicleId: string;
@@ -60,6 +67,20 @@ export interface TimelineEvent {
   readonly provenance: Provenance;
   readonly summaryAr: string;
   readonly summaryEn: string;
+  /**
+   * The structured record behind the summary: oil grade, part numbers, cost.
+   * Free-form because the server stores it as jsonb and different event types
+   * carry different keys — the detail screen renders what is there rather than
+   * assuming a shape.
+   */
+  readonly details: Readonly<Record<string, unknown>>;
+  readonly attachments: readonly TimelineAttachment[];
+}
+
+/** A part replaced during a service, as entered by the owner. */
+export interface PastServicePart {
+  readonly nameAr: string;
+  readonly partNumber?: string | undefined;
 }
 
 export interface Profile {
