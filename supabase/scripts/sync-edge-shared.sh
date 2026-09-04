@@ -20,7 +20,7 @@ MODE="${1:-write}"
 generate() {
   printf '%s\n' \
     '// GENERATED FILE — DO NOT EDIT.' \
-    '// Source: packages/core/src/report/{types,render}.ts' \
+    '// Source: packages/core/src/report/{types,qr,render}.ts' \
     '// Regenerate: ./supabase/scripts/sync-edge-shared.sh' \
     '//' \
     '// Edge Functions run on Deno and cannot import pnpm workspace packages, so' \
@@ -28,10 +28,12 @@ generate() {
     '// fails the build rather than quietly shipping a stale report layout.' \
     ''
 
-  # The two modules are concatenated, so the cross-import between them goes.
+  # The three modules are concatenated, so the cross-imports between them go.
   grep -v "^import .*'\./types\.js';$" "$SRC/types.ts"
   printf '\n'
-  grep -v "^import .*'\./types\.js';$" "$SRC/render.ts"
+  cat "$SRC/qr.ts"
+  printf '\n'
+  grep -vE "^import .*'\./(types|qr)\.js';$" "$SRC/render.ts"
 }
 
 mkdir -p "$(dirname "$DEST")"
