@@ -14,6 +14,7 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Icon, useTheme } from '@habba/ui';
+import { HabbaTabBar } from '@/components/HabbaTabBar';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -21,6 +22,11 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      // Drawn by us so the order follows the locale rather than the platform's
+      // RTL flag, which lags it by a restart and never flips at all in Expo Go
+      // (src/components/HabbaTabBar.tsx). The screens below stay static —
+      // Expo Router registers the routes from that list.
+      tabBar={(props) => <HabbaTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
