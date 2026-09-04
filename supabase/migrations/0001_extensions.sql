@@ -13,6 +13,36 @@
 create schema if not exists extensions;
 create extension if not exists postgis with schema extensions;
 
+-- `if not exists` is a NO-OP when PostGIS is already installed SOMEWHERE ELSE,
+-- and it does not warn. The schema clause is then silently ignored, and the
+-- first failure is `type "extensions.geography" does not exist` three
+-- migrations later in 0004 — which reads like a broken migration rather than a
+-- misconfigured database.
+--
+-- That is not hypothetical: the CI image (postgis/postgis) pre-installs PostGIS
+-- into `public`, and this is exactly how it failed. PostGIS cannot be moved
+-- afterwards (`ALTER EXTENSION postgis SET SCHEMA` → "does not support SET
+-- SCHEMA"), so the only honest response is to refuse here and say what to do.
+do $$
+declare
+  v_schema text;
+begin
+  select n.nspname into v_schema
+  from pg_extension e
+  join pg_namespace n on n.oid = e.extnamespace
+  where e.extname = 'postgis';
+
+  if v_schema is distinct from 'extensions' then
+    raise exception
+      'PostGIS is installed in schema "%", but Habba requires it in "extensions".', v_schema
+      using hint =
+        'Every geography column and every SECURITY DEFINER function schema-qualifies '
+        'extensions.* (search_path is empty — ADR-0003), so the schema is load-bearing. '
+        'On a fresh database: DROP EXTENSION postgis CASCADE, then re-run this migration. '
+        'On Supabase, enable PostGIS from Database > Extensions, which installs it into extensions.';
+  end if;
+end $$;
+
 grant usage on schema extensions to anon, authenticated, service_role;
 
 -- gen_random_uuid() is core since Postgres 13, but Supabase enables pgcrypto

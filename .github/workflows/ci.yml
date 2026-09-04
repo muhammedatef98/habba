@@ -75,6 +75,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
+      # The postgis/postgis image pre-installs PostGIS into `public`, but every
+      # geography column and every SECURITY DEFINER function here qualifies
+      # `extensions.*` (search_path is empty — ADR-0003). PostGIS cannot be
+      # relocated after the fact, so the extension is dropped and 0001 installs
+      # it where it belongs. 0001 refuses to continue if this is skipped.
+      - name: Put PostGIS in the extensions schema
+        run: psql -v ON_ERROR_STOP=1 -c "drop extension if exists postgis cascade"
+
       - name: Apply shim and migrations
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/scripts/supabase_shim.sql
