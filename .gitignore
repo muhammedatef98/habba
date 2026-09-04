@@ -35,3 +35,6 @@ supabase/.tmp/
 
 # Integration test artifacts (rendered report pages)
 .tmp/
+
+# Output of the CI bundle check (pnpm bundle)
+.expo-bundle-check/

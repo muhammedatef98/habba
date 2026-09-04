@@ -37,6 +37,15 @@ jobs:
       - name: Unit tests
         run: pnpm -r test
 
+      # The gap every other step in this job leaves open. Typecheck resolves
+      # types, lint reads syntax, and the unit tests only ever load pure
+      # modules — none of them ever asks Metro to build the app. A missing
+      # native dependency, an unresolvable import or a broken asset therefore
+      # passes all of them and fails on the first device that opens the app.
+      # `expo export` is the cheapest thing that actually bundles.
+      - name: Bundle both apps
+        run: pnpm bundle
+
   database:
     name: Migrations, RLS, hash chain
     runs-on: ubuntu-latest

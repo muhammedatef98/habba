@@ -14,6 +14,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\"",
     "test": "pnpm -r --parallel test",
+    "bundle": "pnpm --filter @habba/customer exec expo export --platform ios --output-dir .expo-bundle-check && pnpm --filter @habba/provider exec expo export --platform ios --output-dir .expo-bundle-check",
     "db:start": "./supabase/scripts/local-db.sh start",
     "db:stop": "./supabase/scripts/local-db.sh stop",
     "db:reset": "./supabase/scripts/local-db.sh reset",
@@ -22,7 +23,7 @@
     "api:start": "./supabase/scripts/postgrest.sh start",
     "api:stop": "./supabase/scripts/postgrest.sh stop",
     "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/customer exec vitest run src/data/",
-    "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm db:test && pnpm test:integration"
+    "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm bundle && pnpm db:test && pnpm test:integration"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
