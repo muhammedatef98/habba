@@ -258,6 +258,8 @@ token pair with the contrast test extended to all three provenance levels.
 
 ## 9. Open decisions — these block real work
 
+> Also summarised, with what each one blocks per phase, in `docs/ROADMAP.md`.
+
 | #   | Decision                                                             | Blocks                                                                                                                                                              |
 | --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **ADR-0008 — payments / merchant of record / SAMA**                  | Anything that moves real money. `authorise_order_payment` / `capture_order_payment` are the interface; the PSP behind them is unchosen                              |

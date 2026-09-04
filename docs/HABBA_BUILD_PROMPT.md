@@ -927,6 +927,8 @@ check. Requirements that are part of the build, not deployment trivia:
 ## 10. PHASED BUILD — ISSUE ONE PHASE AT A TIME
 
 > Do not start a phase before the previous one's acceptance criteria pass.
+> Current status against these phases lives in `docs/ROADMAP.md`; this section
+> is the specification, that file is the status view over it.
 
 ### PHASE 1 — Foundation
 
