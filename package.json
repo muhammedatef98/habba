@@ -21,7 +21,7 @@
     "db:test": "./supabase/scripts/local-db.sh test",
     "api:start": "./supabase/scripts/postgrest.sh start",
     "api:stop": "./supabase/scripts/postgrest.sh stop",
-    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/customer exec vitest run src/data/",
+    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features",
     "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm db:test && pnpm test:integration"
   },
   "devDependencies": {

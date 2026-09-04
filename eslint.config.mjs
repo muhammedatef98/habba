@@ -41,6 +41,83 @@ export default tseslint.config(
     files: ['**/*.config.{js,mjs,ts}', '**/scripts/**/*.{js,mjs,ts}'],
     rules: { 'no-console': 'off' },
   },
+
+  // -------------------------------------------------------------------------
+  // Feature boundaries inside the single mobile app (CLAUDE.md §5.1.5)
+  // -------------------------------------------------------------------------
+  // One app is a shipping decision, not an architectural excuse. Customer and
+  // provider code must not reach into each other; anything genuinely common
+  // moves to shared/ deliberately, rather than by whoever imported it first.
+  //
+  // Written with no-restricted-imports rather than eslint-plugin-boundaries:
+  // the rule is two lines of path patterns, and it is an error (not a warning),
+  // so `pnpm lint` — and therefore CI — fails on a cross-import.
+  {
+    files: [
+      'apps/mobile/src/features/customer/**/*.{ts,tsx}',
+      'apps/mobile/app/(customer)/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/features/provider/*', '@/features/provider/**', '**/features/provider/**'],
+              message:
+                'Customer code must not import provider code (§5.1.5). Move what both need into features/shared.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'apps/mobile/src/features/provider/**/*.{ts,tsx}',
+      'apps/mobile/app/(provider)/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/features/customer/*', '@/features/customer/**', '**/features/customer/**'],
+              message:
+                'Provider code must not import customer code (§5.1.5). Move what both need into features/shared.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // shared/ is imported by both, so it may depend on neither. Without this
+    // the rule above is trivially defeated: customer → shared → provider.
+    files: ['apps/mobile/src/features/shared/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@/features/customer/*',
+                '@/features/customer/**',
+                '@/features/provider/*',
+                '@/features/provider/**',
+                '**/features/customer/**',
+                '**/features/provider/**',
+              ],
+              message:
+                'shared/ is the common floor (§5.1.5). It must not depend on customer or provider code.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     // Metro reads its config with `require`, so these files are CommonJS and
     // run in Node — not app code. `require`, `module` and `__dirname` are

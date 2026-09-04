@@ -285,6 +285,51 @@
     "stillNeeded": "Still needed:",
     "gapMileage": "Odometer reading",
     "gapBefore": "Photo before the work",
-    "gapAfter": "Photo after the work"
+    "gapAfter": "Photo after the work",
+    "upgrade": {
+      "cardTitle": "Work with us as a technician",
+      "cardBody": "Experienced with cars? Submit your details and start taking jobs once verified.",
+      "cta": "Work with us as a technician",
+      "title": "Register as a provider",
+      "subtitle": "Your account stays the same, and so do your vehicles and their logbooks. Technician mode is added once your details are verified.",
+      "typeIndividual": "Mobile technician",
+      "typeWorkshop": "Workshop",
+      "nameLabel": "Business name",
+      "cityLabel": "City",
+      "nationalIdLabel": "National ID or Iqama",
+      "nationalIdHint": "10 digits starting with 1 (ID) or 2 (Iqama).",
+      "ibanLabel": "IBAN",
+      "ibanHint": "Starts with SA, 24 characters. Payouts go here.",
+      "nafathNote": "Nafath verification is required before approval and will be requested in a later step.",
+      "submit": "Submit application",
+      "submittedTitle": "We have your application",
+      "submittedBody": "We are reviewing your details and will be in touch, usually within two working days.",
+      "submittedNote": "Applying is not approval. Technician mode appears in your account only once approved.",
+      "statusNone": "You have not applied yet.",
+      "statusPending": "Your application is waiting to be reviewed.",
+      "statusInReview": "Your application is being reviewed.",
+      "statusApproved": "You are approved. Technician mode is available in your account.",
+      "statusRejected": "Your application was not approved. You can apply again with correct details.",
+      "statusSuspended": "Your provider account is currently suspended. Please contact us.",
+      "errors": {
+        "name": "Enter your business name.",
+        "city": "Choose your city.",
+        "nationalId": "That National ID or Iqama number is not valid.",
+        "iban": "That IBAN is not valid. Check the digits.",
+        "alreadyApplied": "You already have an application in progress.",
+        "submit": "Could not send the application. Check your connection and try again."
+      }
+    }
+  },
+  "profile": {
+    "title": "My account",
+    "unnamed": "Unnamed",
+    "noIdentity": "No phone or email added yet",
+    "myVehicles": "My vehicles",
+    "modeTitle": "Working mode",
+    "modeBody": "One account. Switch between customer and technician whenever you like.",
+    "switchToProvider": "Switch to technician mode",
+    "switchToCustomer": "Switch to customer mode",
+    "signOut": "Sign out"
   }
 }
