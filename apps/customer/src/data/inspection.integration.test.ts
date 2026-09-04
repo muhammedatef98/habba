@@ -90,11 +90,12 @@ beforeAll(async () => {
     .upsert({ id: BUYER_ID, full_name: 'مشتري السيارة', phone: '+966509990001' });
 
   const inspector = clientFor(INSPECTOR_ID);
+  // The technician role comes from approving the providers row below (0040),
+  // never from a field the client sends.
   await inspector.from('profiles').upsert({
     id: INSPECTOR_ID,
     full_name: 'الفاحص المعتمد',
     phone: '+966509990002',
-    role: 'technician',
   });
 
   const cities = await buyer.from('cities').select('id').eq('name_en', 'Riyadh');

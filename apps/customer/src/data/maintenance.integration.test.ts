@@ -104,17 +104,17 @@ beforeAll(async () => {
     .upsert({ id: OWNER_ID, full_name: 'مالك الصيانة', phone: '+966506660001' });
 
   const shop = clientFor(SHOP_ID);
+  // The workshop role follows from approval below, not from this insert (0040).
   await shop.from('profiles').upsert({
     id: SHOP_ID,
     full_name: 'ورشة الصيانة',
     phone: '+966506660002',
-    role: 'workshop_admin',
   });
 
   const ops = clientFor(OPS_ID);
-  await ops
-    .from('profiles')
-    .upsert({ id: OPS_ID, full_name: 'مشغّل', phone: '+966506660003', role: 'ops' });
+  await ops.from('profiles').upsert({ id: OPS_ID, full_name: 'مشغّل', phone: '+966506660003' });
+  // Only the harness shim can grant ops — there is no client path, by design.
+  await ops.rpc('test_grant_role', { p_user_id: OPS_ID, p_role: 'ops' });
 
   const cities = await owner.from('cities').select('id').eq('name_en', 'Riyadh');
   const cityId = (cities.data ?? [])[0]?.id as string;

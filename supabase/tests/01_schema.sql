@@ -9,8 +9,8 @@ begin;
 insert into auth.users (id, phone) values
   ('11111111-1111-1111-1111-111111111111', '+966501111111');
 
-insert into public.profiles (id, role, full_name, phone) values
-  ('11111111-1111-1111-1111-111111111111', 'customer', 'محمد العتيبي', '+966501111111');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-1111-1111-1111-111111111111', 'محمد العتيبي', '+966501111111');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c1111111-1111-1111-1111-111111111111', 'الدمام', 'Dammam', 'المنطقة الشرقية',

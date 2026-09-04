@@ -82,11 +82,12 @@ beforeAll(async () => {
     .upsert({ id: CUSTOMER_ID, full_name: 'عميل الطوارئ', phone: '+966507770001' });
 
   const tech = clientFor(TECH_ID);
+  // No role is declared here, and none could be: the technician role arrives
+  // when the providers row below is approved (migration 0040).
   await tech.from('profiles').upsert({
     id: TECH_ID,
     full_name: 'فنّي الطوارئ',
     phone: '+966507770002',
-    role: 'technician',
   });
 
   const makes = await customer.from('vehicle_makes').select('id').eq('name_en', 'Toyota');

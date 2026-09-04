@@ -82,7 +82,10 @@ jobs:
             echo "  $(basename "$migration")"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
-          psql -v ON_ERROR_STOP=1 -f supabase/seed/seed.sql
+          for seed in supabase/seed/*.sql; do
+            echo "  $(basename "$seed")"
+            psql -v ON_ERROR_STOP=1 -f "$seed"
+          done
 
       - name: Schema, timeline, tamper and RLS suites
         run: |
@@ -122,4 +125,4 @@ jobs:
         # suite is a green build that proved nothing.
         env:
           HABBA_REQUIRE_HARNESS: '1'
-        run: pnpm --filter @habba/customer exec vitest run src/data/supabase-repository.integration.test.ts
+        run: pnpm --filter @habba/mobile exec vitest run src/features
