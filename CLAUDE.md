@@ -1,7 +1,8 @@
 # HABBA (هبّة) — Permanent Project Context
 
 > **This file is the permanent context for the Habba project.**
-> It contains Sections 0–5 of `HABBA_BUILD_PROMPT.md` (Mission → Domain Glossary), verbatim.
+> It contains Sections 0–5.1 of `HABBA_BUILD_PROMPT.md` (Mission → App Topology), verbatim.
+> §5.1 carries Amendments A (single app, multiple roles) and B (admin stays separate).
 > **Re-read this file at the start of every session before doing anything else.**
 > Sections 6–12 of the build prompt (data model, algorithms, design system, app surfaces,
 > phased build, anti-goals, definition of done) are issued **one phase at a time** and are not
@@ -71,6 +72,8 @@ Every single interaction writes to it:
 6. **Every mutation is auditable.** `created_at`, `updated_at`, `created_by` on everything.
 7. **Offline-tolerant.** A technician in a basement parking garage must still be able to complete a job; queue and sync.
 8. **TypeScript `strict: true`.** No `any`. No `@ts-ignore` without a written reason.
+9. **Roles are server-side facts, not client state.** One app serves customers and providers (§5.1); what a user may _do_ is decided by `user_roles` and RLS. The client's role knowledge decides only what it renders.
+10. **Ops code never ships to a phone.** Admin is a separate web app. A role check is not a boundary; a separate bundle is.
 
 ---
 
@@ -100,11 +103,14 @@ Monorepo        pnpm workspaces
 
 ```
 habba/
-├─ CLAUDE.md                    ← this document, sections 0–5
+├─ CLAUDE.md                    ← this document, sections 0–5.1
 ├─ apps/
-│  ├─ customer/                 Expo app — vehicle owners
-│  ├─ provider/                 Expo app — technicians & workshop staff
-│  └─ admin/                    Next.js — ops dashboard
+│  ├─ mobile/                   Expo app — ONE app, customers and providers
+│  │  └─ src/features/
+│  │     ├─ customer/           customer-only screens, hooks, data
+│  │     ├─ provider/           provider-only screens, hooks, data
+│  │     └─ shared/             anything used by both
+│  └─ admin/                    Next.js — ops dashboard (web only, never bundled into mobile)
 ├─ packages/
 │  ├─ core/                     shared types, zod schemas, order state machine
 │  ├─ ui/                       design system (Section 8)
@@ -145,6 +151,100 @@ Use these exact terms in UI copy. Use the English identifiers in code.
 - National ID (هوية): 10 digits starting with `1`. Iqama (إقامة): 10 digits starting with `2`.
 - VAT: 15%. VAT number: 15 digits starting and ending with `3`.
 - Support **Hijri dates** in display alongside Gregorian.
+
+---
+
+## 5.1 APP TOPOLOGY — ONE MOBILE APP, MANY ROLES
+
+> **Amendment A + B.** This supersedes any earlier statement that customers and
+> providers get separate mobile apps.
+
+### 5.1.1 One app, one account, many roles
+
+There is **one** mobile app: `apps/mobile`. It serves vehicle owners and
+providers alike. One account per phone number, holding zero or more roles.
+
+- Everyone signs up as `customer`. **Signup asks no role question** — there is no
+  "are you a customer or a technician?" screen, ever.
+- `provider` is granted **only** when that user's `providers` record reaches
+  `verification_status = 'approved'`. It is never self-selected and never
+  granted by the client.
+- Becoming a provider is an **in-app upgrade** from the profile screen:
+  **«اشتغل معنا كفنّي»** → KYC (هوية/إقامة, IBAN, Nafath) → review → approval.
+  The user keeps their account, their vehicles, and their logbook throughout.
+- A user may hold both roles at once and switch between them. That is the normal
+  case, not an edge case: a technician owns a car too.
+
+### 5.1.2 Roles live in a join table, never in a column
+
+`profiles.role` (a single enum column) is **replaced** by:
+
+```sql
+user_roles(user_id, role, granted_at, revoked_at, granted_by)
+```
+
+A role is held when a row exists for it with `revoked_at is null`. Revocation is
+a timestamp, never a `DELETE` — role history is auditable like everything else
+(§2.6). Every RLS policy, helper function and trigger that referenced
+`profiles.role` must be rewritten against `user_roles`.
+
+### 5.1.3 Roles are enforced on the server. Always.
+
+**The client's opinion about its own roles is worthless.** It exists only to
+decide what to render.
+
+- RLS checks for an **approved provider record**, not a claim in a JWT, a
+  request body, or a column the user can write.
+- A customer-only user must be unable to read `orders` in `searching`,
+  `provider_locations`, `payouts`, or any earnings surface — **even with a
+  hand-crafted request** that bypasses the app entirely.
+- Prove it in `tests/rls.spec.ts`. A role check that only exists in TypeScript
+  is not a role check.
+
+### 5.1.4 Routing and the mode switcher
+
+Expo Router route groups: `(customer)` and `(provider)`.
+
+- The mode switcher is visible **only** to users holding an approved `provider`
+  role. A customer-only user must never see the switcher, a provider tab, or any
+  provider UI.
+- The last active mode is persisted and restored on launch.
+- Switching mode changes which route group is mounted. It does not re-authenticate
+  and does not change the user's identity.
+
+### 5.1.5 Code separation despite the single app
+
+One app is a shipping decision, not an architectural excuse.
+
+```
+apps/mobile/src/features/customer/**
+apps/mobile/src/features/provider/**
+apps/mobile/src/features/shared/**
+```
+
+- `customer/**` and `provider/**` **must never import from each other.**
+- Only `shared/**` may be imported by both.
+- Enforce with ESLint (`eslint-plugin-boundaries`, or `no-restricted-imports`
+  with path patterns). **This must fail CI**, not merely warn.
+
+### 5.1.6 Admin stays a separate web app — non-negotiable
+
+`apps/admin` is a Next.js **web** app and stays one. Ops functionality is never
+merged into `apps/mobile`, not even behind a role check: code behind a role check
+still ships to every user's device, where it can be read and probed.
+
+- Runs locally in development and deploys to Vercel **with zero code changes** —
+  the only difference is environment variables. No hardcoded URLs, no hardcoded
+  keys, no `if (production)` branches.
+- `SUPABASE_SERVICE_ROLE_KEY` is **server-only**: route handlers and server
+  components exclusively. Never in a client component, never prefixed
+  `NEXT_PUBLIC_`. A CI check fails the build if it appears anywhere reachable
+  from the client bundle.
+- **2FA is mandatory** on admin accounts. Sessions expire after **8 hours**.
+  There is no "remember me".
+- Every admin action writes an immutable audit row:
+  `audit_log(actor_id, action, target_table, target_id, before, after, ip, at)`.
+- `apps/admin/README.md` documents local setup and Vercel deployment.
 
 ---
 

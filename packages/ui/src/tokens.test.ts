@@ -65,8 +65,14 @@ describe('colour contrast (WCAG 2.2)', () => {
       // What this test guards is that neither becomes unreadable.
       expect(contrast(colors.verified, colors.verifiedSubtle)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(colors.selfReported, colors.selfReportedSubtle)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colors.selfDocumented, colors.selfDocumentedSubtle)).toBeGreaterThanOrEqual(
+        4.5,
+      );
       expect(colors.verified).not.toBe(colors.selfReported);
       expect(colors.verifiedSubtle).not.toBe(colors.selfReportedSubtle);
+      // Three levels, three appearances. Two of them looking identical would
+      // make the badge decorative.
+      expect(new Set([colors.verified, colors.selfReported, colors.selfDocumented]).size).toBe(3);
     },
   );
 });

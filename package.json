@@ -14,7 +14,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\"",
     "test": "pnpm -r --parallel test",
-    "bundle": "pnpm --filter @habba/customer exec expo export --platform ios --output-dir .expo-bundle-check && pnpm --filter @habba/provider exec expo export --platform ios --output-dir .expo-bundle-check",
+    "bundle": "pnpm --filter @habba/mobile exec expo export --platform ios --output-dir .expo-bundle-check",
     "db:start": "./supabase/scripts/local-db.sh start",
     "db:stop": "./supabase/scripts/local-db.sh stop",
     "db:reset": "./supabase/scripts/local-db.sh reset",
@@ -22,11 +22,13 @@
     "db:test": "./supabase/scripts/local-db.sh test",
     "api:start": "./supabase/scripts/postgrest.sh start",
     "api:stop": "./supabase/scripts/postgrest.sh stop",
-    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/customer exec vitest run src/data/",
-    "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm bundle && pnpm db:test && pnpm test:integration"
+    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features && pnpm test:rls",
+    "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm bundle && pnpm db:test && pnpm test:integration",
+    "test:rls": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@supabase/supabase-js": "^2.112.4",
     "eslint": "^9.39.1",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",

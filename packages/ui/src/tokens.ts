@@ -157,6 +157,14 @@ export interface ColorScheme {
   readonly verifiedSubtle: string;
   readonly selfReported: string;
   readonly selfReportedSubtle: string;
+  /**
+   * Owner-entered WITH evidence attached. A distinct level, not a shade of
+   * self-reported: a photographed invoice is worth more to a buyer than a
+   * recollection, and ADR-0005 gives it its own provenance value — so it gets
+   * its own colour rather than borrowing one.
+   */
+  readonly selfDocumented: string;
+  readonly selfDocumentedSubtle: string;
 
   readonly focusRing: string;
   readonly overlay: string;
@@ -219,6 +227,10 @@ export const lightColors: ColorScheme = {
   // under the 4.5:1 floor. Caught by tokens.test.ts.
   selfReported: light.inkMuted,
   selfReportedSubtle: light.sunken,
+  // Sand rather than another neutral: it reads as "the owner did something"
+  // without borrowing the petrol that means "Habba stands behind this".
+  selfDocumented: sand[700],
+  selfDocumentedSubtle: sand[50],
 
   focusRing: petrol[400],
   overlay: 'rgba(20, 32, 31, 0.55)',
@@ -278,6 +290,10 @@ export const darkColors: ColorScheme = {
   verifiedSubtle: '#123634',
   selfReported: dark.inkMuted,
   selfReportedSubtle: dark.sunken,
+  // The sand pair, on the tinted dark surfaces this theme actually uses —
+  // sand[300] and sand[900] do not exist in this palette.
+  selfDocumented: sand[400],
+  selfDocumentedSubtle: '#33260F',
 
   focusRing: petrol[300],
   overlay: 'rgba(4, 33, 31, 0.70)',

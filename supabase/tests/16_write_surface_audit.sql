@@ -108,7 +108,9 @@ select test.assert_eq(
 -- reminder to guard it there too.
 create temporary table sensitive_columns (table_name text, column_name text) on commit drop;
 insert into sensitive_columns values
-  ('profiles', 'role'),                    -- escalation to ops
+  -- profiles.role is gone (0040). Escalation now aims at user_roles, which is
+  -- checked below as a whole table rather than column by column: it has no
+  -- write policy at all, so there is no column on it a client may set.
   ('profiles', 'phone_verified'),
   ('orders', 'escrow_status'),             -- declaring yourself paid
   ('orders', 'payment_intent_id'),
@@ -139,6 +141,37 @@ select test.assert_eq(
    where s.table_name not in (select table_name from expected_guarded)),
   '(none)',
   'every table holding a sensitive column is classified as guarded');
+
+
+-- 5. user_roles is closed to clients entirely (0040) ----------------------------
+-- The strongest form of the answer: not "which columns may be written" but
+-- "none, by anyone holding a client role". Asserted three ways, matching the
+-- three layers the migration builds.
+select test.assert_eq(
+  (select coalesce(string_agg(p.polname, ', '), '(none)')
+   from pg_policy p
+   join pg_class c on c.oid = p.polrelid
+   join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'user_roles' and p.polcmd in ('*', 'w', 'a', 'd')),
+  '(none)',
+  'user_roles exposes no write policy');
+
+select test.assert_eq(
+  (select coalesce(string_agg(distinct privilege_type, ', ' order by privilege_type), '(none)')
+   from information_schema.role_table_grants
+   where table_schema = 'public' and table_name = 'user_roles'
+     and grantee in ('anon', 'authenticated')
+     and privilege_type in ('INSERT', 'UPDATE', 'DELETE')),
+  '(none)',
+  'and no write grant to anon or authenticated');
+
+select test.assert(
+  (select tg.tgenabled = 'A' from pg_trigger tg
+   join pg_class c on c.oid = tg.tgrelid
+   join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'user_roles'
+     and tg.tgname = 'user_roles_guard_writes'),
+  'and its guard is ENABLE ALWAYS, so a leaked service key cannot write either');
 
 
 -- 5. Append-only tables have no client write path --------------------------------

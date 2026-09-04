@@ -68,9 +68,11 @@ SERVICE_ID=$("${PSQL[@]}" -c "select id from public.services where name_en = 'Oi
 "${PSQL[@]}" >/dev/null <<SQL
   insert into auth.users (id, phone) values
     ('${OWNER}', '+966508880001'), ('${SHOP_OWNER}', '+966508880002');
-  insert into public.profiles (id, full_name, phone, role) values
-    ('${OWNER}', 'عميل التزامن', '+966508880001', 'customer'),
-    ('${SHOP_OWNER}', 'ورشة التزامن', '+966508880002', 'workshop_admin');
+  insert into public.profiles (id, full_name, phone) values
+    ('${OWNER}', 'عميل التزامن', '+966508880001'),
+    ('${SHOP_OWNER}', 'ورشة التزامن', '+966508880002');
+  -- The workshop role follows from the approved providers row below (0040);
+  -- nothing here declares it.
   insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid)
     values ('${CITY}', 'مدينة اختبار', 'SlotCity', 'منطقة', 'Region',
             extensions.st_point(46.6753, 24.7136)::extensions.geography);

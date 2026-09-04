@@ -13,9 +13,11 @@ insert into auth.users (id, phone) values
   ('11111111-0000-4000-a000-000000000001', '+966503000001'),
   ('22222222-0000-4000-a000-000000000002', '+966503000002');
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-a000-000000000001', 'العميل', '+966503000001', 'customer'),
-  ('22222222-0000-4000-a000-000000000002', 'الورشة', '+966503000002', 'workshop_admin');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-a000-000000000001', 'العميل', '+966503000001'),
+  ('22222222-0000-4000-a000-000000000002', 'الورشة', '+966503000002');
+
+select test.grant_role('22222222-0000-4000-a000-000000000002', 'workshop_admin');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-a000-000000000001', 'الرياض', 'RiyadhSched', 'منطقة الرياض',

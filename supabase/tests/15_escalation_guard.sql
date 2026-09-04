@@ -13,9 +13,11 @@ insert into auth.users (id, phone) values
   ('11111111-0000-4000-3333-000000000001', '+966509200001'),
   ('22222222-0000-4000-3333-000000000002', '+966509200002');
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-3333-000000000001', 'المالك', '+966509200001', 'customer'),
-  ('22222222-0000-4000-3333-000000000002', 'الورشة', '+966509200002', 'workshop_admin');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-3333-000000000001', 'المالك', '+966509200001'),
+  ('22222222-0000-4000-3333-000000000002', 'الورشة', '+966509200002');
+
+select test.grant_role('22222222-0000-4000-3333-000000000002', 'workshop_admin');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-3333-000000000001', 'ر', 'CityEsc', 'ر', 'R',
@@ -48,25 +50,52 @@ select test.become('11111111-0000-4000-3333-000000000001');
 -- ===========================================================================
 
 -- THE escalation. Everything in 0033–0035 depended on this being impossible,
--- and until 0036 it was not.
+-- and until 0036 it was not. 0040 moved roles out of profiles entirely, so the
+-- same attack is now aimed at user_roles — and has to fail there too, or the
+-- move traded one hole for another.
 select test.assert_raises(
-  $$update public.profiles set role = 'ops'
-    where id = '11111111-0000-4000-3333-000000000001'$$,
-  'a customer CANNOT promote themselves to ops',
+  $$insert into public.user_roles (user_id, role)
+    values ('11111111-0000-4000-3333-000000000001', 'ops')$$,
+  'a customer CANNOT grant themselves ops',
   '42501');
-
-select test.assert_eq(
-  (select role from public.profiles where id = '11111111-0000-4000-3333-000000000001'),
-  'customer'::user_role, 'the role is unchanged after the attempt');
 
 select test.assert(not public.is_ops(), 'is_ops() is still false');
 
--- Nor to any other role: technician would grant provider-side capabilities.
+-- Nor a provider role: technician would unlock the provider surface (§5.1.3).
 select test.assert_raises(
-  $$update public.profiles set role = 'technician'
-    where id = '11111111-0000-4000-3333-000000000001'$$,
-  'a customer cannot assign themselves any other role either',
+  $$insert into public.user_roles (user_id, role)
+    values ('11111111-0000-4000-3333-000000000001', 'technician')$$,
+  'a customer cannot grant themselves any other role either',
   '42501');
+
+select test.assert(not public.is_provider(), 'is_provider() is still false');
+
+-- Nor revoke someone else's, which would be a denial of service against a
+-- working technician.
+select test.assert_raises(
+  $$update public.user_roles set revoked_at = now()
+    where user_id = '22222222-0000-4000-3333-000000000002'$$,
+  'a customer cannot revoke another user''s role',
+  '42501');
+
+-- Nor delete the history, which is what makes a grant auditable at all.
+select test.assert_raises(
+  $$delete from public.user_roles
+    where user_id = '11111111-0000-4000-3333-000000000001'$$,
+  'a customer cannot delete role history',
+  '42501');
+
+select test.assert_eq(
+  (select count(*)::int from public.user_roles
+   where user_id = '11111111-0000-4000-3333-000000000001' and revoked_at is null),
+  1, 'the customer still holds exactly one role after every attempt');
+
+-- The role column is gone, so the 0036-era attack no longer even parses.
+select test.assert_raises(
+  $$update public.profiles set role = 'ops'
+    where id = '11111111-0000-4000-3333-000000000001'$$,
+  'profiles.role no longer exists to be written',
+  '42703');
 
 -- Nor claim their number is verified.
 select test.assert_raises(

@@ -131,6 +131,29 @@ $$;
 
 grant execute on function public.test_approve_provider(uuid) to authenticated;
 
+-- Stands in for the ops console granting a role (0040). Roles are never
+-- client-settable — user_roles has no write policy and grant_user_role() is
+-- revoked from authenticated — so a test that needs an operator has no other
+-- way to make one.
+--
+-- ⚠️ LOCAL ONLY, same as above. If this ever reached a migration it would BE
+-- the privilege escalation that 0036 and 0040 exist to prevent.
+-- p_role is text, not public.user_role: the shim is applied BEFORE the
+-- migrations, so the enum does not exist yet when this signature is parsed.
+-- The plpgsql body is resolved lazily, so the cast inside is fine.
+create or replace function public.test_grant_role(p_user_id uuid, p_role text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.grant_user_role(p_user_id, p_role::public.user_role, null);
+end;
+$$;
+
+grant execute on function public.test_grant_role(uuid, text) to authenticated;
+
 -- Match Supabase's default grants: tables are reachable, and RLS decides.
 alter default privileges in schema public
   grant select, insert, update, delete on tables to authenticated;

@@ -114,13 +114,28 @@ Native modules are the same story: Expo Go carries a fixed set, so anything
 outside it only works in a build of your own.
 
 ```bash
-cd apps/customer
+cd apps/mobile
 pnpm build:preview
 ```
 
 First time on a machine: `npx eas login`, then `npx eas init` inside the app
 directory to create the project. The `preview` profile produces an installable
 APK on Android and a simulator build on iOS.
+
+---
+
+## One app, not two
+
+There is one mobile app: `apps/mobile` (CLAUDE.md §5.1). It serves vehicle
+owners and providers from one binary and one account. Signup never asks which
+one you are, and `ENABLE_PROVIDER_MODE` is off, so the provider group is
+unreachable — `apps/mobile/src/features/shared/access/provider-access.test.ts`
+is what holds that shut, and it reads the screens' source to prove the check is
+still wired, not merely defined.
+
+`customer/**` and `provider/**` must never import from each other; only
+`shared/**` may be imported by both, and the boundaries lint rule fails CI on a
+violation.
 
 ---
 

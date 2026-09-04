@@ -81,13 +81,13 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # An installable build of the customer app, which is the only way to see
-      # this app as its users will: Expo Go cannot apply config plugins, and
-      # `forcesRTL` in app.json is one — so RTL behaves differently there than
-      # it does in anything shipped. See CONTRIBUTING.md.
-      - name: Build customer preview
+      # An installable build of the app, which is the only way to see it as its
+      # users will: Expo Go cannot apply config plugins, and `forcesRTL` in
+      # app.json is one — so RTL behaves differently there than it does in
+      # anything shipped. See CONTRIBUTING.md.
+      - name: Build mobile preview
         if: steps.token.outputs.present == 'true'
-        working-directory: apps/customer
+        working-directory: apps/mobile
         run: eas build --platform android --profile preview --non-interactive --no-wait
 
   database:
@@ -135,7 +135,10 @@ jobs:
             echo "  $(basename "$migration")"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
-          psql -v ON_ERROR_STOP=1 -f supabase/seed/seed.sql
+          for seed in supabase/seed/*.sql; do
+            echo "  $(basename "$seed")"
+            psql -v ON_ERROR_STOP=1 -f "$seed"
+          done
 
       - name: Schema, timeline, tamper and RLS suites
         run: |
@@ -175,4 +178,9 @@ jobs:
         # suite is a green build that proved nothing.
         env:
           HABBA_REQUIRE_HARNESS: '1'
-        run: pnpm --filter @habba/customer exec vitest run src/data/supabase-repository.integration.test.ts
+        run: pnpm --filter @habba/mobile exec vitest run src/features
+
+      - name: RLS suite (raw HTTP, real JWT)
+        env:
+          HABBA_REQUIRE_HARNESS: '1'
+        run: pnpm test:rls

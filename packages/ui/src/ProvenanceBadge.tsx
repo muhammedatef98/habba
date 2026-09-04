@@ -30,6 +30,23 @@ export function isVerifiedProvenance(provenance: Provenance): boolean {
 export function ProvenanceBadge({ provenance, label }: ProvenanceBadgeProps) {
   const theme = useTheme();
   const verified = isVerifiedProvenance(provenance);
+  // Owner-entered WITH evidence is its own level (ADR-0005), so it gets its own
+  // appearance rather than looking like a bare recollection. It sits visually
+  // between the other two: bordered, because something stands behind it, in
+  // sand rather than petrol, because Habba did not do the work.
+  const documented = provenance === 'self_documented' || provenance === 'third_party';
+
+  const foreground = verified
+    ? theme.colors.verified
+    : documented
+      ? theme.colors.selfDocumented
+      : theme.colors.selfReported;
+
+  const background = verified
+    ? theme.colors.verifiedSubtle
+    : documented
+      ? theme.colors.selfDocumentedSubtle
+      : theme.colors.selfReportedSubtle;
 
   return (
     <View
@@ -40,18 +57,12 @@ export function ProvenanceBadge({ provenance, label }: ProvenanceBadgeProps) {
         paddingHorizontal: theme.spacing.sm,
         paddingVertical: theme.spacing.xs,
         borderRadius: theme.radius.full,
-        backgroundColor: verified ? theme.colors.verifiedSubtle : theme.colors.selfReportedSubtle,
-        borderWidth: verified ? 1 : 0,
-        borderColor: verified ? theme.colors.verified : 'transparent',
+        backgroundColor: background,
+        borderWidth: verified || documented ? 1 : 0,
+        borderColor: verified || documented ? foreground : 'transparent',
       }}
     >
-      <Text
-        variant="caption"
-        style={{
-          color: verified ? theme.colors.verified : theme.colors.selfReported,
-          fontWeight: verified ? '600' : '400',
-        }}
-      >
+      <Text variant="caption" style={{ color: foreground, fontWeight: verified ? '600' : '400' }}>
         {label}
       </Text>
     </View>

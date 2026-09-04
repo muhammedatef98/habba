@@ -18,9 +18,11 @@ insert into auth.users (id, phone) values
   ('11111111-0000-4000-7777-000000000001', '+966509300001'),
   ('22222222-0000-4000-7777-000000000002', '+966509300002');
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-7777-000000000001', 'صاحب الورشة', '+966509300001', 'technician'),
-  ('22222222-0000-4000-7777-000000000002', 'زبون', '+966509300002', 'customer');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-7777-000000000001', 'صاحب الورشة', '+966509300001'),
+  ('22222222-0000-4000-7777-000000000002', 'زبون', '+966509300002');
+
+select test.grant_role('11111111-0000-4000-7777-000000000001', 'technician');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-7777-000000000001', 'ر', 'CityKyc', 'ر', 'R',
@@ -86,9 +88,9 @@ insert into auth.users (id, phone) values
   ('33333333-0000-4000-7777-000000000001', '+966509300010'),
   ('55555555-0000-4000-7777-000000000003', '+966509300012');
 
-insert into public.profiles (id, full_name, phone, phone_verified, role) values
-  ('33333333-0000-4000-7777-000000000001', 'البائع', '+966509300010', true, 'customer'),
-  ('55555555-0000-4000-7777-000000000003', 'المهاجم', '+966509300012', true, 'customer');
+insert into public.profiles (id, full_name, phone, phone_verified) values
+  ('33333333-0000-4000-7777-000000000001', 'البائع', '+966509300010', true),
+  ('55555555-0000-4000-7777-000000000003', 'المهاجم', '+966509300012', true);
 
 insert into public.vehicle_makes (id, name_ar, name_en) values
   ('a0000000-0000-4000-7777-000000000001', 'م', 'MakeXfer');
@@ -148,9 +150,9 @@ insert into auth.users (id, phone) values
 -- The recipient's phone_verified = true here stands in for Supabase Auth's
 -- own SMS verification having already run before this profile existed — not
 -- something this policy grants, only something it now requires.
-insert into public.profiles (id, full_name, phone, phone_verified, role) values
-  ('33333333-0000-4000-7777-000000000004', 'البائع', '+966509300013', true, 'customer'),
-  ('44444444-0000-4000-7777-000000000005', 'المشتري', '+966509300014', true, 'customer');
+insert into public.profiles (id, full_name, phone, phone_verified) values
+  ('33333333-0000-4000-7777-000000000004', 'البائع', '+966509300013', true),
+  ('44444444-0000-4000-7777-000000000005', 'المشتري', '+966509300014', true);
 
 insert into public.vehicle_makes (id, name_ar, name_en) values
   ('a0000000-0000-4000-7777-000000000002', 'م', 'MakeXfer2');
@@ -237,8 +239,8 @@ begin;
 
 insert into auth.users (id, phone) values
   ('66666666-0000-4000-7777-000000000001', '+966509300020');
-insert into public.profiles (id, full_name, phone, role) values
-  ('66666666-0000-4000-7777-000000000001', 'زبون', '+966509300020', 'customer');
+insert into public.profiles (id, full_name, phone) values
+  ('66666666-0000-4000-7777-000000000001', 'زبون', '+966509300020');
 
 set role authenticated;
 select test.become('66666666-0000-4000-7777-000000000001');

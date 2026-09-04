@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { escapeHtml, renderHabbaReport } from './render.js';
+import { qrSvg } from './qr.js';
 import { verifiedRatio, type HabbaReport } from './types.js';
 
 const BASE: HabbaReport = {
@@ -73,6 +74,15 @@ describe('escapeHtml', () => {
 
 describe('renderHabbaReport', () => {
   const html = renderHabbaReport(BASE, OPTIONS);
+
+  test('carries a scannable QR pointing at the public URL', () => {
+    // The printed page is the delivery mechanism (ADR-0016), and on paper the
+    // QR is the ONLY way back to the live report. Asserting the exact encoder
+    // output means a change to either side fails here rather than in a buyer's
+    // hands.
+    expect(html).toContain(qrSvg(OPTIONS.publicUrl, { title: 'رمز التحقّق من تقرير هبّة' }));
+    expect(html).toContain('class="verify-qr"');
+  });
 
   test('is a complete RTL Arabic document', () => {
     expect(html.startsWith('<!doctype html>')).toBe(true);

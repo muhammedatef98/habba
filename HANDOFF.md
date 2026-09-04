@@ -46,27 +46,18 @@ enforced by triggers and revoked grants, never by convention.
 
 ## 2. Current state — one line
 
-All six backend phases pass their acceptance criteria. `pnpm verify` is green
-twice consecutively. Both Expo apps bundle and the customer app runs on the iOS
-simulator. Repo is private at **github.com/muhammedatef98/habba**.
+All six backend phases pass their acceptance criteria, and Amendments A and B
+(one mobile app, roles as a join table, admin stays separate) are applied to
+both the spec and the code. Repo is private at **github.com/muhammedatef98/habba**.
 
 ```
-46 migrations · 25 SQL suites · 2 concurrency tests · 50 customer tests
-90 core tests · 29 ui · 9 i18n · 4 provider · typecheck + lint green
-34 integration tests against real PostgREST + RLS
+41 migrations · 20 SQL suites · 2 concurrency tests · tests/rls.spec.ts (17)
+apps/mobile 52 · core 99 · ui 21 · i18n 9 · typecheck + lint + boundaries green
 ```
 
-⚠️ On macOS with PostgreSQL 17, `pg_ctl` fails with "postmaster became
-multithreaded during startup" unless `LC_ALL` is set to a valid locale.
-Use `LC_ALL=en_US.UTF-8 pnpm verify` — without it the integration suites
-silently skip.
-
-⚠️ **Set it to `en_US.UTF-8`, not `C`.** `LC_ALL=C` satisfies Postgres but puts
-Ruby in ASCII-8BIT, and CocoaPods then dies with `Unicode Normalization not
-appropriate for ASCII-8BIT`. `pod install` crashes, Pods are never regenerated,
-and the iOS build fails much later and much less obviously with
-`ld: framework 'React' not found` — which reads like a broken checkout rather
-than a locale problem. Both tools are happy with a real UTF-8 locale.
+**There is now ONE mobile app.** `apps/customer` and `apps/provider` are gone;
+`apps/mobile` serves both through `(customer)` and `(provider)` route groups.
+`profiles.role` is gone too — roles live in `user_roles` (ADR-0016).
 
 ---
 
@@ -77,23 +68,23 @@ habba/
 ├─ CLAUDE.md                 spec §0–5, permanent context — re-read every session
 ├─ HANDOFF.md                this file
 ├─ apps/
-│  ├─ customer/              Expo app — vehicle owners
-│  │  ├─ app/                expo-router screens
-│  │  ├─ src/data/           repository interface + in-memory + Supabase impls
-│  │  ├─ src/lib/            otp, email-auth, location, supabase, i18n, rtl, payments
-│  │  ├─ src/state/          zustand session
-│  │  └─ metro.config.js     monorepo resolution (see §8 — this was missing)
-│  ├─ provider/              Expo app — technicians & workshops
-│  └─ (admin/ NOT BUILT — Next.js ops dashboard, §9.4)
+│  └─ mobile/               ONE Expo app — customers and providers
+│     ├─ app/               expo-router routes; (customer)/ and (provider)/ groups
+│     ├─ src/features/customer/  customer screens + components
+│     ├─ src/features/provider/  provider screens + shift state
+│     ├─ src/features/shared/    data layer, lib, session/mode state, shared screens
+│     ├─ metro.config.js    monorepo resolution
+│     └─ vitest.config.ts   the `@/` alias, for tests
+│  (admin/ NOT BUILT — separate Next.js ops dashboard, §9.4 + Amendment B)
 ├─ packages/
 │  ├─ core/                  saudi validators, SarAmount money, report render,
 │  │                         inspection scoring, job-flow state mirror
 │  ├─ ui/                    design system (tokens, Text, Button, Card, Field,
-│  │                         Screen, ProvenanceBadge, StatusPill, StatCluster,
-│  │                         ProgressStages, TimelineList, theme)
+│  │                         Screen, ProvenanceBadge, theme)
 │  └─ i18n/                  ar.json + en.json, typed keys
+├─ tests/rls.spec.ts        RLS + Amendment A6, over real HTTP with a real JWT
 ├─ supabase/
-│  ├─ migrations/            0001–0040, forward-only
+│  ├─ migrations/            0001–0041, forward-only
 │  ├─ tests/                 00_helpers + 01–19 SQL suites
 │  ├─ seed/                  cities, services, maintenance rules
 │  └─ scripts/               local-db.sh, postgrest.sh, supabase_shim.sql,
@@ -122,10 +113,13 @@ bug hid for hours (§8).
 Run the app:
 
 ```bash
-cd apps/customer && npx expo start          # dev build / simulator
-npx expo start --go --tunnel                # Expo Go over tunnel (firewall-proof)
-xcrun simctl launch <UDID> sa.habba.customer
+pnpm --filter @habba/mobile start           # Metro
+cd apps/mobile && npx expo start --go --tunnel   # Expo Go over tunnel
+xcrun simctl launch <UDID> sa.habba.app
 ```
+
+See `apps/mobile/README.md` for the dev credentials and how to approve a
+provider locally (applying grants nothing — only approval does).
 
 Dev credentials: OTP code is **`1234`**. Email auth is an in-memory stub.
 Location is a fixed Dammam coordinate.
@@ -146,6 +140,8 @@ Location is a fixed Dammam coordinate.
 | 0010 | **UNRESOLVED.** Supabase region / data residency / PDPL                                                                                               |
 | 0013 | Providers see masked order info before accepting; exact address only after                                                                            |
 | 0015 | Local harness exists so migrations are _verified_, not merely written                                                                                 |
+| 0016 | Roles are `user_roles` rows, not a column; approval grants the provider role; one app with lint-enforced feature boundaries                           |
+| 0017 | The report QR is generated in-page (no external request); KYC sealing is a stub until ADR-0010 lands                                                  |
 
 ---
 
@@ -193,129 +189,59 @@ phone, globally-readable commission rates and invoice sellers.
 
 ## 7. What was built in this session
 
-### Design-system port and emergency-flow rebuild (latest session)
+### Amendments A and B, in the spec and then in the code
 
-A Claude Design handoff bundle (`Habba Emergency Flow.dc.html`, `Habba Design
-System.dc.html`) became the source of truth for colour and for the emergency
-flow's information architecture. Branch: `feat/emergency-flow-design-port`.
+`docs/HABBA_BUILD_PROMPT.md` gained §5.1 (app topology), mirrored verbatim into
+`CLAUDE.md`, and the amendments were threaded through §2, §4, §6.1, §6.4, §6.9,
+a new §6.10 (admin `audit_log`), §9, §10, §11 and §12.
 
-- **Palette ported wholesale.** Every ramp in `tokens.ts` changed, so every
-  existing screen restyled. Warning is now an alias of sand — the design makes
-  warning and accent the same amber deliberately, so a non-emergency alert can
-  never borrow the emergency red, and an alias stops them drifting. New Info
-  ramp; there was no informational colour before.
-- **Five design values were changed on the way in**, each a colour that is fine
-  as a border or a dot being used for small text below 4.5:1. Four were fixed by
-  promoting the text role to a darker step the designer already chose; only
-  `petrol[400]` (#34968F) is new. Every divergence is marked `WCAG:` in
-  `tokens.ts`. **The fifth was caught by the existing provenance-badge test**,
-  not predicted — a grey that passes on the page background fails on the darker
-  sunken surface the badge actually sits on. That test earned its keep.
-- **Ten screens, no new state machine.** They map one-to-one onto `OrderStatus`.
-  `tracking.tsx` is now a dispatcher over six components in
-  `src/components/tracking/`; `emergency.tsx` split into a route group.
-- **The home screen's red emergency button is gone.** The design forbids red
-  before an emergency is under way; a permanently red button is the "everything
-  is urgent" failure the palette exists to prevent. Weight comes from size now.
-- **Nothing is stubbed with plausible data.** Unbacked figures are optional
-  fields with defined reduced states. See §10 for what is still missing and why
-  inventing it would have been worse than omitting it.
-- **Migration 0040** added handover codes and `order_live_progress`. The
-  handover code lives in its own table because `orders_read_assigned_provider`
-  would otherwise let the provider read the code they are being checked
-  against — RLS is row-granular, and column grants cannot separate two parties
-  who are both `authenticated`.
+### Roles as a join table (0040, 0041 — ADR-0016)
 
-⚠️ One correction worth remembering: 0040's first draft justified
-`order_live_progress` on privacy grounds. That was wrong — 0022 already lets a
-customer read their assigned provider's position during the in-transit window.
-The function's real value is keeping the ETA arithmetic in Postgres (§2.2) and
-refusing to answer from a stale fix. An integration test now pins the 0022
-policy so a future narrowing surfaces there rather than as a blank screen.
+`profiles.role` dropped; `user_roles(user_id, role, granted_at, revoked_at,
+granted_by)` added, closed to clients three ways. `customer` on profile insert;
+`technician`/`workshop_admin` from `providers.verification_status='approved'`,
+in the same transaction, revoked on suspension.
 
-### Brand mark and the defects running it surfaced
+**Two real holes closed on the way**, both found by writing `tests/rls.spec.ts`
+rather than by reading the schema:
 
-- **The app had no icon** — a blank springboard tile — and the mark appeared
-  nowhere inside it. `apps/customer/scripts/generate-logo-assets.py` now renders
-  every size from the design's own paths; the raster output is committed.
-  react-native-svg is deliberately not a dependency: it would mean a native
-  rebuild for eleven static images.
-- Shared marks live in `packages/ui/assets`, launcher icons in the app. The
-  design system owns the brand; each app owns its own launcher.
-- **Call and chat dialled `+966500000000`** — nobody. Now inert until a masked
-  relay number exists, with copy explaining why. Dialling a wrong number during
-  an emergency is worse than a disabled button.
+- `current_provider_id()` matched ANY providers row, so a self-registered
+  applicant held provider RLS access — open orders, live locations — before
+  anyone read their ID.
+- `providers` had no uniqueness on `owner_profile_id`. One user could hold
+  several records; `sync_provider_role()` then reasoned about the row being
+  written rather than the account, so inserting a second record revoked a role
+  the first had earned.
 
-### ⚠️ Two traps that cost hours, worth not rediscovering
+### One app (`apps/mobile`)
 
-**Controls in the home-indicator strip look broken.** The triage skip button
-rendered 18dp from the bottom edge, inside the strip iOS claims for its own
-swipe, and simply did not respond. It presents as a _navigation_ bug — the
-button appears dead, so the router and the route tree are the obvious suspects.
-Three navigation rewrites later the answer was that the press never arrived:
-the same button responded when tapped 18dp higher. `Screen` now floors the
-bottom inset at 34dp. Nothing in the test suite asserts layout, so a green run
-says nothing about whether a control is reachable.
+Route groups, a provider-group guard that fails closed while roles load, a mode
+switcher visible only to approved providers, last-mode persistence in
+SecureStore, and «اشتغل معنا كفنّي» → KYC → pending → approval. Boundaries are
+an ESLint error, verified by deliberately writing a cross-import and watching
+lint fail.
 
-**`[runtime not ready]: ReferenceError: Property 'MessageQueue' doesn't exist`**
-is a stale native binary, not app code. It appears when the installed build's
-Expo config no longer matches what Metro serves — changing `app.json` (adding
-the icon did exactly this) is enough. `npx expo run:ios` fixes it; relaunching
-the existing binary against a fresh Metro does not, and neither does clearing
-the Metro cache.
+### Phase 2 surfaces
 
-### Phase 3 customer surfaces (§9.1)
+Timeline grouped by the year work HAPPENED; an event detail screen that shows
+both dates, the structured record and what the provenance level does not claim;
+a mileage screen with progression; manual entry extended to service type, cost
+(as `SarAmount`), parts with part numbers, and photos — where attaching a photo
+moves the entry from `self_reported` to `self_documented`, derived server-side.
 
-The backend passed Phase 3's acceptance criteria long ago, but **nothing had
-ever driven it from the app**. Added:
+### The report QR (ADR-0017)
 
-- `app/vehicles.tsx` — home; vehicle switcher + طلب طارئ / حجز موعد
-- `app/emergency/` — service → location confirm → optional video triage,
-  behind a Zustand draft store and a dark-scoped ThemeProvider
-- `app/tracking.tsx` — status, provider card, quote banner, completion
-  confirmation, rating. §8 calls this the emotional core; motion is eased and
-  directional, never bouncy (a breathing pulse, not a spinner)
-- `app/quote.tsx` — line-itemed parts, OEM flag, per-line approval
-- `app/booking.tsx` — honest "coming soon" (Phase 4 backend exists, screens don't)
-- `src/components/RatingStars.tsx` — 48dp touch targets, no third-party widget
+A dependency-free encoder in `@habba/core`, inlined as SVG so the page still
+fetches nothing. `qr.test.ts` round-trips through jsQR, and immediately caught
+two defects that produce a code which photographs perfectly and scans as
+nothing: a Reed–Solomon generator polynomial built leading-coefficient-last,
+and a transposed format-information block. **Structural assertions would have
+passed on both.**
 
-### Guest access + email identity (migration 0039)
+### Design system
 
-**The decision that matters:** a guest is a real Supabase **anonymous auth
-user**, not an unauthenticated client. Every RLS policy keys on `auth.uid()`;
-a guest without one matches zero rows and could not own a logbook at all —
-which would defeat §11's "the logbook is top-of-funnel and never gated."
-Anonymous auth issues a genuine uid, so the guest owns real rows, and
-conversion to a full account **keeps the same uid** so the logbook carries over.
-
-Schema: `profiles.phone` became nullable, `email` gained case-insensitive
-uniqueness + `email_verified`, `is_guest` added with a rule that it may only
-fall (never rise) and only when an identity exists.
-
-New screens: `app/email.tsx` (register/sign-in), `app/save-account.tsx`
-(guest → account), guest banner on home.
-
-### Read-surface hardening (0037, 0038)
-
-First audit of what clients can _read_ — all prior passes audited writes.
-
-### Harness fix — the most instructive bug
-
-`postgrest.sh stop` ran `kill "$(cat $PIDFILE)" && rm -f "$PIDFILE"`. `kill`
-only _requests_ termination and returns immediately, but the pidfile was
-deleted regardless. So: stop printed "postgrest stopped" while the process
-lived → pidfile gone → `is_running` false → `start` launched a new instance
-that **could not bind the taken port** → the readiness probe hit the **old**
-process, got 200, printed "ready". The harness announced success while serving
-a schema cache older than the migrations under test.
-
-It surfaced as `Could not find the 'is_guest' column of 'profiles' in the
-schema cache`, which reads like a failed migration rather than a stale reader.
-One orphan survived **13 hours and three verify runs**. I worked around this
-symptom twice before actually reading the eight lines of shell — that was the
-wrong call and cost more than the fix did.
-
----
+`ListRow`, `EmptyState` and `BottomSheet`; `self_documented` promoted to a real
+token pair with the contrast test extended to all three provenance levels.
 
 ## 8. Things that were never true until this session
 
@@ -332,6 +258,8 @@ wrong call and cost more than the fix did.
 
 ## 9. Open decisions — these block real work
 
+> Also summarised, with what each one blocks per phase, in `docs/ROADMAP.md`.
+
 | #   | Decision                                                             | Blocks                                                                                                                                                              |
 | --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **ADR-0008 — payments / merchant of record / SAMA**                  | Anything that moves real money. `authorise_order_payment` / `capture_order_payment` are the interface; the PSP behind them is unchosen                              |
@@ -345,45 +273,21 @@ wrong call and cost more than the fix did.
 
 ## 10. Known incomplete
 
-- **Admin dashboard (§9.4, Next.js)** — `apps/admin` exists with the provider
-  verification queue, which was the blocking one: `match_providers` ignores any
-  provider who is not `approved`, so nothing could dispatch until someone could
-  approve. Still to build: live order map, dispute resolution, pricing tuning,
-  payout runs.
-
-  Ops sign-in exists and reads the role from `profiles` on every load rather
-  than trusting a JWT claim, so revoking someone takes effect on their next
-  visit instead of at token expiry. ⚠️ That gate is UX — `is_ops()` (0013) is
-  the boundary, and someone who bypasses the screen reaches an API that returns
-  them nothing.
-
-  ⚠️ The design bundle contains NO admin screens. It specifies the palette,
-  type scale, spacing, components and the RTL mirror, and `apps/admin` takes
-  all of that from `@habba/ui/tokens` so it cannot drift. The layout above the
-  tokens is judgement, not a mockup — do not go looking for the design file it
-  came from.
-
+- **Admin dashboard (§9.4, Next.js + Amendment B)** — not started. Provider
+  verification queue (which is what grants the provider role), live order map,
+  dispute resolution, pricing tuning, payout runs, `audit_log` (spec §6.10 —
+  the table is specified but not yet migrated), 2FA, 8-hour sessions, and the
+  CI check that fails on a client-reachable service-role key.
 - **Booking flow (§9.1)** — placeholder screen. Backend built and tested,
   including the slot-concurrency guarantee. This is the obvious next increment.
 - **Inspection screens (Phase 5)** — backend done, no customer UI.
-- **GPS and camera are both real now** — expo-location behind the same
-  interface (the stub remains for Expo Go, where a bare-workflow permission
-  request fails in a way indistinguishable from a denial), and expo-camera with
-  a 20s cap uploading to the `triage-media` bucket.
-- **No masked-call relay** — `ProviderSummary` has no phone field, so call and
-  chat on the tracking screens are disabled. Needs a relay number issued per
-  job, not the technician's own line.
+- **Camera and GPS are stubs** — both behind interfaces (`location-provider.ts`
+  mirrors `otp-provider.ts`); swapping in real implementations is one file each.
+- **KYC sealing is a stub** (ADR-0017). Real encryption is Supabase Vault /
+  pgsodium and waits on ADR-0010, so no real ID or IBAN may be accepted yet.
 - **Guest → account conversion** uses the dev stub. Real Supabase
   `signInAnonymously` + identity linking is not wired.
-- **Push notifications** — no notifications table and nothing sending them, so
-  the design's header bell is deliberately absent rather than decorative.
-- **Wallet** — nothing holds a balance, a card or a transaction; escrow is
-  per-order and lives on the order. The tab bar ships with three tabs, not the
-  design's four, until there is something to put in it.
-- **The dispatch tick is not scheduled** — `supabase/functions/dispatch-tick`
-  exists and `expand_stale_searches()` is tested, but nothing calls it on a
-  timer yet. Needs a cron (~15s) and `HABBA_DISPATCH_TICK_SECRET` set. Until
-  then searches broadcast round 1 and never widen.
+- **Video triage (§9.1)** — the 20-second clip before dispatch is not built.
 - **PDF generation** — print-to-PDF only, no server-side render.
 - **Ownership transfer acceptance** — `accept_ownership_transfer()` exists
   (0037) with OTP verification, atomic claim, privileged owner reassignment and

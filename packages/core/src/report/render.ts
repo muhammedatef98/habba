@@ -17,6 +17,7 @@
 
 import type { HabbaReport, ReportEvent, ReportProvenance } from './types.js';
 import { verifiedRatio } from './types.js';
+import { qrSvg } from './qr.js';
 
 /**
  * Escapes text for HTML.
@@ -197,6 +198,12 @@ export function renderHabbaReport(report: HabbaReport, options: RenderOptions): 
   .details { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
   .verify { background: var(--petrol-50); border-color: var(--petrol); }
   .verify code { word-break: break-all; font-size: 12px; }
+  /* The QR is the whole point of the printed page: a buyer holding paper has
+     no other way to reach the live report. It stays large enough to scan from
+     a phone at arm's length (about 30mm printed) and never shrinks below it. */
+  .verify-qr { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .verify-qr svg { width: 128px; height: 128px; flex: none; background: #fff; }
+  .verify-qr .legend { flex: 1 1 200px; min-width: 200px; }
   footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; }
   /* Print-to-PDF is the delivery mechanism for now — ADR-0016. */
   @media print {
@@ -252,6 +259,12 @@ export function renderHabbaReport(report: HabbaReport, options: RenderOptions): 
       هذا التحقّق يثبت أن السجلات لم تُعدَّل بعد إدخالها. ولا يثبت صحة السجلات
       التي أدخلها المالك بنفسه.
     </p>
+    <div class="verify-qr">
+      ${qrSvg(options.publicUrl, { title: 'رمز التحقّق من تقرير هبّة' })}
+      <p class="legend">
+        امسح الرمز للاطّلاع على هذا التقرير مباشرة من هبّة والتأكّد من أنه لم يُعدَّل.
+      </p>
+    </div>
     <code>${escapeHtml(options.publicUrl)}</code>
   </section>
 
