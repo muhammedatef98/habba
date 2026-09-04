@@ -126,3 +126,8 @@ jobs:
         env:
           HABBA_REQUIRE_HARNESS: '1'
         run: pnpm --filter @habba/mobile exec vitest run src/features
+
+      - name: RLS suite (raw HTTP, real JWT)
+        env:
+          HABBA_REQUIRE_HARNESS: '1'
+        run: pnpm test:rls

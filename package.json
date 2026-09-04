@@ -21,11 +21,13 @@
     "db:test": "./supabase/scripts/local-db.sh test",
     "api:start": "./supabase/scripts/postgrest.sh start",
     "api:stop": "./supabase/scripts/postgrest.sh stop",
-    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features",
-    "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm db:test && pnpm test:integration"
+    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features && pnpm test:rls",
+    "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm db:test && pnpm test:integration",
+    "test:rls": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@supabase/supabase-js": "^2.112.4",
     "eslint": "^9.39.1",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
