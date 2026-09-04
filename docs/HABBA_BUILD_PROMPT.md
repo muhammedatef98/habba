@@ -4,6 +4,13 @@
 > Do **not** paste the whole file at once. This is a 6-phase build.
 > Give Claude Code **Section 0–5 as permanent context** (save it as `CLAUDE.md` in the repo root),
 > then issue **one phase at a time** from Section 6. Review and merge before moving on.
+>
+> **Amendments applied:**
+> **A — single app, multiple roles** (one `apps/mobile`; `user_roles` join table replaces
+> `profiles.role`; server-enforced roles; enforced feature-folder boundaries).
+> **B — admin stays separate** (`apps/admin` remains a Next.js web app, never merged
+> into mobile). Both are stated in **§5.1** and threaded through §4, §6.1, §6.4, §6.9,
+> §6.10, §9, §10, §11 and §12.
 
 ---
 
@@ -69,6 +76,8 @@ Every single interaction writes to it:
 6. **Every mutation is auditable.** `created_at`, `updated_at`, `created_by` on everything.
 7. **Offline-tolerant.** A technician in a basement parking garage must still be able to complete a job; queue and sync.
 8. **TypeScript `strict: true`.** No `any`. No `@ts-ignore` without a written reason.
+9. **Roles are server-side facts, not client state.** One app serves customers and providers (§5.1); what a user may _do_ is decided by `user_roles` and RLS. The client's role knowledge decides only what it renders.
+10. **Ops code never ships to a phone.** Admin is a separate web app. A role check is not a boundary; a separate bundle is.
 
 ---
 
@@ -98,11 +107,14 @@ Monorepo        pnpm workspaces
 
 ```
 habba/
-├─ CLAUDE.md                    ← this document, sections 0–5
+├─ CLAUDE.md                    ← this document, sections 0–5.1
 ├─ apps/
-│  ├─ customer/                 Expo app — vehicle owners
-│  ├─ provider/                 Expo app — technicians & workshop staff
-│  └─ admin/                    Next.js — ops dashboard
+│  ├─ mobile/                   Expo app — ONE app, customers and providers
+│  │  └─ src/features/
+│  │     ├─ customer/           customer-only screens, hooks, data
+│  │     ├─ provider/           provider-only screens, hooks, data
+│  │     └─ shared/             anything used by both
+│  └─ admin/                    Next.js — ops dashboard (web only, never bundled into mobile)
 ├─ packages/
 │  ├─ core/                     shared types, zod schemas, order state machine
 │  ├─ ui/                       design system (Section 8)
@@ -146,6 +158,100 @@ Use these exact terms in UI copy. Use the English identifiers in code.
 
 ---
 
+## 5.1 APP TOPOLOGY — ONE MOBILE APP, MANY ROLES
+
+> **Amendment A + B.** This supersedes any earlier statement that customers and
+> providers get separate mobile apps.
+
+### 5.1.1 One app, one account, many roles
+
+There is **one** mobile app: `apps/mobile`. It serves vehicle owners and
+providers alike. One account per phone number, holding zero or more roles.
+
+- Everyone signs up as `customer`. **Signup asks no role question** — there is no
+  "are you a customer or a technician?" screen, ever.
+- `provider` is granted **only** when that user's `providers` record reaches
+  `verification_status = 'approved'`. It is never self-selected and never
+  granted by the client.
+- Becoming a provider is an **in-app upgrade** from the profile screen:
+  **«اشتغل معنا كفنّي»** → KYC (هوية/إقامة, IBAN, Nafath) → review → approval.
+  The user keeps their account, their vehicles, and their logbook throughout.
+- A user may hold both roles at once and switch between them. That is the normal
+  case, not an edge case: a technician owns a car too.
+
+### 5.1.2 Roles live in a join table, never in a column
+
+`profiles.role` (a single enum column) is **replaced** by:
+
+```sql
+user_roles(user_id, role, granted_at, revoked_at, granted_by)
+```
+
+A role is held when a row exists for it with `revoked_at is null`. Revocation is
+a timestamp, never a `DELETE` — role history is auditable like everything else
+(§2.6). Every RLS policy, helper function and trigger that referenced
+`profiles.role` must be rewritten against `user_roles`.
+
+### 5.1.3 Roles are enforced on the server. Always.
+
+**The client's opinion about its own roles is worthless.** It exists only to
+decide what to render.
+
+- RLS checks for an **approved provider record**, not a claim in a JWT, a
+  request body, or a column the user can write.
+- A customer-only user must be unable to read `orders` in `searching`,
+  `provider_locations`, `payouts`, or any earnings surface — **even with a
+  hand-crafted request** that bypasses the app entirely.
+- Prove it in `tests/rls.spec.ts`. A role check that only exists in TypeScript
+  is not a role check.
+
+### 5.1.4 Routing and the mode switcher
+
+Expo Router route groups: `(customer)` and `(provider)`.
+
+- The mode switcher is visible **only** to users holding an approved `provider`
+  role. A customer-only user must never see the switcher, a provider tab, or any
+  provider UI.
+- The last active mode is persisted and restored on launch.
+- Switching mode changes which route group is mounted. It does not re-authenticate
+  and does not change the user's identity.
+
+### 5.1.5 Code separation despite the single app
+
+One app is a shipping decision, not an architectural excuse.
+
+```
+apps/mobile/src/features/customer/**
+apps/mobile/src/features/provider/**
+apps/mobile/src/features/shared/**
+```
+
+- `customer/**` and `provider/**` **must never import from each other.**
+- Only `shared/**` may be imported by both.
+- Enforce with ESLint (`eslint-plugin-boundaries`, or `no-restricted-imports`
+  with path patterns). **This must fail CI**, not merely warn.
+
+### 5.1.6 Admin stays a separate web app — non-negotiable
+
+`apps/admin` is a Next.js **web** app and stays one. Ops functionality is never
+merged into `apps/mobile`, not even behind a role check: code behind a role check
+still ships to every user's device, where it can be read and probed.
+
+- Runs locally in development and deploys to Vercel **with zero code changes** —
+  the only difference is environment variables. No hardcoded URLs, no hardcoded
+  keys, no `if (production)` branches.
+- `SUPABASE_SERVICE_ROLE_KEY` is **server-only**: route handlers and server
+  components exclusively. Never in a client component, never prefixed
+  `NEXT_PUBLIC_`. A CI check fails the build if it appears anywhere reachable
+  from the client bundle.
+- **2FA is mandatory** on admin accounts. Sessions expire after **8 hours**.
+  There is no "remember me".
+- Every admin action writes an immutable audit row:
+  `audit_log(actor_id, action, target_table, target_id, before, after, ip, at)`.
+- `apps/admin/README.md` documents local setup and Vercel deployment.
+
+---
+
 ## 6. DATA MODEL
 
 This is the authoritative schema. Implement it as numbered migrations in `supabase/migrations/`.
@@ -156,9 +262,34 @@ This is the authoritative schema. Implement it as numbered migrations in `supaba
 -- Supabase auth.users is the root. profiles extends it.
 create type user_role as enum ('customer', 'technician', 'workshop_admin', 'ops', 'super_admin');
 
+-- Roles are a join table, never a column on profiles (§5.1.2).
+-- A role is HELD when a row exists with revoked_at is null.
+create table user_roles (
+  user_id     uuid not null references profiles(id) on delete cascade,
+  role        user_role not null,
+  granted_at  timestamptz not null default now(),
+  revoked_at  timestamptz,
+  granted_by  uuid references profiles(id),   -- null = granted by the system
+  primary key (user_id, role, granted_at)
+);
+
+-- One live grant per (user, role). Revocation is a timestamp, never a DELETE.
+create unique index user_roles_live_uniq
+  on user_roles (user_id, role) where revoked_at is null;
+create index user_roles_live_idx on user_roles (user_id) where revoked_at is null;
+
+-- The only sanctioned way to ask "does this user hold this role?".
+-- security definer + a locked search_path; never reads a client-supplied claim.
+create function has_role(p_user uuid, p_role user_role) returns boolean
+  language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.user_roles r
+    where r.user_id = p_user and r.role = p_role and r.revoked_at is null
+  );
+$$;
+
 create table profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
-  role          user_role not null default 'customer',
   full_name     text not null,
   phone         text not null unique,          -- E.164, +9665XXXXXXXX
   phone_verified boolean not null default false,
@@ -179,6 +310,20 @@ create table cities (
   is_active boolean not null default true
 );
 ```
+
+**Role grant rules (enforce in SQL, not in the app):**
+
+- `customer` is granted automatically on profile creation. Signup asks nothing
+  about roles (§5.1.1).
+- `provider` may be granted **only** by the transition of a `providers` row into
+  `verification_status = 'approved'` — do it in the same trigger/function that
+  performs that transition, so the two can never disagree. Suspension or
+  rejection sets `revoked_at`.
+- `ops` and `super_admin` are granted only through the admin app, by an existing
+  `super_admin`, and every such grant writes an `audit_log` row (§6.10).
+- `user_roles` is **not client-writable**: no INSERT/UPDATE/DELETE policy, grants
+  revoked, writes only through `security definer` functions. A user granting
+  themselves `provider` — or `ops` — is the highest-value attack in this system.
 
 ### 6.2 Vehicles — THE CENTER OF THE SCHEMA
 
@@ -342,6 +487,10 @@ create table providers (
   city_id             uuid not null references cities(id),
   created_at          timestamptz not null default now()
 );
+
+-- §5.1.1: reaching 'approved' is what grants the provider role — nothing else does.
+-- Leaving 'approved' (rejected/suspended) revokes it. Implement as an AFTER UPDATE
+-- trigger on providers that writes user_roles for owner_profile_id.
 
 create table provider_services (
   provider_id  uuid not null references providers(id) on delete cascade,
@@ -557,6 +706,8 @@ create table zatca_invoices (
 
 Enable RLS on **every** table. Baseline policies:
 
+- `user_roles`: a user reads only their own rows. **No write policy at all** —
+  grants happen in `security definer` functions (§6.1). `ops` reads all.
 - `profiles`: a user reads/updates only their own row. `ops` reads all.
 - `vehicles`: owner full access. A provider may read a vehicle **only** while they have a non-terminal order on it.
 - `vehicle_timeline`: owner reads all. Provider reads only rows from their own orders. **Insert only via `security definer` function** — never direct.
@@ -564,7 +715,50 @@ Enable RLS on **every** table. Baseline policies:
 - `provider_locations`: readable only by the customer of an active order with that provider.
 - `inspection_reports`: owner + assigned provider; plus anonymous read when `public_token` matches.
 
+**Every policy above expresses "is a provider" as `has_role(auth.uid(),'technician')`
+plus an approved `providers` row — never as a column the user can write, and never
+as a claim the client sends.**
+
 Write a `tests/rls.spec.ts` that asserts, for each table, that a random authenticated user **cannot** read another user's rows. This test must run in CI.
+
+**Amendment A6 — it must also assert, with raw requests that bypass the app:**
+
+- a **customer-only** user cannot read `orders` in `searching`, `provider_locations`,
+  `payouts`, or any earnings surface
+- a customer-only user cannot insert into `user_roles`, nor update their own row to
+  add `provider`, `ops`, or `super_admin`
+- a user whose `providers` row is `pending`, `in_review`, `rejected` or `suspended`
+  has the same access as a customer-only user — **only `approved` grants anything**
+- revoking a provider role (suspension) removes access immediately, with no
+  client action and no token refresh required
+- a provider cannot read another provider's earnings, KYC columns, or open orders
+  outside their own city/service set
+
+### 6.10 Admin audit log
+
+Every action taken in `apps/admin` writes one row. No exceptions, including reads
+of sensitive material (KYC documents, IBANs, dispute evidence).
+
+```sql
+create table audit_log (
+  id           uuid primary key default gen_random_uuid(),
+  actor_id     uuid not null references profiles(id),
+  action       text not null,          -- 'provider.approve', 'order.refund', 'role.grant'
+  target_table text not null,
+  target_id    uuid,
+  before       jsonb,                  -- row state prior to the action
+  after        jsonb,                  -- row state after the action
+  ip           inet,
+  at           timestamptz not null default now()
+);
+
+create index on audit_log (actor_id, at desc);
+create index on audit_log (target_table, target_id, at desc);
+```
+
+**Immutable, like the timeline (§2.4):** no UPDATE, no DELETE, enforced by rules
+and revoked grants rather than convention. Readable by `ops` and `super_admin`
+only; never exposed to the mobile app on any path.
 
 ---
 
@@ -666,11 +860,24 @@ Movement should suggest _wind_: eased, directional, never bouncy. Use `react-nat
 
 ## 9. APP SURFACES
 
-### 9.1 Customer app
+> §9.1–9.3 are all surfaces of the **single** `apps/mobile` app (§5.1). "Customer
+> app" and "provider app" are names for route groups and feature folders, not for
+> separate binaries. §9.4 is the only separate app, and it is web.
+
+### 9.0 Shared surfaces (`features/shared`)
+
+| Screen           | Notes                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Onboarding       | Phone OTP. **No role question.** Everyone lands as a customer.                                                                 |
+| Profile          | Account, locale, vehicles. Hosts **«اشتغل معنا كفنّي»** for users without a provider role.                                     |
+| Provider upgrade | KYC (هوية/إقامة + IBAN + Nafath) → submitted → in review → approved/rejected. Status is readable; it is never client-settable. |
+| Mode switcher    | Rendered **only** for an approved provider role. Persists the last active mode and restores it on launch.                      |
+
+### 9.1 Customer surfaces (`features/customer`)
 
 | Screen            | Notes                                                                                                                  |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Onboarding        | Phone OTP. Add first vehicle in ≤3 taps (make → model → year). Plate optional at first.                                |
+| First run         | Add first vehicle in ≤3 taps (make → model → year). Plate optional at first. Auth itself is §9.0.                      |
 | Home              | Vehicle switcher at top. Two primary actions: **طلب طارئ** (one tap) and **حجز موعد**. Predictive alerts surface here. |
 | Emergency flow    | Service → location confirm → optional 20s video triage → searching animation → provider matched → live tracking        |
 | Booking flow      | Service → mode (mobile/workshop) → provider or slot → confirm                                                          |
@@ -680,24 +887,40 @@ Movement should suggest _wind_: eased, directional, never bouncy. Use `react-nat
 | Report            | Generate/share تقرير هبّة                                                                                              |
 | Wallet & invoices | ZATCA invoices downloadable                                                                                            |
 
-### 9.2 Provider app
+### 9.2 Provider surfaces (`features/provider`)
 
-| Screen           | Notes                                                                                                                  |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Onboarding & KYC | ID/Iqama + IBAN + Nafath. Status tracking while in review.                                                             |
-| Online toggle    | Prominent. Location broadcast only while online (battery + privacy).                                                   |
-| Incoming order   | Full-screen with sound, 45s countdown, distance + service + estimated payout. Never show exact address pre-acceptance. |
-| Job flow         | Navigate → arrived → diagnose → build quote (parts + labour) → await approval → work → complete with photos            |
-| Completion       | **Mandatory:** mileage reading + before/after photos + parts used. This is what feeds the logbook — enforce it.        |
-| Earnings         | Daily/weekly, payout schedule, commission breakdown                                                                    |
+Reachable only via the mode switcher, and only for an approved provider role.
+KYC and status-tracking live in §9.0 — they are used by people who are not
+providers yet, so they cannot sit behind the provider route group.
 
-### 9.3 Workshop console (inside provider app)
+| Screen         | Notes                                                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Online toggle  | Prominent. Location broadcast only while online (battery + privacy).                                                   |
+| Incoming order | Full-screen with sound, 45s countdown, distance + service + estimated payout. Never show exact address pre-acceptance. |
+| Job flow       | Navigate → arrived → diagnose → build quote (parts + labour) → await approval → work → complete with photos            |
+| Completion     | **Mandatory:** mileage reading + before/after photos + parts used. This is what feeds the logbook — enforce it.        |
+| Earnings       | Daily/weekly, payout schedule, commission breakdown                                                                    |
+
+### 9.3 Workshop console (inside `features/provider`)
 
 Slot calendar, bay management, staff assignment, walk-in orders.
 
-### 9.4 Admin (Next.js)
+### 9.4 Admin (Next.js) — a separate web app, always
 
 Provider verification queue, live order map, dispute resolution, pricing/rules tuning, payout runs, fraud flags.
+
+Per §5.1.6, none of this ever appears in `apps/mobile`, not even behind a role
+check. Requirements that are part of the build, not deployment trivia:
+
+| Requirement            | Detail                                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Environment-driven     | Identical code runs locally and on Vercel. Every URL and key comes from env. No hardcoded values, no `if (production)`.                                       |
+| Service-role isolation | `SUPABASE_SERVICE_ROLE_KEY` in route handlers/server components only. Never `NEXT_PUBLIC_`. **CI fails the build** if it is reachable from the client bundle. |
+| 2FA                    | Mandatory on every admin account. No exemptions for founders.                                                                                                 |
+| Sessions               | Expire after 8 hours. No "remember me".                                                                                                                       |
+| Audit                  | Every action writes `audit_log` (§6.10), including reads of KYC and dispute evidence.                                                                         |
+| Role grants            | The only surface that may grant `ops` / `super_admin`, and only a `super_admin` may do it.                                                                    |
+| README                 | `apps/admin/README.md` documents local setup and Vercel deployment.                                                                                           |
 
 ---
 
@@ -707,9 +930,18 @@ Provider verification queue, live order map, dispute resolution, pricing/rules t
 
 ### PHASE 1 — Foundation
 
-Monorepo, Supabase project, migrations for §6.1–6.2, auth with phone OTP, RTL shell, design system primitives, i18n scaffolding, CI with lint + typecheck + RLS test.
+Monorepo with the single `apps/mobile`, Supabase project, migrations for §6.1–6.2
+(including `user_roles` and `has_role()`), auth with phone OTP and **no role
+question**, `(customer)`/`(provider)` route groups with the `features/*` folder
+split, the boundaries ESLint rule, RTL shell, design system primitives, i18n
+scaffolding, CI with lint + typecheck + boundaries + RLS test.
 
-**Acceptance:** a user signs up with a Saudi phone number, adds a vehicle, sees an empty logbook. RLS test passes. App runs RTL in Arabic and LTR in English.
+**Acceptance:** a user signs up with a Saudi phone number, adds a vehicle, sees an
+empty logbook, and holds exactly one role (`customer`). RLS test passes, including
+the A6 assertions that a customer-only user cannot reach provider surfaces or grant
+themselves a role. **The mode switcher is not rendered.** An import from
+`features/customer` into `features/provider` fails CI. App runs RTL in Arabic and
+LTR in English.
 
 ### PHASE 2 — The logbook (build the moat first)
 
@@ -719,9 +951,16 @@ Timeline schema with hash chain, manual entry (owner logs their own past service
 
 ### PHASE 3 — On-demand emergency
 
-Service catalogue, provider onboarding + KYC stub, matching function, order state machine, live tracking, escrow authorise/capture, completion → timeline write, ratings.
+Service catalogue, the in-app provider upgrade («اشتغل معنا كفنّي») + KYC stub,
+approval → `provider` role grant, the mode switcher and persisted last-active mode,
+matching function, order state machine, live tracking, escrow authorise/capture,
+completion → timeline write, ratings.
 
-**Acceptance:** end-to-end emergency order on two devices, completed job appears in the logbook automatically, payment captured only after customer confirmation.
+**Acceptance:** end-to-end emergency order on two devices, completed job appears in
+the logbook automatically, payment captured only after customer confirmation. A user
+upgrades to provider **in the same account** — the mode switcher appears only after
+approval, and their vehicles and logbook survive the upgrade intact. Suspending that
+provider removes provider access immediately, with no client action.
 
 ### PHASE 4 — Scheduled & workshop
 
@@ -737,9 +976,14 @@ Templates, structured capture with photos, scoring, PDF, public share, pre-purch
 
 ### PHASE 6 — Intelligence & compliance
 
-Predictive maintenance cron, alert→booking conversion, ZATCA invoicing, payouts, admin dashboard, analytics.
+Predictive maintenance cron, alert→booking conversion, ZATCA invoicing, payouts,
+the separate `apps/admin` Next.js dashboard (§9.4) with 2FA, 8-hour sessions,
+`audit_log`, and the CI check for service-role-key leakage, analytics.
 
-**Acceptance:** a vehicle with history receives a correctly-timed alert; a completed order produces a ZATCA-valid invoice with a scannable QR.
+**Acceptance:** a vehicle with history receives a correctly-timed alert; a completed
+order produces a ZATCA-valid invoice with a scannable QR. Admin runs locally and
+deploys to Vercel with env vars only and no code change; every admin action appears
+in `audit_log`; the CI check fails a deliberate `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`.
 
 ---
 
@@ -752,6 +996,11 @@ Predictive maintenance cron, alert→booking conversion, ZATCA invoicing, payout
 - ❌ Do not skip the completion photos/mileage. Without them the moat is empty.
 - ❌ Do not build web before mobile. This market is mobile-only.
 - ❌ Do not add ride-hailing, fuel delivery subscriptions, or car sales in v1. Focus.
+- ❌ **Never ship admin/ops functionality inside the mobile bundle, even behind a role check.**
+- ❌ Do not ask a new user which kind of account they want. Everyone is a customer first (§5.1.1).
+- ❌ Do not decide access from a client-held role, a JWT claim the user can influence, or a column the user can write. The server decides (§5.1.3).
+- ❌ Do not let `features/customer` and `features/provider` import from each other. One app is not one namespace.
+- ❌ Do not put `SUPABASE_SERVICE_ROLE_KEY` anywhere a browser can reach it, and never behind a `NEXT_PUBLIC_` prefix.
 
 ---
 
@@ -764,3 +1013,7 @@ Predictive maintenance cron, alert→booking conversion, ZATCA invoicing, payout
 - [ ] Money uses `numeric`, never float
 - [ ] Any status change goes through the state machine, never a direct UPDATE
 - [ ] Errors surfaced to the user in Arabic, plainly, with a next action
+- [ ] Role checks are server-side; any new client-side check is cosmetic only and has an RLS counterpart
+- [ ] No cross-import between `features/customer` and `features/provider` (the lint rule proves it)
+- [ ] Nothing ops-facing was added to `apps/mobile`
+- [ ] Any new admin action writes an `audit_log` row
