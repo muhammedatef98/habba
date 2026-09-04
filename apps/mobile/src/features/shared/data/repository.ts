@@ -558,8 +558,8 @@ export class InMemoryRepository implements Repository {
         provenance: 'habba_verified',
         summaryAr: 'تم تسجيل السيارة في هبّة',
         summaryEn: 'Vehicle registered with Habba',
-      details: {},
-      attachments: [],
+        details: {},
+        attachments: [],
       },
     ]);
 
