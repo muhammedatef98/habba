@@ -35,17 +35,3 @@ export function rowDirectionFor(
   const platformIsBehind = locale !== native;
   return platformIsBehind === reverse ? 'row' : 'row-reverse';
 }
-
-/**
- * Order to hand a list of peers to a container whose `flexDirection` is not
- * ours to set — a navigator's tab bar, above all — so the first one lands on
- * the reading side: the right in Arabic, the left in English.
- *
- * Same rule, expressed in the only thing such a container leaves under our
- * control. When Yoga is already reversing the row, the natural order is
- * correct; when it is not, the order has to carry the direction instead.
- */
-export function readingOrder<T>(items: readonly T[], locale: Direction, native: Direction): T[] {
-  const platformIsBehind = locale !== native;
-  return platformIsBehind ? [...items].reverse() : [...items];
-}

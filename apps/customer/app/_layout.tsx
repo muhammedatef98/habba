@@ -137,8 +137,15 @@ export default function RootLayout() {
               the top padding of every screen in the app. The notice carries
               its own inset instead, and renders nothing at all while the
               connection is fine — so the layout is untouched when online. */}
-          <OfflineNotice testID="offline-notice" />
-          <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+          {/* One flex parent for the two of them. Left as bare siblings, the
+              navigator had no `flex: 1` of its own to fall back on and the
+              screen below it stopped filling the window. */}
+          <View style={{ flex: 1 }}>
+            <OfflineNotice testID="offline-notice" />
+            <View style={{ flex: 1 }}>
+              <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+            </View>
+          </View>
         </ThemeProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
