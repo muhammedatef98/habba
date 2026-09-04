@@ -14,6 +14,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sarOrThrow, type SarAmount } from '@habba/core';
+import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import type {
   City,
@@ -421,6 +422,10 @@ export class SupabaseRepository implements Repository {
   }
 
   async applyAsProvider(input: ProviderApplicationInput): Promise<ProviderApplication> {
+    // See the in-memory implementation: the flag gates the data path too, so a
+    // KYC payload cannot leave the device through a screen added later.
+    assertProviderApplicationsAllowed();
+
     const userId = this.userId();
     if (userId === null) throw new Error('applyAsProvider: not authenticated');
 

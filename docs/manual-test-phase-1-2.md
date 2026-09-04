@@ -56,6 +56,18 @@ timeline cannot be written directly by anyone, including the owner.
 > **Acceptance:** the upgrade is in-app, the role comes only from approval, and
 > a customer-only user can reach no provider surface.
 
+**This section needs `enableProviderMode: true` in `apps/mobile/app.json`.** It
+ships `false`, so on a default build there is no «اشتغل معنا كفنّي» entry, no
+mode switcher, and no reachable KYC form — which is itself worth checking
+first:
+
+| #   | Do this                                                   | Expect                                                                       |
+| --- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| B0a | On a default build, open «حسابي»                          | No «اشتغل معنا كفنّي» card and no mode switcher.                             |
+| B0b | Deep link straight to the form: `habba://become-provider` | Redirected to the profile. No field asking for an ID or an IBAN is rendered. |
+
+Then set the flag to `true`, restart Metro, and continue.
+
 | #   | Do this                                                                | Expect                                                                             |
 | --- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | B1  | «حسابي» → «اشتغل معنا كفنّي»                                           | A KYC form: individual/workshop, business name, city, ID/Iqama, IBAN.              |

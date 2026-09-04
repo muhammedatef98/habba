@@ -13,10 +13,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { repository } from '@/features/shared/data/repository';
+import { canApplyAsProvider, canEnterProviderMode } from '@/features/shared/access/provider-access';
 import { useIsAuthenticated } from '@/features/shared/state/session';
-import type { UserRole } from '@/features/shared/data/types';
-
-const PROVIDER_ROLES: readonly UserRole[] = ['technician', 'workshop_admin'];
 
 export function useRoles() {
   const isAuthenticated = useIsAuthenticated();
@@ -30,14 +28,22 @@ export function useRoles() {
 }
 
 /**
- * Whether to show the mode switcher at all (§5.1.4).
+ * Whether the mode switcher renders and the provider group is reachable
+ * (§5.1.4), which needs both an approved role and the ENABLE_PROVIDER_MODE
+ * flag.
  *
  * Defaults to false while loading and on error: a customer-only user must
  * never see provider UI, so the failure mode is "hidden", never "shown".
  */
 export function useIsApprovedProvider(): boolean {
   const roles = useRoles();
-  return (roles.data ?? []).some((role) => PROVIDER_ROLES.includes(role));
+  return canEnterProviderMode({ roles: roles.data ?? [] });
+}
+
+/** Whether «اشتغل معنا كفنّي» is offered and the KYC form may open. */
+export function useCanApplyAsProvider(): boolean {
+  const roles = useRoles();
+  return canApplyAsProvider({ roles: roles.data ?? [] });
 }
 
 export function useProviderApplication() {

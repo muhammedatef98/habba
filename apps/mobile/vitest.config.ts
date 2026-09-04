@@ -13,6 +13,12 @@ import path from 'node:path';
 export default defineConfig({
   resolve: {
     alias: [
+      // expo-constants reaches React Native, whose Flow-typed source Vitest
+      // cannot parse. The stub supplies the only field the app reads from it.
+      {
+        find: /^expo-constants$/,
+        replacement: path.resolve(__dirname, 'test/stubs/expo-constants.ts'),
+      },
       // `.js` specifiers are correct for tsc's Node resolution but there is no
       // build step here, so map them back onto the TypeScript sources — the
       // same retry metro.config.js performs.

@@ -53,6 +53,7 @@ in-memory repository:
 | Location      | a fixed Dammam coordinate                                         |
 | Camera        | stubbed; "add a photo" records an attachment without a real image |
 | Provider role | granted only by approval, which needs the ops console (not built) |
+| Provider mode | **off** — see Feature flags below                                 |
 
 That last row is deliberate: applying through «اشتغل معنا كفنّي» creates a
 `pending` record and grants nothing. To exercise provider mode against the local
@@ -63,6 +64,24 @@ pnpm db:reset && pnpm api:start
 psql -h localhost -p 54329 -d habba_dev \
   -c "select public.test_approve_provider('<provider-id>')"
 ```
+
+## Feature flags
+
+`app.json` → `expo.extra`:
+
+| Flag                 | Default | Effect when off                                                                                                                                                                                                          |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enableProviderMode` | `false` | «اشتغل معنا كفنّي» is not offered, the KYC screen redirects before rendering a field, the mode switcher is hidden even from an approved provider, the `(provider)` group is unreachable, and `applyAsProvider()` throws. |
+
+Off by default for the logbook launch: the KYC vault is a placeholder
+(ADR-0017) and there is no ops console to approve an application (Amendment B,
+Phase 6). Collecting a national ID and an IBAN we cannot yet protect, from
+applicants nobody can approve, is the thing the flag prevents.
+
+To work on the provider side, set it to `true` and restart Metro. The flag
+decides only what renders and what the client will send — a user still holds no
+provider role until approval, and RLS refuses every provider read regardless
+(§5.1.3).
 
 ## Pointing it at Supabase
 

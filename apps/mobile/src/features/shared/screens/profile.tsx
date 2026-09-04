@@ -18,7 +18,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, ListRow, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
-import { useIsApprovedProvider, useProviderApplication } from '@/features/shared/hooks/use-roles';
+import {
+  useCanApplyAsProvider,
+  useIsApprovedProvider,
+  useProviderApplication,
+} from '@/features/shared/hooks/use-roles';
 import { useMode } from '@/features/shared/state/mode';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/features/shared/state/session';
 import type { ProviderApplicationStatus } from '@/features/shared/data/types';
@@ -38,6 +42,7 @@ export default function ProfileScreen() {
   const isAuthenticated = useIsAuthenticated();
   const isGuest = useIsGuest();
   const isProvider = useIsApprovedProvider();
+  const canApply = useCanApplyAsProvider();
   const application = useProviderApplication();
   const setMode = useMode((state) => state.setMode);
   const signOut = useSession((state) => state.signOut);
@@ -85,8 +90,10 @@ export default function ProfileScreen() {
       ) : null}
 
       {/* «اشتغل معنا كفنّي». Hidden once the role is held — there is nothing
-          left to apply for — and replaced by status while one is in flight. */}
-      {!isProvider ? (
+          left to apply for — replaced by status while one is in flight, and
+          absent entirely while ENABLE_PROVIDER_MODE is off: the launch does not
+          collect an ID or an IBAN it cannot yet protect (ADR-0017). */}
+      {canApply ? (
         <Card testID="provider-upgrade">
           <View style={{ gap: theme.spacing.sm }}>
             <Text variant="bodyStrong">{t('provider.upgrade.cardTitle')}</Text>

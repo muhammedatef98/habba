@@ -16,6 +16,7 @@
  */
 
 import { addSar, applyRate, multiplySar, normalisePlate, sarOrThrow } from '@habba/core';
+import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
@@ -759,6 +760,9 @@ export class InMemoryRepository implements Repository {
   }
 
   async applyAsProvider(input: ProviderApplicationInput): Promise<ProviderApplication> {
+    // Not only a UI concern: with ENABLE_PROVIDER_MODE off, no national ID or
+    // IBAN may be sealed and stored, whatever screen asked (ADR-0017).
+    assertProviderApplicationsAllowed();
     if (this.profile === null) throw new Error('not_signed_in');
     if (this.application !== null && this.application.status !== 'rejected') {
       throw new Error('already_applied');

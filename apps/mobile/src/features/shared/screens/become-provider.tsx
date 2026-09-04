@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { isValidNationalId, isValidSaudiIban, normaliseIban } from '@habba/core';
 import { Button, Card, Field, ListRow, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
-import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
+import { useCanApplyAsProvider } from '@/features/shared/hooks/use-roles';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
 type ProviderType = 'individual' | 'workshop';
@@ -28,7 +28,7 @@ export default function BecomeProviderScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
-  const isProvider = useIsApprovedProvider();
+  const canApply = useCanApplyAsProvider();
   const isArabic = i18n.language === 'ar';
 
   const cities = useQuery({ queryKey: ['cities'], queryFn: () => repository.listCities() });
@@ -43,8 +43,11 @@ export default function BecomeProviderScreen() {
   const [submitted, setSubmitted] = useState(false);
 
   if (!isAuthenticated) return <Redirect href="/" />;
-  // Already approved: there is nothing here for them.
-  if (isProvider) return <Redirect href="/profile" />;
+  // Covers both cases in one check: ENABLE_PROVIDER_MODE is off, or the role is
+  // already held and there is nothing here to apply for. The redirect happens
+  // before render, so with the flag off no field that asks for a national ID or
+  // an IBAN is ever mounted — not disabled, not hidden, not mounted.
+  if (!canApply) return <Redirect href="/profile" />;
 
   async function handleSubmit() {
     setError(undefined);
