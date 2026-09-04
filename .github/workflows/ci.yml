@@ -46,6 +46,50 @@ jobs:
       - name: Bundle both apps
         run: pnpm bundle
 
+  preview-build:
+    name: Preview build (EAS)
+    runs-on: ubuntu-latest
+    needs: static
+
+    # Only on the default branch, and only once an Expo token exists. Without
+    # the secret this job is skipped rather than failed: a red pipeline that
+    # means "you have not signed up for EAS yet" trains people to ignore red.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for an Expo token
+        id: token
+        run: echo "present=${{ secrets.EXPO_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.present == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        if: steps.token.outputs.present == 'true'
+
+      - uses: expo/expo-github-action@v8
+        if: steps.token.outputs.present == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # An installable build of the customer app, which is the only way to see
+      # this app as its users will: Expo Go cannot apply config plugins, and
+      # `forcesRTL` in app.json is one — so RTL behaves differently there than
+      # it does in anything shipped. See CONTRIBUTING.md.
+      - name: Build customer preview
+        if: steps.token.outputs.present == 'true'
+        working-directory: apps/customer
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+
   database:
     name: Migrations, RLS, hash chain
     runs-on: ubuntu-latest
