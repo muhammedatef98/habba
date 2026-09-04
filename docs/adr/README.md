@@ -2,8 +2,10 @@
 
 Format and status conventions: [ADR-0001](0001-record-architecture-decisions.md).
 
-**Nothing here is `Accepted` yet.** Every ADR below is `Proposed` — written with a recommendation,
-awaiting the product owner's decision. No application code has been written.
+Most ADRs below remain `Proposed` — written with a recommendation, awaiting the product owner's
+decision. The `Accepted` ones are implemented and have tests behind them; where an accepted decision
+is a stand-in for a blocked one (ADR-0017's KYC sealing, which waits on ADR-0010), that is stated in
+the record itself rather than left to be inferred.
 
 ## Index
 
@@ -24,6 +26,8 @@ awaiting the product owner's decision. No application code has been written.
 | [0013](0013-provider-order-visibility.md)                   | Masked order discovery via RPC, not RLS row reads                    | Proposed     | Phase 3                              |
 | [0014](0014-toolchain-and-versions.md)                      | Node, pnpm, Expo SDK, TypeScript strictness, CI                      | Proposed     | Phase 1                              |
 | [0015](0015-local-verification-harness.md)                  | Postgres + PostGIS + PostgREST harness, no Docker                    | **Accepted** | Phase 1                              |
+| [0016](0016-roles-as-a-join-table.md)                       | Roles as `user_roles`; one app, two route groups                     | **Accepted** | Phase 1 (Amendment A)                |
+| [0017](0017-report-qr-and-kyc-sealing.md)                   | In-page report QR; KYC sealing seam (stub pending 0010)              | **Accepted** | Phase 2                              |
 
 ## Blocking Phase 1
 
