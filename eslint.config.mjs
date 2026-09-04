@@ -48,7 +48,7 @@ export default tseslint.config(
     // Metro reads its config with `require`, so these files are CommonJS and
     // run in Node — not app code. `require`, `module` and `__dirname` are
     // correct here rather than something to work around.
-    files: ['**/metro.config.js', '**/babel.config.js'],
+    files: ['**/metro.config.js', '**/babel.config.js', '**/jest.config.js'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { require: 'readonly', module: 'writable', __dirname: 'readonly' },

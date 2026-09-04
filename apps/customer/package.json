@@ -8,7 +8,7 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests && jest --passWithNoTests"
   },
   "dependencies": {
     "@expo-google-fonts/almarai": "^0.4.1",
@@ -46,7 +46,13 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@react-native/jest-preset": "^0.86.3",
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.2.0",
+    "jest": "^30.5.1",
+    "jest-expo": "^57.0.5",
+    "react-test-renderer": "^19.2.8",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
