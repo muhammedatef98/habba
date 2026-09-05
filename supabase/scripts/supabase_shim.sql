@@ -70,10 +70,20 @@ begin
   -- same arrangement, and it is what makes the HTTP integration tests exercise
   -- genuine role-based RLS rather than a simulation of it.
   if not exists (select 1 from pg_roles where rolname = 'authenticator') then
-    create role authenticator login noinherit;
+    -- A password, because the CI Postgres image authenticates host connections
+    -- with scram-sha-256 while the local cluster uses trust. Without one,
+    -- PostgREST could not connect in CI at all — which is how the integration
+    -- and RLS steps came to be "passing" without ever having run.
+    --
+    -- Local-only, like everything else in this shim, and deliberately named so
+    -- that it cannot be mistaken for a credential worth protecting.
+    create role authenticator login noinherit password 'habba-local-only';
   end if;
 end
 $$;
+
+-- Idempotent for a cluster where the role already exists from an earlier run.
+alter role authenticator with login password 'habba-local-only';
 
 grant anon, authenticated, service_role to authenticator;
 
