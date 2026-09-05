@@ -1,82 +1,94 @@
 /**
  * دفتر السيارة — the logbook.
  *
- * Build prompt §9.1: "This is the app's soul — design it first, not last."
+ * §9.1: "This is the app's soul — design it first, not last." It was designed
+ * last, and it showed: a title that never said which car, a flat stack of
+ * identical cards, and the verified-versus-owner-entered ratio — the number the
+ * entire moat rests on — rendered as a 12px grey caption between two headings.
  *
- * Chronological, newest first, grouped by year. The grouping is not decoration:
- * a well-kept logbook runs to dozens of entries over a car's life, and "what
- * happened in 2024" is how an owner — and a buyer — actually reads it. The year
- * header carries that year's entry count and its verified share, so the shape
- * of the history is visible without opening anything.
+ * The three things this screen now does that it did not:
  *
- * Every event renders its provenance (ADR-0005). A Habba-verified service and
- * an owner's recollection must never look the same.
+ *  1. Names the car. With two vehicles in a household, "دفتر السيارة" alone is
+ *     a screen you cannot be sure you are reading correctly.
+ *  2. Leads with coverage. §1.2 says a documented car sells for more, and what
+ *     a buyer pays for is the *verified* share. The gap between the two bars is
+ *     the argument for routing the next service through Habba, so it is shown
+ *     as a proportion rather than as a sentence.
+ *  3. Filters, which §9.1 asked for and nothing implemented. The cuts are the
+ *     questions people arrive with — when was it serviced, has it been
+ *     inspected, what has the odometer done — not the schema's nine event
+ *     types.
+ *
+ * تقرير هبّة lives inside the coverage card rather than as a loose amber button
+ * halfway down, because generating it is the thing you do *because of* the
+ * coverage number, not a separate errand.
  */
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, EmptyState, ProvenanceBadge, Screen, Text, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Icon,
+  Screen,
+  SkeletonCard,
+  Text,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
+import { CoverageBar } from '@/features/customer/components/logbook/CoverageBar';
+import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
+import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { reportBaseUrl } from '@/features/shared/lib/config';
 import { repository } from '@/features/shared/data/repository';
-import type { Provenance, TimelineEvent } from '@/features/shared/data/types';
+import { formatCount } from '@/features/shared/lib/format-number';
+import {
+  countByFilter,
+  filterEvents,
+  LOGBOOK_FILTERS,
+  type LogbookFilter,
+} from '@/features/shared/lib/logbook-filter';
+import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
-const PROVENANCE_LABEL_KEY: Record<Provenance, string> = {
-  habba_verified: 'logbook.verifiedBadge',
-  self_reported: 'logbook.selfReportedBadge',
-  self_documented: 'logbook.selfDocumentedBadge',
-  third_party: 'logbook.thirdPartyBadge',
+const FILTER_LABEL_KEY: Readonly<Record<LogbookFilter, string>> = {
+  all: 'logbook.filterAll',
+  service: 'logbook.filterService',
+  inspection: 'logbook.filterInspection',
+  mileage: 'logbook.filterMileage',
 };
-
-interface YearGroup {
-  readonly year: number;
-  readonly events: readonly TimelineEvent[];
-  readonly verified: number;
-}
-
-/**
- * Groups by the year the service HAPPENED, not the year it was recorded.
- * An owner entering ten years of history in one sitting must see ten years,
- * not one.
- */
-function groupByYear(events: readonly TimelineEvent[]): readonly YearGroup[] {
-  const byYear = new Map<number, TimelineEvent[]>();
-
-  for (const event of events) {
-    const year = new Date(event.occurredAt).getFullYear();
-    const bucket = byYear.get(year);
-    if (bucket === undefined) byYear.set(year, [event]);
-    else bucket.push(event);
-  }
-
-  return [...byYear.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .map(([year, group]) => ({
-      year,
-      events: [...group].sort(
-        (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
-      ),
-      verified: group.filter((event) => event.provenance === 'habba_verified').length,
-    }));
-}
 
 export default function LogbookScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const isArabic = i18n.language === 'ar';
+  const isArabic = i18n.language.startsWith('ar');
 
   const [reportToken, setReportToken] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<LogbookFilter>('all');
 
   const timeline = useQuery({
     queryKey: ['timeline', id],
     queryFn: () => repository.listTimeline(id ?? ''),
     enabled: id !== undefined,
+  });
+
+  const vehicle = useQuery({
+    queryKey: ['vehicle', id],
+    queryFn: () => repository.getVehicle(id ?? ''),
+    enabled: id !== undefined,
+  });
+
+  const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
+  const models = useQuery({
+    queryKey: ['models', 'all'],
+    queryFn: () => repository.listAllModels(),
   });
 
   const report = useMutation({
@@ -97,161 +109,212 @@ export default function LogbookScreen() {
     },
   });
 
-  const events = useMemo(() => timeline.data ?? [], [timeline.data]);
-  const groups = useMemo(() => groupByYear(events), [events]);
-
   if (!isAuthenticated) return <Redirect href="/" />;
 
+  const events = timeline.data ?? [];
   const verifiedCount = events.filter((event) => event.provenance === 'habba_verified').length;
   const selfReportedCount = events.length - verifiedCount;
 
+  const counts = countByFilter(events);
+  const shown = filterEvents(events, filter);
+
+  const sources = { makes: makes.data, models: models.data, isArabic };
+  const car = vehicle.data;
+  const described = car === null || car === undefined ? '' : describeVehicleModel(car, sources);
+  const heading =
+    car === null || car === undefined
+      ? t('logbook.vehicleUnknown')
+      : (car.nickname?.trim().length ?? 0) > 0
+        ? (car.nickname as string)
+        : described.length > 0
+          ? described
+          : vehicleLabel(car, sources);
+
   return (
-    <Screen scrollable>
+    <Screen scrollable style={{ gap: theme.spacing.lg }}>
       <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="title">{t('logbook.title')}</Text>
-        {events.length > 0 ? (
-          // The honest headline: how much of this history Habba can stand
-          // behind. It is also the reason to route the next service through
-          // Habba — raising the ratio raises resale value (ADR-0005).
-          <Text variant="caption" tone="muted">
-            {t('logbook.coverage', {
-              verified: verifiedCount,
-              selfReported: selfReportedCount,
-            })}
-          </Text>
-        ) : null}
+        <Text variant="label" tone="muted">
+          {t('logbook.title')}
+        </Text>
+        <Text variant="title">{heading}</Text>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            gap: theme.spacing.sm,
+            alignItems: 'center',
+          }}
+        >
+          {car?.plateNormalised != null ? (
+            <Text variant="bodySmall" tone="muted" numeric>
+              {car.plateNormalised}
+            </Text>
+          ) : null}
+          {events.length > 0 ? (
+            <Text variant="bodySmall" tone="subtle">
+              {t('logbook.recordsCount', { count: formatCount(events.length, i18n.language) })}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
-      {events.length === 0 ? (
-        <EmptyState
-          testID="logbook-empty"
-          title={t('logbook.emptyTitle')}
-          body={t('logbook.emptyBody')}
-          actionLabel={t('logbook.emptyAction')}
-          onAction={() => router.push({ pathname: '/record-service', params: { id } })}
-          secondaryActionLabel={t('logbook.mileageAction')}
-          onSecondaryAction={() => router.push({ pathname: '/mileage', params: { id } })}
+      {/* The one screen the product cannot afford to be wrong about. Telling
+          an owner with two years of history that their logbook "starts here"
+          undermines the single thing §1 asks them to trust — and it would be a
+          dropped connection saying it, not the record. */}
+      {timeline.isError ? (
+        <ErrorState
+          testID="logbook-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={timeline.isFetching}
+          onRetry={() => void timeline.refetch()}
         />
-      ) : null}
-
-      {groups.map((group) => (
-        <View key={group.year} style={{ gap: theme.spacing.sm }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: theme.spacing.sm,
-            }}
-          >
-            <Text variant="heading">{group.year}</Text>
-            <Text variant="caption" tone="subtle">
-              {t('logbook.yearSummary', {
-                count: group.events.length,
-                verified: group.verified,
-              })}
-            </Text>
-          </View>
-
-          {group.events.map((event) => {
-            const recordedLater =
-              new Date(event.recordedAt).getTime() - new Date(event.occurredAt).getTime() >
-              60 * 60 * 1000;
-
-            return (
-              <Card
-                key={event.id}
-                testID={`event-${event.id}`}
-                onPress={() =>
-                  router.push({ pathname: '/event', params: { id, eventId: event.id } })
-                }
-                accessibilityLabel={isArabic ? event.summaryAr : event.summaryEn}
-              >
-                <View style={{ gap: theme.spacing.sm }}>
-                  <ProvenanceBadge
-                    provenance={event.provenance}
-                    label={t(PROVENANCE_LABEL_KEY[event.provenance])}
-                  />
-
-                  <Text variant="bodyStrong">{isArabic ? event.summaryAr : event.summaryEn}</Text>
-
-                  <View style={{ gap: theme.spacing.xs }}>
-                    <Text variant="caption" tone="subtle">
-                      {new Date(event.occurredAt).toLocaleDateString(isArabic ? 'ar-SA' : 'en-GB')}
-                      {event.mileage !== null
-                        ? ` · ${t('logbook.mileageAt', { mileage: event.mileage })}`
-                        : ''}
-                    </Text>
-
-                    {/* ADR-0012: when an event was recorded materially later than
-                        it happened, say so rather than implying live capture. */}
-                    {recordedLater ? (
-                      <Text variant="caption" tone="subtle">
-                        {t('logbook.recordedLater')}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              </Card>
-            );
-          })}
+      ) : timeline.isPending ? (
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.md }}
+        >
+          <SkeletonCard testID="logbook-skeleton" lines={3} />
+          <SkeletonCard lines={3} />
         </View>
-      ))}
-
-      <Button
-        testID="record-service"
-        label={t('logbook.addRecord')}
-        variant={events.length === 0 ? 'primary' : 'secondary'}
-        onPress={() => router.push({ pathname: '/record-service', params: { id } })}
-      />
-
-      <Button
-        testID="open-mileage"
-        label={t('logbook.mileageAction')}
-        variant="secondary"
-        onPress={() => router.push({ pathname: '/mileage', params: { id } })}
-      />
-
-      {/* تقرير هبّة is only meaningful once there is history to report on. */}
-      {events.length > 0 ? (
+      ) : events.length === 0 ? (
+        <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
+          <View style={{ gap: theme.spacing.md }}>
+            <Text variant="heading">{t('logbook.emptyTitle')}</Text>
+            <Text variant="body" tone="muted">
+              {t('logbook.emptyBody')}
+            </Text>
+            <Button
+              testID="record-service"
+              label={t('logbook.addRecord')}
+              onPress={() => router.push({ pathname: '/record-service', params: { id } })}
+            />
+          </View>
+        </Card>
+      ) : (
         <>
-          <Button
-            testID="generate-report"
-            label={t('logbook.generateReport')}
-            variant="accent"
-            onPress={() => report.mutate()}
-            loading={report.isPending}
-          />
+          <Card testID="logbook-coverage" elevation="sm" style={{ gap: theme.spacing.md }}>
+            <View style={{ gap: theme.spacing.xs }}>
+              <Text variant="subheading">{t('logbook.coverageTitle')}</Text>
+              <Text variant="caption" tone="muted">
+                {t('logbook.coverageBody')}
+              </Text>
+            </View>
 
-          {reportToken !== null ? (
-            <Card elevation="sm">
-              <View style={{ gap: theme.spacing.sm }}>
-                <Text variant="bodyStrong">{t('logbook.reportReady')}</Text>
+            <CoverageBar
+              testID="logbook-coverage-bar"
+              verified={verifiedCount}
+              selfReported={selfReportedCount}
+            />
+
+            <Button
+              testID="generate-report"
+              label={t('logbook.generateReport')}
+              variant="accent"
+              size="medium"
+              onPress={() => report.mutate()}
+              loading={report.isPending}
+            />
+
+            {reportToken !== null ? (
+              <View
+                style={{
+                  gap: theme.spacing.xs,
+                  borderTopWidth: 1,
+                  borderTopColor: theme.colors.border,
+                  paddingTop: theme.spacing.md,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
+                  <Icon name="check" size={theme.iconSize.sm} color={theme.colors.successFg} />
+                  <Text variant="bodyStrong" tone="success">
+                    {t('logbook.reportReady')}
+                  </Text>
+                </View>
                 <Text variant="caption" tone="muted">
                   {t('logbook.reportShareHint')}
                 </Text>
-                <Text variant="caption" style={{ color: theme.colors.primary }} selectable>
+                <Text variant="caption" tone="primary" selectable>
                   {`${reportBaseUrl()}/${reportToken}`}
                 </Text>
                 <Text variant="caption" tone="subtle">
                   {t('logbook.reportCoverage', {
-                    verified: verifiedCount,
-                    total: events.length,
+                    verified: formatCount(verifiedCount, i18n.language),
+                    total: formatCount(events.length, i18n.language),
                   })}
                 </Text>
               </View>
-            </Card>
-          ) : null}
+            ) : null}
 
-          {reportError !== null ? (
-            <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
-              <Text variant="caption" style={{ color: theme.colors.emergency }}>
+            {reportError !== null ? (
+              <Text variant="caption" tone="emergency">
                 {reportError}
               </Text>
-            </Card>
-          ) : null}
+            ) : null}
+          </Card>
+
+          <View style={{ gap: theme.spacing.md }}>
+            <SectionHeader
+              title={t('logbook.title')}
+              actionLabel={t('logbook.addRecord')}
+              onAction={() => router.push({ pathname: '/record-service', params: { id } })}
+            />
+
+            {/* A filter with nothing behind it is a control that punishes
+                curiosity, so an empty bucket is not offered. */}
+            <View
+              style={{
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                flexWrap: 'wrap',
+                gap: theme.spacing.sm,
+              }}
+            >
+              {LOGBOOK_FILTERS.filter((option) => counts[option] > 0).map((option) => {
+                const selected = filter === option;
+                return (
+                  <Card
+                    key={option}
+                    testID={`logbook-filter-${option}`}
+                    elevation="none"
+                    onPress={() => setFilter(option)}
+                    style={{
+                      paddingVertical: theme.spacing.xs,
+                      paddingHorizontal: theme.spacing.md,
+                      minHeight: 36,
+                      justifyContent: 'center',
+                      borderRadius: theme.radius.full,
+                      backgroundColor: selected
+                        ? theme.colors.primarySubtle
+                        : theme.colors.surfaceSunken,
+                      borderColor: selected ? theme.colors.primary : theme.colors.border,
+                      borderWidth: selected ? 1.5 : 1,
+                    }}
+                  >
+                    <Text variant="caption" tone={selected ? 'primary' : 'muted'}>
+                      {`${t(FILTER_LABEL_KEY[option])} · ${formatCount(counts[option], i18n.language)}`}
+                    </Text>
+                  </Card>
+                );
+              })}
+            </View>
+
+            {shown.length === 0 ? (
+              <Text variant="bodySmall" tone="muted">
+                {t('logbook.filterEmpty')}
+              </Text>
+            ) : (
+              <LogbookTimeline testID="logbook-timeline" events={shown} />
+            )}
+          </View>
         </>
-      ) : null}
+      )}
 
       <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>

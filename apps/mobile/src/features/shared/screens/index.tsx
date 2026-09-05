@@ -16,8 +16,8 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { parseSaudiPhone } from '@habba/core';
-import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
+import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
+import { Button, Field, HabbaWordmark, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/features/shared/lib/otp';
 import { repository } from '@/features/shared/data/repository';
 import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
@@ -94,6 +94,10 @@ export default function PhoneScreen() {
     <Screen scrollable>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.sm }}>
+          {/* The full lockup, not the mark alone: this is the one screen that
+              introduces the brand, and the wordmark is where the name and the
+              gust are shown together. */}
+          <HabbaWordmark size={56} />
           <Text variant="display">{t('auth.welcomeTitle')}</Text>
           <Text variant="body" tone="muted">
             {t('auth.welcomeSubtitle')}
@@ -115,7 +119,12 @@ export default function PhoneScreen() {
           textContentType="telephoneNumber"
           autoComplete="tel"
           maxLength={16}
-          // Phone numbers read left-to-right even in an Arabic UI.
+          // The dialling code, shown rather than assumed. `parseSaudiPhone`
+          // accepts 05…, 5…, +966… and 00966… equally, so this is not
+          // validation — it is the app answering "do I type the zero?" before
+          // the question is asked, on the very first screen. The prefix is not
+          // part of the value, so every form the parser accepts still works.
+          prefix={`+${SAUDI_COUNTRY_CODE}`}
           forceLtrInput
         />
 

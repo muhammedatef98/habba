@@ -27,7 +27,8 @@ insert into expected_guarded (table_name) values
   ('order_parts'),         -- 0035
   ('profiles'),            -- 0036  (privilege escalation)
   ('habba_reports'),       -- 0036  (report tampering)
-  ('appointment_slots');   -- 0036  (booked_count)
+  ('appointment_slots'),   -- 0036  (booked_count)
+  ('order_offers');        -- 0042  (self-acceptance bypassing escrow)
 
 -- Tables whose only update policy is ops-gated. RLS alone is a sufficient
 -- answer there: `using (is_ops())` already restricts the whole row.

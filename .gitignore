@@ -6,6 +6,8 @@ coverage/
 
 # Expo
 .expo/
+.next/
+next-env.d.ts
 .expo-shared/
 *.jks
 *.p8
@@ -38,3 +40,6 @@ supabase/.tmp/
 
 # Integration test artifacts (rendered report pages)
 .tmp/
+
+# Output of the CI bundle check (pnpm bundle)
+.expo-bundle-check/

@@ -1,10 +1,16 @@
 /**
- * Vitest needs the same `@/` alias that tsc and Metro already have.
+ * Vitest owns the pure modules; Jest owns anything that renders.
  *
- * tsconfig `paths` teaches the type-checker, and metro.config.js teaches the
- * bundler; neither reaches Vitest, which resolves through Vite. Without this
- * the data-layer suites fail to load the moment a file imports `@/features/...`
- * — which is what happened when the app moved to feature folders.
+ * The split is not a preference — Vitest cannot load `react-native` at all (it
+ * ships Flow syntax and fails to parse), which is why every test in this repo
+ * was a pure-module test until the tab bar disappeared under a green build.
+ * `*.render.test.tsx` is the boundary, and it is excluded here so the two
+ * runners never fight over the same file.
+ *
+ * The aliases are the other half: tsconfig `paths` teaches the type-checker and
+ * metro.config.js teaches the bundler, and neither reaches Vitest, which
+ * resolves through Vite. Without them the data-layer suites fail to load the
+ * moment a file imports `@/features/...`.
  */
 
 import { defineConfig } from 'vitest/config';
@@ -25,5 +31,8 @@ export default defineConfig({
       { find: /^@\/(.*)\.js$/, replacement: path.resolve(__dirname, 'src/$1.ts') },
       { find: /^@\/(.*)$/, replacement: path.resolve(__dirname, 'src/$1') },
     ],
+  },
+  test: {
+    exclude: ['**/node_modules/**', '**/*.render.test.tsx'],
   },
 });

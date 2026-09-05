@@ -37,6 +37,59 @@ jobs:
       - name: Unit tests
         run: pnpm -r test
 
+      # The gap every other step in this job leaves open. Typecheck resolves
+      # types, lint reads syntax, and the unit tests only ever load pure
+      # modules — none of them ever asks Metro to build the app. A missing
+      # native dependency, an unresolvable import or a broken asset therefore
+      # passes all of them and fails on the first device that opens the app.
+      # `expo export` is the cheapest thing that actually bundles.
+      - name: Bundle both apps
+        run: pnpm bundle
+
+  preview-build:
+    name: Preview build (EAS)
+    runs-on: ubuntu-latest
+    needs: static
+
+    # Only on the default branch, and only once an Expo token exists. Without
+    # the secret this job is skipped rather than failed: a red pipeline that
+    # means "you have not signed up for EAS yet" trains people to ignore red.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for an Expo token
+        id: token
+        run: echo "present=${{ secrets.EXPO_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.present == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        if: steps.token.outputs.present == 'true'
+
+      - uses: expo/expo-github-action@v8
+        if: steps.token.outputs.present == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # An installable build of the app, which is the only way to see it as its
+      # users will: Expo Go cannot apply config plugins, and `forcesRTL` in
+      # app.json is one — so RTL behaves differently there than it does in
+      # anything shipped. See CONTRIBUTING.md.
+      - name: Build mobile preview
+        if: steps.token.outputs.present == 'true'
+        working-directory: apps/mobile
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+
   database:
     name: Migrations, RLS, hash chain
     runs-on: ubuntu-latest

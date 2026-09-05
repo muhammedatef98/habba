@@ -31,6 +31,26 @@ export default function JobScreen() {
     enabled: id !== undefined,
   });
 
+  /**
+   * Declining is deliberately cheap and explicit.
+   *
+   * A provider who cannot decline in one tap will simply ignore the offer
+   * instead, which looks identical to the dispatcher — the job sits pending,
+   * the radius never widens, and the customer waits on somebody who already
+   * decided no. An ignored offer is the expensive outcome, not a declined one.
+   *
+   * Only offered on jobs not yet accepted: there is nothing to decline once
+   * the job is yours, and abandoning one is a cancellation with different
+   * rules entirely.
+   */
+  const decline = useMutation({
+    mutationFn: () => providerRepository.declineOffer(id ?? ''),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['open-jobs'] });
+      router.replace('/');
+    },
+  });
+
   const advance = useMutation({
     mutationFn: async () => {
       const current = job.data;
@@ -158,6 +178,19 @@ export default function JobScreen() {
         <Text variant="caption" style={{ color: theme.colors.warning }}>
           {t('provider.evidenceBlocks')}
         </Text>
+      ) : null}
+
+      {/* Only while the job is still an offer. Once it is yours there is
+          nothing to decline — walking away then is a cancellation, which has
+          different rules and different consequences. */}
+      {step.action === 'accept' ? (
+        <Button
+          testID="decline-offer"
+          label={t('job.decline')}
+          variant="secondary"
+          onPress={() => decline.mutate()}
+          loading={decline.isPending}
+        />
       ) : null}
 
       <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />

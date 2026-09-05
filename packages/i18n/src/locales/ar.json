@@ -11,7 +11,11 @@
     "skip": "تخطّي",
     "optional": "اختياري",
     "loading": "جارٍ التحميل…",
-    "search": "بحث"
+    "search": "بحث",
+    "later": "لاحقاً",
+    "share": "مشاركة",
+    "verified": "موثّق",
+    "sar": "{{amount}} ر.س"
   },
   "auth": {
     "welcomeTitle": "أهلاً بك في هبّة",
@@ -21,14 +25,14 @@
     "phoneHint": "سنرسل لك رمز تحقّق برسالة نصية",
     "sendCode": "إرسال الرمز",
     "otpTitle": "أدخل رمز التحقّق",
-    "otpSubtitle": "أرسلنا رمزاً مكوّناً من ٤ أرقام إلى {{phone}}",
+    "otpSubtitle": "أرسلنا رمزاً مكوّناً من {{length}} أرقام إلى {{phone}}",
     "resendIn": "إعادة الإرسال خلال {{seconds}} ثانية",
     "resend": "إعادة إرسال الرمز",
     "verify": "تحقّق",
     "nameTitle": "ما اسمك؟",
     "nameLabel": "الاسم الكامل",
     "continueAsGuest": "الدخول كضيف",
-    "guestHint": "جرّب دفتر السيارة أولاً. تقدر تضيف رقمك أو بريدك في أي وقت وتحتفظ بكل شيء.",
+    "guestHint": "جرّب دفتر السيارة أولاً. يمكنك إضافة رقمك أو بريدك في أي وقت مع الاحتفاظ بكل شيء.",
     "useEmail": "الدخول بالبريد الإلكتروني",
     "emailSignInTitle": "الدخول بالبريد",
     "emailRegisterTitle": "إنشاء حساب بالبريد",
@@ -61,7 +65,11 @@
       "unknownEmail": "لا يوجد حساب بهذا البريد. أنشئ حساباً جديداً.",
       "wrongPassword": "كلمة المرور غير صحيحة.",
       "guestNeedsIdentity": "أضف رقم جوال أو بريد إلكتروني لحفظ الحساب."
-    }
+    },
+    "otpLabel": "رمز التحقّق",
+    "changePhone": "تغيير رقم الجوال",
+    "showPassword": "إظهار",
+    "hidePassword": "إخفاء"
   },
   "vehicle": {
     "addTitle": "أضف سيارتك",
@@ -84,8 +92,11 @@
       "yearTooOld": "سنة الصنع يجب أن تكون ١٩٧٠ أو بعدها.",
       "yearTooNew": "سنة الصنع غير صحيحة.",
       "vinInvalid": "رقم الهيكل يجب أن يتكوّن من ١٧ خانة بدون الأحرف I أو O أو Q.",
-      "required": "هذا الحقل مطلوب."
-    }
+      "required": "هذا الحقل مطلوب.",
+      "mileageImplausible": "تحقّق من القراءة — الرقم غير منطقي.",
+      "saveFailed": "تعذّر حفظ السيارة. تحقّق من الاتصال وحاول مرة أخرى."
+    },
+    "mileageHint": "يساعدنا نتوقّع مواعيد الصيانة القادمة"
   },
   "logbook": {
     "title": "دفتر السيارة",
@@ -191,7 +202,19 @@
       "appendOnlyNote": "السجلات لا تُعدَّل ولا تُحذف بعد إدخالها؛ هذا ما يجعل الدفتر ذا قيمة عند البيع. لتصحيح خطأ أضف سجلاً جديداً يوضّحه.",
       "missingTitle": "هذا السجل غير موجود",
       "missingBody": "قد يكون الرابط قديماً أو السجل يخصّ سيارة أخرى."
-    }
+    },
+    "coverageTitle": "توثيق الدفتر",
+    "coverageBody": "كل خدمة تنفّذها هبّة تُضاف موثّقة. كل ما زاد التوثيق، زادت قيمة سيارتك عند البيع.",
+    "filterAll": "الكل",
+    "filterService": "صيانة",
+    "filterInspection": "فحص",
+    "filterMileage": "العداد",
+    "filterEmpty": "ما فيه سجلات بهذا التصنيف.",
+    "recordsCount": "{{count}} سجل",
+    "vehicleUnknown": "سيارتك",
+    "recordMonth": "الشهر",
+    "recordDay": "اليوم",
+    "recordYear": "السنة"
   },
   "settings": {
     "title": "الإعدادات",
@@ -203,25 +226,101 @@
     "themeDark": "داكن",
     "themeSystem": "حسب النظام",
     "signOut": "تسجيل الخروج",
-    "restartRequired": "سيُعاد تشغيل التطبيق لتطبيق اتجاه الكتابة الجديد."
+    "restartRequired": "أغلق التطبيق وافتحه من جديد لتطبيق اللغة واتجاه الكتابة.",
+    "sectionAccount": "الحساب",
+    "sectionPreferences": "التفضيلات",
+    "sectionAbout": "عن هبّة",
+    "guestLabel": "ضيف",
+    "noContact": "ما أضفت رقم أو بريد بعد",
+    "myVehicles": "سياراتي",
+    "vehiclesCount": "{{count}} سيارة",
+    "signOutConfirmTitle": "تسجيل الخروج؟",
+    "signOutConfirmBody": "بيانات سيارتك محفوظة، وترجع لها بنفس الرقم أو البريد.",
+    "signOutGuestWarning": "أنت تستخدم التطبيق كضيف. إذا سجّلت الخروج الآن قبل إضافة رقمك أو بريدك، فلن تتمكّن من الوصول إلى دفتر سيارتك مرة أخرى.",
+    "signOutConfirm": "نعم، سجّل خروجي",
+    "version": "الإصدار",
+    "help": "المساعدة والدعم",
+    "languageHint": "تغيير اللغة يغيّر اتجاه الكتابة، ويحتاج إعادة فتح التطبيق."
   },
   "errors": {
     "generic": "حدث خطأ غير متوقّع.",
     "genericAction": "حاول مرة أخرى",
     "offline": "لا يوجد اتصال بالإنترنت. سنحفظ ما أدخلته ونرسله عند عودة الاتصال.",
     "notFound": "لم نعثر على ما تبحث عنه.",
-    "forbidden": "ليس لديك صلاحية لهذا الإجراء."
+    "forbidden": "ليس لديك صلاحية لهذا الإجراء.",
+    "offlineTitle": "لا يوجد اتصال بالإنترنت",
+    "offlineBody": "ما تظهره الشاشة الآن قد يكون قديماً. سيتحدّث تلقائياً عند عودة الاتصال."
   },
   "home": {
     "emergencyAction": "طلب طارئ",
     "bookingAction": "حجز موعد",
     "noVehicleTitle": "أضف سيارة أولاً",
-    "noVehicleBody": "لطلب خدمة طارئة نحتاج بيانات سيارتك."
+    "noVehicleBody": "لطلب خدمة طارئة نحتاج بيانات سيارتك.",
+    "emergencyCta": "طلب طارئ",
+    "emergencySubtitle": "أقرب فنّي متاح · 24 ساعة",
+    "bookAppointment": "حجز موعد",
+    "alertsTitle": "تنبيهات سيارتك",
+    "bookNow": "احجز الآن",
+    "recentTitle": "آخر الطلبات",
+    "noRecent": "ما عندك طلبات سابقة بعد.",
+    "lastReading": "آخر قراءة {{km}} كم",
+    "greetingMorning": "صباح الخير",
+    "greetingEvening": "مساء الخير",
+    "greetingNight": "ليلة بخير",
+    "activeTitle": "طلبك جارٍ الآن",
+    "activeTrack": "تتبّع الطلب",
+    "quickTitle": "خدمات سريعة",
+    "quickAll": "كل الخدمات",
+    "vehicleTitle": "سيارتك",
+    "statMileage": "العداد",
+    "statRecords": "سجلّات",
+    "statLastService": "آخر خدمة",
+    "openLogbook": "افتح دفتر السيارة",
+    "switchVehicle": "تبديل",
+    "otherVehicles": "سياراتك الأخرى",
+    "statEmpty": "—",
+    "emergencyBadge": "متاح الآن"
   },
   "booking": {
     "title": "حجز موعد",
     "comingSoonTitle": "الحجز قريباً",
-    "comingSoonBody": "حجز المواعيد والورش قادم في المرحلة التالية. للحالات الطارئة استخدم «طلب طارئ» من الشاشة الرئيسية."
+    "comingSoonBody": "حجز المواعيد والورش قادم في المرحلة التالية. للحالات الطارئة استخدم «طلب طارئ» من الشاشة الرئيسية.",
+    "stepService": "الخدمة",
+    "stepProvider": "مقدّم الخدمة",
+    "stepSlot": "الموعد",
+    "serviceHeadline": "ما الخدمة التي تحتاجها؟",
+    "serviceSubhead": "احجز في وقت يناسبك — بدون استعجال.",
+    "durationMinutes": "{{minutes}} دقيقة",
+    "vehicleLabel": "لأي سيارة؟",
+    "modeLabel": "أين تريد تنفيذ الخدمة؟",
+    "modeMobile": "يجيك لموقعك",
+    "modeWorkshop": "في الورشة",
+    "modeLockedWorkshop": "هذه الخدمة تحتاج رافعة، فتتم في الورشة فقط.",
+    "modeLockedMobile": "هذه الخدمة متاحة كخدمة متنقّلة فقط.",
+    "providerHeadline": "اختر مقدّم الخدمة",
+    "providerSubhead": "الأعلى تقييماً أولاً. السعر شامل الخدمة قبل الضريبة.",
+    "providerJobs": "{{jobs}} خدمة منجزة",
+    "providerComesToYou": "يجيك لموقعك",
+    "providerNone": "ما فيه مقدّم خدمة متاح لهذه الخدمة بهذه الطريقة حالياً. جرّب الطريقة الثانية.",
+    "slotHeadline": "متى يناسبك؟",
+    "slotSubhead": "المواعيد المتاحة خلال الأسبوع القادم.",
+    "slotNone": "ما فيه مواعيد متاحة عند هذا المقدّم. ارجع واختر غيره.",
+    "slotToday": "اليوم",
+    "slotTomorrow": "غدًا",
+    "slotLastOne": "آخر موعد",
+    "summaryTitle": "ملخّص الحجز",
+    "summarySubtotal": "الخدمة",
+    "summaryVat": "ضريبة القيمة المضافة ١٥٪",
+    "summaryTotal": "الإجمالي",
+    "confirm": "تأكيد الحجز",
+    "confirmed": "تم الحجز",
+    "problemLabel": "تفاصيل تساعد الفنّي — اختياري",
+    "problemPlaceholder": "مثال: صوت غريب عند الفرملة",
+    "errorSlotTaken": "انحجز هذا الموعد قبل شوي. اختر موعداً ثانياً.",
+    "errorGeneric": "ما قدرنا نكمل الحجز. جرّب مرة ثانية.",
+    "noVehicle": "أضف سيارتك أولاً حتى نسجّل الخدمة في دفترها.",
+    "workshopOnly": "في الورشة فقط",
+    "mobileOnly": "خدمة متنقّلة فقط"
   },
   "emergency": {
     "title": "طلب طارئ",
@@ -240,7 +339,28 @@
     "errors": {
       "noLocation": "لم نتمكّن من تحديد موقعك بعد.",
       "createFailed": "تعذّر إرسال الطلب. حاول مرة أخرى."
-    }
+    },
+    "serviceHeadline": "ما المشكلة؟",
+    "serviceSubhead": "اختر وبنبحث لك عن أقرب فنّي فوراً.",
+    "estimatedPrice": "السعر التقديري لـ{{service}}",
+    "priceRange": "{{min}} – {{max}} ر.س",
+    "dragToAdjust": "اسحب لتعديل الموقع",
+    "placeRoadside": "على كتف الطريق",
+    "placeParking": "داخل موقف",
+    "confirmAndSubmit": "تأكيد وإرسال الطلب",
+    "triageTitle": "صوّر 20 ثانية — يساعد الفنّي يجهّز القطعة",
+    "triageBody": "خطوة اختيارية تماماً. البحث عن فنّي بدأ فعلاً في الخلفية.",
+    "triageSkip": "تخطّي — أكمل بدون فيديو",
+    "cameraPreview": "معاينة الكاميرا",
+    "cameraAim": "وجّهها على المشكلة أو الصوت",
+    "triagePermission": "نحتاج إذن الكاميرا والمايك لتسجيل المقطع.",
+    "triageAllow": "السماح",
+    "triageRecord": "ابدأ التسجيل",
+    "triageStop": "إيقاف",
+    "triageRetake": "إعادة التصوير",
+    "triageUse": "استخدم المقطع",
+    "triageRecorded": "تم تسجيل مقطع ({{seconds}} ثانية)",
+    "triageFailed": "تعذّر التسجيل. يمكنك المتابعة بدون فيديو."
   },
   "tracking": {
     "title": "تتبّع الطلب",
@@ -266,8 +386,61 @@
     "errors": {
       "notFound": "لم نعثر على هذا الطلب.",
       "confirmFailed": "تعذّر تأكيد الإنجاز. حاول مرة أخرى.",
-      "cancelFailed": "تعذّر إلغاء الطلب."
-    }
+      "cancelFailed": "تعذّر إلغاء الطلب.",
+      "rateFailed": "تعذّر إرسال تقييمك. حاول مرة أخرى."
+    },
+    "searchingHeadline": "نبحث لك عن فنّي",
+    "searchingReassure": "ما نحتاج منك شي. خلّ الجوال مفتوح وبنخبرك أول ما نلقى أحد.",
+    "searchRadius": "نطاق البحث الآن {{km}} كم",
+    "contactedLabel": "تواصلنا مع",
+    "techniciansCount": "{{count}} فنّيين",
+    "reviewing": "{{count}} يراجعون الطلب",
+    "aboutToRespond": "{{count}} على وشك الرد",
+    "busy": "{{count}} مشغولون",
+    "radiusExpanded": "وسّعنا النطاق إلى {{km}} كم",
+    "avgMatchTime": "متوسط وقت المطابقة في حيّك هذي الساعة {{minutes}} دقيقة",
+    "cancelFreeBeforeMatch": "الإلغاء قبل المطابقة مجاني",
+    "matchedBanner": "لقينا لك فنّي",
+    "orderCount": "{{count}} طلب",
+    "unitMinute": "دقيقة",
+    "unitMinutes": "دقائق",
+    "unitKm": "كم",
+    "totalWithVat": "ر.س شامل الضريبة",
+    "priceFixedNote": "السعر ثابت. أي عمل إضافي يوصلك كعرض سعر تعتمده بنفسك قبل التنفيذ.",
+    "acceptWithAmount": "قبول · {{amount}} ر.س",
+    "findAnother": "ابحث عن فنّي آخر",
+    "arrivesIn": "يوصلك خلال",
+    "distance": "المسافة",
+    "price": "السعر",
+    "chatAction": "محادثة",
+    "shareTrip": "شارك رحلتك مع أحد",
+    "providerArrived": "{{name}} وصل",
+    "waitingAtVehicle": "ينتظرك عند السيارة",
+    "handoverCodePrompt": "أعطِ {{name}} هذا الرمز قبل البدء",
+    "agreedTotal": "المتفق عليه",
+    "agreedTotalLong": "الإجمالي المتفق عليه",
+    "inProgressPill": "جارٍ العمل",
+    "providerWorking": "{{name}} يشتغل على السيارة",
+    "workingBody": "بيحدّثك عند كل خطوة. ما تحتاج تسوي شي.",
+    "paidWith": "مدفوع · {{method}}",
+    "zatcaInvoice": "فاتورة ضريبية معتمدة (ZATCA)",
+    "rateProviderQuestion": "كيف كان {{name}}؟",
+    "vatLine": "ضريبة القيمة المضافة 15%",
+    "labourLine": "أجرة الخدمة",
+    "totalLine": "الإجمالي",
+    "stages": {
+      "accepted": "قَبِل",
+      "enRoute": "في الطريق",
+      "arrived": "وصل",
+      "completed": "مكتمل"
+    },
+    "tags": {
+      "fast": "وصل بسرعة",
+      "respectful": "تعامل محترم",
+      "explained": "شرح الوضع"
+    },
+    "evidenceTitle": "صور من موقع العمل",
+    "contactUnavailable": "الاتصال بالفنّي غير متاح بعد — نجهّز رقم وسيط يحمي خصوصية الطرفين."
   },
   "quote": {
     "title": "عرض قطع الغيار",
@@ -285,7 +458,10 @@
     "vatLabel": "ضريبة القيمة المضافة",
     "totalLabel": "الإجمالي",
     "allApprovedHint": "بعد الموافقة على كل القطع سيُرسَل العمل لتأكيد الإنجاز.",
-    "pendingHint": "لم تتم الموافقة على كل القطع بعد."
+    "pendingHint": "لم تتم الموافقة على كل القطع بعد.",
+    "pendingBadge": "{{count}} بانتظار موافقتك",
+    "allApprovedBadge": "تمت الموافقة",
+    "approveFailed": "تعذّر تسجيل موافقتك على هذه القطعة. تحقّق من الاتصال وحاول مرة أخرى."
   },
   "job": {
     "accept": "قبول الطلب",
@@ -308,7 +484,9 @@
       "completed": "مكتمل",
       "cancelled": "ملغى",
       "disputed": "قيد النزاع"
-    }
+    },
+    "decline": "غير متاح حالياً",
+    "declined": "تم رفض الطلب"
   },
   "provider": {
     "shiftTitle": "ورديتك",
@@ -378,7 +556,20 @@
         "alreadyApplied": "لديك طلب قائم بالفعل.",
         "submit": "تعذّر إرسال الطلب. تحقّق من الاتصال وحاول مرة أخرى."
       }
-    }
+    },
+    "navShift": "الوردية",
+    "navJobs": "طلباتي",
+    "statusOnline": "أنت متاح الآن",
+    "statusOffline": "أنت غير متاح",
+    "shiftSubtitleOnline": "يُشارك موقعك أثناء العمل فقط، ويتوقّف فور إيقاف الاستقبال.",
+    "openJobsCount": "{{count}} طلب قريب",
+    "hasVideo": "فيه فيديو",
+    "payoutLabel": "العائد المتوقّع",
+    "distanceLabel": "المسافة",
+    "activeJobsTitle": "جارٍ العمل عليها",
+    "noMyJobs": "ما عندك طلبات جارية. الطلبات القريبة تظهر في شاشة الوردية.",
+    "goToShift": "افتح الوردية",
+    "sarSuffix": "ر.س"
   },
   "profile": {
     "title": "حسابي",
@@ -390,5 +581,16 @@
     "switchToProvider": "انتقل إلى وضع الفنّي",
     "switchToCustomer": "انتقل إلى وضع العميل",
     "signOut": "تسجيل الخروج"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "orders": "طلباتي",
+    "wallet": "المحفظة",
+    "account": "حسابي"
+  },
+  "orders": {
+    "liveTitle": "جارٍ الآن",
+    "pastTitle": "السجل",
+    "emptyBody": "أول طلب لك بيظهر هنا، ويتسجّل في دفتر سيارتك."
   }
 }

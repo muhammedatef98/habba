@@ -7,6 +7,9 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      // Next's build output. Generated bundles are not source and lint them
+      // reports on webpack's own emitted require() calls.
+      '**/.next/**',
       '**/build/**',
       '**/.expo/**',
       '**/coverage/**',
@@ -143,7 +146,7 @@ export default tseslint.config(
     // Metro reads its config with `require`, so these files are CommonJS and
     // run in Node — not app code. `require`, `module` and `__dirname` are
     // correct here rather than something to work around.
-    files: ['**/metro.config.js', '**/babel.config.js'],
+    files: ['**/metro.config.js', '**/babel.config.js', '**/jest.config.js'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { require: 'readonly', module: 'writable', __dirname: 'readonly' },
