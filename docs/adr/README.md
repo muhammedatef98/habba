@@ -20,7 +20,7 @@ the record itself rather than left to be inferred.
 | [0007](0007-money-vat-and-rounding.md)                      | Money representation, VAT rate as data, rounding rule                | Proposed     | Phase 3                              |
 | [0008](0008-payments-escrow-and-merchant-of-record.md)      | Escrow model and merchant of record                                  | Proposed     | Phase 3                              |
 | [0009](0009-zatca-seller-of-record.md)                      | ZATCA seller of record and invoice types                             | Proposed     | Phase 3 (schema), Phase 6 (delivery) |
-| [0010](0010-data-residency-and-pdpl.md)                     | Supabase region, PDPL posture, erasure vs immutability               | Proposed     | Phase 1                              |
+| [0010](0010-data-residency-and-pdpl.md)                     | Supabase region (**decided: Frankfurt**); PDPL basis still open      | Partial      | Phase 1                              |
 | [0011](0011-saudi-identifier-formats.md)                    | Plates, IBAN, national ID, VAT number                                | Proposed     | Phase 1                              |
 | [0012](0012-offline-capture-semantics.md)                   | `occurred_at` vs `recorded_at`; what the chain proves                | Proposed     | Phase 3                              |
 | [0013](0013-provider-order-visibility.md)                   | Masked order discovery via RPC, not RLS row reads                    | Proposed     | Phase 3                              |
@@ -33,7 +33,7 @@ the record itself rather than left to be inferred.
 
 Four decisions must land before the first migration:
 
-1. **[ADR-0010] Supabase region.** Chosen once at project creation; reversing it later means
+1. ~~**[ADR-0010] Supabase region.**~~ **Decided 2026-09-05: `eu-central-1` (Frankfurt).** The PDPL transfer basis behind it is still open. Originally: chosen once at project creation; reversing it later means
    migrating live customer data and an immutable timeline.
 2. **[ADR-0014] Expo SDK version.** The spec says 52+; 52 is well behind current. Recommendation:
    latest stable.

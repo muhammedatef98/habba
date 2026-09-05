@@ -12,9 +12,9 @@ insert into auth.users (id, phone) values
   ('11111111-0000-4000-d000-000000000001', '+966505000001'),
   ('22222222-0000-4000-d000-000000000002', '+966505000002');
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-d000-000000000001', 'العميل', '+966505000001', 'customer'),
-  ('22222222-0000-4000-d000-000000000002', 'فنّي', '+966505000002', 'technician');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-d000-000000000001', 'العميل', '+966505000001'),
+  ('22222222-0000-4000-d000-000000000002', 'فنّي', '+966505000002');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-d000-000000000001', 'الدمام', 'DammamExpand', 'الشرقية', 'Eastern',

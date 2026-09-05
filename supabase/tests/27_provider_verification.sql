@@ -13,10 +13,15 @@ insert into auth.users (id, phone) values
   ('22222222-0000-4000-f000-000000000002', '+966506000002'),  -- the provider
   ('33333333-0000-4000-f000-000000000003', '+966506000003');  -- a customer
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-f000-000000000001', 'المشغّل', '+966506000001', 'ops'),
-  ('22222222-0000-4000-f000-000000000002', 'الفنّي',  '+966506000002', 'technician'),
-  ('33333333-0000-4000-f000-000000000003', 'عميل',    '+966506000003', 'customer');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-f000-000000000001', 'المشغّل', '+966506000001'),
+  ('22222222-0000-4000-f000-000000000002', 'الفنّي',  '+966506000002'),
+  ('33333333-0000-4000-f000-000000000003', 'عميل',    '+966506000003');
+
+-- `customer` arrives with the profile (§5.1.1); anything else is granted, and
+-- only ever by the server. The technician's role is NOT granted here — it is
+-- what approval produces, which is the thing this suite is about.
+select test.grant_role('11111111-0000-4000-f000-000000000001', 'ops');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-f000-000000000001', 'الرياض', 'RiyadhVerify', 'الرياض', 'Riyadh',

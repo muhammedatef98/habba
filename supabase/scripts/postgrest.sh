@@ -80,7 +80,7 @@ case "${1:-}" in
     fi
 
     cat > "$CONF" <<EOF
-db-uri = "postgres://authenticator@localhost:${PGPORT}/habba_dev"
+db-uri = "postgres://authenticator:habba-local-only@localhost:${PGPORT}/habba_dev"
 db-schemas = "public"
 db-anon-role = "anon"
 db-pool = 4

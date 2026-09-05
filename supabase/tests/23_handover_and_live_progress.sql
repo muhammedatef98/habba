@@ -15,10 +15,10 @@ insert into auth.users (id, phone) values
   ('22222222-0000-4000-a000-000000000002', '+966502000002'),  -- technician
   ('33333333-0000-4000-a000-000000000003', '+966502000003');  -- unrelated customer
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-a000-000000000001', 'العميل',  '+966502000001', 'customer'),
-  ('22222222-0000-4000-a000-000000000002', 'الفنّي',  '+966502000002', 'technician'),
-  ('33333333-0000-4000-a000-000000000003', 'فضولي',   '+966502000003', 'customer');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-a000-000000000001', 'العميل',  '+966502000001'),
+  ('22222222-0000-4000-a000-000000000002', 'الفنّي',  '+966502000002'),
+  ('33333333-0000-4000-a000-000000000003', 'فضولي',   '+966502000003');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-a000-000000000001', 'الرياض', 'RiyadhHandover', 'الرياض',

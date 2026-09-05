@@ -31,7 +31,7 @@ proving less than it looks — see §4 of HANDOFF.md.
 | A2  | Read the first screen                                              | It asks for a phone number. **No question about being a customer or a technician** — anywhere in the flow (§5.1.1). |
 | A3  | Enter `0512345678`                                                 | Accepted and normalised to `+966512345678`.                                                                         |
 | A4  | Enter `0412345678`                                                 | Refused in Arabic, naming what is wrong. Saudi mobiles start `05`.                                                  |
-| A5  | Send the code, enter `1234`, enter a name                          | Signed in, landing on the vehicle list.                                                                             |
+| A5  | Send the code, enter `123456`, enter a name                        | Signed in, landing on the vehicle list.                                                                             |
 | A6  | Open «حسابي» from the bottom of the home screen                    | «اشتغل معنا كفنّي» is offered. **No mode switcher** — this account holds only `customer` (§5.1.4).                  |
 | A7  | Add a vehicle: make → model → year, plate optional                 | Three taps to a saved vehicle. It appears on the home screen.                                                       |
 | A8  | Open the vehicle                                                   | The logbook, with one entry: «تم تسجيل السيارة في هبّة», badged **موثّق من هبّة**.                                  |
@@ -56,7 +56,8 @@ timeline cannot be written directly by anyone, including the owner.
 > **Acceptance:** the upgrade is in-app, the role comes only from approval, and
 > a customer-only user can reach no provider surface.
 
-**This section needs `enableProviderMode: true` in `apps/mobile/app.json`.** It
+**This section needs `EXPO_PUBLIC_ENABLE_PROVIDER_MODE=true` in
+`apps/mobile/.env.local`.** It
 ships `false`, so on a default build there is no «اشتغل معنا كفنّي» entry, no
 mode switcher, and no reachable KYC form — which is itself worth checking
 first:
@@ -66,7 +67,7 @@ first:
 | B0a | On a default build, open «حسابي»                          | No «اشتغل معنا كفنّي» card and no mode switcher.                             |
 | B0b | Deep link straight to the form: `habba://become-provider` | Redirected to the profile. No field asking for an ID or an IBAN is rendered. |
 
-Then set the flag to `true`, restart Metro, and continue.
+Then set the variable to `true`, restart Metro, and continue.
 
 | #   | Do this                                                                | Expect                                                                             |
 | --- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |

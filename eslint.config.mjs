@@ -40,8 +40,29 @@ export default tseslint.config(
     },
   },
   {
-    // Scripts and configs are allowed to talk to the terminal.
+    // Scripts and configs are allowed to talk to the terminal, and run on Node
+    // rather than in a bundle — so `process`, `fetch` and `Buffer` are globals
+    // here in a way they deliberately are not in app code.
     files: ['**/*.config.{js,mjs,ts}', '**/scripts/**/*.{js,mjs,ts}'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        fetch: 'readonly',
+        Buffer: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: { 'no-console': 'off' },
+  },
+  {
+    // Edge Functions are servers: stdout IS their operational log, and a
+    // successful delivery is information rather than a warning. `no-console`
+    // exists to keep debug noise out of the APP bundle, which these are not
+    // part of.
+    //
+    // What still applies here, and is not enforceable by a linter, is WHAT may
+    // be logged: never an OTP, never a message body (ADR-0018).
+    files: ['supabase/functions/**/*.ts'],
     rules: { 'no-console': 'off' },
   },
 

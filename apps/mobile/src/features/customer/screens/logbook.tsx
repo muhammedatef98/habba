@@ -43,6 +43,7 @@ import {
 import { CoverageBar } from '@/features/customer/components/logbook/CoverageBar';
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
+import { reportBaseUrl } from '@/features/shared/lib/config';
 import { repository } from '@/features/shared/data/repository';
 import { formatCount } from '@/features/shared/lib/format-number';
 import {
@@ -53,9 +54,6 @@ import {
 } from '@/features/shared/lib/logbook-filter';
 import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { useIsAuthenticated } from '@/features/shared/state/session';
-
-/** Where the public report is served. Replaced by the real domain at launch. */
-const REPORT_BASE_URL = 'https://habba.sa/r';
 
 const FILTER_LABEL_KEY: Readonly<Record<LogbookFilter, string>> = {
   all: 'logbook.filterAll',
@@ -244,7 +242,7 @@ export default function LogbookScreen() {
                   {t('logbook.reportShareHint')}
                 </Text>
                 <Text variant="caption" tone="primary" selectable>
-                  {`${REPORT_BASE_URL}/${reportToken}`}
+                  {`${reportBaseUrl()}/${reportToken}`}
                 </Text>
                 <Text variant="caption" tone="subtle">
                   {t('logbook.reportCoverage', {

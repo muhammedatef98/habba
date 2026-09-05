@@ -70,10 +70,20 @@ begin
   -- same arrangement, and it is what makes the HTTP integration tests exercise
   -- genuine role-based RLS rather than a simulation of it.
   if not exists (select 1 from pg_roles where rolname = 'authenticator') then
-    create role authenticator login noinherit;
+    -- A password, because the CI Postgres image authenticates host connections
+    -- with scram-sha-256 while the local cluster uses trust. Without one,
+    -- PostgREST could not connect in CI at all — which is how the integration
+    -- and RLS steps came to be "passing" without ever having run.
+    --
+    -- Local-only, like everything else in this shim, and deliberately named so
+    -- that it cannot be mistaken for a credential worth protecting.
+    create role authenticator login noinherit password 'habba-local-only';
   end if;
 end
 $$;
+
+-- Idempotent for a cluster where the role already exists from an earlier run.
+alter role authenticator with login password 'habba-local-only';
 
 grant anon, authenticated, service_role to authenticator;
 
@@ -154,13 +164,13 @@ $$;
 
 grant execute on function public.test_grant_role(uuid, text) to authenticated;
 
--- Match Supabase's default grants: tables are reachable, and RLS decides.
-alter default privileges in schema public
-  grant select, insert, update, delete on tables to authenticated;
-alter default privileges in schema public
-  grant select on tables to anon;
-alter default privileges in schema public
-  grant all on tables to service_role;
+-- The default privileges on `public` used to be set here, and they were not the
+-- ones Supabase actually sets — anon had SELECT where hosted anon has ALL. That
+-- is a local-vs-hosted divergence in precisely the layer this harness exists to
+-- test: locally a missing RLS policy could be masked by a missing grant.
+--
+-- Migration 0001 now sets them, faithfully, so both environments get them from
+-- the same line of SQL. Nothing to do here.
 
 
 -- ---------------------------------------------------------------------------

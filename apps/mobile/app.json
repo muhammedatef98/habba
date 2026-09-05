@@ -43,11 +43,6 @@
     "experiments": {
       "typedRoutes": true
     },
-    "extra": {
-      "enableProviderMode": false,
-      "supabaseUrl": "http://localhost:54321",
-      "supabaseAnonKey": "dev-anon-key"
-    },
     "web": {
       "favicon": "./assets/favicon.png"
     }

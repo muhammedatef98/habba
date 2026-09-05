@@ -22,9 +22,10 @@
     "db:test": "./supabase/scripts/local-db.sh test",
     "api:start": "./supabase/scripts/postgrest.sh start",
     "api:stop": "./supabase/scripts/postgrest.sh stop",
-    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features && pnpm test:rls",
+    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features && pnpm test:rls && pnpm test:rls:hosted-shape",
     "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm bundle && pnpm db:test && pnpm test:integration",
-    "test:rls": "vitest run --config vitest.config.ts"
+    "test:rls": "vitest run --config vitest.config.ts",
+    "test:rls:hosted-shape": "./supabase/scripts/hosted-shape.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

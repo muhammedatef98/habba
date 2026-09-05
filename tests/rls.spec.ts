@@ -21,8 +21,43 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { mintTestJwt } from '../apps/mobile/src/features/shared/data/test-jwt.js';
 
+/**
+ * HABBA_POSTGREST_URL has exactly one meaning: **the origin supabase-js is
+ * given**, with no `/rest/v1` on it.
+ *
+ * Locally that is bare PostgREST, which serves the tables at its own root.
+ * Hosted it is the project URL, and Supabase's gateway routes `/rest/v1` to
+ * PostgREST behind it. supabase-js appends `/rest/v1` either way, so the two
+ * shapes are reconciled in exactly one place — `restFetch()` below — and every
+ * other request in this file, the reachability probe included, goes through it.
+ *
+ * The first hosted run had the two meanings mixed: the probe wanted the value
+ * with `/rest/v1`, `createClient` wanted it without, and no single value
+ * satisfied both.
+ */
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
+
+/**
+ * Set by `supabase/scripts/verify-hosted.sh` when this runs against a real
+ * project rather than the local harness.
+ *
+ * The ASSERTIONS are identical in both modes — that is the whole point of
+ * running it hosted, and any divergence there would make the exercise
+ * pointless. What differs is fixture creation, which cannot be identical:
+ *
+ *   - locally, auth.users rows come from `test_seed_auth_user`, a shim defined
+ *     in supabase_shim.sql and deliberately never in a migration
+ *   - hosted, they come from GoTrue's admin API, and provider approval comes
+ *     from a privileged SQL statement — both done by the script BEFORE this
+ *     suite runs, because they need credentials a test file should not hold
+ *
+ * If the shim ever appeared on a hosted project it would BE the privilege
+ * escalation that 0036 and 0040 exist to prevent, so "just deploy the helpers"
+ * is not an option.
+ */
+const HOSTED = process.env.HABBA_HOSTED === '1';
+const ANON_KEY = process.env.HABBA_ANON_KEY ?? '';
 
 /** A customer who never applies for anything. */
 const CUSTOMER_ID = 'aa000000-0000-4000-8000-000000000001';
@@ -33,34 +68,89 @@ const PROVIDER_ID = 'aa000000-0000-4000-8000-000000000003';
 /** Another customer, whose data nobody else may see. */
 const STRANGER_ID = 'aa000000-0000-4000-8000-000000000004';
 
-async function isHarnessUp(): Promise<boolean> {
+/**
+ * Bare PostgREST serves at the root; Supabase routes `/rest/v1` to it through a
+ * gateway. Locally the prefix is stripped, hosted it is left alone — and the
+ * rewrite lives here rather than in the app precisely so the app runs
+ * unmodified against both.
+ */
+function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  return fetch(HOSTED ? raw : raw.replace('/rest/v1/', '/'), init);
+}
+
+/**
+ * Hosted, nothing may be defaulted. The defaults above point at localhost, so a
+ * hosted run that lost one variable would have quietly proved the local harness
+ * correct and reported 17 green — the most expensive kind of passing test. The
+ * first real hosted run did exactly that.
+ */
+if (HOSTED) {
+  for (const name of ['HABBA_POSTGREST_URL', 'HABBA_JWT_SECRET', 'HABBA_ANON_KEY'] as const) {
+    if ((process.env[name] ?? '') === '') {
+      throw new Error(
+        `${name} is empty but HABBA_HOSTED=1. A hosted run must not fall back to the ` +
+          `local harness — run this through supabase/scripts/verify-hosted.sh.`,
+      );
+    }
+  }
+  if (POSTGREST_URL.includes('/rest/v1')) {
+    throw new Error(
+      `HABBA_POSTGREST_URL must be the project origin (https://<ref>.supabase.co), not ` +
+        `${POSTGREST_URL}. supabase-js appends /rest/v1 itself.`,
+    );
+  }
+}
+
+type Probe = { ok: true } | { ok: false; detail: string };
+
+/**
+ * Reports *why* it could not reach the API, not merely that it could not.
+ * "RLS harness unreachable" hid a real 401 for several runs of the first hosted
+ * attempt, which is a whole class of debugging nobody should repeat.
+ */
+async function probeHarness(): Promise<Probe> {
+  let detail = 'no response';
+
   for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
-      const response = await fetch(`${POSTGREST_URL}/vehicle_makes?limit=1`, {
+      const response = await restFetch(`${POSTGREST_URL}/rest/v1/vehicle_makes?limit=1`, {
         signal: AbortSignal.timeout(1500),
+        ...(HOSTED && ANON_KEY !== ''
+          ? { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } }
+          : {}),
       });
-      if (response.ok) return true;
-    } catch {
-      // retry
+      if (response.ok) return { ok: true };
+
+      const body = (await response.text()).replace(/\s+/g, ' ').slice(0, 300);
+      detail = `HTTP ${response.status} ${response.statusText} — ${body}`;
+
+      // A 4xx is an answer: the server is up and is refusing us. Retrying it
+      // seven more times only delays the diagnosis.
+      if (response.status < 500) break;
+    } catch (error) {
+      detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  return false;
+
+  return { ok: false, detail };
 }
 
 // Module scope, not beforeAll: `describe.skipIf` is evaluated during
 // collection, so a flag set in a hook is always still false.
-const harnessUp = await isHarnessUp();
+const probe = await probeHarness();
+const harnessUp = probe.ok;
 
-if (process.env.HABBA_REQUIRE_HARNESS === '1' && !harnessUp) {
+if (process.env.HABBA_REQUIRE_HARNESS === '1' && !probe.ok) {
   throw new Error(
-    `RLS harness unreachable at ${POSTGREST_URL}. Start it with \`pnpm db:reset && pnpm api:start\`.`,
+    `RLS API unreachable at ${POSTGREST_URL} — ${probe.detail}\n` +
+      (HOSTED
+        ? 'Hosted: a 401 usually means the apikey header is missing or the anon key does ' +
+          'not belong to this project; a 403/42501 means the migrations ran but the role ' +
+          'grants on schema public did not (see docs/supabase-setup.md § Resetting).'
+        : 'Start it with `pnpm db:reset && pnpm api:start`.'),
   );
-}
-
-function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  return fetch(raw.replace('/rest/v1/', '/'), init);
 }
 
 function clientFor(userId: string | null): SupabaseClient {
@@ -71,7 +161,16 @@ function clientFor(userId: string | null): SupabaseClient {
 
   return createClient(POSTGREST_URL, token, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // The hosted gateway wants an apikey header alongside the bearer
+        // token. The minted JWT stays the thing RLS reads — the apikey only
+        // gets the request past the edge.
+        ...(HOSTED && ANON_KEY !== '' ? { apikey: ANON_KEY } : {}),
+      },
+      fetch: restFetch,
+    },
   });
 }
 
@@ -96,7 +195,8 @@ beforeAll(async () => {
   };
 
   for (const [id, phone] of Object.entries(phones)) {
-    await seed.rpc('test_seed_auth_user', { p_id: id, p_phone: phone });
+    // Hosted, these users were created through GoTrue by verify-hosted.sh.
+    if (!HOSTED) await seed.rpc('test_seed_auth_user', { p_id: id, p_phone: phone });
     await clientFor(id).from('profiles').upsert({
       id,
       full_name: 'مستخدم اختبار',
@@ -162,9 +262,15 @@ beforeAll(async () => {
     }
   }
 
-  await clientFor(PROVIDER_ID).rpc('test_approve_provider', {
-    p_provider_id: PROVIDER_RECORD_ID,
-  });
+  // Approval is privileged: the column guard (0034) is ENABLE ALWAYS, so even a
+  // service key cannot set verification_status without declaring a privileged
+  // write. Locally the shim does it; hosted, verify-hosted.sh does it in SQL
+  // before this runs.
+  if (!HOSTED) {
+    await clientFor(PROVIDER_ID).rpc('test_approve_provider', {
+      p_provider_id: PROVIDER_RECORD_ID,
+    });
+  }
 });
 
 describe.skipIf(!harnessUp)("RLS: a user cannot read another user's rows", () => {

@@ -128,6 +128,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
+      # The postgis/postgis image pre-installs PostGIS into `public`, but every
+      # geography column and every SECURITY DEFINER function here qualifies
+      # `extensions.*` (search_path is empty — ADR-0003). PostGIS cannot be
+      # relocated after the fact, so the extension is dropped and 0001 installs
+      # it where it belongs. 0001 refuses to continue if this is skipped.
+      - name: Put PostGIS in the extensions schema
+        run: psql -v ON_ERROR_STOP=1 -c "drop extension if exists postgis cascade"
+
       - name: Apply shim and migrations
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/scripts/supabase_shim.sql
@@ -184,3 +192,10 @@ jobs:
         env:
           HABBA_REQUIRE_HARNESS: '1'
         run: pnpm test:rls
+
+      # The same 17 assertions in HOSTED mode, behind a gateway that routes
+      # /rest/v1 and demands an apikey the way Supabase's does. Catches the URL
+      # and header defects that otherwise only surface against a live project —
+      # which is how they were found the first time.
+      - name: RLS suite (hosted request shape)
+        run: pnpm test:rls:hosted-shape

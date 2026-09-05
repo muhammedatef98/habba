@@ -13,10 +13,15 @@ insert into auth.users (id, phone) values
   ('22222222-0000-4000-1000-000000000002', '+966507000002'),  -- customer
   ('33333333-0000-4000-1000-000000000003', '+966507000003');  -- technician
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-1000-000000000001', 'المشغّل', '+966507000001', 'ops'),
-  ('22222222-0000-4000-1000-000000000002', 'العميل',  '+966507000002', 'customer'),
-  ('33333333-0000-4000-1000-000000000003', 'الفنّي',  '+966507000003', 'technician');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-1000-000000000001', 'المشغّل', '+966507000001'),
+  ('22222222-0000-4000-1000-000000000002', 'العميل',  '+966507000002'),
+  ('33333333-0000-4000-1000-000000000003', 'الفنّي',  '+966507000003');
+
+-- `customer` arrives with the profile (§5.1.1). The operator's role is granted
+-- the way the ops console will grant it; the technician's follows from the
+-- approved providers row below, through sync_provider_role.
+select test.grant_role('11111111-0000-4000-1000-000000000001', 'ops');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-1000-000000000001', 'الرياض', 'RiyadhBoard', 'الرياض', 'Riyadh',
