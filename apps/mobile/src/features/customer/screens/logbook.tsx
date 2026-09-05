@@ -19,6 +19,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, EmptyState, ProvenanceBadge, Screen, Text, useTheme } from '@habba/ui';
+import { reportBaseUrl } from '@/features/shared/lib/config';
 import { repository } from '@/features/shared/data/repository';
 import type { Provenance, TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -29,9 +30,6 @@ const PROVENANCE_LABEL_KEY: Record<Provenance, string> = {
   self_documented: 'logbook.selfDocumentedBadge',
   third_party: 'logbook.thirdPartyBadge',
 };
-
-/** Where the public report is served. Replaced by the real domain at launch. */
-const REPORT_BASE_URL = 'https://habba.sa/r';
 
 interface YearGroup {
   readonly year: number;
@@ -233,7 +231,7 @@ export default function LogbookScreen() {
                   {t('logbook.reportShareHint')}
                 </Text>
                 <Text variant="caption" style={{ color: theme.colors.primary }} selectable>
-                  {`${REPORT_BASE_URL}/${reportToken}`}
+                  {`${reportBaseUrl()}/${reportToken}`}
                 </Text>
                 <Text variant="caption" tone="subtle">
                   {t('logbook.reportCoverage', {

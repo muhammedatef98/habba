@@ -32,7 +32,16 @@ export interface OtpProvider {
   verify(phoneE164: string, code: string): Promise<OtpVerifyResult>;
 }
 
-export const OTP_LENGTH = 4;
+/**
+ * Six digits, because that is what Supabase Auth sends.
+ *
+ * This constant drives the input boxes on the verify screen, so it is not
+ * cosmetic: four boxes against a six-digit SMS is an app nobody can sign into.
+ * If the project's OTP length is ever changed in the dashboard (Authentication
+ * → Providers → Phone), it must be changed here in the same breath.
+ */
+export const OTP_LENGTH = 6;
+/** Matches the dashboard's OTP expiry. Keep the two in step for the same reason. */
 export const OTP_TTL_SECONDS = 120;
 export const OTP_MAX_ATTEMPTS = 5;
 /** Matches the resend cooldown shown in the UI. */
@@ -51,7 +60,7 @@ interface PendingOtp {
  * until launch.
  */
 export class DevOtpProvider implements OtpProvider {
-  static readonly FIXED_CODE = '1234';
+  static readonly FIXED_CODE = '123456';
 
   private readonly pending = new Map<string, PendingOtp>();
   private readonly lastSentAt = new Map<string, number>();

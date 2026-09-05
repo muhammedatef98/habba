@@ -43,7 +43,7 @@ bundles for iOS. Amendment A's boundary rule (`features/customer/**` and
 `features/provider/**` cannot import each other) is an ESLint error and fails
 CI.
 
-**Not covered:** real SMS (OTP is `1234` — see open decision 4), and there are
+**Not covered:** real SMS credentials (the transport is built — see open decision 4), and there are
 no component or E2E tests: screens are covered by typecheck, lint, and the data
 layer beneath them.
 

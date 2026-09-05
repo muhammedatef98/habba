@@ -24,6 +24,27 @@ import { mintTestJwt } from '../apps/mobile/src/features/shared/data/test-jwt.js
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
 
+/**
+ * Set by `supabase/scripts/verify-hosted.sh` when this runs against a real
+ * project rather than the local harness.
+ *
+ * The ASSERTIONS are identical in both modes — that is the whole point of
+ * running it hosted, and any divergence there would make the exercise
+ * pointless. What differs is fixture creation, which cannot be identical:
+ *
+ *   - locally, auth.users rows come from `test_seed_auth_user`, a shim defined
+ *     in supabase_shim.sql and deliberately never in a migration
+ *   - hosted, they come from GoTrue's admin API, and provider approval comes
+ *     from a privileged SQL statement — both done by the script BEFORE this
+ *     suite runs, because they need credentials a test file should not hold
+ *
+ * If the shim ever appeared on a hosted project it would BE the privilege
+ * escalation that 0036 and 0040 exist to prevent, so "just deploy the helpers"
+ * is not an option.
+ */
+const HOSTED = process.env.HABBA_HOSTED === '1';
+const ANON_KEY = process.env.HABBA_ANON_KEY ?? '';
+
 /** A customer who never applies for anything. */
 const CUSTOMER_ID = 'aa000000-0000-4000-8000-000000000001';
 /** A customer who applies and is left pending — approval is what counts. */
@@ -38,6 +59,9 @@ async function isHarnessUp(): Promise<boolean> {
     try {
       const response = await fetch(`${POSTGREST_URL}/vehicle_makes?limit=1`, {
         signal: AbortSignal.timeout(1500),
+        ...(HOSTED && ANON_KEY !== ''
+          ? { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } }
+          : {}),
       });
       if (response.ok) return true;
     } catch {
@@ -58,9 +82,15 @@ if (process.env.HABBA_REQUIRE_HARNESS === '1' && !harnessUp) {
   );
 }
 
+/**
+ * Bare PostgREST serves at the root; Supabase routes `/rest/v1` to it through a
+ * gateway. Locally the prefix is stripped, hosted it is left alone — and the
+ * rewrite lives here rather than in the app precisely so the app runs
+ * unmodified against both.
+ */
 function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  return fetch(raw.replace('/rest/v1/', '/'), init);
+  return fetch(HOSTED ? raw : raw.replace('/rest/v1/', '/'), init);
 }
 
 function clientFor(userId: string | null): SupabaseClient {
@@ -71,7 +101,16 @@ function clientFor(userId: string | null): SupabaseClient {
 
   return createClient(POSTGREST_URL, token, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // The hosted gateway wants an apikey header alongside the bearer
+        // token. The minted JWT stays the thing RLS reads — the apikey only
+        // gets the request past the edge.
+        ...(HOSTED && ANON_KEY !== '' ? { apikey: ANON_KEY } : {}),
+      },
+      fetch: restFetch,
+    },
   });
 }
 
@@ -96,7 +135,8 @@ beforeAll(async () => {
   };
 
   for (const [id, phone] of Object.entries(phones)) {
-    await seed.rpc('test_seed_auth_user', { p_id: id, p_phone: phone });
+    // Hosted, these users were created through GoTrue by verify-hosted.sh.
+    if (!HOSTED) await seed.rpc('test_seed_auth_user', { p_id: id, p_phone: phone });
     await clientFor(id).from('profiles').upsert({
       id,
       full_name: 'مستخدم اختبار',
@@ -162,9 +202,15 @@ beforeAll(async () => {
     }
   }
 
-  await clientFor(PROVIDER_ID).rpc('test_approve_provider', {
-    p_provider_id: PROVIDER_RECORD_ID,
-  });
+  // Approval is privileged: the column guard (0034) is ENABLE ALWAYS, so even a
+  // service key cannot set verification_status without declaring a privileged
+  // write. Locally the shim does it; hosted, verify-hosted.sh does it in SQL
+  // before this runs.
+  if (!HOSTED) {
+    await clientFor(PROVIDER_ID).rpc('test_approve_provider', {
+      p_provider_id: PROVIDER_RECORD_ID,
+    });
+  }
 });
 
 describe.skipIf(!harnessUp)("RLS: a user cannot read another user's rows", () => {

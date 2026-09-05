@@ -133,9 +133,8 @@ export function parseSendResponse(status: number, rawBody: string): SmsSendResul
     return { ok: true, messageId: id === undefined || id === null ? null : String(id) };
   }
 
-  const code = parsed.errorCode === undefined || parsed.errorCode === null
-    ? null
-    : String(parsed.errorCode);
+  const code =
+    parsed.errorCode === undefined || parsed.errorCode === null ? null : String(parsed.errorCode);
 
   // Unifonic's ER-* codes distinguish a bad recipient from a bad account. The
   // difference matters upstream: one is the user's typo, the other is ours.
