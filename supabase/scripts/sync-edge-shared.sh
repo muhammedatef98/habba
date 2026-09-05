@@ -46,8 +46,13 @@ generate_sms() {
   cat "$CORE/sms/unifonic.ts"
 }
 
+generate_api_keys() {
+  header 'packages/core/src/supabase/api-keys.ts'
+  cat "$CORE/supabase/api-keys.ts"
+}
+
 # name → generator
-MODULES=("report:generate_report" "sms:generate_sms")
+MODULES=("report:generate_report" "sms:generate_sms" "api-keys:generate_api_keys")
 
 mkdir -p "$SHARED"
 status=0

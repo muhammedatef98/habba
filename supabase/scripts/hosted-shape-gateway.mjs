@@ -15,16 +15,49 @@
  * header plumbing, and nothing else — the gateway is not Supabase, does not
  * verify the apikey, and has no opinion about RLS.
  */
+import { createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
 
 const UPSTREAM = process.env.HABBA_UPSTREAM ?? 'http://127.0.0.1:54321';
 const PORT = Number(process.env.HABBA_GATEWAY_PORT ?? 54331);
+const SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
+const FIXTURE_PASSWORD = process.env.HABBA_FIXTURE_PASSWORD ?? '';
 const PREFIX = '/rest/v1';
 
 const deny = (res, status, message) => {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify({ message }));
 };
+
+const b64url = (value) => Buffer.from(value).toString('base64url');
+
+/**
+ * Stands in for GoTrue's password grant.
+ *
+ * Since the suite stopped minting its own tokens, the sign-in is part of the
+ * hosted request shape and belongs here — otherwise this check would exercise
+ * everything about a hosted run except how it gets a token. The token is signed
+ * with the harness's shared secret because that is what the local PostgREST
+ * verifies; what is being checked is the exchange, not the algorithm.
+ */
+function passwordGrant(body) {
+  const email = typeof body.email === 'string' ? body.email : '';
+  const match = /^rls-([0-9a-f-]{36})@habba\.test$/.exec(email);
+
+  if (match === null) return { status: 400, payload: { error: 'invalid_grant' } };
+  if (FIXTURE_PASSWORD === '' || body.password !== FIXTURE_PASSWORD) {
+    return { status: 400, payload: { error: 'invalid_grant', error_description: 'Bad password' } };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const claims = b64url(
+    JSON.stringify({ sub: match[1], role: 'authenticated', iat: now, exp: now + 3600 }),
+  );
+  const signature = createHmac('sha256', SECRET).update(`${head}.${claims}`).digest('base64url');
+
+  return { status: 200, payload: { access_token: `${head}.${claims}.${signature}` } };
+}
 
 createServer(async (req, res) => {
   try {
@@ -34,13 +67,26 @@ createServer(async (req, res) => {
       deny(res, 401, 'No API key found in request');
       return;
     }
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+
+    if (req.url?.startsWith('/auth/v1/token')) {
+      let parsed = {};
+      try {
+        parsed = JSON.parse(Buffer.concat(chunks).toString() || '{}');
+      } catch {
+        // An unparseable body is an invalid grant, not a crash.
+      }
+      const { status, payload } = passwordGrant(parsed);
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(payload));
+      return;
+    }
+
     if (!req.url?.startsWith(`${PREFIX}/`)) {
       deny(res, 404, 'Invalid path specified in request URL');
       return;
     }
-
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
 
     const headers = { ...req.headers };
     delete headers.host;

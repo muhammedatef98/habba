@@ -43,7 +43,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Absent → the app runs on the in-memory repository and the dev OTP stub,
     // which is what makes `pnpm start` work on a laptop with no project.
     supabaseUrl: env('EXPO_PUBLIC_SUPABASE_URL'),
-    supabaseAnonKey: env('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
+
+    // Publishable key first, legacy anon key second. Both are designed to be
+    // public and both work here; the publishable key is the one that survives
+    // rotating the JWT signing secret, because it is not derived from it.
+    // Reading both means the swap is a change of environment variable, and can
+    // be reverted the same way.
+    supabaseAnonKey:
+      env('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ?? env('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
 
     // Off unless explicitly enabled (ADR-0017). Parsed as a strict equality
     // against 'true' so a typo, `1`, or `yes` leaves the flow off rather than
