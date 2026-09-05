@@ -89,6 +89,29 @@ production by accident.
 `supabase link && supabase db push` does the same thing if you prefer the CLI;
 the script exists because it also runs the checks in §6.
 
+### Re-running: `--reset`
+
+Migrations are forward-only, so a second run against an already-migrated
+database stops at the first `create type` with `type "user_role" already
+exists`. Start over with:
+
+```bash
+./supabase/scripts/verify-hosted.sh --reset
+```
+
+That drops and recreates schema `public` and then applies everything again.
+**Do not do this by hand in the SQL editor.** `drop schema public cascade` also
+removes the schema grants and default privileges Supabase set at project
+creation, and re-granting them by hand — `grant all on all tables … to anon` —
+produces a database that is both broader than the migrations intend and no
+longer a valid test of them: the `revoke` statements in `0010`, `0014`, `0026`,
+`0030`, `0037` and `0040` are a defence layer of their own, and a blanket grant
+afterwards silently undoes all of them.
+
+Migration `0001` now sets those baseline privileges itself, so a database reset
+this way ends up with grants that came only from the migrations. That is the
+condition the RLS run in §6 has to be judged under.
+
 **How to tell it worked:** Table editor shows `vehicles`, `vehicle_timeline`,
 `user_roles` and about forty others; `select count(*) from cities` returns 10.
 
@@ -247,12 +270,16 @@ and an ops console exists to approve applications (ADR-0017).
 
 ## Troubleshooting
 
-| Symptom                                                        | Cause                                                                                   |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `PostGIS is installed in schema "public"` on migration 0001    | PostGIS was enabled outside `extensions`. `DROP EXTENSION postgis CASCADE`, redo §2.    |
-| `type "extensions.geography" does not exist`                   | Same cause on an older checkout — pull, so 0001 carries the check.                      |
-| OTP never arrives, function logs say `delivered`               | Sender ID not registered with the CITC. The operators drop it silently.                 |
-| OTP never arrives, function logs say `delivery failed (…)`     | Unifonic rejected it. The code in the log is theirs; no message body is ever logged.    |
-| `sms_not_sent` immediately, no function invocation             | The hook is not registered, or `SEND_SMS_HOOK_SECRET` is missing.                       |
-| Sign-in works but the app shows six boxes and the SMS has four | OTP length in the dashboard does not match `OTP_LENGTH` (§5).                           |
-| `tests/rls.spec.ts` fails hosted but passes locally            | Stop. Do not launch. Compare the failing assertion against `supabase/tests/04_rls.sql`. |
+| Symptom                                                        | Cause                                                                                                       |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `PostGIS is installed in schema "public"` on migration 0001    | PostGIS was enabled outside `extensions`. `DROP EXTENSION postgis CASCADE`, redo §2.                        |
+| `type "extensions.geography" does not exist`                   | Same cause on an older checkout — pull, so 0001 carries the check.                                          |
+| OTP never arrives, function logs say `delivered`               | Sender ID not registered with the CITC. The operators drop it silently.                                     |
+| OTP never arrives, function logs say `delivery failed (…)`     | Unifonic rejected it. The code in the log is theirs; no message body is ever logged.                        |
+| `sms_not_sent` immediately, no function invocation             | The hook is not registered, or `SEND_SMS_HOOK_SECRET` is missing.                                           |
+| Sign-in works but the app shows six boxes and the SMS has four | OTP length in the dashboard does not match `OTP_LENGTH` (§5).                                               |
+| `type "user_role" already exists` on migration 0002            | The database has been migrated before. Re-run with `--reset` (§4).                                          |
+| `Invalid path specified in request URL` on every write         | `HABBA_POSTGREST_URL` carries `/rest/v1`. It must be the project origin — supabase-js appends the prefix.   |
+| `RLS API unreachable … HTTP 401 … No API key found`            | The anon key is missing or belongs to another project. The suite now prints the status and body; read them. |
+| `RLS API unreachable … HTTP 403` or `42501 permission denied`  | Schema `public` was reset by hand without its grants. Re-run with `--reset` (§4).                           |
+| `tests/rls.spec.ts` fails hosted but passes locally            | Stop. Do not launch. Compare the failing assertion against `supabase/tests/04_rls.sql`.                     |

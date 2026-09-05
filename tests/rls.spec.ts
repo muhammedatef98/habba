@@ -21,6 +21,20 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { mintTestJwt } from '../apps/mobile/src/features/shared/data/test-jwt.js';
 
+/**
+ * HABBA_POSTGREST_URL has exactly one meaning: **the origin supabase-js is
+ * given**, with no `/rest/v1` on it.
+ *
+ * Locally that is bare PostgREST, which serves the tables at its own root.
+ * Hosted it is the project URL, and Supabase's gateway routes `/rest/v1` to
+ * PostgREST behind it. supabase-js appends `/rest/v1` either way, so the two
+ * shapes are reconciled in exactly one place — `restFetch()` below — and every
+ * other request in this file, the reachability probe included, goes through it.
+ *
+ * The first hosted run had the two meanings mixed: the probe wanted the value
+ * with `/rest/v1`, `createClient` wanted it without, and no single value
+ * satisfied both.
+ */
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
 
@@ -54,34 +68,6 @@ const PROVIDER_ID = 'aa000000-0000-4000-8000-000000000003';
 /** Another customer, whose data nobody else may see. */
 const STRANGER_ID = 'aa000000-0000-4000-8000-000000000004';
 
-async function isHarnessUp(): Promise<boolean> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    try {
-      const response = await fetch(`${POSTGREST_URL}/vehicle_makes?limit=1`, {
-        signal: AbortSignal.timeout(1500),
-        ...(HOSTED && ANON_KEY !== ''
-          ? { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } }
-          : {}),
-      });
-      if (response.ok) return true;
-    } catch {
-      // retry
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  return false;
-}
-
-// Module scope, not beforeAll: `describe.skipIf` is evaluated during
-// collection, so a flag set in a hook is always still false.
-const harnessUp = await isHarnessUp();
-
-if (process.env.HABBA_REQUIRE_HARNESS === '1' && !harnessUp) {
-  throw new Error(
-    `RLS harness unreachable at ${POSTGREST_URL}. Start it with \`pnpm db:reset && pnpm api:start\`.`,
-  );
-}
-
 /**
  * Bare PostgREST serves at the root; Supabase routes `/rest/v1` to it through a
  * gateway. Locally the prefix is stripped, hosted it is left alone — and the
@@ -91,6 +77,80 @@ if (process.env.HABBA_REQUIRE_HARNESS === '1' && !harnessUp) {
 function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   return fetch(HOSTED ? raw : raw.replace('/rest/v1/', '/'), init);
+}
+
+/**
+ * Hosted, nothing may be defaulted. The defaults above point at localhost, so a
+ * hosted run that lost one variable would have quietly proved the local harness
+ * correct and reported 17 green — the most expensive kind of passing test. The
+ * first real hosted run did exactly that.
+ */
+if (HOSTED) {
+  for (const name of ['HABBA_POSTGREST_URL', 'HABBA_JWT_SECRET', 'HABBA_ANON_KEY'] as const) {
+    if ((process.env[name] ?? '') === '') {
+      throw new Error(
+        `${name} is empty but HABBA_HOSTED=1. A hosted run must not fall back to the ` +
+          `local harness — run this through supabase/scripts/verify-hosted.sh.`,
+      );
+    }
+  }
+  if (POSTGREST_URL.includes('/rest/v1')) {
+    throw new Error(
+      `HABBA_POSTGREST_URL must be the project origin (https://<ref>.supabase.co), not ` +
+        `${POSTGREST_URL}. supabase-js appends /rest/v1 itself.`,
+    );
+  }
+}
+
+type Probe = { ok: true } | { ok: false; detail: string };
+
+/**
+ * Reports *why* it could not reach the API, not merely that it could not.
+ * "RLS harness unreachable" hid a real 401 for several runs of the first hosted
+ * attempt, which is a whole class of debugging nobody should repeat.
+ */
+async function probeHarness(): Promise<Probe> {
+  let detail = 'no response';
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      const response = await restFetch(`${POSTGREST_URL}/rest/v1/vehicle_makes?limit=1`, {
+        signal: AbortSignal.timeout(1500),
+        ...(HOSTED && ANON_KEY !== ''
+          ? { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } }
+          : {}),
+      });
+      if (response.ok) return { ok: true };
+
+      const body = (await response.text()).replace(/\s+/g, ' ').slice(0, 300);
+      detail = `HTTP ${response.status} ${response.statusText} — ${body}`;
+
+      // A 4xx is an answer: the server is up and is refusing us. Retrying it
+      // seven more times only delays the diagnosis.
+      if (response.status < 500) break;
+    } catch (error) {
+      detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return { ok: false, detail };
+}
+
+// Module scope, not beforeAll: `describe.skipIf` is evaluated during
+// collection, so a flag set in a hook is always still false.
+const probe = await probeHarness();
+const harnessUp = probe.ok;
+
+if (process.env.HABBA_REQUIRE_HARNESS === '1' && !probe.ok) {
+  throw new Error(
+    `RLS API unreachable at ${POSTGREST_URL} — ${probe.detail}\n` +
+      (HOSTED
+        ? 'Hosted: a 401 usually means the apikey header is missing or the anon key does ' +
+          'not belong to this project; a 403/42501 means the migrations ran but the role ' +
+          'grants on schema public did not (see docs/supabase-setup.md § Resetting).'
+        : 'Start it with `pnpm db:reset && pnpm api:start`.'),
+  );
 }
 
 function clientFor(userId: string | null): SupabaseClient {

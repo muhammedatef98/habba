@@ -56,3 +56,35 @@ create extension if not exists pgcrypto;
 
 -- All objects live in `public` unless stated. SECURITY DEFINER functions set
 -- search_path = '' and schema-qualify everything (ADR-0003).
+
+-- ---------------------------------------------------------------------------
+-- Baseline privileges on `public`
+-- ---------------------------------------------------------------------------
+-- Every later migration assumes these exist. They are the ones Supabase sets on
+-- a new project, and until the first hosted run that assumption was invisible:
+-- `drop schema public cascade` in the dashboard takes the schema grants and the
+-- default privileges with it, after which PostgREST answers 42501 on every
+-- table and the migrations have no way to put it back.
+--
+-- Setting them here makes the migrations self-sufficient — a database can be
+-- reset and re-migrated with no hand-written SQL — and is a no-op on a project
+-- that still has Supabase's originals.
+--
+-- Two things this is NOT:
+--
+--   * `grant all on all tables in schema public` — that is a one-shot grant on
+--     tables that exist *now*, so run after the migrations it would silently
+--     undo every `revoke` in 0010, 0014, 0026, 0030, 0037 and 0040, which are a
+--     defence layer in their own right (§2.4). ALTER DEFAULT PRIVILEGES applies
+--     only to tables created afterwards, so the later revokes still win.
+--   * a substitute for RLS. Privileges decide which verbs a role may attempt;
+--     RLS decides which rows it sees. Both are load-bearing, and 0013 turns RLS
+--     on with default deny.
+grant usage on schema public to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on functions to anon, authenticated, service_role;

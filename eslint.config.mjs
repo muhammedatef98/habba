@@ -37,8 +37,18 @@ export default tseslint.config(
     },
   },
   {
-    // Scripts and configs are allowed to talk to the terminal.
+    // Scripts and configs are allowed to talk to the terminal, and run on Node
+    // rather than in a bundle — so `process`, `fetch` and `Buffer` are globals
+    // here in a way they deliberately are not in app code.
     files: ['**/*.config.{js,mjs,ts}', '**/scripts/**/*.{js,mjs,ts}'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        fetch: 'readonly',
+        Buffer: 'readonly',
+        console: 'readonly',
+      },
+    },
     rules: { 'no-console': 'off' },
   },
   {

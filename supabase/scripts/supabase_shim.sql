@@ -164,10 +164,10 @@ $$;
 
 grant execute on function public.test_grant_role(uuid, text) to authenticated;
 
--- Match Supabase's default grants: tables are reachable, and RLS decides.
-alter default privileges in schema public
-  grant select, insert, update, delete on tables to authenticated;
-alter default privileges in schema public
-  grant select on tables to anon;
-alter default privileges in schema public
-  grant all on tables to service_role;
+-- The default privileges on `public` used to be set here, and they were not the
+-- ones Supabase actually sets — anon had SELECT where hosted anon has ALL. That
+-- is a local-vs-hosted divergence in precisely the layer this harness exists to
+-- test: locally a missing RLS policy could be masked by a missing grant.
+--
+-- Migration 0001 now sets them, faithfully, so both environments get them from
+-- the same line of SQL. Nothing to do here.

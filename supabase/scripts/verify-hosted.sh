@@ -19,6 +19,12 @@
 #
 #   --migrate-only   apply migrations and seed, skip the RLS suite
 #   --verify-only    skip migrations, run the RLS suite against what is there
+#   --reset          drop and recreate schema `public` first, then do the above
+#
+# --reset exists so a repeat run needs no hand-written SQL in the dashboard.
+# Migrations are forward-only, so a second run against an already-migrated
+# database fails on the first `create type` — and resetting by hand is how the
+# first hosted attempt ended up with grants the migrations never set.
 #
 # ⚠️ This writes to the project it is pointed at. It is for a project you are
 # willing to have test rows in — a fresh one, or a staging one. It refuses to
@@ -27,7 +33,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MODE="${1:-all}"
+
+MODE=all
+RESET=0
+for arg in "$@"; do
+  case "$arg" in
+    --reset) RESET=1 ;;
+    --migrate-only | --verify-only) MODE="$arg" ;;
+    *) echo "error: unknown argument $arg. See the header of this script." >&2; exit 2 ;;
+  esac
+done
 
 require() {
   if [ -z "${!1:-}" ]; then
@@ -39,6 +54,11 @@ require() {
 # ---------------------------------------------------------------------------
 # Migrations
 # ---------------------------------------------------------------------------
+if [ "$RESET" = "1" ] && [ "$MODE" = "--verify-only" ]; then
+  echo "error: --reset and --verify-only contradict each other." >&2
+  exit 2
+fi
+
 if [ "$MODE" != "--verify-only" ]; then
   require SUPABASE_DB_URL
 
@@ -61,6 +81,21 @@ if [ "$MODE" != "--verify-only" ]; then
     echo "error: this project already holds ${existing} vehicles." >&2
     echo "       Point at a fresh project, or set HABBA_ALLOW_NONEMPTY=1 if you are sure." >&2
     exit 2
+  fi
+
+  if [ "$RESET" = "1" ]; then
+    echo "── resetting schema public"
+    # Everything Habba owns lives in `public`, so this is the whole database as
+    # far as the app is concerned. auth.users survives, which is why the GoTrue
+    # fixtures below tolerate "already registered".
+    #
+    # Nothing here grants anything. Migration 0001 sets the schema grants and
+    # the default privileges that Supabase would otherwise have set at project
+    # creation, so a database reset this way ends up with grants that came only
+    # from the migrations — which is the point.
+    psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q \
+      -c 'drop schema if exists public cascade' \
+      -c 'create schema public'
   fi
 
   # PostGIS must live in `extensions` — 0001 refuses otherwise, with a hint.
@@ -182,10 +217,13 @@ if [ "$MODE" != "--migrate-only" ]; then
   echo
   echo "── running tests/rls.spec.ts against $SUPABASE_URL"
 
-  # The suite mints its own JWTs, so it needs the project's JWT secret. It
-  # addresses PostgREST through the same /rest/v1 prefix supabase-js uses, so
-  # no rewrite is needed against a hosted project.
-  HABBA_POSTGREST_URL="$SUPABASE_URL/rest/v1" \
+  # The suite mints its own JWTs, so it needs the project's JWT secret.
+  #
+  # HABBA_POSTGREST_URL is the project ORIGIN, with no /rest/v1: supabase-js
+  # appends that itself. The first hosted run passed the prefixed form, which
+  # made the reachability probe pass and then every write fail with "Invalid
+  # path specified in request URL" — /rest/v1/rest/v1/providers.
+  HABBA_POSTGREST_URL="$SUPABASE_URL" \
   HABBA_JWT_SECRET="$SUPABASE_JWT_SECRET" \
   HABBA_ANON_KEY="$SUPABASE_ANON_KEY" \
   HABBA_HOSTED=1 \

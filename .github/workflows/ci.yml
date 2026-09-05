@@ -139,3 +139,10 @@ jobs:
         env:
           HABBA_REQUIRE_HARNESS: '1'
         run: pnpm test:rls
+
+      # The same 17 assertions in HOSTED mode, behind a gateway that routes
+      # /rest/v1 and demands an apikey the way Supabase's does. Catches the URL
+      # and header defects that otherwise only surface against a live project —
+      # which is how they were found the first time.
+      - name: RLS suite (hosted request shape)
+        run: pnpm test:rls:hosted-shape
