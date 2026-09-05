@@ -81,7 +81,7 @@ export SUPABASE_DB_URL='postgresql://postgres.<ref>:<password>@<host>:5432/postg
 ./supabase/scripts/verify-hosted.sh --migrate-only
 ```
 
-That applies `0001`–`0042` in order and then the seed (cities, 20 makes and
+That applies `0001`–`0043` in order and then the seed (cities, 20 makes and
 their models, the service catalogue, maintenance rules). It refuses to run
 against a database that already holds vehicles, so it cannot be pointed at
 production by accident.
