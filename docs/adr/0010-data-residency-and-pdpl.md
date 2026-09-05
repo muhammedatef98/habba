@@ -1,6 +1,8 @@
 # ADR-0010 — Data residency, Supabase region, and PDPL posture
 
-- **Status:** Proposed — ⚠️ requires legal advice. **Blocks Phase 1** (region is chosen at project creation).
+- **Status:** **Region decided (2026-09-05): `eu-central-1`, Frankfurt.** The PDPL
+  transfer basis remains ⚠️ open and requires legal advice — see "What is still
+  open" below. The region half no longer blocks the hosted project.
 - **Date:** 2026-08-26
 - **Relates to:** `CLAUDE.md` §3; build prompt §6.4, §11
 
@@ -20,6 +22,34 @@ Three pressures:
    spec's _"emotional core"_) are all latency-sensitive from Saudi devices.
 3. **Region availability.** Supabase does not currently offer a Saudi region. Every option is a
    cross-border transfer, which makes the PDPL basis a requirement rather than a nicety.
+
+## Decision (region)
+
+**`eu-central-1` (Frankfurt).** Chosen by the product owner on 2026-09-05, over
+Mumbai's better latency, because a GDPR-grade regime is the most defensible
+starting point for a PDPL transfer assessment that has not been done yet. The
+~90–110 ms penalty is acceptable for Phase 2, whose latency-sensitive surfaces
+(live tracking, matching) are Phase 3 and not yet in users' hands.
+
+Reconsider if and when the assessment lands somewhere else, or if Supabase opens
+a Middle East region — but reconsidering means a dump, a restore and downtime,
+so it is a decision to revisit deliberately rather than drift into.
+
+## What is still open
+
+Choosing a region is a data-location control. It is **not** a lawful basis for
+transferring Saudi personal data out of the Kingdom, and the following are
+unanswered:
+
+- the transfer basis itself (adequacy, SDAIA approval, or a listed exemption)
+- whether a Data Processing Agreement with Supabase is required, and signed
+- retention, and how erasure requests interact with an append-only timeline
+  that is deliberately impossible to rewrite (ADR-0003)
+- where backups and logs live, which is a separate transfer from the database
+
+None of these block **launching the logbook to a small pilot group**, which is
+the near-term plan, but all of them block scale. They are a legal task, not a
+coding one.
 
 ## Options
 

@@ -13,16 +13,16 @@ insert into auth.users (id, phone, email) values
   ('22222222-0000-4000-9999-000000000002', null, null),
   ('33333333-0000-4000-9999-000000000003', null, 'buyer@example.com');
 
-insert into public.profiles (id, full_name, phone, phone_verified, role) values
-  ('11111111-0000-4000-9999-000000000001', 'صاحب رقم', '+966509500001', true, 'customer');
+insert into public.profiles (id, full_name, phone, phone_verified) values
+  ('11111111-0000-4000-9999-000000000001', 'صاحب رقم', '+966509500001', true);
 
 -- A guest: no phone, no email. This INSERT failing is what 0039 exists to
 -- prevent — before it, profiles.phone was NOT NULL.
-insert into public.profiles (id, is_guest, role) values
-  ('22222222-0000-4000-9999-000000000002', true, 'customer');
+insert into public.profiles (id, is_guest) values
+  ('22222222-0000-4000-9999-000000000002', true);
 
-insert into public.profiles (id, full_name, email, role) values
-  ('33333333-0000-4000-9999-000000000003', 'مشتري', 'buyer@example.com', 'customer');
+insert into public.profiles (id, full_name, email) values
+  ('33333333-0000-4000-9999-000000000003', 'مشتري', 'buyer@example.com');
 
 select test.assert_eq(
   (select full_name from public.profiles where id = '22222222-0000-4000-9999-000000000002'),
@@ -116,10 +116,11 @@ select test.assert(
        where id = '33333333-0000-4000-9999-000000000003'),
   'changing the email revokes its verification');
 
--- Role escalation is still refused on every path (0036 remains the floor).
+-- Role escalation is still refused on every path (0036 remains the floor;
+-- 0040 moved the target to user_roles).
 select test.assert_raises(
-  $$update public.profiles set role = 'ops'
-    where id = '33333333-0000-4000-9999-000000000003'$$,
+  $$insert into public.user_roles (user_id, role)
+    values ('33333333-0000-4000-9999-000000000003', 'ops')$$,
   'an email user still cannot promote themselves to ops',
   '42501');
 
@@ -128,8 +129,8 @@ reset role;
 -- A non-guest with no identity at all is refused: nothing may leave a profile
 -- unreachable.
 select test.assert_raises(
-  $$insert into public.profiles (id, full_name, role)
-    values ('44444444-0000-4000-9999-000000000004', 'مجهول', 'customer')$$,
+  $$insert into public.profiles (id, full_name)
+    values ('44444444-0000-4000-9999-000000000004', 'مجهول')$$,
   'a non-guest profile must carry a phone or an email',
   '23514');
 
@@ -141,8 +142,8 @@ insert into auth.users (id, email) values
   ('55555555-0000-4000-9999-000000000005', 'Someone.Else@Example.com');
 
 select test.assert_raises(
-  $$insert into public.profiles (id, full_name, email, role)
-    values ('55555555-0000-4000-9999-000000000005', 'مكرر', 'SOMEONE.ELSE@example.com', 'customer')$$,
+  $$insert into public.profiles (id, full_name, email)
+    values ('55555555-0000-4000-9999-000000000005', 'مكرر', 'SOMEONE.ELSE@example.com')$$,
   'the same email in different case cannot become a second account',
   '23505');
 
@@ -151,8 +152,8 @@ select test.assert_raises(
 -- not carry the address: the rule under test is the profiles index, and the
 -- shim's own auth.users unique constraint would otherwise mask it.
 insert into auth.users (id) values ('66666666-0000-4000-9999-000000000006');
-insert into public.profiles (id, full_name, email, role)
-values ('66666666-0000-4000-9999-000000000006', 'مالك جديد', 'buyer@example.com', 'customer');
+insert into public.profiles (id, full_name, email)
+values ('66666666-0000-4000-9999-000000000006', 'مالك جديد', 'buyer@example.com');
 
 select test.assert_eq(
   (select count(*)::int from public.profiles where lower(email) = 'buyer@example.com'),

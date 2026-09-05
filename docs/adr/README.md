@@ -2,8 +2,10 @@
 
 Format and status conventions: [ADR-0001](0001-record-architecture-decisions.md).
 
-**Nothing here is `Accepted` yet.** Every ADR below is `Proposed` — written with a recommendation,
-awaiting the product owner's decision. No application code has been written.
+Most ADRs below remain `Proposed` — written with a recommendation, awaiting the product owner's
+decision. The `Accepted` ones are implemented and have tests behind them; where an accepted decision
+is a stand-in for a blocked one (ADR-0017's KYC sealing, which waits on ADR-0010), that is stated in
+the record itself rather than left to be inferred.
 
 ## Index
 
@@ -18,18 +20,20 @@ awaiting the product owner's decision. No application code has been written.
 | [0007](0007-money-vat-and-rounding.md)                      | Money representation, VAT rate as data, rounding rule                | Proposed     | Phase 3                              |
 | [0008](0008-payments-escrow-and-merchant-of-record.md)      | Escrow model and merchant of record                                  | Proposed     | Phase 3                              |
 | [0009](0009-zatca-seller-of-record.md)                      | ZATCA seller of record and invoice types                             | Proposed     | Phase 3 (schema), Phase 6 (delivery) |
-| [0010](0010-data-residency-and-pdpl.md)                     | Supabase region, PDPL posture, erasure vs immutability               | Proposed     | Phase 1                              |
+| [0010](0010-data-residency-and-pdpl.md)                     | Supabase region (**decided: Frankfurt**); PDPL basis still open      | Partial      | Phase 1                              |
 | [0011](0011-saudi-identifier-formats.md)                    | Plates, IBAN, national ID, VAT number                                | Proposed     | Phase 1                              |
 | [0012](0012-offline-capture-semantics.md)                   | `occurred_at` vs `recorded_at`; what the chain proves                | Proposed     | Phase 3                              |
 | [0013](0013-provider-order-visibility.md)                   | Masked order discovery via RPC, not RLS row reads                    | Proposed     | Phase 3                              |
 | [0014](0014-toolchain-and-versions.md)                      | Node, pnpm, Expo SDK, TypeScript strictness, CI                      | Proposed     | Phase 1                              |
 | [0015](0015-local-verification-harness.md)                  | Postgres + PostGIS + PostgREST harness, no Docker                    | **Accepted** | Phase 1                              |
+| [0016](0016-roles-as-a-join-table.md)                       | Roles as `user_roles`; one app, two route groups                     | **Accepted** | Phase 1 (Amendment A)                |
+| [0017](0017-report-qr-and-kyc-sealing.md)                   | In-page report QR; KYC sealing seam (stub pending 0010)              | **Accepted** | Phase 2                              |
 
 ## Blocking Phase 1
 
 Four decisions must land before the first migration:
 
-1. **[ADR-0010] Supabase region.** Chosen once at project creation; reversing it later means
+1. ~~**[ADR-0010] Supabase region.**~~ **Decided 2026-09-05: `eu-central-1` (Frankfurt).** The PDPL transfer basis behind it is still open. Originally: chosen once at project creation; reversing it later means
    migrating live customer data and an immutable timeline.
 2. **[ADR-0014] Expo SDK version.** The spec says 52+; 52 is well behind current. Recommendation:
    latest stable.

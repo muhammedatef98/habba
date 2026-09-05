@@ -13,10 +13,12 @@ insert into auth.users (id, phone) values
   ('22222222-0000-4000-b000-000000000002', '+966504000002'),  -- inspector
   ('33333333-0000-4000-b000-000000000003', '+966504000003');  -- someone else
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-b000-000000000001', 'المشتري', '+966504000001', 'customer'),
-  ('22222222-0000-4000-b000-000000000002', 'الفاحص',  '+966504000002', 'technician'),
-  ('33333333-0000-4000-b000-000000000003', 'شخص آخر', '+966504000003', 'customer');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-b000-000000000001', 'المشتري', '+966504000001'),
+  ('22222222-0000-4000-b000-000000000002', 'الفاحص', '+966504000002'),
+  ('33333333-0000-4000-b000-000000000003', 'شخص آخر', '+966504000003');
+
+select test.grant_role('22222222-0000-4000-b000-000000000002', 'technician');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-b000-000000000001', 'جدة', 'JeddahInsp', 'مكة', 'Makkah',

@@ -68,8 +68,22 @@ begin
   perform set_config('request.jwt.claim.sub', '', true);
 end $$;
 
+-- Grants a role the way the server does (0040): through grant_user_role(),
+-- never by writing user_roles directly. Fixtures that need a technician, a
+-- workshop admin or an operator call this; `customer` needs no call at all,
+-- because every profile gets it on insert (§5.1.1).
+--
+-- Runs as the privileged migration role, standing in for the ops console.
+create or replace function test.grant_role(p_user_id uuid, p_role public.user_role)
+returns void language plpgsql as $$
+begin
+  perform public.grant_user_role(p_user_id, p_role, null);
+end $$;
+
 -- The RLS suite runs as the `authenticated` role so that real policies apply
 -- (the table owner and any superuser bypass RLS, which would make the whole
 -- suite vacuous). That role therefore needs to reach these helpers.
-grant usage on schema test to authenticated, anon;
-grant execute on all functions in schema test to authenticated, anon;
+-- service_role too: suites now assert what a LEAKED SERVICE KEY cannot do
+-- (0042's ledger, among others), and that assertion has to run as that role.
+grant usage on schema test to authenticated, anon, service_role;
+grant execute on all functions in schema test to authenticated, anon, service_role;

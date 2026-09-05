@@ -30,7 +30,7 @@ insert into public.vehicle_makes (name_ar, name_en, sort_order) values
   ('جي إم سي',   'GMC',           70),
   ('لكزس',       'Lexus',         80),
   ('هوندا',      'Honda',         90),
-  ('مازda',      'Mazda',        100),
+  ('مازدا',      'Mazda',        100),
   ('ميتسوبيشي',  'Mitsubishi',   110),
   ('إم جي',      'MG',           120),
   ('شانجان',     'Changan',      130),
@@ -38,11 +38,10 @@ insert into public.vehicle_makes (name_ar, name_en, sort_order) values
   ('مرسيدس-بنز', 'Mercedes-Benz',150),
   ('بي إم دبليو','BMW',          160),
   ('لاند روفر',  'Land Rover',   170),
-  ('إيسوزو',     'Isuzu',        180)
+  ('إيسوزو',     'Isuzu',        180),
+  ('سوزوكي',     'Suzuki',       190),
+  ('إنفينيتي',   'Infiniti',     200)
 on conflict do nothing;
-
--- Correct a typo in the Arabic name above without depending on statement order.
-update public.vehicle_makes set name_ar = 'مازدا' where name_en = 'Mazda';
 
 
 -- Models ---------------------------------------------------------------------
@@ -114,7 +113,10 @@ join (values
   ('BMW',    'الفئة الخامسة','5 Series',     2012, 'sedan'),
   ('BMW',    'X5',           'X5',           2012, 'suv'),
   ('Land Rover','رينج روفر', 'Range Rover',  2012, 'suv'),
-  ('Isuzu',  'دي ماكس',      'D-Max',        2012, 'pickup')
+  ('Isuzu',  'دي ماكس',      'D-Max',        2012, 'pickup'),
+  ('Suzuki', 'بالينو',       'Baleno',       2016, 'sedan'),
+  ('Suzuki', 'ديزاير',       'Dzire',        2017, 'sedan'),
+  ('Infiniti','QX80',        'QX80',         2011, 'suv')
 ) as v(make_en, name_ar, name_en, year_from, body_type)
   on v.make_en = m.name_en
 on conflict do nothing;

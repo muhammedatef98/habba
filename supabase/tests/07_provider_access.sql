@@ -20,10 +20,13 @@ insert into auth.users (id, phone) values
   ('22222222-0000-4000-9000-000000000002', '+966502000002'),  -- assigned provider
   ('44444444-0000-4000-9000-000000000004', '+966502000004');  -- other provider
 
-insert into public.profiles (id, full_name, phone, role) values
-  ('11111111-0000-4000-9000-000000000001', 'العميل',      '+966502000001', 'customer'),
-  ('22222222-0000-4000-9000-000000000002', 'الفنّي',      '+966502000002', 'technician'),
-  ('44444444-0000-4000-9000-000000000004', 'فنّي آخر',    '+966502000004', 'technician');
+insert into public.profiles (id, full_name, phone) values
+  ('11111111-0000-4000-9000-000000000001', 'العميل', '+966502000001'),
+  ('22222222-0000-4000-9000-000000000002', 'الفنّي', '+966502000002'),
+  ('44444444-0000-4000-9000-000000000004', 'فنّي آخر', '+966502000004');
+
+select test.grant_role('22222222-0000-4000-9000-000000000002', 'technician');
+select test.grant_role('44444444-0000-4000-9000-000000000004', 'technician');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('c0000000-0000-4000-9000-000000000001', 'الخبر', 'KhobarTest', 'المنطقة الشرقية',
