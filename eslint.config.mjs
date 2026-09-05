@@ -41,6 +41,17 @@ export default tseslint.config(
     files: ['**/*.config.{js,mjs,ts}', '**/scripts/**/*.{js,mjs,ts}'],
     rules: { 'no-console': 'off' },
   },
+  {
+    // Edge Functions are servers: stdout IS their operational log, and a
+    // successful delivery is information rather than a warning. `no-console`
+    // exists to keep debug noise out of the APP bundle, which these are not
+    // part of.
+    //
+    // What still applies here, and is not enforceable by a linter, is WHAT may
+    // be logged: never an OTP, never a message body (ADR-0018).
+    files: ['supabase/functions/**/*.ts'],
+    rules: { 'no-console': 'off' },
+  },
 
   // -------------------------------------------------------------------------
   // Feature boundaries inside the single mobile app (CLAUDE.md §5.1.5)

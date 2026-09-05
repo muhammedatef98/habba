@@ -51,7 +51,7 @@
     "guestUpgradeDone": "Your account is saved",
     "errors": {
       "invalidPhone": "That mobile number isn't valid. It should start with 5 and be 9 digits.",
-      "invalidOtp": "That code isn't right. Check your messages and try again.",
+      "invalidOtp": "That code is wrong or has expired. Check the message, or request a new code.",
       "otpExpired": "That code has expired. Request a new one.",
       "tooManyAttempts": "Too many attempts. Wait a minute and try again.",
       "network": "Couldn't connect. Check your internet and try again.",

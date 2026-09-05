@@ -3,8 +3,8 @@
 // Regenerate: ./supabase/scripts/sync-edge-shared.sh
 //
 // Edge Functions run on Deno and cannot import pnpm workspace packages, so
-// the renderer is vendored here. CI runs this script with --check, so drift
-// fails the build rather than quietly shipping a stale report layout.
+// this module is vendored here. CI runs this script with --check, so drift
+// fails the build rather than quietly shipping stale behaviour.
 
 /**
  * تقرير هبّة payload — the shape `generate_habba_report` produces.

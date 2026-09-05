@@ -1,10 +1,19 @@
 /**
  * The app's OTP provider instance.
  *
- * Swapping the development stub for a real SMS provider (Unifonic, Taqnyat,
- * Twilio — open decision, see otp-provider.ts) happens here and nowhere else.
+ * Real phone auth when the app is pointed at a Supabase project, the dev stub
+ * otherwise — the same switch the repository uses, for the same reason: the
+ * app has to run end-to-end on a laptop with no project and no SMS credit.
+ *
+ * This is the only place that decision is made.
  */
 
-import { DevOtpProvider, type OtpProvider } from './otp-provider.js';
+import { getSupabaseClient } from './supabase.js';
+import { DevOtpProvider, SupabaseOtpProvider, type OtpProvider } from './otp-provider.js';
 
-export const otpProvider: OtpProvider = new DevOtpProvider();
+function createOtpProvider(): OtpProvider {
+  const client = getSupabaseClient();
+  return client === null ? new DevOtpProvider() : new SupabaseOtpProvider(client);
+}
+
+export const otpProvider: OtpProvider = createOtpProvider();

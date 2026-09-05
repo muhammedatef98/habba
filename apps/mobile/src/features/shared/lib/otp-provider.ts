@@ -1,20 +1,22 @@
 /**
  * OTP delivery, behind an interface.
  *
- * ⚠️ OPEN DECISION — this blocks Phase 1's acceptance criterion ("a user signs
- * up with a Saudi phone number"). Supabase Auth needs an SMS provider, and in
- * Saudi Arabia the sender ID must be registered with the CITC. Candidates are
- * Unifonic and Taqnyat (local, straightforward sender-ID registration) or
- * Twilio/MessageBird (international, more friction for KSA sender IDs).
+ * Two implementations, chosen by configuration in `otp.ts`:
  *
- * Until that is chosen and credentialled, `DevOtpProvider` below lets the
- * whole flow — validation, rate limiting, expiry, resend, navigation — be
- * built and tested. Only the transport is stubbed. Swapping in the real
- * provider is one implementation of this interface and no screen changes.
+ *   - `SupabaseOtpProvider` — real phone auth. Supabase Auth generates,
+ *     expires and verifies the code and issues the session; delivery goes
+ *     through the `send-sms-hook` Edge Function, which sends via Unifonic and
+ *     enforces the 5/hour per-phone limit in Postgres (0042, ADR-0018).
+ *   - `DevOtpProvider` — a fixed code, for working offline and in CI.
+ *
+ * The interface exists so the app never learns which one it has. Note what it
+ * does NOT expose: any way to read a code. The client sends a number and later
+ * submits what the user typed; it is never told what the right answer is.
  *
  * The same abstraction shape applies to Nafath in Phase 3 (build prompt §3).
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseSaudiPhone } from '@habba/core';
 
 export type OtpSendResult =
@@ -94,5 +96,77 @@ export class DevOtpProvider implements OtpProvider {
 
     this.pending.delete(phoneE164);
     return { ok: true };
+  }
+}
+
+/**
+ * Supabase Auth phone OTP.
+ *
+ * Every rule that matters is server-side: the code, its expiry, the attempt
+ * count, the per-phone send limit, and the session. This class translates the
+ * two calls and maps errors onto the same result type the dev provider
+ * returns, so screens behave identically against either.
+ *
+ * Nothing here logs. `error.message` from GoTrue does not contain the code,
+ * but the discipline is worth keeping at the boundary rather than trusting an
+ * upstream string to stay code-free (ADR-0018).
+ */
+export class SupabaseOtpProvider implements OtpProvider {
+  constructor(private readonly client: SupabaseClient) {}
+
+  async send(phoneE164: string): Promise<OtpSendResult> {
+    if (!parseSaudiPhone(phoneE164).ok) {
+      return { ok: false, reason: 'invalid_phone' };
+    }
+
+    const { error } = await this.client.auth.signInWithOtp({
+      phone: phoneE164,
+      // Sign-in and sign-up are the same act for a phone-first product: a new
+      // number becomes an account, and everyone starts as a customer (§5.1.1).
+      options: { shouldCreateUser: true },
+    });
+
+    if (error === null) return { ok: true, expiresInSeconds: OTP_TTL_SECONDS };
+
+    // 429 covers both GoTrue's own limit and the hook refusing on ours; from
+    // the user's side they are the same event and get the same message.
+    if (error.status === 429 || /rate|limit|too many/i.test(error.message)) {
+      return { ok: false, reason: 'rate_limited' };
+    }
+
+    if (/phone|number|invalid/i.test(error.message)) {
+      return { ok: false, reason: 'invalid_phone' };
+    }
+
+    return { ok: false, reason: 'transport_failed' };
+  }
+
+  async verify(phoneE164: string, code: string): Promise<OtpVerifyResult> {
+    const { error } = await this.client.auth.verifyOtp({
+      phone: phoneE164,
+      token: code,
+      type: 'sms',
+    });
+
+    if (error === null) return { ok: true };
+
+    if (error.status === 429 || /too many/i.test(error.message)) {
+      return { ok: false, reason: 'too_many_attempts' };
+    }
+
+    // GoTrue answers a wrong code and an expired code with ONE message —
+    // "Token has expired or is invalid" — deliberately, because telling them
+    // apart would confirm that a code was issued for that number.
+    //
+    // So `expired` is claimed only when the provider says expiry and nothing
+    // else. The ambiguous case is reported as `invalid_code`, whose copy covers
+    // both ("الرمز غير صحيح أو انتهت صلاحيته"). The alternative — calling every
+    // mistyped digit "expired" — sends the user to request a new SMS, spending
+    // one of their five hourly sends to fix a typo.
+    if (/expired/i.test(error.message) && !/invalid/i.test(error.message)) {
+      return { ok: false, reason: 'expired' };
+    }
+
+    return { ok: false, reason: 'invalid_code' };
   }
 }
