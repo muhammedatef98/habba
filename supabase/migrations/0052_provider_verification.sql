@@ -1,4 +1,4 @@
--- 0045 — Provider verification, as a decision with a record
+-- 0052 — Provider verification, as a decision with a record
 --
 -- `verification_status` gates everything: `match_providers` will not consider a
 -- provider who is not `approved`, and 0034 already stops a provider setting it

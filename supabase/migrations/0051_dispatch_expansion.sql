@@ -1,6 +1,6 @@
--- 0044 — Expanding the search when nobody answers
+-- 0051 — Expanding the search when nobody answers
 --
--- 0042 broadcasts round 1 the instant an order starts searching. §7.1 then
+-- 0049 broadcasts round 1 the instant an order starts searching. §7.1 then
 -- widens the radius — 8km, 15km, 25km — when nobody accepts within 45 seconds.
 -- A trigger cannot do that: there is no event at 45 seconds, only the absence
 -- of one, and absence does not fire.
@@ -23,9 +23,9 @@ comment on column public.orders.dispatch_round is
 
 
 /**
- * Redefined from 0042 to record the attempt on the order.
+ * Redefined from 0049 to record the attempt on the order.
  *
- * Forward-only: 0042 has shipped, so this replaces the function here rather
+ * Forward-only: 0049 has shipped, so this replaces the function here rather
  * than editing history. The body is otherwise unchanged.
  */
 create or replace function public.broadcast_order(p_order_id uuid, p_round int default 1)

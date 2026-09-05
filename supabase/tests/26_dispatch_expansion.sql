@@ -1,6 +1,6 @@
--- 23 — Expanding a quiet search
+-- 26 — Expanding a quiet search
 --
--- Companion to 0044. The interesting cases are the ones where nothing should
+-- Companion to 0051. The interesting cases are the ones where nothing should
 -- happen: a search that is still fresh, one that already reached the last
 -- rung, and one that stopped searching.
 

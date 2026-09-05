@@ -1,6 +1,6 @@
--- 21 — Triage clip storage
+-- 24 — Triage clip storage
 --
--- Companion to 0041. A triage clip is video of someone's car, often their
+-- Companion to 0048. A triage clip is video of someone's car, often their
 -- driveway, sometimes them, captured at a moment of stress. The assertions
 -- that matter are about who cannot see it.
 

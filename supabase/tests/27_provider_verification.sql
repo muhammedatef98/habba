@@ -1,6 +1,6 @@
--- 24 — Provider verification as an answerable decision
+-- 27 — Provider verification as an answerable decision
 --
--- Companion to 0045. Approving a provider is the moment Habba vouches for
+-- Companion to 0052. Approving a provider is the moment Habba vouches for
 -- someone who will be sent to a stranger's car at night. The assertions are
 -- about that being recorded, and about who may do it.
 

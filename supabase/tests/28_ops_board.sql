@@ -1,6 +1,6 @@
--- 25 — The dispatch board
+-- 28 — The dispatch board
 --
--- Companion to 0046. The board's job is deciding what an operator looks at
+-- Companion to 0053. The board's job is deciding what an operator looks at
 -- first, so the assertions are about ordering and about the attention flag
 -- being right — a board that calls everything urgent is a board nobody reads.
 

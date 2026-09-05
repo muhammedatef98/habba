@@ -1,6 +1,6 @@
--- 22 — Dispatch offers and telemetry
+-- 25 — Dispatch offers and telemetry
 --
--- Companion to 0042. The counts belong to the customer; the identities do not.
+-- Companion to 0049. The counts belong to the customer; the identities do not.
 -- Most of what follows is about that line.
 
 \echo '── dispatch offers'

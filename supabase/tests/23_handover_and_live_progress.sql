@@ -1,6 +1,6 @@
--- 20 — Handover codes and live progress
+-- 23 — Handover codes and live progress
 --
--- Companion to 0040. Both features exist to be withheld from someone, so the
+-- Companion to 0047. Both features exist to be withheld from someone, so the
 -- assertions that matter are the negative ones: the provider must not be able
 -- to read the code they are being checked against, and nobody but the customer
 -- may ask how far away their technician is.

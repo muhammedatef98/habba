@@ -1,4 +1,4 @@
--- 0040 — Handover verification and live job progress
+-- 0047 — Handover verification and live job progress
 --
 -- Two gaps the emergency-flow design surfaced, both of which have to be solved
 -- server-side or not at all.
@@ -51,7 +51,7 @@ create table public.order_handovers (
 );
 
 comment on table public.order_handovers is
-  'Customer-visible handover code. Never readable by the provider being verified — see 0040.';
+  'Customer-visible handover code. Never readable by the provider being verified — see 0047.';
 
 /** Attempts allowed before the code is locked and ops must intervene. */
 create or replace function public.handover_max_attempts()

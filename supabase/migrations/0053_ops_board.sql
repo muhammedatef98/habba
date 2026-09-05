@@ -1,4 +1,4 @@
--- 0046 — The dispatch board
+-- 0053 — The dispatch board
 --
 -- §9.4 calls for a live order map. The map is the picture; this is the part
 -- that decides what ops should be looking at, and it belongs in the database
@@ -12,7 +12,7 @@
 /**
  * How long a search may run before it needs a human.
  *
- * Past the last rung the ladder has nothing left to try (0044), so this is
+ * Past the last rung the ladder has nothing left to try (0051), so this is
  * about the case where widening happened and still found nobody. Ops can call,
  * widen manually, or tell the customer honestly — all of which beat a spinner.
  */

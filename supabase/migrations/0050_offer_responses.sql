@@ -1,6 +1,6 @@
--- 0043 — The provider's side of an offer
+-- 0050 — The provider's side of an offer
 --
--- 0042 records what was broadcast; this is how a provider responds to it.
+-- 0049 records what was broadcast; this is how a provider responds to it.
 --
 -- Both actions go through functions rather than a direct UPDATE. The column
 -- guard already refuses the dangerous write (self-acceptance), but "mark this
