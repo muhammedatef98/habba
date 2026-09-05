@@ -13,18 +13,20 @@ lives in the Supabase dashboard.
 
 ## 0. Before you start — one decision only you can make
 
-**Which region.** Supabase pins your database, Auth and Storage to one region,
-chosen at creation and expensive to change afterwards. There is **no Saudi
-region**; the nearest options are Frankfurt (`eu-central-1`), London
-(`eu-west-2`) and Mumbai (`ap-south-1`).
+**Which region — decided: `eu-central-1` (Frankfurt).** Recorded in ADR-0010 on
+2026-09-05. Supabase pins your database, Auth and Storage to one region, chosen
+at creation and expensive to change afterwards, so use this one unless you are
+deliberately revisiting the decision.
 
-That makes this a PDPL question, not a latency question: Saudi personal data
-leaving the Kingdom needs a lawful basis, and Habba stores phone numbers, plate
-numbers, national IDs (later) and locations. This is **ADR-0010**, still open.
-Decide it — with legal advice if you have it — before creating the project,
-because the migration path afterwards is a dump, a restore, and downtime.
+There is **no Saudi region**. Frankfurt was chosen over Mumbai's better latency
+because a GDPR-grade regime is the most defensible starting point for a PDPL
+transfer assessment.
 
-The rest of this document is the same whichever region you pick.
+⚠️ **That assessment is still outstanding.** Picking a region is a data-location
+control, not a lawful basis for moving Saudi personal data out of the Kingdom.
+The transfer basis, a DPA with Supabase, retention, and how erasure requests
+interact with an append-only timeline are all open (ADR-0010). They do not block
+a small pilot; they do block scale.
 
 ---
 
@@ -36,7 +38,7 @@ The rest of this document is the same whichever region you pick.
 | ----------------- | ----------------------------------------------------------------------- |
 | Name              | `habba-production` (or `habba-staging` — make a staging one first)      |
 | Database password | Generate one. Store it in your password manager; you need it in step 3. |
-| Region            | Your answer from §0                                                     |
+| Region            | **Frankfurt (`eu-central-1`)** — see §0                                 |
 | Plan              | Free is fine to prove this out. Production wants Pro, for PITR backups. |
 
 Wait for "Project is ready" — provisioning takes a couple of minutes.
