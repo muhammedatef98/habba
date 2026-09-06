@@ -131,10 +131,9 @@
     "recordNotVerifiedNotice": "This entry shows as “owner-entered” because Habba did not carry out the work. Services Habba performs appear as verified.",
     "updateMileage": "Update mileage",
     "mileageNow": "Current mileage",
-    "generateReport": "Generate Habba report",
-    "reportReady": "Report ready",
-    "reportShareHint": "Share this link with the buyer. It works without a login.",
-    "reportCopyLink": "Copy link",
+    "generateReport": "Generate Habba report (PDF)",
+    "reportReady": "Report created",
+    "reportShareHint": "A PDF ready to share or print. It carries neither your name nor your number.",
     "reportCoverage": "{{verified}} of {{total}} records Habba-verified",
     "reportChainVerified": "Record chain verified",
     "errors": {
@@ -143,6 +142,7 @@
       "mileageTooLow": "That reading is below the recorded {{current}} km. Check the number.",
       "reportChainBroken": "The report could not be issued because this logbook failed verification. Contact support.",
       "reportFailed": "The report could not be issued. Try again.",
+      "reportShareUnavailable": "The report was created, but this device could not open a share sheet.",
       "cost": "That amount is not valid. Use digits, e.g. 350.00",
       "mileageRequired": "Enter the odometer reading."
     },

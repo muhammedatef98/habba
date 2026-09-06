@@ -101,15 +101,19 @@ deferred.
 Deliberately cheap, in this order:
 
 1. Register a domain and point it at the project.
-2. `supabase functions deploy report --no-verify-jwt`, and set
+2. Restore `supabase/functions/report/index.ts` (git history; it was ~90 lines
+   of transport) and re-add `report:generate_report` to `MODULES` in
+   `supabase/scripts/sync-edge-shared.sh` so the renderer vendors into
+   `_shared/` again.
+3. `supabase functions deploy report --no-verify-jwt`, and set
    `HABBA_PUBLIC_BASE_URL`.
-3. Set `EXPO_PUBLIC_REPORT_BASE_URL` to match.
-4. Put the QR back on the PDF's last page, encoding `<base>/r/<token>`.
+4. Reintroduce `EXPO_PUBLIC_REPORT_BASE_URL` and a `reportBaseUrl()` reader.
+5. Put the QR back on the PDF's last sheet, encoding `<base>/r/<token>`.
 
 Nothing in this decision deletes the database function, the token, the
-`habba_reports` table, or the renderer — reversing it is configuration and one
-page of layout, not a rebuild. Tokens minted while this ADR stands remain valid
-and would resolve the moment the endpoint exists.
+`habba_reports` table, or the renderer — reversing it is configuration, one
+Deno file and one panel of layout, not a rebuild. Tokens minted while this ADR
+stands remain valid and would resolve the moment the endpoint exists.
 
 ## Alternatives considered
 
@@ -125,3 +129,26 @@ and would resolve the moment the endpoint exists.
   verifier gains nothing from a signature they cannot check, and it needs a key
   and a key-management story we do not have. Worth revisiting when a verifier
   exists.
+
+## What shipped
+
+Migration `0046` added the two things the layout needed and the payload did not
+carry — live warranty status, and the inspection score's scale and
+recommendation. `renderHabbaReportPdf()` in `@habba/core` produces the document
+as a pure function; `apps/mobile/src/features/shared/lib/report-pdf.ts` prints
+it, names the file after the car, and opens the platform share sheet.
+
+Three details worth recording because they were not obvious from the layout:
+
+- **The PDF is rendered from the payload read back by token**, not from a fresh
+  read of the timeline. If those two ever disagreed, the document a buyer holds
+  and the record it claims to be would be different things.
+- **No webfont.** The document is generated on a phone that may be offline, and
+  a `@font-face` that fails to load silently reflows the whole thing. The stack
+  names the platform Arabic faces instead.
+- **Every Latin run is wrapped in `<bdi>`.** Without it the bidi algorithm
+  resolves the neutral `-` in `90915-YZZE1` and `2026-01-05` against the Arabic
+  around them, and they print as `YZZE1-90915` and `05-01-2026` — which reads
+  as the wrong part number and the wrong date. `<bdi>` rather than `dir="ltr"`,
+  because a Saudi plate reads «أ ب ج ١٢٣٤» right to left and forcing LTR would
+  fix the part numbers by breaking the plates.

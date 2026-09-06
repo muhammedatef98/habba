@@ -218,17 +218,17 @@ if the project is heading for production.
 > production would be exactly the privilege escalation that migrations 0036 and
 > 0040 exist to prevent. `verify-hosted.sh` does not apply it.
 
-## 7. Deploy the report function
+## 7. There is no report function to deploy
 
-```bash
-supabase functions deploy report
-supabase secrets set HABBA_PUBLIC_BASE_URL='https://habba.sa'
-```
+تقرير هبّة used to be an Edge Function serving a public page at
+`/functions/v1/report/<token>`. **ADR-0019 dropped it.** The report is now
+generated on the device as a PDF and shared as a file, so there is no endpoint
+to deploy, no domain to register and no `HABBA_PUBLIC_BASE_URL` to set.
 
-تقرير هبّة is served at `/functions/v1/report/<token>`. Point whatever domain
-you use for share links at it, and set `EXPO_PUBLIC_REPORT_BASE_URL` in the app
-to match — the QR on the report encodes that URL, so a mismatch produces a code
-that scans to nothing.
+`generate_habba_report()` and the token still exist, unchanged: the payload is
+issued and frozen exactly as before, and the app reads it back by token to
+render the document. ADR-0019 lists the steps to bring the public page back if
+that decision is reversed.
 
 ## 8. Point the app at the project
 
@@ -240,7 +240,6 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false
-EXPO_PUBLIC_REPORT_BASE_URL=https://habba.sa/r
 ```
 
 Restart Metro. With those set, the app switches from the in-memory repository

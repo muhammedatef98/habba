@@ -49,8 +49,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // against 'true' so a typo, `1`, or `yes` leaves the flow off rather than
     // opening a KYC form we cannot yet protect.
     enableProviderMode: env('EXPO_PUBLIC_ENABLE_PROVIDER_MODE') === 'true',
-
-    // Where تقرير هبّة is served, for the share link the app shows.
-    reportBaseUrl: env('EXPO_PUBLIC_REPORT_BASE_URL') ?? 'https://habba.sa/r',
   },
 });

@@ -15,61 +15,21 @@
  * deployed function.
  */
 
-import type { HabbaReport, ReportEvent, ReportProvenance } from './types.js';
+import type { HabbaReport, ReportEvent } from './types.js';
 import { verifiedRatio } from './types.js';
 import { qrSvg } from './qr.js';
+import {
+  DETAIL_LABEL_AR,
+  PROVENANCE_LABEL_AR,
+  escapeHtml,
+  formatDetailValue,
+  formatNumber,
+} from './labels.js';
 
-/**
- * Escapes text for HTML.
- *
- * The report renders owner-typed strings (service descriptions) into a public
- * page. Without escaping, an owner could inject markup into a page a buyer
- * trusts — the exact XSS the security rules forbid.
- */
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-const PROVENANCE_LABEL_AR: Record<ReportProvenance, string> = {
-  habba_verified: 'موثّق من هبّة',
-  self_documented: 'مُدخل من المالك مع مرفق',
-  self_reported: 'مُدخل من المالك',
-  third_party: 'من جهة خارجية',
-};
-
-const DETAIL_LABEL_AR: Record<string, string> = {
-  oil_grade: 'درجة الزيت',
-  oil_quantity_l: 'كمية الزيت (لتر)',
-  filter_part_number: 'رقم الفلتر',
-  part_number: 'رقم القطعة',
-  is_oem: 'قطعة أصلية',
-  warranty_days: 'الضمان (يوم)',
-  labour_hours: 'ساعات العمل',
-  service_kind: 'نوع الخدمة',
-  inspection_score: 'نتيجة الفحص',
-  obd_codes: 'أكواد الكمبيوتر',
-  tyre_size: 'مقاس الإطار',
-  battery_capacity_ah: 'سعة البطارية',
-  brake_pad_position: 'موضع الفحمات',
-  notes_public: 'ملاحظات',
-};
-
-function formatNumber(value: number): string {
-  // Latin numerals: §8 notes Saudi users prefer 1234 over ١٢٣٤ on screen.
-  return new Intl.NumberFormat('en-US').format(value);
-}
-
-function formatDetailValue(value: unknown): string {
-  if (typeof value === 'boolean') return value ? 'نعم' : 'لا';
-  if (typeof value === 'number') return formatNumber(value);
-  if (Array.isArray(value)) return value.map((entry) => String(entry)).join('، ');
-  return String(value);
-}
+// Re-exported because `inspection.ts` and the tests import it from here, and
+// because a second escaping helper is exactly the kind of thing that ends up
+// subtly different from the first one.
+export { escapeHtml };
 
 function renderDetails(details: Readonly<Record<string, unknown>>): string {
   const entries = Object.entries(details).filter(([, value]) => value !== null && value !== '');
