@@ -1,4 +1,4 @@
--- 23 — Verified identity, and the transfer gate it unlocks (0044, 0045)
+-- 29 — Verified identity, and the transfer gate it unlocks (0044, 0045)
 --
 -- Before 0044 nothing in the product ever set `phone_verified`, so 0037's
 -- ownership-transfer discovery policy — which requires it — refused everyone.

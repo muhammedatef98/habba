@@ -80,7 +80,7 @@ number is confirmed could type a victim's number into their profile and carry
 the verified flag across with it — precisely the escalation 0037 was written to
 stop. 0039's column guard already knocks the flag down whenever the value
 changes; 0044 only ever raises it again when the new value is one GoTrue
-vouched for. Both directions are asserted in `23_verified_identity.sql`.
+vouched for. Both directions are asserted in `29_verified_identity.sql`.
 
 Two triggers keep it true: one on `auth.users` (GoTrue confirms), one on
 `profiles` (the row appears after sign-in, or the user corrects their address).
