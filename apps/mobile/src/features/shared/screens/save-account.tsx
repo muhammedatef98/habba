@@ -16,7 +16,7 @@ import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone } from '@habba/core';
 import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
-import { isValidEmail, normaliseEmail } from '@/features/shared/lib/email-auth-provider';
+import { isValidEmail, normaliseEmail } from '@/features/shared/lib/email-otp-provider';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/features/shared/state/session';
 

@@ -18,8 +18,18 @@ create table if not exists auth.users (
   id            uuid primary key default gen_random_uuid(),
   phone         text unique,
   email         text unique,
+  -- GoTrue stamps these when it has actually delivered a code to the address
+  -- and seen it typed back. Migration 0044 derives profiles.phone_verified and
+  -- email_verified from them, so the harness cannot omit them and still be
+  -- testing the thing that matters.
+  phone_confirmed_at timestamptz,
+  email_confirmed_at timestamptz,
   created_at    timestamptz not null default now()
 );
+
+-- Defensive, for a cluster whose auth.users predates the columns above.
+alter table auth.users add column if not exists phone_confirmed_at timestamptz;
+alter table auth.users add column if not exists email_confirmed_at timestamptz;
 
 -- Mirrors Supabase's real auth.uid()/auth.role(), which read TWO GUC forms:
 --
@@ -98,6 +108,10 @@ grant select on auth.users to authenticated, service_role;
 -- ⚠️ LOCAL ONLY. This function is defined in the shim, never in a migration,
 -- so it cannot reach a hosted Supabase project — where GoTrue owns auth.users
 -- and nothing else may write to it.
+-- The phone arrives CONFIRMED, because a real phone-OTP sign-up cannot produce
+-- an unconfirmed one: GoTrue only creates the session after the code is typed
+-- back. A fixture that left it null would make every test run against an
+-- account shape production never sees.
 create or replace function public.test_seed_auth_user(p_id uuid, p_phone text)
 returns void
 language plpgsql
@@ -105,12 +119,32 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into auth.users (id, phone) values (p_id, p_phone)
+  insert into auth.users (id, phone, phone_confirmed_at)
+  values (p_id, p_phone, now())
   on conflict (id) do nothing;
 end;
 $$;
 
 grant execute on function public.test_seed_auth_user(uuid, text) to authenticated, anon;
+
+-- Stands in for GoTrue confirming an EMAIL identity — the second way in, added
+-- in 0044/0045. Same shape as above and equally local-only.
+create or replace function public.test_seed_auth_email(p_id uuid, p_email text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into auth.users (id, email, email_confirmed_at)
+  values (p_id, p_email, now())
+  on conflict (id) do update
+    set email = excluded.email,
+        email_confirmed_at = excluded.email_confirmed_at;
+end;
+$$;
+
+grant execute on function public.test_seed_auth_email(uuid, text) to authenticated, anon;
 
 -- Stands in for the ops verification queue, which is Phase 6 (build prompt
 -- §9.4). Provider approval is deliberately NOT self-service — a provider that
