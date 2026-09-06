@@ -60,7 +60,7 @@ message.
    document the seller chose to hand over; the buyer's trust now rests on the
    seller being present and cooperative.
 2. **A PDF can be forged, and the hash chain cannot stop it.** The chain proves
-   that rows in *our* database were not rewritten. Nothing in a PDF is bound to
+   that rows in _our_ database were not rewritten. Nothing in a PDF is bound to
    that database: change "84" to "94" in any PDF editor and the file is
    indistinguishable from a real one to anyone without the app. The chain
    remains real and remains verified at generation time — but the printed claim

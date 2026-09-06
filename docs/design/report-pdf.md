@@ -13,16 +13,16 @@ The PDF renders the payload `generate_habba_report()` already produces. Nothing
 is computed in the app that the server does not already send, so the printed
 document and the database cannot drift.
 
-| Page | Section | Payload source |
-| --- | --- | --- |
-| 1 | Car identity | `vehicle.{make_ar, model_ar, year, plate, vin, colour, current_mileage}` |
-| 1 | «على هبّة منذ» | `ownership.months_on_habba` |
-| 1 | Coverage bar and legend | `coverage.{total, habba_verified, self_documented, self_reported, third_party}` |
-| 1 | Mileage chart | `mileage_history[]` |
-| 2 | Timeline | `events[]`, grouped by the year in `occurred_at` |
-| 2 | Badges | `events[].provenance` (ADR-0005) |
-| 2 | Detail chips | `events[].details`, already allowlist-redacted by `redact_timeline_details()` |
-| 3 | Verification statement | `chain.{is_valid, length}` |
+| Page | Section                 | Payload source                                                                  |
+| ---- | ----------------------- | ------------------------------------------------------------------------------- |
+| 1    | Car identity            | `vehicle.{make_ar, model_ar, year, plate, vin, colour, current_mileage}`        |
+| 1    | «على هبّة منذ»          | `ownership.months_on_habba`                                                     |
+| 1    | Coverage bar and legend | `coverage.{total, habba_verified, self_documented, self_reported, third_party}` |
+| 1    | Mileage chart           | `mileage_history[]`                                                             |
+| 2    | Timeline                | `events[]`, grouped by the year in `occurred_at`                                |
+| 2    | Badges                  | `events[].provenance` (ADR-0005)                                                |
+| 2    | Detail chips            | `events[].details`, already allowlist-redacted by `redact_timeline_details()`   |
+| 3    | Verification statement  | `chain.{is_valid, length}`                                                      |
 
 ## Decisions worth knowing before reading the layout
 
