@@ -328,8 +328,16 @@ alter table storage.objects enable row level security;
 -- Role grants are CLUSTER-wide and survive `drop database`, so a membership
 -- handed out by hand in an earlier session would silently persist and hand the
 -- migration role the storage owner's rights again. Revoke it every run.
-revoke supabase_storage_admin from habba_migrator;
-revoke supabase_auth_admin from habba_migrator;
+do $$
+begin
+  if pg_has_role('habba_migrator', 'supabase_storage_admin', 'MEMBER') then
+    revoke supabase_storage_admin from habba_migrator;
+  end if;
+  if pg_has_role('habba_migrator', 'supabase_auth_admin', 'MEMBER') then
+    revoke supabase_auth_admin from habba_migrator;
+  end if;
+end
+$$;
 
 grant usage on schema storage to habba_migrator;
 grant select, insert, update, delete on storage.buckets to habba_migrator;

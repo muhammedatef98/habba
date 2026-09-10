@@ -128,25 +128,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      # The postgis/postgis image pre-installs PostGIS into `public`, but every
-      # geography column and every SECURITY DEFINER function here qualifies
-      # `extensions.*` (search_path is empty — ADR-0003). PostGIS cannot be
-      # relocated after the fact, so the extension is dropped and 0001 installs
-      # it where it belongs. 0001 refuses to continue if this is skipped.
-      - name: Put PostGIS in the extensions schema
-        run: psql -v ON_ERROR_STOP=1 -c "drop extension if exists postgis cascade"
-
-      - name: Apply shim and migrations
-        run: |
-          psql -v ON_ERROR_STOP=1 -f supabase/scripts/supabase_shim.sql
-          for migration in supabase/migrations/*.sql; do
-            echo "  $(basename "$migration")"
-            psql -v ON_ERROR_STOP=1 -f "$migration"
-          done
-          for seed in supabase/seed/*.sql; do
-            echo "  $(basename "$seed")"
-            psql -v ON_ERROR_STOP=1 -f "$seed"
-          done
+      # ONE definition of "apply the database", shared with `pnpm db:test`.
+      #
+      # This job used to carry its own copy of the loop, and the copy drifted:
+      # it applied migrations as the superuser — so the hosted-privilege
+      # harness in supabase_shim.sql was bypassed here, in the very place meant
+      # to catch a migration that a real project would refuse — and it never
+      # applied supabase/storage/*.sql, so the triage-media policies were
+      # missing and suite 24 failed. Calling the script removes the copy.
+      #
+      # HABBA_PG_EXTERNAL keeps it away from the cluster: the service container
+      # above is not ours to start or stop. It still drops and recreates the
+      # database, which is also how the postgis/postgis image's pre-loaded
+      # PostGIS (in `public`) goes away — the shim then installs it into
+      # `extensions`, where every SECURITY DEFINER function expects it under an
+      # empty search_path (ADR-0003).
+      - name: Apply shim, migrations, storage policies and seed
+        env:
+          HABBA_PG_EXTERNAL: '1'
+        run: ./supabase/scripts/local-db.sh create && ./supabase/scripts/local-db.sh migrate
 
       - name: Schema, timeline, tamper and RLS suites
         run: |

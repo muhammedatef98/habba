@@ -24,6 +24,16 @@ PGPORT="${HABBA_PGPORT:-54329}"
 PGDATABASE="habba_dev"
 LOGFILE="$ROOT/supabase/.data/postgres.log"
 
+# HABBA_PG_EXTERNAL=1 → a Postgres someone else is running (CI's service
+# container), so this script manages the database but never the cluster.
+#
+# It exists so CI can call THIS SCRIPT instead of its own copy of the migration
+# loop. It had a copy, and the copy drifted: it applied migrations as the
+# superuser and never applied supabase/storage/*.sql, so the hosted-privilege
+# harness was defeated and the storage policies were absent — in the one place
+# that is supposed to catch exactly that.
+EXTERNAL_PG="${HABBA_PG_EXTERNAL:-}"
+
 # Prefer a Homebrew PostgreSQL 17 if present, else whatever is on PATH.
 for prefix in /opt/homebrew/opt/postgresql@17 /usr/local/opt/postgresql@17; do
   if [ -x "$prefix/bin/pg_ctl" ]; then
@@ -32,7 +42,7 @@ for prefix in /opt/homebrew/opt/postgresql@17 /usr/local/opt/postgresql@17; do
   fi
 done
 
-if ! command -v pg_ctl >/dev/null 2>&1; then
+if [ -z "$EXTERNAL_PG" ] && ! command -v pg_ctl >/dev/null 2>&1; then
   echo "error: PostgreSQL not found on PATH." >&2
   echo "  macOS:  brew install postgresql@17 postgis" >&2
   echo "  Linux:  apt-get install postgresql-17 postgresql-17-postgis-3" >&2
@@ -45,6 +55,7 @@ PSQL=(psql -h localhost -p "$PGPORT" -v ON_ERROR_STOP=1 --quiet)
 is_running() { pg_ctl -D "$PGDATA" status >/dev/null 2>&1; }
 
 cmd_start() {
+  if [ -n "$EXTERNAL_PG" ]; then echo "using the Postgres already running on port $PGPORT"; return 0; fi
   if is_running; then echo "already running on port $PGPORT"; return 0; fi
 
   if [ ! -d "$PGDATA/base" ]; then
@@ -59,6 +70,7 @@ cmd_start() {
 }
 
 cmd_stop() {
+  if [ -n "$EXTERNAL_PG" ]; then echo "not ours to stop"; return 0; fi
   if is_running; then pg_ctl -D "$PGDATA" -w stop; else echo "not running"; fi
 }
 
