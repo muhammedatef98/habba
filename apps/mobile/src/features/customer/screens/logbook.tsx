@@ -43,8 +43,8 @@ import {
 import { CoverageBar } from '@/features/customer/components/logbook/CoverageBar';
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
-import { reportBaseUrl } from '@/features/shared/lib/config';
 import { repository } from '@/features/shared/data/repository';
+import { shareHabbaReportPdf } from '@/features/shared/lib/report-pdf';
 import { formatCount } from '@/features/shared/lib/format-number';
 import {
   countByFilter,
@@ -69,7 +69,7 @@ export default function LogbookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isArabic = i18n.language.startsWith('ar');
 
-  const [reportToken, setReportToken] = useState<string | null>(null);
+  const [reportShared, setReportShared] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [filter, setFilter] = useState<LogbookFilter>('all');
 
@@ -91,14 +91,23 @@ export default function LogbookScreen() {
     queryFn: () => repository.listAllModels(),
   });
 
+  // Issue, read back, render, share — one action from the owner's side, and
+  // the whole of ADR-0019 from ours. The payload is read back by token rather
+  // than rebuilt from the timeline: the PDF must say what the database froze,
+  // or the document and the record it claims to be are different things.
   const report = useMutation({
-    mutationFn: () => repository.generateReport(id ?? ''),
-    onSuccess: (token) => {
-      setReportToken(token);
-      setReportError(null);
+    mutationFn: async () => {
+      const token = await repository.generateReport(id ?? '');
+      const payload = await repository.getReport(token);
+      if (payload === null) throw new Error('report_missing');
+      return shareHabbaReportPdf(payload);
+    },
+    onSuccess: (result) => {
+      setReportShared(result.ok);
+      setReportError(result.ok ? null : t('logbook.errors.reportShareUnavailable'));
     },
     onError: (error: Error) => {
-      setReportToken(null);
+      setReportShared(false);
       // A refused report means the logbook failed verification. That is not a
       // transient error and must not invite a retry — it needs support.
       setReportError(
@@ -217,7 +226,7 @@ export default function LogbookScreen() {
               loading={report.isPending}
             />
 
-            {reportToken !== null ? (
+            {reportShared ? (
               <View
                 style={{
                   gap: theme.spacing.xs,
@@ -240,9 +249,6 @@ export default function LogbookScreen() {
                 </View>
                 <Text variant="caption" tone="muted">
                   {t('logbook.reportShareHint')}
-                </Text>
-                <Text variant="caption" tone="primary" selectable>
-                  {`${reportBaseUrl()}/${reportToken}`}
                 </Text>
                 <Text variant="caption" tone="subtle">
                   {t('logbook.reportCoverage', {

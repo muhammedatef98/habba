@@ -79,9 +79,34 @@ cmd_migrate() {
   echo "applying supabase shim (local only — never run against hosted Supabase)"
   "${PSQL[@]}" -d "$PGDATABASE" -f "$ROOT/supabase/scripts/supabase_shim.sql" >/dev/null
 
+  # Migrations run as `habba_migrator`, NOT as the cluster superuser.
+  #
+  # Hosted Supabase runs them as `postgres`, which is not a superuser there: it
+  # does not own the `auth` or `storage` schemas, and no superuser check
+  # rescues it. Applying them here as the superuser meant every ownership rule
+  # was silently satisfied — which is how 0048's `alter table storage.objects`
+  # passed locally and in CI and then failed on the first real project.
+  #
+  # PGOPTIONS sets the role for the whole psql session, so a migration cannot
+  # opt out of it the way a leading `set role` in one file could.
   for migration in "$ROOT"/supabase/migrations/*.sql; do
     printf '  %s\n' "$(basename "$migration")"
-    "${PSQL[@]}" -d "$PGDATABASE" -f "$migration" >/dev/null
+    PGOPTIONS='-c role=habba_migrator' "${PSQL[@]}" -d "$PGDATABASE" -f "$migration" >/dev/null
+  done
+
+  # Storage policies, applied AS THE STORAGE OWNER — i.e. as the superuser
+  # running this script, not as habba_migrator.
+  #
+  # This stands in for the dashboard SQL editor step in §7 of
+  # docs/supabase-setup.md. `create policy on storage.objects` needs ownership
+  # of that table, which no migration connection has on a hosted project, so
+  # these cannot live in a migration. Applying them here keeps
+  # supabase/tests/24_triage_media_storage.sql testing the real policies
+  # instead of a weaker stand-in.
+  for policy in "$ROOT"/supabase/storage/*.sql; do
+    [ -e "$policy" ] || continue
+    echo "applying storage policies $(basename "$policy") (as the storage owner)"
+    "${PSQL[@]}" -d "$PGDATABASE" -f "$policy" >/dev/null
   done
 
   for seed in "$ROOT"/supabase/seed/*.sql; do

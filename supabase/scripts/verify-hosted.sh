@@ -125,6 +125,33 @@ if [ "$MODE" != "--verify-only" ]; then
   done
 
   echo "── migrations applied cleanly"
+
+  # Storage policies are NOT migrations and are deliberately not applied here.
+  #
+  # `create policy on storage.objects` requires ownership of that table, and
+  # the project's `postgres` role — the one this connection uses — does not
+  # have it. Attempting it is how 0048 failed on its first hosted run. They are
+  # applied once from the dashboard SQL editor; this only reports whether that
+  # has been done, because the bucket is closed and unusable until it has.
+  triage_policies=$(psql "$SUPABASE_DB_URL" -t -A -c \
+    "select count(*) from pg_policies
+      where schemaname = 'storage' and tablename = 'objects'
+        and policyname like 'triage_media%'" 2>/dev/null || echo 0)
+
+  if [ "$triage_policies" = "3" ]; then
+    echo "── storage policies for triage-media are in place"
+  else
+    echo
+    echo "⚠️  triage-media storage policies are NOT applied ($triage_policies of 3)."
+    echo "    Video triage uploads will be refused until they are."
+    echo
+    echo "    Open Dashboard → SQL Editor and run:"
+    echo "      supabase/storage/triage-media-policies.sql"
+    echo
+    echo "    They cannot be applied from here: storage.objects is owned by"
+    echo "    supabase_storage_admin, and this connection is not."
+    echo
+  fi
 fi
 
 # ---------------------------------------------------------------------------

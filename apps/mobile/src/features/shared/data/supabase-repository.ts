@@ -13,7 +13,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { sarOrThrow, type SarAmount } from '@habba/core';
+import { sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import type {
@@ -703,6 +703,17 @@ export class SupabaseRepository implements Repository {
     if (error !== null) throw new Error(`generateReport: ${error.message}`);
 
     return data as string;
+  }
+
+  async getReport(token: string): Promise<HabbaReport | null> {
+    // get_habba_report is SECURITY DEFINER and token-scoped (0014): it returns
+    // the frozen payload or null, with one indistinguishable answer for "never
+    // existed", "expired" and "revoked".
+    const { data, error } = await this.client.rpc('get_habba_report', { p_token: token });
+
+    if (error !== null) throw new Error(`getReport: ${error.message}`);
+
+    return (data as HabbaReport | null) ?? null;
   }
 
   async listEmergencyServices(): Promise<readonly Service[]> {

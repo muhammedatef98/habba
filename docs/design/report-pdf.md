@@ -32,6 +32,10 @@ document and the database cannot drift.
   a full-bleed dark header drinks ink on every copy anyone prints.
 - **Grouped by the year the work happened**, newest first, matching the logbook
   screen. Paper and app tell the same story in the same order.
+- **Counted nouns take their Arabic form.** «سجلان», not «٢ سجل» — the dual is
+  not optional, and this is the artefact a seller hands to a buyer.
+- **Every Latin run is isolated with `<bdi>`.** Otherwise `90915-YZZE1` prints
+  as `YZZE1-90915` and `2026-01-05` as `05-01-2026`.
 - **The mileage chart runs right to left**, oldest reading at the right, with
   both ends direct-labelled so the direction cannot be misread. One series, one
   hue, no legend — the heading names it.
@@ -42,23 +46,19 @@ document and the database cannot drift.
   allowlist. Page 1 and page 3 both say so in Arabic, because a buyer should be
   able to see that it is deliberate.
 
-## Two things the payload does not carry yet
+## The two payload gaps, now closed
 
-Both are drawn on page 3 as they should look. Neither can be built from what
-`get_habba_report()` returns today:
+The layout was drawn before the payload could fill them. Migration `0046` added
+both, and page 3 renders them:
 
-1. **Warranty status** («ساري» / «منتهٍ»). The payload carries `warranty_days`
-   as a per-job detail — a duration, not a state. Live warranties live in the
-   `warranties` table and the `active_warranties` view (0025), which the report
-   payload does not read. Needs a `warranties` section added to the payload in
-   `generate_habba_report()`.
-2. **The inspection score's scale and recommendation.** `inspection_score`
-   arrives as a bare number in `details`; "84" with no denominator means
-   nothing on paper. Full inspection reports live in `inspection_reports`
-   (0026) with their own tokens.
+| Page | Section          | Payload source                                                                                   |
+| ---- | ---------------- | ------------------------------------------------------------------------------------------------ |
+| 3    | Warranty table   | `warranties[].{service_ar, completed_at, warranty_days, status, days_remaining, has_open_claim}` |
+| 3    | Inspection score | `inspections[].{overall_score, score_scale, recommendation, template_ar, completed_at}`          |
 
-Until those land, page 3 can only show what the events carry: the warranty
-duration per job, and the score as a number.
+A payload at `report_version` 1 predates both. Page 3 says so rather than
+printing «لا يوجد ضمان» for a car whose warranties were simply never captured —
+`carriesWarrantyAndScore()` is the check.
 
 ## Not in this layout, deliberately
 

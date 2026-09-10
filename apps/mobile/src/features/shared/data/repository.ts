@@ -15,6 +15,7 @@
  * shape of this interface reflects the shape of the security model.
  */
 
+import type { HabbaReport } from '@habba/core';
 import {
   addSar,
   applyRate,
@@ -135,6 +136,15 @@ export interface Repository {
   recordPastService(input: PastServiceInput): Promise<void>;
   recordMileage(vehicleId: string, mileage: number): Promise<void>;
   generateReport(vehicleId: string): Promise<string>;
+  /**
+   * The FROZEN payload behind a token (migration 0014).
+   *
+   * Deliberately a second call rather than something `generateReport` returns
+   * inline: the PDF must be rendered from what the database stored, not from a
+   * fresh read of the timeline. If those two ever disagree, the document a
+   * buyer holds and the record it claims to be are different things.
+   */
+  getReport(token: string): Promise<HabbaReport | null>;
 
   // Phase 3. Note there is no method that sets `escrowStatus`, `totalAmount`
   // or `providerId` directly — those are guarded server-side (0033) and
@@ -1028,6 +1038,66 @@ export class InMemoryRepository implements Repository {
     // refusal-on-broken-chain behaviour lives in the database.
     if (!this.vehicles.has(vehicleId)) throw new Error('not_found');
     return `dev-report-${vehicleId}`;
+  }
+
+  async getReport(token: string): Promise<HabbaReport | null> {
+    const vehicleId = token.replace(/^dev-report-/, '');
+    const vehicle = this.vehicles.get(vehicleId);
+    if (vehicle === undefined) return null;
+
+    const events = this.timeline.get(vehicleId) ?? [];
+    const provenanceCount = (kind: TimelineEvent['provenance']): number =>
+      events.filter((event) => event.provenance === kind).length;
+
+    // Built to the same shape the database produces, so the PDF the dev build
+    // renders is the PDF a real one renders. It claims the current payload
+    // version because it carries the current payload's fields.
+    return {
+      report_version: 2,
+      generated_at: new Date().toISOString(),
+      vehicle: {
+        make_ar: vehicle.makeId,
+        make_en: vehicle.makeId,
+        model_ar: vehicle.modelId,
+        model_en: vehicle.modelId,
+        year: vehicle.year,
+        plate: vehicle.plateNormalised,
+        vin: vehicle.vin,
+        // The client's Vehicle has no colour column; the real payload reads
+        // it from the database.
+        colour: null,
+        current_mileage: vehicle.currentMileage,
+      },
+      ownership: { months_on_habba: 0 },
+      chain: { is_valid: true, length: events.length },
+      coverage: {
+        total: events.length,
+        habba_verified: provenanceCount('habba_verified'),
+        self_documented: provenanceCount('self_documented'),
+        self_reported: provenanceCount('self_reported'),
+        third_party: provenanceCount('third_party'),
+      },
+      warranties: [],
+      inspections: [],
+      mileage_history: events
+        .filter((event) => event.mileage !== null)
+        .map((event) => ({
+          occurred_at: event.occurredAt.slice(0, 10),
+          mileage: event.mileage as number,
+        }))
+        .reverse(),
+      events: events.map((event) => ({
+        occurred_at: event.occurredAt.slice(0, 10),
+        recorded_at: event.recordedAt.slice(0, 10),
+        event_type: event.eventType,
+        provenance: event.provenance,
+        summary_ar: event.summaryAr,
+        summary_en: event.summaryEn,
+        mileage: event.mileage,
+        details: event.details,
+        attachment_count: event.attachments.length,
+      })),
+    };
   }
 
   async listEmergencyServices() {

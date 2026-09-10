@@ -241,19 +241,50 @@ if the project is heading for production.
 > production would be exactly the privilege escalation that migrations 0036 and
 > 0040 exist to prevent. `verify-hosted.sh` does not apply it.
 
-## 7. Deploy the report function
+## 7. Apply the storage policies (dashboard SQL editor)
 
-```bash
-supabase functions deploy report
-supabase secrets set HABBA_PUBLIC_BASE_URL='https://habba.sa'
+Migration `0048` creates the private `triage-media` bucket. It deliberately
+does **not** create the RLS policies on it, and cannot:
+
+```
+ERROR: must be owner of table objects
 ```
 
-تقرير هبّة is served at `/functions/v1/report/<token>`. Point whatever domain
-you use for share links at it, and set `EXPO_PUBLIC_REPORT_BASE_URL` in the app
-to match — the QR on the report encodes that URL, so a mismatch produces a code
-that scans to nothing.
+`storage.objects` is owned by `supabase_storage_admin`. `create policy` needs
+ownership of the table it is on, and the project's `postgres` role — the one
+`psql` and `verify-hosted.sh` connect as — is neither the owner nor a member of
+the owning role. This is the same shape as PostGIS in §2: a privileged one-off
+that a migration cannot perform.
 
-## 8. Point the app at the project
+**Dashboard → SQL Editor**, paste and run once, after the migrations:
+
+```
+supabase/storage/triage-media-policies.sql
+```
+
+**How to tell it worked:** §6's run prints `storage policies for triage-media
+are in place`. Until then it prints a warning naming this step — and video
+triage uploads are refused, because RLS denies by default. The failure mode of
+forgetting is a closed bucket, never an open one.
+
+> The local harness applies the same file as the storage owner
+> (`local-db.sh`), so `supabase/tests/24_triage_media_storage.sql` exercises
+> the real policies rather than a weaker stand-in. Suite `31` asserts the
+> harness has not quietly given itself ownership it would not have here.
+
+## 8. There is no report function to deploy
+
+تقرير هبّة used to be an Edge Function serving a public page at
+`/functions/v1/report/<token>`. **ADR-0019 dropped it.** The report is now
+generated on the device as a PDF and shared as a file, so there is no endpoint
+to deploy, no domain to register and no `HABBA_PUBLIC_BASE_URL` to set.
+
+`generate_habba_report()` and the token still exist, unchanged: the payload is
+issued and frozen exactly as before, and the app reads it back by token to
+render the document. ADR-0019 lists the steps to bring the public page back if
+that decision is reversed.
+
+## 9. Point the app at the project
 
 ```bash
 cp apps/mobile/.env.example apps/mobile/.env.local
@@ -263,7 +294,6 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false
-EXPO_PUBLIC_REPORT_BASE_URL=https://habba.sa/r
 ```
 
 Restart Metro. With those set, the app switches from the in-memory repository
@@ -276,7 +306,7 @@ EXPO_PUBLIC_SUPABASE_URL --value ...`.
 **Leave `EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false`** until the KYC vault is real
 and an ops console exists to approve applications (ADR-0017).
 
-## 9. Before real users
+## 10. Before real users
 
 - **Backups.** Free plan keeps daily backups for 7 days. Production wants Pro
   and PITR. The logbook is the product; losing a week of it is losing the moat.

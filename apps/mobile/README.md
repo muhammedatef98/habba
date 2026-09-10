@@ -76,15 +76,14 @@ scheme, bundle ids).
 cp .env.example .env.local   # git-ignored
 ```
 
-| Variable                           | Default              | Notes                                                   |
-| ---------------------------------- | -------------------- | ------------------------------------------------------- |
-| `EXPO_PUBLIC_SUPABASE_URL`         | unset                | Unset → in-memory repository and the dev OTP            |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | unset                | Public by design; useless unless RLS is wrong           |
-| `EXPO_PUBLIC_ENABLE_PROVIDER_MODE` | `false`              | See below                                               |
-| `EXPO_PUBLIC_REPORT_BASE_URL`      | `https://habba.sa/r` | Encoded into the report QR — must match where it serves |
+| Variable                           | Default | Notes                                         |
+| ---------------------------------- | ------- | --------------------------------------------- |
+| `EXPO_PUBLIC_SUPABASE_URL`         | unset   | Unset → in-memory repository and the dev OTP  |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | unset   | Public by design; useless unless RLS is wrong |
+| `EXPO_PUBLIC_ENABLE_PROVIDER_MODE` | `false` | See below                                     |
 
 `EXPO_PUBLIC_*` values are **inlined into the bundle** and readable by anyone
-with the app. That is correct for these four and for nothing else: the
+with the app. That is correct for these three and for nothing else: the
 service-role key, the Unifonic credentials and the SMS hook secret are set on
 the server (Supabase → Edge Functions → Secrets). `docs/supabase-setup.md` is
 the full runbook.
