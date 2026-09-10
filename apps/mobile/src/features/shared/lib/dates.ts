@@ -80,3 +80,14 @@ export function monthKey(iso: string): string {
   const date = new Date(iso);
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}`;
 }
+
+/**
+ * Local `YYYY`, for the year band above the month grouping.
+ *
+ * Local for the same reason `monthKey` is: a year boundary is local. A service
+ * at 02:00 on 1 January in Riyadh belongs to the new year for the person who
+ * paid for it, whatever UTC thinks.
+ */
+export function yearKey(iso: string): string {
+  return `${new Date(iso).getFullYear()}`;
+}

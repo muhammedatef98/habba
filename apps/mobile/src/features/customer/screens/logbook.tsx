@@ -85,6 +85,12 @@ export default function LogbookScreen() {
     enabled: id !== undefined,
   });
 
+  const warranties = useQuery({
+    queryKey: ['warranties', id],
+    queryFn: () => repository.listVehicleWarranties(id ?? ''),
+    enabled: id !== undefined,
+  });
+
   const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
   const models = useQuery({
     queryKey: ['models', 'all'],
@@ -318,6 +324,61 @@ export default function LogbookScreen() {
             ) : (
               <LogbookTimeline testID="logbook-timeline" events={shown} />
             )}
+          </View>
+
+          {/* Live cover, from `vehicle_warranties()` rather than from anything
+              under `orders` (ADR-0021). After a handover the two differ: the
+              buyer owns the cover and cannot read the order that carries it,
+              and the report prints the car's cover, not the payer's. */}
+          {warranties.data !== undefined && warranties.data.length > 0 ? (
+            <View style={{ gap: theme.spacing.md }}>
+              <SectionHeader title={t('transfer.warrantiesTitle')} />
+              <Card elevation="none" style={{ gap: theme.spacing.md }}>
+                <Text variant="caption" tone="muted">
+                  {t('transfer.warrantiesBody')}
+                </Text>
+                {warranties.data.map((warranty) => (
+                  <View key={warranty.orderId} style={{ gap: 2 }}>
+                    <Text variant="bodySmall">
+                      {isArabic ? warranty.serviceAr : warranty.serviceEn}
+                    </Text>
+                    <Text variant="caption" tone="subtle">
+                      {t('transfer.warrantyRemaining', {
+                        days: formatCount(warranty.daysRemaining, i18n.language),
+                      })}
+                      {warranty.hasOpenClaim ? ` · ${t('transfer.warrantyOpenClaim')}` : ''}
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+            </View>
+          ) : null}
+
+          {/* «إدارة السيارة» sits at the FOOT of the logbook, not in the
+              coverage card. Transferring is rare and irreversible; the card
+              holds «أصدر تقرير هبّة», which is the button people press often.
+              Putting them adjacent optimises for the wrong one. */}
+          <View style={{ gap: theme.spacing.md }}>
+            <SectionHeader title={t('transfer.manageSection')} />
+            <Card elevation="none" style={{ gap: theme.spacing.sm }}>
+              <Button
+                testID="logbook-mileage"
+                label={t('logbook.updateMileage')}
+                variant="secondary"
+                size="medium"
+                onPress={() => router.push({ pathname: '/mileage', params: { id } })}
+              />
+              <Button
+                testID="logbook-transfer"
+                label={t('transfer.entry')}
+                variant="ghost"
+                size="medium"
+                onPress={() => router.push({ pathname: '/transfer', params: { id } })}
+              />
+              <Text variant="caption" tone="subtle">
+                {t('transfer.entryHint')}
+              </Text>
+            </Card>
           </View>
         </>
       )}

@@ -28,8 +28,12 @@ import type {
   CompletionMedia,
   EscrowStatus,
   JobProgress,
+  IncomingTransfer,
   MaintenanceAlert,
+  MintedTransfer,
   OrderSummary,
+  OwnershipTransfer,
+  OwnershipTransferStatus,
   NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
@@ -49,8 +53,14 @@ import type {
   Vehicle,
   VehicleMake,
   VehicleModel,
+  VehicleWarranty,
 } from './types.js';
-import type { GuestUpgradeInput, PastServiceInput, Repository } from './repository.js';
+import type {
+  GuestUpgradeInput,
+  PastServiceInput,
+  Repository,
+  TransferAddress,
+} from './repository.js';
 
 interface DispatchTelemetryRow {
   readonly contacted_count: number;
@@ -323,6 +333,48 @@ function toTimelineEvent(row: TimelineRow): TimelineEvent {
  * `T | null`, and inference otherwise carries the null into T, so callers end
  * up re-checking something this function has already guaranteed.
  */
+interface MintedTransferRow {
+  readonly transfer_id: string;
+  readonly code: string;
+  readonly expires_at: string;
+}
+
+interface OwnershipTransferRow {
+  readonly id: string;
+  readonly vehicle_id: string;
+  readonly to_phone: string | null;
+  readonly to_email: string | null;
+  readonly status: OwnershipTransferStatus;
+  readonly expires_at: string;
+  readonly created_at: string;
+}
+
+interface IncomingTransferRow {
+  readonly transfer_id: string;
+  readonly expires_at: string;
+  readonly make_ar: string;
+  readonly make_en: string;
+  readonly model_ar: string;
+  readonly model_en: string;
+  readonly model_year: number;
+  readonly plate: string | null;
+  readonly records_total: number;
+  readonly habba_verified: number;
+  readonly first_record_at: string | null;
+  readonly open_warranties: number;
+}
+
+interface VehicleWarrantyRow {
+  readonly order_id: string;
+  readonly service_ar: string;
+  readonly service_en: string;
+  readonly provider_name_ar: string | null;
+  readonly completed_at: string;
+  readonly warranty_expires_at: string;
+  readonly days_remaining: number;
+  readonly has_open_claim: boolean;
+}
+
 function unwrap<T>(
   result: { data: T | null; error: { message: string } | null },
   context: string,
@@ -1140,5 +1192,128 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`rateOrder: ${error.message}`);
+  }
+
+  // نقل الملكية ---------------------------------------------------------------
+  async initiateTransfer(input: TransferAddress): Promise<MintedTransfer> {
+    // Returns a SET OF one row, so PostgREST hands back an array. The code is
+    // in it exactly once and is never readable again — not by a second call,
+    // not by reading the row, which does not expose `otp_code_hash` to any
+    // client at all (0054).
+    const { data, error } = await this.client.rpc('initiate_ownership_transfer', {
+      p_vehicle_id: input.vehicleId,
+      p_to_phone: input.phone ?? null,
+      p_to_email: input.email ?? null,
+    });
+
+    if (error !== null) throw new Error(`initiateTransfer: ${error.message}`);
+
+    const row = (data as readonly MintedTransferRow[] | null)?.[0];
+    if (row === undefined) throw new Error('initiateTransfer: no transfer returned');
+
+    return { id: row.transfer_id, code: row.code, expiresAt: row.expires_at };
+  }
+
+  async getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null> {
+    // `otp_code_hash` is absent from this column list because it is absent
+    // from the grant: asking for it fails the whole request with a permission
+    // error rather than returning a null column.
+    const { data, error } = await this.client
+      .from('ownership_transfers')
+      .select('id, vehicle_id, to_phone, to_email, status, expires_at, created_at')
+      .eq('vehicle_id', vehicleId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error !== null) throw new Error(`getOutgoingTransfer: ${error.message}`);
+    if (data === null) return null;
+
+    const row = data as OwnershipTransferRow;
+
+    // The row can still SAY `pending` past its expiry: `expire_ownership_transfers`
+    // runs on initiation and on a sweep, not on a clock. It is returned all the
+    // same, restated as `expired`, because the seller coming back on day eight
+    // needs to be told the code stopped working — dropping the row here would
+    // show them a fresh warning screen with no account of where their transfer
+    // went.
+    const lapsed = new Date(row.expires_at).getTime() <= Date.now();
+
+    return {
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      toPhone: row.to_phone,
+      toEmail: row.to_email,
+      status: lapsed ? 'expired' : row.status,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+    };
+  }
+
+  async cancelTransfer(transferId: string): Promise<void> {
+    const { error } = await this.client.rpc('cancel_ownership_transfer', {
+      p_transfer_id: transferId,
+    });
+
+    if (error !== null) throw new Error(`cancelTransfer: ${error.message}`);
+  }
+
+  async getIncomingTransfer(): Promise<IncomingTransfer | null> {
+    const { data, error } = await this.client.rpc('pending_ownership_transfer_for_me');
+
+    if (error !== null) throw new Error(`getIncomingTransfer: ${error.message}`);
+
+    const row = (data as readonly IncomingTransferRow[] | null)?.[0];
+    if (row === undefined) return null;
+
+    return {
+      transferId: row.transfer_id,
+      expiresAt: row.expires_at,
+      makeAr: row.make_ar,
+      makeEn: row.make_en,
+      modelAr: row.model_ar,
+      modelEn: row.model_en,
+      year: row.model_year,
+      plate: row.plate,
+      recordsTotal: row.records_total,
+      habbaVerified: row.habba_verified,
+      firstRecordAt: row.first_record_at,
+      openWarranties: row.open_warranties,
+    };
+  }
+
+  async acceptTransfer(transferId: string, code: string): Promise<string> {
+    const { data, error } = await this.client.rpc('accept_ownership_transfer', {
+      p_transfer_id: transferId,
+      p_otp_code: code,
+    });
+
+    // Left as the server wrote it. The refusals here are deliberately
+    // indistinguishable from one another — a wrong code and a transfer
+    // addressed to someone else give the same message — and rewording them on
+    // the way past would undo that.
+    if (error !== null) throw new Error(`acceptTransfer: ${error.message}`);
+
+    return data as string;
+  }
+
+  async listVehicleWarranties(vehicleId: string): Promise<readonly VehicleWarranty[]> {
+    const { data, error } = await this.client.rpc('vehicle_warranties', {
+      p_vehicle_id: vehicleId,
+    });
+
+    if (error !== null) throw new Error(`listVehicleWarranties: ${error.message}`);
+
+    return ((data as readonly VehicleWarrantyRow[] | null) ?? []).map((row) => ({
+      orderId: row.order_id,
+      serviceAr: row.service_ar,
+      serviceEn: row.service_en,
+      providerNameAr: row.provider_name_ar,
+      completedAt: row.completed_at,
+      expiresAt: row.warranty_expires_at,
+      daysRemaining: row.days_remaining,
+      hasOpenClaim: row.has_open_claim,
+    }));
   }
 }

@@ -84,6 +84,7 @@ export default function HomeScreen() {
     useCallback(() => {
       void queryClient.invalidateQueries({ queryKey: ['recent-orders'] });
       void queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      void queryClient.invalidateQueries({ queryKey: ['transfer', 'incoming'] });
     }, [queryClient]),
   );
 
@@ -107,6 +108,20 @@ export default function HomeScreen() {
   const services = useQuery({
     queryKey: ['emergency-services'],
     queryFn: () => repository.listEmergencyServices(),
+  });
+
+  /**
+   * A car someone is handing to this account (§1.3).
+   *
+   * This banner is the ONLY way a recipient learns a transfer exists. The
+   * server tells nobody: there is no SMS, no push and no email — the code is
+   * spoken at handover — so a buyer who is never shown this never finds the
+   * flow, which is exactly how the acquisition loop stayed closed through
+   * three migrations that had already reopened it in the database.
+   */
+  const incomingTransfer = useQuery({
+    queryKey: ['transfer', 'incoming'],
+    queryFn: () => repository.getIncomingTransfer(),
   });
 
   // The car the switcher has selected, falling back to the first. The fallback
@@ -213,6 +228,32 @@ export default function HomeScreen() {
           />
         </View>
       </View>
+
+      {/* Above the alerts and below the live job: someone is standing next to
+          this person waiting to hand over a car, which outranks a maintenance
+          reminder and does not outrank a technician already on the way. */}
+      {incomingTransfer.data !== null && incomingTransfer.data !== undefined ? (
+        <View style={{ marginTop: theme.spacing.xl }}>
+          <Card
+            testID="home-incoming-transfer"
+            elevation="sm"
+            onPress={() => router.push('/accept-transfer')}
+            accessibilityLabel={t('transfer.incomingTitle')}
+            style={{ gap: theme.spacing.xs, borderColor: theme.colors.primary, borderWidth: 1 }}
+          >
+            <Text variant="bodyStrong" tone="primary">
+              {t('transfer.incomingTitle')}
+            </Text>
+            <Text variant="bodySmall" tone="muted">
+              {t('transfer.incomingBannerBody', {
+                vehicle: isArabic
+                  ? `${incomingTransfer.data.makeAr} ${incomingTransfer.data.modelAr}`
+                  : `${incomingTransfer.data.makeEn} ${incomingTransfer.data.modelEn}`,
+              })}
+            </Text>
+          </Card>
+        </View>
+      ) : null}
 
       {(alerts.data ?? []).slice(0, 1).map((alert) => (
         <View key={alert.id} style={{ marginTop: theme.spacing.xl }}>

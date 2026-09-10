@@ -44,6 +44,9 @@ import type {
   NewVehicleInput,
   Order,
   OrderPart,
+  IncomingTransfer,
+  MintedTransfer,
+  OwnershipTransfer,
   Profile,
   ProviderApplication,
   ProviderApplicationInput,
@@ -55,6 +58,7 @@ import type {
   Vehicle,
   VehicleMake,
   VehicleModel,
+  VehicleWarranty,
 } from './types.js';
 
 export interface GuestUpgradeInput {
@@ -203,7 +207,54 @@ export interface Repository {
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
   rateOrder(input: NewRatingInput): Promise<void>;
+
+  // نقل الملكية — the handover (0011, completed in 0054).
+  //
+  // Note what is missing: nothing here creates an `ownership_transfers` row,
+  // chooses an OTP or sets an expiry. It cannot — the table is guarded and the
+  // INSERT policy is gone — and the shape of this interface is meant to make
+  // that obvious rather than to hide it behind a method that would fail.
+  /**
+   * Starts a handover and returns the code EXACTLY once (§2.2).
+   *
+   * The code is minted, hashed and stored server-side; the plaintext comes
+   * back here and nowhere else, ever again. It must not be persisted, logged
+   * or put in a query cache that survives the screen — the seller reads it
+   * aloud to the buyer and that is the whole delivery mechanism.
+   */
+  initiateTransfer(input: TransferAddress): Promise<MintedTransfer>;
+  /** The live handover on a car, if there is one. Null once it closes. */
+  getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null>;
+  /** Withdraws a pending handover. Sender only, server-enforced. */
+  cancelTransfer(transferId: string): Promise<void>;
+  /**
+   * A handover waiting for THIS user, with the logbook's weight attached.
+   *
+   * Null is the answer for "nothing waiting", for "addressed to an identity
+   * you have not verified", and for "expired" — indistinguishable on purpose,
+   * because telling a stranger which one it is tells them a transfer exists.
+   */
+  getIncomingTransfer(): Promise<IncomingTransfer | null>;
+  /** Accepts with the spoken code. Returns the vehicle id now owned. */
+  acceptTransfer(transferId: string, code: string): Promise<string>;
+  /**
+   * Live cover on a car, for whoever owns it now (ADR-0021).
+   *
+   * Distinct from anything under `orders`: after a handover the buyer owns the
+   * cover and cannot read the order that carries it.
+   */
+  listVehicleWarranties(vehicleId: string): Promise<readonly VehicleWarranty[]>;
 }
+
+/** Exactly one of `phone` or `email` — the server refuses both and neither. */
+export interface TransferAddress {
+  readonly vehicleId: string;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
+}
+
+/** Seven days, matching `ownership_transfer_window()` in migration 0054. */
+const TRANSFER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const MAKES: readonly VehicleMake[] = [
   { id: 'make-toyota', nameAr: 'تويوتا', nameEn: 'Toyota' },
@@ -859,6 +910,16 @@ export class InMemoryRepository implements Repository {
   private readonly vehicles = new Map<string, Vehicle>();
   private readonly timeline = new Map<string, TimelineEvent[]>();
   private readonly orders = new DevOrderSimulator();
+  private transfers: OwnershipTransfer[] = [];
+  /**
+   * Transfer id → the minted code.
+   *
+   * Separate from the transfer itself, and never returned by any read, because
+   * the server stores only a hash and does not let a client read even that
+   * (0054). A dev repository that kept the code on the row would let a screen
+   * be written against a lookup production refuses.
+   */
+  private readonly transferCodes = new Map<string, string>();
   private profile: Profile | null = null;
   private application: ProviderApplication | null = null;
   private applicationType: 'individual' | 'workshop' = 'individual';
@@ -1245,6 +1306,164 @@ export class InMemoryRepository implements Repository {
   async rateOrder(): Promise<void> {
     // No read surface depends on the dev rating yet — accepting and
     // discarding it is enough to exercise the flow offline.
+  }
+
+  // نقل الملكية --------------------------------------------------------------
+  // The dev stub mirrors the server where the server's behaviour is what the
+  // screens are built against: the code is minted HERE and returned once, the
+  // plaintext is never stored, and only the hash-equivalent is kept — so a
+  // screen that tried to read the code back would fail in development exactly
+  // as it fails in production.
+  //
+  // What it cannot mirror is the identity check: there is one account in the
+  // dev repository, so `getIncomingTransfer` answers from whatever this device
+  // last created. That is enough to build the accept screen against and is not
+  // enough to prove anything — the identity rule is proved in tests/32.
+  async initiateTransfer(input: TransferAddress): Promise<MintedTransfer> {
+    if ((input.phone === undefined) === (input.email === undefined)) {
+      throw new Error('initiateTransfer: address exactly one of phone or email');
+    }
+    if (this.transfers.some((t) => t.vehicleId === input.vehicleId && t.status === 'pending')) {
+      throw new Error('initiateTransfer: a transfer is already pending for this vehicle');
+    }
+
+    this.counter += 1;
+    const code = `${Math.floor(Math.random() * 1_000_000)}`.padStart(6, '0');
+    const expiresAt = new Date(Date.now() + TRANSFER_WINDOW_MS).toISOString();
+
+    const transfer: OwnershipTransfer = {
+      id: `xfer-${this.counter}`,
+      vehicleId: input.vehicleId,
+      toPhone: input.phone ?? null,
+      toEmail: input.email ?? null,
+      status: 'pending',
+      expiresAt,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.transfers.push(transfer);
+    this.transferCodes.set(transfer.id, code);
+
+    return { id: transfer.id, code, expiresAt };
+  }
+
+  async getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null> {
+    this.expireTransfers();
+    // `expired` is returned alongside `pending`, mirroring the Supabase
+    // implementation: the seller has to be told the seven days ran out, and a
+    // repository that swallowed the row would leave that screen unreachable in
+    // development and reachable in production.
+    return (
+      [...this.transfers]
+        .reverse()
+        .find(
+          (transfer) =>
+            transfer.vehicleId === vehicleId &&
+            (transfer.status === 'pending' || transfer.status === 'expired'),
+        ) ?? null
+    );
+  }
+
+  async cancelTransfer(transferId: string): Promise<void> {
+    const index = this.transfers.findIndex((transfer) => transfer.id === transferId);
+    if (index < 0) return;
+    const existing = this.transfers[index];
+    if (existing === undefined || existing.status !== 'pending') return;
+    this.transfers[index] = { ...existing, status: 'cancelled' };
+  }
+
+  async getIncomingTransfer(): Promise<IncomingTransfer | null> {
+    this.expireTransfers();
+
+    const transfer = this.transfers.find((candidate) => candidate.status === 'pending');
+    if (transfer === undefined) return null;
+
+    const vehicle = this.vehicles.get(transfer.vehicleId);
+    if (vehicle === undefined) return null;
+
+    const events = this.timeline.get(transfer.vehicleId) ?? [];
+    const make = MAKES.find((candidate) => candidate.id === vehicle.makeId);
+    const model = MODELS.find((candidate) => candidate.id === vehicle.modelId);
+    const occurred = events.map((event) => event.occurredAt).sort();
+
+    return {
+      transferId: transfer.id,
+      expiresAt: transfer.expiresAt,
+      makeAr: make?.nameAr ?? '',
+      makeEn: make?.nameEn ?? '',
+      modelAr: model?.nameAr ?? '',
+      modelEn: model?.nameEn ?? '',
+      year: vehicle.year,
+      plate: vehicle.plateNormalised,
+      recordsTotal: events.length,
+      habbaVerified: events.filter((event) => event.provenance === 'habba_verified').length,
+      firstRecordAt: occurred[0] ?? null,
+      openWarranties: 0,
+    };
+  }
+
+  async acceptTransfer(transferId: string, code: string): Promise<string> {
+    this.expireTransfers();
+
+    const index = this.transfers.findIndex((transfer) => transfer.id === transferId);
+    const transfer = index < 0 ? undefined : this.transfers[index];
+
+    if (transfer === undefined || transfer.status !== 'pending') {
+      throw new Error('Transfer not found, already used, or expired');
+    }
+    // Same refusal for a wrong code as the server gives, and deliberately the
+    // same one it gives for "this transfer is not addressed to you".
+    if (this.transferCodes.get(transferId) !== code) {
+      throw new Error('Incorrect code');
+    }
+
+    this.transfers[index] = {
+      ...transfer,
+      status: 'accepted',
+    };
+    this.transferCodes.delete(transferId);
+
+    // The car does not leave the dev account, because there is only one. The
+    // timeline event is written all the same: it is what the logbook shows a
+    // buyer, and a stub that skipped it would hide the moat's own record of
+    // the handover from every screen built against it.
+    const events = this.timeline.get(transfer.vehicleId) ?? [];
+    const now = new Date().toISOString();
+    this.timeline.set(transfer.vehicleId, [
+      {
+        id: `evt-transfer-${transferId}`,
+        vehicleId: transfer.vehicleId,
+        eventType: 'ownership_transferred',
+        provenance: 'habba_verified',
+        summaryAr: 'انتقلت ملكية السيارة إلى مالك جديد',
+        summaryEn: 'Ownership transferred to a new owner',
+        occurredAt: now,
+        recordedAt: now,
+        mileage: null,
+        details: {},
+        attachments: [],
+      },
+      ...events,
+    ]);
+
+    return transfer.vehicleId;
+  }
+
+  async listVehicleWarranties(_vehicleId: string): Promise<readonly VehicleWarranty[]> {
+    // The dev order simulator carries no warranty windows, so there is nothing
+    // honest to return. An invented warranty here would put «ساري» on a screen
+    // for cover that does not exist — the exact lie ADR-0021 was written to
+    // stop the report telling.
+    return [];
+  }
+
+  private expireTransfers(): void {
+    const now = Date.now();
+    this.transfers = this.transfers.map((transfer) =>
+      transfer.status === 'pending' && new Date(transfer.expiresAt).getTime() <= now
+        ? { ...transfer, status: 'expired' }
+        : transfer,
+    );
   }
 
   // Roles ---------------------------------------------------------------------
