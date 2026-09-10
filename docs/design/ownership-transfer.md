@@ -1,7 +1,8 @@
 # نقل الملكية — the ownership-transfer flow
 
-Nine phone screens, Arabic RTL, light and dark. Design only — no components
-have been written against this yet.
+Nine phone screens, Arabic RTL, light and dark. **Built** — the screens live in
+`apps/mobile/src/features/customer/screens/transfer.tsx` and
+`accept-transfer.tsx`, against migrations 0054 and 0055.
 
 **Canvas:** https://claude.ai/code/artifact/773103d8-ceb4-43c7-a009-4f7a51ea25fa
 **Source:** `docs/design/ownership-transfer/build.py` renders every artboard
@@ -73,39 +74,53 @@ with no explanation.
 `LogbookTimeline` already groups by month; the year band sits above it, and the
 filters and `CoverageBar` stay where they are.
 
-## Two gaps this design does not paper over
+## The two gaps, closed
 
-Both are drawn honestly in the screens rather than assumed away, and both are
-decisions for the owner rather than for the renderer.
+Both were drawn honestly in the screens rather than assumed away, and both are
+now fixed in the database rather than documented around.
 
-### 1. There is no `initiate_ownership_transfer()`
+### 1. `initiate_ownership_transfer()` exists (0054)
 
-Creation today is a plain client `INSERT` under `ownership_transfers_insert`
-(`0013`). That means the **client** chooses `otp_code_hash` and `expires_at`,
-which is flatly against §2 — "all business logic lives in Postgres functions or
-Edge Functions" — and there is nothing to deliver the code.
+Creation used to be a plain client `INSERT` under `ownership_transfers_insert`
+(`0013`), so the **client** chose `otp_code_hash` and `expires_at` — flatly
+against §2 — and nothing delivered the code.
 
-Screens 3 and 4 are drawn against the function that should exist: it takes the
-vehicle and one identity, mints a six-digit code server-side, stores the hash,
-sets the expiry, and returns the plaintext exactly once.
+The function mints six digits server-side, stores the hash, sets the expiry from
+`ownership_transfer_window()` (seven days), and returns the plaintext exactly
+once. Alongside it: `cancel_ownership_transfer`, `expire_ownership_transfers`,
+and `pending_ownership_transfer_for_me`, which is screen 7's whole payload.
 
-The 7-day expiry shown on screen 3 is a proposal. Nothing in the schema sets a
-default.
+Three things fell out of building it, each a defect on its own:
 
-### 2. The warranty does not transfer
+- **`otp_code_hash` was readable by the recipient.** Discovery deliberately
+  shows the row to the identity it is addressed to; six digits behind sha256 is
+  an offline search of a million candidates, so every recipient could derive the
+  code they were supposed to be told. The OTP checked nothing against the one
+  party it exists to check. The column is now off the client-readable surface.
+- **Expiry was written and never read.** A row sat `pending` forever, and
+  because the unique index is partial on `status = 'pending'`, that stale row
+  locked the car out of ever being transferred again.
+- **The table had no write guard.** It has one now, `ENABLE ALWAYS`: writing a
+  transfer row directly is the same thing as taking a car.
 
-`claim_warranty` (`0025`) checks `orders.customer_id`, which is the person who
-paid for the work — not the owner of the car. After a transfer:
+### 2. The warranty follows the car (0055, ADR-0021)
 
-- the buyer sees «ساري» in تقرير هبّة for cover they cannot claim;
-- the seller keeps a claim on a car they no longer own.
+`claim_warranty` authorised on `orders.customer_id` — who paid — while
+`generate_habba_report` printed cover on the car with no reference to who paid.
+Nothing could complete a transfer, so they never disagreed. Now the right to
+claim belongs to the current owner; the claim order is created in the
+claimant's name and does not inherit the seller's address; and the buyer's read
+surface is `vehicle_warranties()` rather than an `orders` policy that would have
+handed them amounts, problem descriptions and where the seller lives.
 
-Screens 2 and 8 state this in Arabic rather than let a buyer discover it at the
-counter. Making warranties follow the car instead is a schema change and its
-own decision.
+An in-flight claim refuses the transfer — checked at initiation where it is
+actionable, and again inside acceptance. ADR-0021 has the reasoning, including
+what the seller keeps (their orders and invoices) and what they lose.
 
-## Open, smaller
+## The smaller ones, also closed
 
-- The seller's «إلغاء النقل» has no confirmation step in this draft.
-- Nothing here covers a transfer that expires unaccepted — the seller sees the
-  countdown, but not what the screen becomes when it reaches zero.
+- «إلغاء النقل» asks first, in a bottom sheet. The code is already in the
+  buyer's hands and cancelling invalidates it.
+- Screen 5 has an expired state. Both repositories return a lapsed transfer
+  rather than dropping it, so the seller is told the seven days ran out instead
+  of being shown a fresh warning screen.
