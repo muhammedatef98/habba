@@ -9,37 +9,83 @@
 
 import { Text as RNText, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 import { useTheme } from './theme.js';
-import type { FontSizeToken } from './tokens.js';
+import { MAX_BODY_SCALE, MAX_HEADING_SCALE } from './font-scale.js';
+import { arabicFace, latinFace, type FontSizeToken } from './tokens.js';
 
 export type TextVariant =
-  'display' | 'title' | 'heading' | 'body' | 'bodyStrong' | 'caption' | 'label';
+  | 'display'
+  | 'title'
+  | 'heading'
+  | 'subheading'
+  | 'body'
+  | 'bodyStrong'
+  | 'bodySmall'
+  | 'caption'
+  | 'label';
 
+/**
+ * Sizes and weights from the design system's type scale, one variant per step
+ * it names: display 40/600, h1 32/600, h2 24/600, h3 20/500, body 16/400,
+ * body-sm 14/400, caption 12/400.
+ *
+ * Weights are 600 at the top rather than 700: the design sets its headings in
+ * semibold, and bold at 40px in Arabic closes the counters.
+ */
 const VARIANTS: Record<
   TextVariant,
   { size: FontSizeToken; weight: '400' | '500' | '600' | '700' }
 > = {
-  display: { size: '4xl', weight: '700' },
-  title: { size: '3xl', weight: '700' },
+  display: { size: '3xl', weight: '600' },
+  title: { size: '2xl', weight: '600' },
   heading: { size: 'xl', weight: '600' },
+  subheading: { size: 'lg', weight: '500' },
   body: { size: 'base', weight: '400' },
   bodyStrong: { size: 'base', weight: '600' },
-  caption: { size: 'sm', weight: '400' },
+  bodySmall: { size: 'sm', weight: '400' },
+  caption: { size: 'xs', weight: '400' },
   label: { size: 'sm', weight: '600' },
 };
 
-export type TextTone = 'default' | 'muted' | 'subtle' | 'inverse' | 'primary' | 'emergency';
+export type TextTone =
+  | 'default'
+  | 'muted'
+  | 'subtle'
+  | 'inverse'
+  | 'primary'
+  | 'emergency'
+  | 'success'
+  | 'warning'
+  | 'accent'
+  | 'info';
 
 export interface HabbaTextProps extends TextProps {
   readonly variant?: TextVariant;
   readonly tone?: TextTone;
   readonly align?: 'start' | 'center' | 'end';
+  /**
+   * Figures: prices, ETAs, distances, timestamps, plate codes.
+   *
+   * Switches to the design's Latin face and turns on tabular figures, so a
+   * number that ticks does not make the row beside it twitch. Never use it for
+   * Arabic copy — Outfit has no Arabic glyphs, and the text would fall back
+   * mid-sentence.
+   */
+  readonly numeric?: boolean;
   readonly style?: StyleProp<TextStyle>;
 }
+
+/**
+ * Display and title type is already 32–40px, so it gets the lower ceiling: the
+ * multiplier that is comfortable on a caption turns a headline into four lines
+ * (font-scale.ts).
+ */
+const HEADING_VARIANTS = new Set<TextVariant>(['display', 'title', 'heading']);
 
 export function Text({
   variant = 'body',
   tone = 'default',
   align = 'start',
+  numeric = false,
   style,
   ...rest
 }: HabbaTextProps) {
@@ -53,23 +99,67 @@ export function Text({
     subtle: theme.colors.textSubtle,
     inverse: theme.colors.textInverse,
     primary: theme.colors.primary,
-    emergency: theme.colors.emergency,
+    emergency: theme.colors.emergencyFg,
+    success: theme.colors.successFg,
+    warning: theme.colors.warningFg,
+    // accentFg, not accent: the raw amber is a fill colour and fails contrast
+    // as text. See tokens.ts.
+    accent: theme.colors.accentFg,
+    info: theme.colors.infoFg,
   }[tone];
 
-  // `start`/`end` are the logical values — React Native resolves them against
-  // the writing direction. Never `left`/`right` (§8).
-  const textAlign = align === 'center' ? 'center' : align === 'start' ? 'auto' : 'right';
+  /**
+   * Resolved against the LAYOUT direction, not the string's own script.
+   *
+   * The comment here used to claim `start`/`end` were logical values React
+   * Native resolves for us. They are not: RN's `textAlign` takes
+   * `left | right | center | justify | auto`, and both previous values were
+   * wrong in one direction each.
+   *
+   *  - `start` mapped to `'auto'`, which aligns by the *content's* script. An
+   *    Arabic provider name in the English app therefore right-aligned inside
+   *    a left-aligned row, leaving a gap between it and its avatar, and a
+   *    Latin string in the Arabic app did the mirror of that. Mixed-script
+   *    content is the normal case in this product — Saudi business names stay
+   *    Arabic whichever language the customer reads.
+   *  - `end` was hardcoded to `'right'`, which is the correct end in LTR and
+   *    the START in RTL, so it silently did nothing in the app's default
+   *    direction.
+   *
+   * Alignment is a property of the interface, not of the sentence.
+   */
+  const textAlign =
+    align === 'center'
+      ? ('center' as const)
+      : align === 'start'
+        ? theme.isRtl
+          ? ('right' as const)
+          : ('left' as const)
+        : theme.isRtl
+          ? ('left' as const)
+          : ('right' as const);
 
   return (
     <RNText
       {...rest}
+      // Follows the device's text-size setting — RN's default — but capped, so
+      // an accessibility size cannot push the primary action off the screen.
+      // A caller may still override this for a specific string.
+      maxFontSizeMultiplier={
+        rest.maxFontSizeMultiplier ??
+        (HEADING_VARIANTS.has(variant) ? MAX_HEADING_SCALE : MAX_BODY_SCALE)
+      }
       style={[
         {
           color,
           fontSize: size,
           lineHeight: theme.lineHeightFor(size),
           fontWeight: spec.weight,
-          fontFamily: theme.fontFamily.arabic,
+          // Both faces are chosen by weight: RN matches a face by exact family
+          // name and never synthesises bold, so a family without the weight
+          // renders regular and silently ignores `fontWeight` (tokens.ts).
+          fontFamily: numeric ? latinFace[spec.weight] : arabicFace[spec.weight],
+          ...(numeric ? { fontVariant: ['tabular-nums' as const] } : {}),
           textAlign,
           writingDirection: theme.direction,
         },

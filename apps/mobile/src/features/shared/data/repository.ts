@@ -15,14 +15,29 @@
  * shape of this interface reflects the shape of the security model.
  */
 
-import { addSar, applyRate, multiplySar, normalisePlate, sarOrThrow } from '@habba/core';
+import {
+  addSar,
+  applyRate,
+  multiplySar,
+  normalisePlate,
+  sarOrThrow,
+  SAUDI_VAT_RATE,
+} from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import type {
+  AppointmentSlot,
+  BookingMode,
+  BookingProvider,
   City,
+  DispatchTelemetry,
+  JobProgress,
+  MaintenanceAlert,
+  OrderSummary,
+  NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
@@ -65,6 +80,20 @@ export interface PastServiceInput {
 export interface Repository {
   listMakes(): Promise<readonly VehicleMake[]>;
   listModels(makeId: string): Promise<readonly VehicleModel[]>;
+  /**
+   * Every model across every make, for the screens that name a vehicle they
+   * did not pick the make for.
+   *
+   * Four screens needed this and none had it. Three fanned out over
+   * `listMakes()` and called `listModels` once per make; the emergency service
+   * screen called `listModels('')`, which matches no make and therefore always
+   * returned nothing — so the one screen where the customer most needs to be
+   * certain which car they are calling help for could never show its make and
+   * model, and silently fell back to the plate. Worse, both spellings shared
+   * the query key `['models', 'all']`, so whichever screen mounted first
+   * decided what the other one saw.
+   */
+  listAllModels(): Promise<readonly VehicleModel[]>;
   listVehicles(): Promise<readonly Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | null>;
   addVehicle(input: NewVehicleInput): Promise<Vehicle>;
@@ -111,10 +140,53 @@ export interface Repository {
   // or `providerId` directly — those are guarded server-side (0033) and
   // written only by the matching function and the payment functions, never by
   // a client call.
+  /** Open predictive alerts for a vehicle, most urgent first (§1.4). */
+  listMaintenanceAlerts(vehicleId: string): Promise<readonly MaintenanceAlert[]>;
+  /** The customer's recent orders, newest first. */
+  listRecentOrders(limit?: number): Promise<readonly OrderSummary[]>;
+  /**
+   * Uploads a triage clip against an order and records it on the order.
+   *
+   * Returns false when there is nowhere to upload to — the dev build has no
+   * storage — so the caller can carry on rather than trapping the customer.
+   * A clip is an aid to the technician, never a precondition for rescue.
+   */
+  attachTriageClip(orderId: string, clip: { uri: string; seconds: number }): Promise<boolean>;
   listEmergencyServices(): Promise<readonly Service[]>;
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
+
+  // Phase 4 — booking ahead. The server side has existed since 0024; these are
+  // the calls the customer app was missing, which is why حجز موعد led to a
+  // "coming soon" card while `book_appointment` sat there fully written.
+  /** Everything the customer can book ahead — the catalogue minus emergencies. */
+  listBookableServices(): Promise<readonly Service[]>;
+  /** Approved providers offering this service in this mode, best rated first. */
+  listBookingProviders(serviceId: string, mode: BookingMode): Promise<readonly BookingProvider[]>;
+  /** A provider's free upcoming windows, earliest first. Never past ones. */
+  listSlots(providerId: string): Promise<readonly AppointmentSlot[]>;
+  /**
+   * Claims a slot and opens the order (0024's `book_appointment`).
+   *
+   * Throws when the slot filled up between being listed and being tapped —
+   * the normal outcome under contention, and the reason the claim is a single
+   * atomic UPDATE server-side rather than a read followed by a write.
+   */
+  bookAppointment(input: NewBookingInput): Promise<string>;
   getOrder(orderId: string): Promise<Order | null>;
   getOrderProvider(providerId: string): Promise<ProviderSummary | null>;
+  /**
+   * Live figures for an active job — distance, ETA, and the handover code.
+   * Returns null whenever the server has nothing to report (no assigned
+   * provider, a stale position, or a job that is no longer travelling), which
+   * the tracking screens render as their reduced state rather than as zeroes.
+   */
+  getOrderProgress(orderId: string): Promise<JobProgress | null>;
+  /**
+   * Live dispatch figures while an order is being matched (§7.1).
+   * Null once matching is over — the counts are of no use to the customer
+   * afterwards, and they say how many people turned the job down.
+   */
+  getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null>;
   listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
   approveOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
@@ -295,6 +367,9 @@ const EMERGENCY_SERVICES: readonly Service[] = [
     icon: 'truck',
     basePrice: sarOrThrow('150.00'),
     requiresVehicle: true,
+    supportedModes: ['mobile_ondemand'],
+    estDurationMin: 45,
+    requiresLift: false,
   },
   {
     id: 'svc-battery',
@@ -305,6 +380,9 @@ const EMERGENCY_SERVICES: readonly Service[] = [
     icon: 'battery',
     basePrice: sarOrThrow('120.00'),
     requiresVehicle: true,
+    supportedModes: ['mobile_ondemand'],
+    estDurationMin: 45,
+    requiresLift: false,
   },
   {
     id: 'svc-tyre',
@@ -315,6 +393,9 @@ const EMERGENCY_SERVICES: readonly Service[] = [
     icon: 'tyre',
     basePrice: sarOrThrow('100.00'),
     requiresVehicle: true,
+    supportedModes: ['mobile_ondemand'],
+    estDurationMin: 45,
+    requiresLift: false,
   },
   {
     id: 'svc-lockout',
@@ -325,6 +406,9 @@ const EMERGENCY_SERVICES: readonly Service[] = [
     icon: 'key',
     basePrice: sarOrThrow('130.00'),
     requiresVehicle: false,
+    supportedModes: ['mobile_ondemand'],
+    estDurationMin: 45,
+    requiresLift: false,
   },
   {
     id: 'svc-fuel',
@@ -335,6 +419,9 @@ const EMERGENCY_SERVICES: readonly Service[] = [
     icon: 'fuel',
     basePrice: sarOrThrow('90.00'),
     requiresVehicle: false,
+    supportedModes: ['mobile_ondemand'],
+    estDurationMin: 45,
+    requiresLift: false,
   },
   {
     id: 'svc-overheating',
@@ -345,8 +432,204 @@ const EMERGENCY_SERVICES: readonly Service[] = [
     icon: 'thermometer',
     basePrice: sarOrThrow('140.00'),
     requiresVehicle: true,
+    supportedModes: ['mobile_ondemand'],
+    estDurationMin: 45,
+    requiresLift: false,
   },
 ];
+
+/**
+ * What can be booked ahead — the catalogue minus emergencies.
+ *
+ * `supportedModes` is the load-bearing field: تغيير زيت can be done in a
+ * driveway or a workshop, a brake job needs a lift and so is workshop-only,
+ * and a pre-purchase inspection is the one service with
+ * `requiresVehicle: false` because the whole point is that the car is not
+ * yours yet (§7 — the inspection is how the buyer becomes a customer).
+ */
+const BOOKABLE_SERVICES: readonly Service[] = [
+  {
+    id: 'svc-oil',
+    category: 'periodic',
+    nameAr: 'تغيير زيت وفلتر',
+    nameEn: 'Oil and filter change',
+    descriptionAr: 'زيت وفلتر أصلي، مع تسجيل القراءة في دفتر السيارة',
+    icon: 'oil',
+    basePrice: sarOrThrow('220.00'),
+    requiresVehicle: true,
+    supportedModes: ['mobile_scheduled', 'workshop'],
+    estDurationMin: 45,
+    requiresLift: false,
+  },
+  {
+    id: 'svc-brakes',
+    category: 'periodic',
+    nameAr: 'فحص وتغيير فحمات الفرامل',
+    nameEn: 'Brake pad inspection and change',
+    descriptionAr: 'يحتاج رافعة — في الورشة فقط',
+    icon: 'brake',
+    basePrice: sarOrThrow('380.00'),
+    requiresVehicle: true,
+    supportedModes: ['workshop'],
+    estDurationMin: 90,
+    requiresLift: true,
+  },
+  {
+    id: 'svc-ac',
+    category: 'periodic',
+    nameAr: 'صيانة مكيّف',
+    nameEn: 'Air-conditioning service',
+    descriptionAr: 'فحص الضغط وتعبئة الفريون',
+    icon: 'snowflake',
+    basePrice: sarOrThrow('260.00'),
+    requiresVehicle: true,
+    supportedModes: ['mobile_scheduled', 'workshop'],
+    estDurationMin: 60,
+    requiresLift: false,
+  },
+  {
+    id: 'svc-inspection',
+    category: 'inspection',
+    nameAr: 'فحص ما قبل الشراء',
+    nameEn: 'Pre-purchase inspection',
+    descriptionAr: 'تقرير مفصّل قبل ما تشتري — ١٢٠ نقطة فحص',
+    icon: 'inspection',
+    basePrice: sarOrThrow('450.00'),
+    // §7.3: the car being inspected is not the customer's yet. This is the one
+    // service where demanding a vehicle from the logbook would block the exact
+    // customer the inspection exists to win.
+    requiresVehicle: false,
+    supportedModes: ['mobile_scheduled', 'workshop'],
+    estDurationMin: 120,
+    requiresLift: false,
+  },
+  {
+    id: 'svc-wash',
+    category: 'wash',
+    nameAr: 'غسيل وتلميع',
+    nameEn: 'Wash and polish',
+    descriptionAr: null,
+    icon: 'wash',
+    basePrice: sarOrThrow('120.00'),
+    requiresVehicle: true,
+    supportedModes: ['mobile_scheduled'],
+    estDurationMin: 60,
+    requiresLift: false,
+  },
+];
+
+/**
+ * Providers the booking flow can pick between.
+ *
+ * Two workshops and two mobile technicians, because the mode picker is
+ * meaningless if one side of it is empty — and a flow that offers a choice and
+ * then has nothing behind it is worse than not offering it.
+ */
+interface DevProvider extends BookingProvider {
+  readonly serviceIds: readonly string[];
+  readonly modes: readonly BookingMode[];
+}
+
+const DEV_PROVIDERS: readonly DevProvider[] = [
+  {
+    id: 'prov-alkhobar-1',
+    providerType: 'workshop',
+    businessNameAr: 'ورشة الخبر المركزية',
+    businessNameEn: 'Al Khobar Central Workshop',
+    ratingAvg: 4.8,
+    ratingCount: 412,
+    jobsCompleted: 1830,
+    addressAr: 'الخبر — شارع الملك فهد، مقابل مركز الراشد',
+    price: sarOrThrow('0.00'),
+    serviceIds: ['svc-oil', 'svc-brakes', 'svc-ac', 'svc-inspection'],
+    modes: ['workshop'],
+  },
+  {
+    id: 'prov-dammam-1',
+    providerType: 'workshop',
+    businessNameAr: 'مركز الدمام لصيانة السيارات',
+    businessNameEn: 'Dammam Auto Service Centre',
+    ratingAvg: 4.5,
+    ratingCount: 267,
+    jobsCompleted: 990,
+    addressAr: 'الدمام — طريق الأمير محمد بن فهد، حي الشاطئ',
+    price: sarOrThrow('0.00'),
+    serviceIds: ['svc-oil', 'svc-brakes', 'svc-ac'],
+    modes: ['workshop'],
+  },
+  {
+    id: 'prov-mobile-1',
+    providerType: 'individual',
+    businessNameAr: 'عبدالله — فنّي متنقّل',
+    businessNameEn: null,
+    ratingAvg: 4.9,
+    ratingCount: 143,
+    jobsCompleted: 620,
+    addressAr: null,
+    price: sarOrThrow('0.00'),
+    serviceIds: ['svc-oil', 'svc-ac', 'svc-wash', 'svc-inspection'],
+    modes: ['mobile_scheduled'],
+  },
+  {
+    id: 'prov-mobile-2',
+    providerType: 'individual',
+    businessNameAr: 'ورشة متنقّلة — الشرقية',
+    businessNameEn: null,
+    ratingAvg: 4.3,
+    ratingCount: 88,
+    jobsCompleted: 310,
+    addressAr: null,
+    price: sarOrThrow('0.00'),
+    serviceIds: ['svc-oil', 'svc-wash'],
+    modes: ['mobile_scheduled'],
+  },
+];
+
+/** Working hours the dev slot generator fills, local time. */
+const SLOT_HOURS: readonly number[] = [9, 11, 13, 16, 18, 20];
+const SLOT_DAYS_AHEAD = 7;
+
+/**
+ * Windows for the next week, generated rather than hardcoded so the picker is
+ * never looking at a past date — a fixture with literal timestamps rots within
+ * days and then the whole flow looks broken.
+ *
+ * Deterministic per provider: the same provider always has the same gaps, so a
+ * fully-booked slot is reproducible instead of flickering between renders.
+ */
+function devSlotsFor(providerId: string, now: Date): readonly AppointmentSlot[] {
+  const slots: AppointmentSlot[] = [];
+  const seed = [...providerId].reduce((total, char) => total + char.charCodeAt(0), 0);
+
+  for (let day = 0; day < SLOT_DAYS_AHEAD; day += 1) {
+    for (const [index, hour] of SLOT_HOURS.entries()) {
+      const startsAt = new Date(now);
+      startsAt.setDate(startsAt.getDate() + day);
+      startsAt.setHours(hour, 0, 0, 0);
+
+      // Already gone. The server clause is `starts_at > now()`; mirroring it
+      // here keeps the dev list honest about what could actually be claimed.
+      if (startsAt.getTime() <= now.getTime()) continue;
+
+      const capacity = 2;
+      const booked = (seed + day * SLOT_HOURS.length + index) % 5 === 0 ? capacity : 0;
+      if (booked >= capacity) continue;
+
+      const endsAt = new Date(startsAt);
+      endsAt.setHours(endsAt.getHours() + 1);
+
+      slots.push({
+        id: `slot-${providerId}-${day}-${hour}`,
+        providerId,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        remaining: capacity - booked,
+      });
+    }
+  }
+
+  return slots;
+}
 
 const DEV_PROVIDER: ProviderSummary = {
   id: 'provider-dev-1',
@@ -354,6 +637,14 @@ const DEV_PROVIDER: ProviderSummary = {
   ratingAvg: 4.7,
   ratingCount: 128,
 };
+
+/** The Arabic name of any catalogue entry, emergency or bookable. */
+function serviceNameFor(serviceId: string): string {
+  const match = [...EMERGENCY_SERVICES, ...BOOKABLE_SERVICES].find(
+    (candidate) => candidate.id === serviceId,
+  );
+  return match?.nameAr ?? serviceId;
+}
 
 /**
  * Development order state machine.
@@ -368,11 +659,13 @@ const DEV_PROVIDER: ProviderSummary = {
 class DevOrderSimulator {
   private readonly orders = new Map<string, Order>();
   private readonly parts = new Map<string, OrderPart[]>();
+  private readonly createdAt = new Map<string, string>();
   private counter = 0;
 
   create(input: NewEmergencyOrderInput): string {
     this.counter += 1;
     const id = `order-${this.counter}`;
+    this.createdAt.set(id, new Date().toISOString());
     const service = EMERGENCY_SERVICES.find((candidate) => candidate.id === input.serviceId);
 
     const order: Order = {
@@ -390,6 +683,8 @@ class DevOrderSimulator {
       vatAmount: null,
       totalAmount: null,
       escrowStatus: 'authorised',
+      // The dev simulator has no technician taking photographs.
+      completionMedia: [],
     };
     this.orders.set(id, order);
 
@@ -419,6 +714,41 @@ class DevOrderSimulator {
         },
       ]);
       return { ...current, status: 'in_progress' };
+    });
+
+    return id;
+  }
+
+  /**
+   * A booked appointment, which is a different animal from an emergency: the
+   * provider is known at creation because the customer chose them, so the
+   * order opens at `accepted` and never passes through `searching`. Nothing
+   * advances on a timer either — the job is days away, and a dev simulator
+   * that marched a Tuesday appointment to `completed` in ten seconds would
+   * teach the UI a lie.
+   */
+  book(input: NewBookingInput, mode: BookingMode, providerId: string): string {
+    this.counter += 1;
+    const id = `order-${this.counter}`;
+    this.createdAt.set(id, new Date().toISOString());
+    const service = BOOKABLE_SERVICES.find((candidate) => candidate.id === input.serviceId);
+
+    this.orders.set(id, {
+      id,
+      status: 'accepted',
+      fulfilmentMode: mode,
+      vehicleId: input.vehicleId ?? null,
+      serviceId: input.serviceId,
+      providerId,
+      serviceAddressAr: input.addressAr ?? null,
+      problemDescription: input.problem ?? null,
+      quotedAmount: service?.basePrice ?? null,
+      partsAmount: null,
+      labourAmount: null,
+      vatAmount: null,
+      totalAmount: null,
+      escrowStatus: 'authorised',
+      completionMedia: [],
     });
 
     return id;
@@ -458,7 +788,7 @@ class DevOrderSimulator {
             sarOrThrow('0.00'),
           );
           const labourAmount = order.quotedAmount ?? sarOrThrow('0.00');
-          const vatAmount = applyRate(addSar(partsAmount, labourAmount), '0.15');
+          const vatAmount = applyRate(addSar(partsAmount, labourAmount), SAUDI_VAT_RATE);
           const totalAmount = addSar(addSar(partsAmount, labourAmount), vatAmount);
           this.orders.set(orderId, {
             ...order,
@@ -472,6 +802,23 @@ class DevOrderSimulator {
       }
       return;
     }
+  }
+
+  /** Newest first. Mirrors the ordering the server read will use. */
+  recent(limit: number): readonly OrderSummary[] {
+    return [...this.orders.values()]
+      .reverse()
+      .slice(0, limit)
+      .map((order) => ({
+        id: order.id,
+        status: order.status,
+        // Both halves of the catalogue: a booked oil change would otherwise
+        // show its raw id in the history, which is what the emergency-only
+        // lookup did the moment booking started creating orders.
+        serviceNameAr: serviceNameFor(order.serviceId),
+        totalAmount: order.totalAmount,
+        createdAt: this.createdAt.get(order.id) ?? new Date().toISOString(),
+      }));
   }
 
   cancel(id: string): void {
@@ -513,6 +860,10 @@ export class InMemoryRepository implements Repository {
 
   async listModels(makeId: string) {
     return MODELS.filter((model) => model.makeId === makeId);
+  }
+
+  async listAllModels() {
+    return MODELS;
   }
 
   async listVehicles() {
@@ -687,12 +1038,98 @@ export class InMemoryRepository implements Repository {
     return this.orders.create(input);
   }
 
+  async listBookableServices(): Promise<readonly Service[]> {
+    return BOOKABLE_SERVICES;
+  }
+
+  async listBookingProviders(
+    serviceId: string,
+    mode: BookingMode,
+  ): Promise<readonly BookingProvider[]> {
+    const service = BOOKABLE_SERVICES.find((candidate) => candidate.id === serviceId);
+
+    return DEV_PROVIDERS.filter(
+      (provider) => provider.modes.includes(mode) && provider.serviceIds.includes(serviceId),
+    )
+      .map(({ serviceIds: _serviceIds, modes: _modes, ...provider }) => ({
+        ...provider,
+        // The catalogue price stands in until a provider sets their own. The
+        // fixtures carry 0.00 rather than a duplicated number so a price
+        // change in the catalogue cannot leave the picker quoting a stale one.
+        price: service?.basePrice ?? provider.price,
+      }))
+      .sort((a, b) => b.ratingAvg - a.ratingAvg);
+  }
+
+  async listSlots(providerId: string): Promise<readonly AppointmentSlot[]> {
+    return devSlotsFor(providerId, new Date());
+  }
+
+  async bookAppointment(input: NewBookingInput): Promise<string> {
+    const slot = input.slotId;
+    const provider = DEV_PROVIDERS.find((candidate) => slot.startsWith(`slot-${candidate.id}-`));
+    if (provider === undefined) throw new Error('slot_unavailable');
+
+    // Re-derived rather than trusted from the client: which mode an order is
+    // placed in follows from who is fulfilling it, and 0024 decides the same
+    // way server-side from the slot's provider.
+    const mode: BookingMode =
+      provider.providerType === 'workshop' ? 'workshop' : 'mobile_scheduled';
+
+    return this.orders.book(input, mode, provider.id);
+  }
+
   async getOrder(orderId: string) {
     return this.orders.get(orderId);
   }
 
   async getOrderProvider(providerId: string) {
     return providerId === DEV_PROVIDER.id ? DEV_PROVIDER : null;
+  }
+
+  // Seeded rather than empty: the alert card is the moat's most visible claim
+  // (§1.4), and a home screen that never shows one teaches the wrong thing
+  // about what the product is for. These mirror the shape the rules engine
+  // produces server-side, not invented figures for a live order.
+  async listMaintenanceAlerts(vehicleId: string): Promise<readonly MaintenanceAlert[]> {
+    if (this.vehicles.get(vehicleId) === undefined) return [];
+    return [
+      {
+        id: `alert-${vehicleId}-oil`,
+        vehicleId,
+        serviceId: 'svc-oil',
+        messageAr: 'تبديل الزيت خلال 600 كم',
+        messageEn: 'Oil change due within 600 km',
+        dueAtKm: 62400,
+        estimatedKm: 61800,
+        confidence: 'estimated',
+      },
+    ];
+  }
+
+  async listRecentOrders(limit = 5): Promise<readonly OrderSummary[]> {
+    return this.orders.recent(limit);
+  }
+
+  // No storage in the in-memory build, and saying so is the point: a silent
+  // success here would hide that the clip went nowhere.
+  async attachTriageClip(): Promise<boolean> {
+    return false;
+  }
+
+  // The dev build has no matcher and no providers to offer anything to, so
+  // there is genuinely nothing to report. Null, not zeroes: "0 contacted"
+  // would be a claim, and a false one.
+  async getDispatchTelemetry(): Promise<DispatchTelemetry | null> {
+    return null;
+  }
+
+  // The in-memory repository has no PostGIS and no provider moving around, so
+  // there is genuinely nothing to report. Returning null rather than sample
+  // figures keeps the dev build honest about which parts are wired: a
+  // plausible ETA here would hide the fact that the real one is not yet read.
+  async getOrderProgress(_orderId: string): Promise<JobProgress | null> {
+    return null;
   }
 
   async listOrderParts(orderId: string) {

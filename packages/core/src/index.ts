@@ -4,6 +4,7 @@ export * from './saudi/iban.js';
 export * from './saudi/national-id.js';
 export * from './saudi/phone.js';
 export * from './saudi/vat-number.js';
+export * from './text/bidi.js';
 export * from './money/sar.js';
 export * from './report/types.js';
 export * from './report/render.js';

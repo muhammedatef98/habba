@@ -17,8 +17,20 @@ import { sarOrThrow, type SarAmount } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import type {
+  AlertConfidence,
+  AppointmentSlot,
+  BookingMode,
+  BookingProvider,
   City,
+  DispatchTelemetry,
+  FulfilmentMode,
+  OrderStatus,
+  CompletionMedia,
   EscrowStatus,
+  JobProgress,
+  MaintenanceAlert,
+  OrderSummary,
+  NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
@@ -39,6 +51,44 @@ import type {
   VehicleModel,
 } from './types.js';
 import type { GuestUpgradeInput, PastServiceInput, Repository } from './repository.js';
+
+interface DispatchTelemetryRow {
+  readonly contacted_count: number;
+  readonly reviewing_count: number;
+  readonly notified_count: number;
+  readonly busy_count: number;
+  readonly radius_m: number;
+  readonly area_median_seconds: number | null;
+}
+
+interface MaintenanceAlertRow {
+  readonly id: string;
+  readonly vehicle_id: string;
+  readonly service_id: string;
+  readonly message_ar: string;
+  readonly message_en: string;
+  readonly due_at_km: number | null;
+  readonly estimated_km: number | null;
+  readonly confidence: AlertConfidence;
+}
+
+interface OrderSummaryRow {
+  readonly id: string;
+  readonly status: OrderStatus;
+  readonly total_amount: number | null;
+  readonly created_at: string;
+  // PostgREST returns an embedded resource as an array even when the foreign
+  // key makes it one-to-one, and supabase-js types it that way. Narrowed at
+  // the boundary rather than pretending the join is scalar.
+  readonly services: readonly { readonly name_ar: string }[] | null;
+}
+
+/** Shape of one `order_live_progress` row (migration 0040). */
+interface LiveProgressRow {
+  readonly distance_m: number;
+  readonly eta_minutes: number;
+  readonly measured_at: string;
+}
 
 interface VehicleRow {
   id: string;
@@ -110,6 +160,16 @@ function toVehicle(row: VehicleRow): Vehicle {
   };
 }
 
+/**
+ * Every column the app's `Service` needs, named once.
+ *
+ * Explicit rather than `select()` for the same reason as `providers` (0037):
+ * asking for every column couples the client to whatever the table grows next,
+ * and a single revoked column fails the whole query rather than one field.
+ */
+const SERVICE_COLUMNS =
+  'id, category, name_ar, name_en, description_ar, icon, base_price, requires_vehicle, supported_modes, est_duration_min, requires_lift';
+
 interface ServiceRow {
   id: string;
   category: ServiceCategory;
@@ -119,6 +179,30 @@ interface ServiceRow {
   icon: string | null;
   base_price: number;
   requires_vehicle: boolean;
+  supported_modes: FulfilmentMode[];
+  est_duration_min: number;
+  requires_lift: boolean;
+}
+
+interface BookingProviderRow {
+  id: string;
+  provider_type: BookingProvider['providerType'];
+  business_name_ar: string;
+  business_name_en: string | null;
+  rating_avg: number;
+  rating_count: number;
+  jobs_completed: number;
+  workshops: { address_ar: string } | { address_ar: string }[] | null;
+  provider_services: { custom_price: number | null }[] | null;
+}
+
+interface SlotRow {
+  id: string;
+  provider_id: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+  booked_count: number;
 }
 
 interface OrderRow {
@@ -136,6 +220,7 @@ interface OrderRow {
   vat_amount: number | null;
   total_amount: number | null;
   escrow_status: EscrowStatus;
+  readonly completion_media: readonly CompletionMedia[] | null;
 }
 
 interface OrderPartRow {
@@ -172,6 +257,9 @@ function toService(row: ServiceRow): Service {
     icon: row.icon,
     basePrice: toSar(row.base_price),
     requiresVehicle: row.requires_vehicle,
+    supportedModes: row.supported_modes,
+    estDurationMin: row.est_duration_min,
+    requiresLift: row.requires_lift,
   };
 }
 
@@ -191,6 +279,10 @@ function toOrder(row: OrderRow): Order {
     vatAmount: toSarOrNull(row.vat_amount),
     totalAmount: toSarOrNull(row.total_amount),
     escrowStatus: row.escrow_status,
+    // jsonb defaults to '[]' server-side, but a client that selected an older
+    // column list would see undefined — normalise rather than let a screen
+    // map over nothing.
+    completionMedia: row.completion_media ?? [],
   };
 }
 
@@ -272,6 +364,29 @@ export class SupabaseRepository implements Repository {
         .eq('is_active', true)
         .order('name_en'),
       'listModels',
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      makeId: row.make_id,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      yearFrom: row.year_from,
+      yearTo: row.year_to,
+    }));
+  }
+
+  async listAllModels(): Promise<readonly VehicleModel[]> {
+    // One query rather than one per make: the catalogue is small and bounded,
+    // and the screens that need it need all of it before they can name a
+    // vehicle at all.
+    const rows = unwrap(
+      await this.client
+        .from('vehicle_models')
+        .select('id, make_id, name_ar, name_en, year_from, year_to')
+        .eq('is_active', true)
+        .order('name_en'),
+      'listAllModels',
     );
 
     return rows.map((row) => ({
@@ -594,9 +709,7 @@ export class SupabaseRepository implements Repository {
     const rows = unwrap(
       await this.client
         .from('services')
-        .select(
-          'id, category, name_ar, name_en, description_ar, icon, base_price, requires_vehicle',
-        )
+        .select(SERVICE_COLUMNS)
         .eq('category', 'emergency')
         .eq('is_active', true)
         .order('sort_order'),
@@ -621,11 +734,124 @@ export class SupabaseRepository implements Repository {
     return data as string;
   }
 
+  async listBookableServices(): Promise<readonly Service[]> {
+    const rows = unwrap(
+      await this.client
+        .from('services')
+        .select(SERVICE_COLUMNS)
+        .neq('category', 'emergency')
+        .eq('is_active', true)
+        .order('sort_order'),
+      'listBookableServices',
+    );
+
+    return (rows as ServiceRow[]).map(toService);
+  }
+
+  async listBookingProviders(
+    serviceId: string,
+    mode: BookingMode,
+  ): Promise<readonly BookingProvider[]> {
+    // A workshop booking needs a workshop row for the address; a scheduled
+    // mobile visit needs a provider who is NOT a workshop. `provider_type` is
+    // the discriminator either way, so the mode maps straight onto it rather
+    // than needing a separate capability table.
+    const query = this.client
+      .from('providers')
+      .select(
+        'id, provider_type, business_name_ar, business_name_en, rating_avg, rating_count, jobs_completed, workshops(address_ar), provider_services!inner(custom_price)',
+      )
+      .eq('verification_status', 'approved')
+      .eq('provider_services.service_id', serviceId)
+      .order('rating_avg', { ascending: false });
+
+    const rows = unwrap(
+      await (mode === 'workshop'
+        ? query.eq('provider_type', 'workshop')
+        : query.eq('provider_type', 'individual')),
+      'listBookingProviders',
+    );
+
+    // The catalogue price is the fallback: `custom_price` is null for every
+    // fixed-price service (0018's price guard), which is most of them.
+    const service = await this.serviceById(serviceId);
+
+    return (rows as BookingProviderRow[]).map((row) => {
+      const workshop = Array.isArray(row.workshops) ? row.workshops[0] : row.workshops;
+      const custom = row.provider_services?.[0]?.custom_price ?? null;
+
+      return {
+        id: row.id,
+        providerType: row.provider_type,
+        businessNameAr: row.business_name_ar,
+        businessNameEn: row.business_name_en,
+        ratingAvg: Number(row.rating_avg),
+        ratingCount: row.rating_count,
+        jobsCompleted: row.jobs_completed,
+        addressAr: workshop?.address_ar ?? null,
+        price: custom === null ? (service?.basePrice ?? toSar(0)) : toSar(custom),
+      };
+    });
+  }
+
+  private async serviceById(serviceId: string): Promise<Service | null> {
+    const { data, error } = await this.client
+      .from('services')
+      .select(SERVICE_COLUMNS)
+      .eq('id', serviceId)
+      .maybeSingle();
+
+    if (error !== null) throw new Error(`serviceById: ${error.message}`);
+    return data === null ? null : toService(data as ServiceRow);
+  }
+
+  async listSlots(providerId: string): Promise<readonly AppointmentSlot[]> {
+    // `starts_at > now()` and the capacity check mirror `book_appointment`'s
+    // own claim clause (0024). Listing a slot the RPC would then refuse is how
+    // a booking flow earns a reputation for randomly failing.
+    const rows = unwrap(
+      await this.client
+        .from('appointment_slots')
+        .select('id, provider_id, starts_at, ends_at, capacity, booked_count')
+        .eq('provider_id', providerId)
+        .eq('is_blocked', false)
+        .gt('starts_at', new Date().toISOString())
+        .order('starts_at'),
+      'listSlots',
+    );
+
+    return (rows as SlotRow[])
+      .filter((row) => row.booked_count < row.capacity)
+      .map((row) => ({
+        id: row.id,
+        providerId: row.provider_id,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        remaining: row.capacity - row.booked_count,
+      }));
+  }
+
+  async bookAppointment(input: NewBookingInput): Promise<string> {
+    const { data, error } = await this.client.rpc('book_appointment', {
+      p_slot_id: input.slotId,
+      p_service_id: input.serviceId,
+      p_vehicle_id: input.vehicleId ?? null,
+      p_problem: input.problem ?? null,
+      p_mileage: input.mileage ?? null,
+      p_lon: input.lon ?? null,
+      p_lat: input.lat ?? null,
+      p_address_ar: input.addressAr ?? null,
+    });
+
+    if (error !== null) throw new Error(`bookAppointment: ${error.message}`);
+    return data as string;
+  }
+
   async getOrder(orderId: string): Promise<Order | null> {
     const { data, error } = await this.client
       .from('orders')
       .select(
-        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status',
+        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media',
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -652,6 +878,183 @@ export class SupabaseRepository implements Repository {
       businessNameAr: data.business_name_ar,
       ratingAvg: data.rating_avg,
       ratingCount: data.rating_count,
+    };
+  }
+
+  /**
+   * Live progress for an active job (migration 0040).
+   *
+   * Two reads, both server-guarded. `order_live_progress` is a definer
+   * function that returns a distance and an ETA but never the provider's
+   * coordinates — 0018 keeps that position private, and the screens only ever
+   * needed the derived figures. It returns no row at all when the fix is stale
+   * or the journey is over, so "no data" is a real answer here rather than an
+   * error to paper over.
+   *
+   * The handover code comes from `order_handovers`, whose only read policy is
+   * the customer's: the provider being verified cannot select it. Both are
+   * allowed to come back empty and the caller renders less, never something
+   * invented.
+   */
+  async getOrderProgress(orderId: string): Promise<JobProgress | null> {
+    const [progress, handover] = await Promise.all([
+      this.client.rpc('order_live_progress', { p_order_id: orderId }),
+      this.client
+        .from('order_handovers')
+        .select('code, verified_at')
+        .eq('order_id', orderId)
+        .maybeSingle(),
+    ]);
+
+    if (progress.error !== null) {
+      throw new Error(`getOrderProgress: ${progress.error.message}`);
+    }
+    // A missing handover row is normal before acceptance, so it is not an
+    // error — but a genuine failure still has to surface.
+    if (handover.error !== null) {
+      throw new Error(`getOrderProgress (handover): ${handover.error.message}`);
+    }
+
+    const row = (progress.data as readonly LiveProgressRow[] | null)?.[0];
+    const code = handover.data?.code ?? undefined;
+
+    if (row === undefined && code === undefined) return null;
+
+    return {
+      ...(row !== undefined
+        ? {
+            distanceKm: row.distance_m / 1000,
+            etaMinutes: row.eta_minutes,
+            lastUpdateAt: row.measured_at,
+          }
+        : {}),
+      // Once verified there is nothing left to show — the technician has
+      // already proved they are the right person.
+      ...(code !== undefined && handover.data?.verified_at === null ? { handoverCode: code } : {}),
+    };
+  }
+
+  /**
+   * Open predictive alerts for one vehicle (migration 0028, §1.4).
+   *
+   * Dismissed and actioned alerts are filtered server-side by status rather
+   * than here: an alert the owner has already dealt with reappearing on the
+   * home screen is the fastest way to teach them to ignore the card.
+   */
+  async listMaintenanceAlerts(vehicleId: string): Promise<readonly MaintenanceAlert[]> {
+    const rows = unwrap(
+      await this.client
+        .from('maintenance_alerts')
+        .select(
+          'id, vehicle_id, service_id, message_ar, message_en, due_at_km, estimated_km, confidence',
+        )
+        .eq('vehicle_id', vehicleId)
+        .eq('status', 'open')
+        .order('due_at_km', { ascending: true, nullsFirst: false }),
+      'listMaintenanceAlerts',
+    );
+
+    return (rows as readonly MaintenanceAlertRow[]).map((row) => ({
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      serviceId: row.service_id,
+      messageAr: row.message_ar,
+      messageEn: row.message_en,
+      dueAtKm: row.due_at_km,
+      estimatedKm: row.estimated_km,
+      confidence: row.confidence,
+    }));
+  }
+
+  async listRecentOrders(limit = 5): Promise<readonly OrderSummary[]> {
+    // Joins the service for its Arabic name: the row reads "بنشر · قبل 3 أيام"
+    // and an order id would tell the customer nothing.
+    const rows = unwrap(
+      await this.client
+        .from('orders')
+        .select('id, status, total_amount, created_at, services(name_ar)')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      'listRecentOrders',
+    );
+
+    return (rows as readonly OrderSummaryRow[]).map((row) => ({
+      id: row.id,
+      status: row.status,
+      serviceNameAr: row.services?.[0]?.name_ar ?? '',
+      totalAmount: toSarOrNull(row.total_amount),
+      createdAt: row.created_at,
+    }));
+  }
+
+  /**
+   * Uploads the clip to the private `triage-media` bucket (0041) and records it
+   * on the order.
+   *
+   * Keyed `<order_id>/<filename>`, because the bucket's policies authorise on
+   * the first path segment — an object anywhere else matches no order and is
+   * refused. Nothing here needs to check that; RLS does.
+   *
+   * Failure returns false rather than throwing. The clip helps the technician
+   * prepare; it is not a precondition for being rescued, and an upload that
+   * fails on a roadside connection must not take the order down with it.
+   */
+  async attachTriageClip(
+    orderId: string,
+    clip: { uri: string; seconds: number },
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(clip.uri);
+      const body = await response.arrayBuffer();
+      const path = `${orderId}/${Date.now()}.mp4`;
+
+      const upload = await this.client.storage
+        .from('triage-media')
+        .upload(path, body, { contentType: 'video/mp4', upsert: false });
+
+      if (upload.error !== null) return false;
+
+      // The order carries the reference; the bucket carries the bytes. Storing
+      // the path rather than a signed URL, because a signed URL expires and
+      // this row is permanent.
+      const { error } = await this.client
+        .from('orders')
+        .update({
+          triage_media: [{ path, kind: 'video', seconds: clip.seconds }],
+        })
+        .eq('id', orderId);
+
+      return error === null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Dispatch figures for the waiting screen (0042).
+   *
+   * Aggregates only. The offers themselves are not readable by the customer —
+   * knowing which specific technicians nearby declined them is commercially
+   * sensitive to the provider and a grudge waiting to happen — so this comes
+   * through a definer function that returns the numbers without the names.
+   */
+  async getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null> {
+    const { data, error } = await this.client.rpc('order_dispatch_telemetry', {
+      p_order_id: orderId,
+    });
+
+    if (error !== null) throw new Error(`getDispatchTelemetry: ${error.message}`);
+
+    const row = (data as readonly DispatchTelemetryRow[] | null)?.[0];
+    if (row === undefined) return null;
+
+    return {
+      contactedCount: row.contacted_count,
+      reviewingCount: row.reviewing_count,
+      respondingCount: row.notified_count,
+      busyCount: row.busy_count,
+      radiusKm: row.radius_m / 1000,
+      ...(row.area_median_seconds !== null ? { areaMedianSeconds: row.area_median_seconds } : {}),
     };
   }
 

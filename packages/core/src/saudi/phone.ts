@@ -55,7 +55,15 @@ export function isValidSaudiPhone(input: string): boolean {
   return parseSaudiPhone(input).ok;
 }
 
-/** `05• •••• •67` — safe for logs and push notification bodies (ADR-0010). */
+/**
+ * `050•••••67` — safe for logs and push notification bodies (ADR-0010).
+ *
+ * The example in this docstring used to read `05• •••• •67`, which is not what
+ * the code below produces: there are no spaces and the first three digits are
+ * kept, not two. Worth correcting rather than leaving, because the shape of a
+ * mask is exactly the sort of thing a reader takes from the comment instead of
+ * counting the slices.
+ */
 export function maskPhone(input: string): string {
   const parsed = parseSaudiPhone(input);
   if (!parsed.ok) return '••••••••••';

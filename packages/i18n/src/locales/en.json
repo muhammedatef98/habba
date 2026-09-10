@@ -11,7 +11,11 @@
     "skip": "Skip",
     "optional": "Optional",
     "loading": "Loading…",
-    "search": "Search"
+    "search": "Search",
+    "later": "Later",
+    "share": "Share",
+    "verified": "Verified",
+    "sar": "{{amount}} SAR"
   },
   "auth": {
     "welcomeTitle": "Welcome to Habba",
@@ -21,7 +25,7 @@
     "phoneHint": "We'll text you a verification code",
     "sendCode": "Send code",
     "otpTitle": "Enter your code",
-    "otpSubtitle": "We sent a 4-digit code to {{phone}}",
+    "otpSubtitle": "We sent a {{length}}-digit code to {{phone}}",
     "resendIn": "Resend in {{seconds}}s",
     "resend": "Resend code",
     "verify": "Verify",
@@ -61,7 +65,11 @@
       "unknownEmail": "No account uses that email. Create one instead.",
       "wrongPassword": "That password isn't right.",
       "guestNeedsIdentity": "Add a mobile number or email to save the account."
-    }
+    },
+    "otpLabel": "Verification code",
+    "changePhone": "Change phone number",
+    "showPassword": "Show",
+    "hidePassword": "Hide"
   },
   "vehicle": {
     "addTitle": "Add your vehicle",
@@ -84,8 +92,11 @@
       "yearTooOld": "Year must be 1970 or later.",
       "yearTooNew": "That year isn't valid.",
       "vinInvalid": "A VIN is 17 characters and never contains I, O or Q.",
-      "required": "This field is required."
-    }
+      "required": "This field is required.",
+      "mileageImplausible": "Check that reading — the number doesn't look right.",
+      "saveFailed": "We couldn't save this vehicle. Check your connection and try again."
+    },
+    "mileageHint": "Helps us predict when the next service is due"
   },
   "logbook": {
     "title": "Vehicle logbook",
@@ -191,7 +202,19 @@
       "appendOnlyNote": "Records are never edited or deleted once entered — that is what makes the logbook worth something at resale. To correct a mistake, add a new record explaining it.",
       "missingTitle": "That record does not exist",
       "missingBody": "The link may be old, or the record may belong to a different vehicle."
-    }
+    },
+    "coverageTitle": "Logbook verification",
+    "coverageBody": "Every service Habba performs is added verified. The more verified the record, the more the car is worth when you sell it.",
+    "filterAll": "All",
+    "filterService": "Service",
+    "filterInspection": "Inspection",
+    "filterMileage": "Odometer",
+    "filterEmpty": "No records in this category.",
+    "recordsCount": "{{count}} records",
+    "vehicleUnknown": "Your vehicle",
+    "recordMonth": "Month",
+    "recordDay": "Day",
+    "recordYear": "Year"
   },
   "settings": {
     "title": "Settings",
@@ -203,25 +226,101 @@
     "themeDark": "Dark",
     "themeSystem": "System",
     "signOut": "Sign out",
-    "restartRequired": "The app will restart to apply the new text direction."
+    "restartRequired": "Close the app and open it again to apply the language and writing direction.",
+    "sectionAccount": "Account",
+    "sectionPreferences": "Preferences",
+    "sectionAbout": "About Habba",
+    "guestLabel": "Guest",
+    "noContact": "No phone or email added yet",
+    "myVehicles": "My vehicles",
+    "vehiclesCount": "{{count}} vehicles",
+    "signOutConfirmTitle": "Sign out?",
+    "signOutConfirmBody": "Your vehicle data is saved, and the same phone or email brings you back to it.",
+    "signOutGuestWarning": "You're a guest — if you sign out now without adding a phone or email, you cannot get back to your logbook.",
+    "signOutConfirm": "Yes, sign me out",
+    "version": "Version",
+    "help": "Help and support",
+    "languageHint": "Changing the language changes the writing direction, which needs the app reopened."
   },
   "errors": {
     "generic": "Something went wrong.",
     "genericAction": "Try again",
     "offline": "You're offline. We'll save what you entered and send it when you reconnect.",
     "notFound": "We couldn't find that.",
-    "forbidden": "You don't have permission to do that."
+    "forbidden": "You don't have permission to do that.",
+    "offlineTitle": "No internet connection",
+    "offlineBody": "What you see may be out of date. It will refresh on its own once you're back online."
   },
   "home": {
     "emergencyAction": "Emergency request",
     "bookingAction": "Book an appointment",
     "noVehicleTitle": "Add a vehicle first",
-    "noVehicleBody": "We need your vehicle's details to send an emergency request."
+    "noVehicleBody": "We need your vehicle's details to send an emergency request.",
+    "emergencyCta": "Emergency request",
+    "emergencySubtitle": "Nearest available technician · 24 hours",
+    "bookAppointment": "Book an appointment",
+    "alertsTitle": "Your vehicle alerts",
+    "bookNow": "Book now",
+    "recentTitle": "Recent orders",
+    "noRecent": "You don't have any past orders yet.",
+    "lastReading": "Last reading {{km}} km",
+    "greetingMorning": "Good morning",
+    "greetingEvening": "Good evening",
+    "greetingNight": "Good night",
+    "activeTitle": "Your request is under way",
+    "activeTrack": "Track request",
+    "quickTitle": "Quick services",
+    "quickAll": "All services",
+    "vehicleTitle": "Your vehicle",
+    "statMileage": "Odometer",
+    "statRecords": "Records",
+    "statLastService": "Last service",
+    "openLogbook": "Open the vehicle logbook",
+    "switchVehicle": "Switch",
+    "otherVehicles": "Your other vehicles",
+    "statEmpty": "—",
+    "emergencyBadge": "Available now"
   },
   "booking": {
     "title": "Book an appointment",
     "comingSoonTitle": "Booking is coming soon",
-    "comingSoonBody": "Scheduled and workshop bookings arrive in the next phase. For emergencies, use \"Emergency request\" from the home screen."
+    "comingSoonBody": "Scheduled and workshop bookings arrive in the next phase. For emergencies, use \"Emergency request\" from the home screen.",
+    "stepService": "Service",
+    "stepProvider": "Provider",
+    "stepSlot": "Time",
+    "serviceHeadline": "What do you need?",
+    "serviceSubhead": "Book a time that suits you — no rush.",
+    "durationMinutes": "{{minutes}} min",
+    "vehicleLabel": "Which vehicle?",
+    "modeLabel": "Where would you like it?",
+    "modeMobile": "They come to you",
+    "modeWorkshop": "At the workshop",
+    "modeLockedWorkshop": "This service needs a lift, so it is workshop-only.",
+    "modeLockedMobile": "This service is available as a mobile visit only.",
+    "providerHeadline": "Choose a provider",
+    "providerSubhead": "Highest rated first. Price is for the service, before VAT.",
+    "providerJobs": "{{jobs}} jobs completed",
+    "providerComesToYou": "Comes to you",
+    "providerNone": "No provider offers this service that way right now. Try the other option.",
+    "slotHeadline": "When suits you?",
+    "slotSubhead": "Available times over the next week.",
+    "slotNone": "This provider has no free times. Go back and pick another.",
+    "slotToday": "Today",
+    "slotTomorrow": "Tomorrow",
+    "slotLastOne": "Last one",
+    "summaryTitle": "Booking summary",
+    "summarySubtotal": "Service",
+    "summaryVat": "VAT 15%",
+    "summaryTotal": "Total",
+    "confirm": "Confirm booking",
+    "confirmed": "Booked",
+    "problemLabel": "Anything that helps the technician — optional",
+    "problemPlaceholder": "e.g. odd noise when braking",
+    "errorSlotTaken": "That time was taken a moment ago. Choose another.",
+    "errorGeneric": "We couldn't complete the booking. Please try again.",
+    "noVehicle": "Add your vehicle first so the service is recorded in its logbook.",
+    "workshopOnly": "Workshop only",
+    "mobileOnly": "Mobile only"
   },
   "emergency": {
     "title": "Emergency request",
@@ -240,7 +339,28 @@
     "errors": {
       "noLocation": "We couldn't determine your location yet.",
       "createFailed": "The request could not be sent. Try again."
-    }
+    },
+    "serviceHeadline": "What happened?",
+    "serviceSubhead": "Pick one and we'll find your nearest technician right away.",
+    "estimatedPrice": "Estimated price for {{service}}",
+    "priceRange": "{{min}} – {{max}} SAR",
+    "dragToAdjust": "Drag to adjust location",
+    "placeRoadside": "On the hard shoulder",
+    "placeParking": "In a car park",
+    "confirmAndSubmit": "Confirm and send request",
+    "triageTitle": "Record 20 seconds — it helps the technician bring the right part",
+    "triageBody": "Entirely optional. We've already started looking for a technician.",
+    "triageSkip": "Skip — continue without video",
+    "cameraPreview": "Camera preview",
+    "cameraAim": "Point it at the problem or the sound",
+    "triagePermission": "We need camera and microphone access to record the clip.",
+    "triageAllow": "Allow",
+    "triageRecord": "Start recording",
+    "triageStop": "Stop",
+    "triageRetake": "Record again",
+    "triageUse": "Use this clip",
+    "triageRecorded": "Clip recorded ({{seconds}}s)",
+    "triageFailed": "Recording failed. You can continue without video."
   },
   "tracking": {
     "title": "Track request",
@@ -266,8 +386,61 @@
     "errors": {
       "notFound": "We couldn't find that request.",
       "confirmFailed": "Confirmation failed. Try again.",
-      "cancelFailed": "The request could not be cancelled."
-    }
+      "cancelFailed": "The request could not be cancelled.",
+      "rateFailed": "We couldn't send your rating. Try again."
+    },
+    "searchingHeadline": "Finding you a technician",
+    "searchingReassure": "Nothing needed from you. Keep your phone handy and we'll tell you the moment we find someone.",
+    "searchRadius": "Search radius now {{km}} km",
+    "contactedLabel": "We've contacted",
+    "techniciansCount": "{{count}} technicians",
+    "reviewing": "{{count}} reviewing the request",
+    "aboutToRespond": "{{count}} about to respond",
+    "busy": "{{count}} busy",
+    "radiusExpanded": "Widened the search to {{km}} km",
+    "avgMatchTime": "Average match time in your area right now is {{minutes}} minutes",
+    "cancelFreeBeforeMatch": "Cancelling before a match is free",
+    "matchedBanner": "We found you a technician",
+    "orderCount": "{{count}} jobs",
+    "unitMinute": "minute",
+    "unitMinutes": "minutes",
+    "unitKm": "km",
+    "totalWithVat": "SAR incl. VAT",
+    "priceFixedNote": "The price is fixed. Any additional work reaches you as a quote you approve yourself before it starts.",
+    "acceptWithAmount": "Accept · {{amount}} SAR",
+    "findAnother": "Find another technician",
+    "arrivesIn": "Arrives in",
+    "distance": "Distance",
+    "price": "Price",
+    "chatAction": "Chat",
+    "shareTrip": "Share your trip with someone",
+    "providerArrived": "{{name}} has arrived",
+    "waitingAtVehicle": "Waiting for you at the vehicle",
+    "handoverCodePrompt": "Give {{name}} this code before work starts",
+    "agreedTotal": "Agreed",
+    "agreedTotalLong": "Agreed total",
+    "inProgressPill": "In progress",
+    "providerWorking": "{{name}} is working on the vehicle",
+    "workingBody": "They'll update you at each step. Nothing needed from you.",
+    "paidWith": "Paid · {{method}}",
+    "zatcaInvoice": "Approved tax invoice (ZATCA)",
+    "rateProviderQuestion": "How was {{name}}?",
+    "vatLine": "VAT 15%",
+    "labourLine": "Service charge",
+    "totalLine": "Total",
+    "stages": {
+      "accepted": "Accepted",
+      "enRoute": "En route",
+      "arrived": "Arrived",
+      "completed": "Completed"
+    },
+    "tags": {
+      "fast": "Arrived quickly",
+      "respectful": "Courteous",
+      "explained": "Explained the issue"
+    },
+    "evidenceTitle": "Photos from the job",
+    "contactUnavailable": "Calling the technician isn't available yet — we're setting up a relay number that protects both sides' privacy."
   },
   "quote": {
     "title": "Parts quote",
@@ -285,7 +458,10 @@
     "vatLabel": "VAT",
     "totalLabel": "Total",
     "allApprovedHint": "Once every part is approved, the work moves to completion confirmation.",
-    "pendingHint": "Not every part is approved yet."
+    "pendingHint": "Not every part is approved yet.",
+    "pendingBadge": "{{count}} awaiting you",
+    "allApprovedBadge": "All approved",
+    "approveFailed": "We couldn't record your approval for this part. Check your connection and try again."
   },
   "job": {
     "accept": "Accept job",
@@ -308,7 +484,9 @@
       "completed": "Completed",
       "cancelled": "Cancelled",
       "disputed": "Disputed"
-    }
+    },
+    "decline": "Can't take this one",
+    "declined": "Offer declined"
   },
   "provider": {
     "shiftTitle": "Your shift",
@@ -378,7 +556,20 @@
         "alreadyApplied": "You already have an application in progress.",
         "submit": "Could not send the application. Check your connection and try again."
       }
-    }
+    },
+    "navShift": "Shift",
+    "navJobs": "My jobs",
+    "statusOnline": "You're available",
+    "statusOffline": "You're not available",
+    "shiftSubtitleOnline": "Your location is shared only while you're working, and stops the moment you go offline.",
+    "openJobsCount": "{{count}} nearby",
+    "hasVideo": "Has video",
+    "payoutLabel": "Estimated payout",
+    "distanceLabel": "Distance",
+    "activeJobsTitle": "In progress",
+    "noMyJobs": "No jobs in progress. Nearby requests appear on the shift screen.",
+    "goToShift": "Open shift",
+    "sarSuffix": "SAR"
   },
   "profile": {
     "title": "My account",
@@ -390,5 +581,16 @@
     "switchToProvider": "Switch to technician mode",
     "switchToCustomer": "Switch to customer mode",
     "signOut": "Sign out"
+  },
+  "nav": {
+    "home": "Home",
+    "orders": "Orders",
+    "wallet": "Wallet",
+    "account": "Account"
+  },
+  "orders": {
+    "liveTitle": "Happening now",
+    "pastTitle": "History",
+    "emptyBody": "Your first request will appear here, and be written into your vehicle's logbook."
   }
 }
