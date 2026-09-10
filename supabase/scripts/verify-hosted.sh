@@ -13,9 +13,14 @@
 # Usage:
 #   export SUPABASE_DB_URL='postgresql://postgres.<ref>:<password>@<host>:5432/postgres'
 #   export SUPABASE_URL='https://<ref>.supabase.co'
-#   export SUPABASE_ANON_KEY='<anon key>'
-#   export SUPABASE_JWT_SECRET='<JWT secret from Settings → API>'
+#   export SUPABASE_ANON_KEY='<anon or publishable key>'
+#   export SUPABASE_SERVICE_ROLE_KEY='<service_role or secret key>'
 #   ./supabase/scripts/verify-hosted.sh
+#
+# No JWT secret. The suite signs the fixtures in through GoTrue and uses the
+# tokens it gets back, so it works whatever the project signs with — including
+# after the legacy HS256 secret is revoked, which the dashboard will no longer
+# let you read anyway.
 #
 #   --migrate-only   apply migrations and seed, skip the RLS suite
 #   --verify-only    skip migrations, run the RLS suite against what is there
@@ -136,21 +141,54 @@ if [ "$MODE" != "--migrate-only" ]; then
   echo
   echo "── creating auth users through GoTrue"
 
-  # Ids and numbers must match tests/rls.spec.ts.
+  # A legacy service_role key is a JWT and belongs on Authorization as well as
+  # apikey. A new secret key (`sb_secret_…`) is NOT a JWT: sent as a bearer
+  # token the platform tries to parse it and answers `Invalid JWT`. Deciding per
+  # key rather than per project means this script is correct before and after
+  # the swap, which is what makes the swap reversible.
+  admin_auth_headers=(-H "apikey: $SUPABASE_SERVICE_ROLE_KEY")
+  case "$SUPABASE_SERVICE_ROLE_KEY" in
+    eyJ*.*.*) admin_auth_headers+=(-H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY") ;;
+  esac
+
+  # The fixtures need a password so the suite can sign them in and hold a real
+  # GoTrue session. Generated per run and never written anywhere: it lives for
+  # the length of this script, and the accounts it opens are throwaway.
+  FIXTURE_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' )Aa1!"
+
+  # Ids and numbers must match tests/rls.spec.ts. Each fixture gets a phone (its
+  # product identity) AND an email with a password (how the suite signs in) —
+  # email sign-in does not depend on the phone provider being configured, so the
+  # verification does not fail for a reason unrelated to what it is testing.
   create_user() {
     local id="$1" phone="$2"
+    local email="rls-$id@habba.test"
     local code
     code=$(curl -sS -o /dev/null -w '%{http_code}' \
       -X POST "$SUPABASE_URL/auth/v1/admin/users" \
-      -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-      -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+      "${admin_auth_headers[@]}" \
       -H 'content-type: application/json' \
-      -d "{\"id\":\"$id\",\"phone\":\"$phone\",\"phone_confirm\":true}")
+      -d "{\"id\":\"$id\",\"phone\":\"$phone\",\"phone_confirm\":true,\
+           \"email\":\"$email\",\"email_confirm\":true,\
+           \"password\":\"$FIXTURE_PASSWORD\"}")
 
-    # 422 is "already registered", which is the expected answer on a re-run.
+    # 422 is "already registered" — expected on a re-run, but then the account
+    # still holds the PREVIOUS run's password and could not be signed in. So
+    # set this run's password on it.
     case "$code" in
       2*) printf '   created %s\n' "$phone" ;;
-      422) printf '   exists  %s\n' "$phone" ;;
+      422)
+        code=$(curl -sS -o /dev/null -w '%{http_code}' \
+          -X PUT "$SUPABASE_URL/auth/v1/admin/users/$id" \
+          "${admin_auth_headers[@]}" \
+          -H 'content-type: application/json' \
+          -d "{\"email\":\"$email\",\"email_confirm\":true,\
+               \"password\":\"$FIXTURE_PASSWORD\"}")
+        case "$code" in
+          2*) printf '   exists  %s (password reset for this run)\n' "$phone" ;;
+          *) echo "error: resetting $phone returned HTTP $code" >&2; exit 1 ;;
+        esac
+        ;;
       *) echo "error: creating $phone returned HTTP $code" >&2; exit 1 ;;
     esac
   }
@@ -211,21 +249,22 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$MODE" != "--migrate-only" ]; then
   require SUPABASE_URL
-  require SUPABASE_JWT_SECRET
   require SUPABASE_ANON_KEY
 
   echo
   echo "── running tests/rls.spec.ts against $SUPABASE_URL"
 
-  # The suite mints its own JWTs, so it needs the project's JWT secret.
+  # No JWT secret is passed. The suite signs each fixture in through GoTrue and
+  # uses the access token it gets back, so the assertions run against a token
+  # signed the way the APP's tokens are signed — asymmetric key included.
   #
   # HABBA_POSTGREST_URL is the project ORIGIN, with no /rest/v1: supabase-js
   # appends that itself. The first hosted run passed the prefixed form, which
   # made the reachability probe pass and then every write fail with "Invalid
   # path specified in request URL" — /rest/v1/rest/v1/providers.
   HABBA_POSTGREST_URL="$SUPABASE_URL" \
-  HABBA_JWT_SECRET="$SUPABASE_JWT_SECRET" \
   HABBA_ANON_KEY="$SUPABASE_ANON_KEY" \
+  HABBA_FIXTURE_PASSWORD="$FIXTURE_PASSWORD" \
   HABBA_HOSTED=1 \
   HABBA_REQUIRE_HARNESS=1 \
     pnpm --dir "$ROOT" test:rls
@@ -273,8 +312,7 @@ SQL
   # DELETE by way of two cascades.
   erase_code=$(curl -sS -o /dev/null -w '%{http_code}' \
     -X DELETE "$SUPABASE_URL/auth/v1/admin/users/$ERASE_ID" \
-    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+    "${admin_auth_headers[@]}")
   case "$erase_code" in
     2*) printf '   deleted the auth user (HTTP %s)\n' "$erase_code" ;;
     *) echo "error: deleting the auth user returned HTTP $erase_code" >&2; exit 1 ;;

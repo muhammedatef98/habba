@@ -14,9 +14,17 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { renderHabbaReport, type HabbaReport } from '../_shared/report.ts';
+import { apiKeyOnlyFetch, resolveSecretKey } from '../_shared/api-keys.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+// Prefers the new secret key when the project has one, so disabling the legacy
+// service_role key needs no redeploy. See _shared/api-keys.ts for why the
+// transport differs between the two.
+const SERVICE_KEY = resolveSecretKey({
+  secretKeys: Deno.env.get('SUPABASE_SECRET_KEYS'),
+  legacy: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+});
 const PUBLIC_BASE = Deno.env.get('HABBA_PUBLIC_BASE_URL') ?? 'https://habba.sa';
 
 /**
@@ -54,6 +62,10 @@ Deno.serve(async (request: Request) => {
 
   const client = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false },
+    // A secret key is not a JWT: sent as a bearer token the platform answers
+    // `Invalid JWT`, so this strips the header supabase-js adds by default. A
+    // legacy key is passed through untouched.
+    global: { fetch: apiKeyOnlyFetch(SERVICE_KEY, fetch) },
   });
 
   // get_habba_report is SECURITY DEFINER and token-scoped: it returns the

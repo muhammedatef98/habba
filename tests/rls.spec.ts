@@ -55,9 +55,29 @@ const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-
  * If the shim ever appeared on a hosted project it would BE the privilege
  * escalation that 0036 and 0040 exist to prevent, so "just deploy the helpers"
  * is not an option.
+ *
+ * TOKENS differ too, and that difference is the point of this file's hosted
+ * mode. Locally there is no GoTrue — it needs Docker — so tokens are minted
+ * with the shared secret PostgREST verifies against. Hosted, they come from
+ * GoTrue itself, by signing the fixtures in. That means:
+ *
+ *   - the suite exercises the signing path the APP uses, rather than one only
+ *     the tests use. A hand-minted HS256 token proves RLS accepts a token this
+ *     repo made; a GoTrue token proves it accepts the token a user arrives with
+ *   - it is algorithm-agnostic. Supabase's asymmetric signing keys (ES256, and
+ *     whatever replaces them) verify through the key discovery endpoint with no
+ *     shared secret to hold, so revoking the legacy HS256 secret — which the
+ *     project can no longer even display — stops being able to break this suite
  */
 const HOSTED = process.env.HABBA_HOSTED === '1';
 const ANON_KEY = process.env.HABBA_ANON_KEY ?? '';
+
+/**
+ * The password `verify-hosted.sh` gave the fixture users when it created them.
+ * Randomly generated per run and never written down: it exists for the seconds
+ * between creating a throwaway user and signing it in.
+ */
+const FIXTURE_PASSWORD = process.env.HABBA_FIXTURE_PASSWORD ?? '';
 
 /** A customer who never applies for anything. */
 const CUSTOMER_ID = 'aa000000-0000-4000-8000-000000000001';
@@ -67,6 +87,19 @@ const APPLICANT_ID = 'aa000000-0000-4000-8000-000000000002';
 const PROVIDER_ID = 'aa000000-0000-4000-8000-000000000003';
 /** Another customer, whose data nobody else may see. */
 const STRANGER_ID = 'aa000000-0000-4000-8000-000000000004';
+
+/** Identities the fixtures were created with. Must match verify-hosted.sh. */
+const PHONES: Readonly<Record<string, string>> = {
+  [CUSTOMER_ID]: '+966590000001',
+  [APPLICANT_ID]: '+966590000002',
+  [PROVIDER_ID]: '+966590000003',
+  [STRANGER_ID]: '+966590000004',
+};
+
+/** Hosted, the fixtures sign in by email; the phone is their profile identity. */
+function fixtureEmail(userId: string): string {
+  return `rls-${userId}@habba.test`;
+}
 
 /**
  * Bare PostgREST serves at the root; Supabase routes `/rest/v1` to it through a
@@ -86,7 +119,7 @@ function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
  * first real hosted run did exactly that.
  */
 if (HOSTED) {
-  for (const name of ['HABBA_POSTGREST_URL', 'HABBA_JWT_SECRET', 'HABBA_ANON_KEY'] as const) {
+  for (const name of ['HABBA_POSTGREST_URL', 'HABBA_ANON_KEY', 'HABBA_FIXTURE_PASSWORD'] as const) {
     if ((process.env[name] ?? '') === '') {
       throw new Error(
         `${name} is empty but HABBA_HOSTED=1. A hosted run must not fall back to the ` +
@@ -153,11 +186,88 @@ if (process.env.HABBA_REQUIRE_HARNESS === '1' && !probe.ok) {
   );
 }
 
-function clientFor(userId: string | null): SupabaseClient {
+/**
+ * Signs a fixture in through GoTrue and returns its access token.
+ *
+ * This is the ordinary password grant — the same endpoint the app's users
+ * reach — so the token is signed by whatever key the project currently signs
+ * with, and this file never needs to know which. That is the property worth
+ * having: under Supabase's signing-keys system the legacy shared secret is
+ * verify-only and cannot be read back, so a suite that minted its own tokens
+ * would be testing a signing path nothing in production uses, right up until
+ * the secret is revoked and it tests nothing at all.
+ */
+async function gotrueToken(userId: string): Promise<string> {
+  const response = await fetch(`${POSTGREST_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, 'content-type': 'application/json' },
+    body: JSON.stringify({ email: fixtureEmail(userId), password: FIXTURE_PASSWORD }),
+  });
+
+  const body: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const detail =
+      typeof body === 'object' && body !== null
+        ? JSON.stringify(body).slice(0, 300)
+        : `HTTP ${response.status}`;
+    throw new Error(
+      `could not sign in fixture ${userId}: ${detail}\n` +
+        'The fixtures are created by verify-hosted.sh; run the suite through it. ' +
+        'A 400 usually means email sign-in is disabled on the project.',
+    );
+  }
+
   const token =
-    userId === null
+    typeof body === 'object' && body !== null
+      ? (body as Record<string, unknown>).access_token
+      : undefined;
+
+  if (typeof token !== 'string' || token === '') {
+    throw new Error(`GoTrue returned no access_token for fixture ${userId}`);
+  }
+
+  return token;
+}
+
+/**
+ * Hosted, every fixture's token is fetched once, up front: a sign-in per test
+ * would be slower and would make a rate limit look like an RLS failure.
+ */
+const hostedTokens = new Map<string, string>();
+
+if (HOSTED && harnessUp) {
+  for (const id of [CUSTOMER_ID, APPLICANT_ID, PROVIDER_ID, STRANGER_ID]) {
+    hostedTokens.set(id, await gotrueToken(id));
+  }
+}
+
+/**
+ * The token a request carries.
+ *
+ * Hosted: a real session for a user, and the anon key itself for the anonymous
+ * case — that key IS the anonymous credential, so minting a token claiming
+ * `role: anon` would be inventing something the platform never issues.
+ *
+ * Locally: minted, because the harness has no GoTrue. PostgREST verifies it
+ * with the same shared secret, so role switching and RLS are still real.
+ */
+function tokenFor(userId: string | null): string {
+  if (!HOSTED) {
+    return userId === null
       ? mintTestJwt(JWT_SECRET, { sub: '00000000-0000-4000-8000-000000000000', role: 'anon' })
       : mintTestJwt(JWT_SECRET, { sub: userId, role: 'authenticated' });
+  }
+
+  if (userId === null) return ANON_KEY;
+
+  const token = hostedTokens.get(userId);
+  if (token === undefined) throw new Error(`no hosted session for fixture ${userId}`);
+  return token;
+}
+
+function clientFor(userId: string | null): SupabaseClient {
+  const token = tokenFor(userId);
 
   return createClient(POSTGREST_URL, token, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -165,8 +275,9 @@ function clientFor(userId: string | null): SupabaseClient {
       headers: {
         Authorization: `Bearer ${token}`,
         // The hosted gateway wants an apikey header alongside the bearer
-        // token. The minted JWT stays the thing RLS reads — the apikey only
-        // gets the request past the edge.
+        // token. The session token stays the thing RLS reads — the apikey
+        // only gets the request past the edge, and works as either a legacy
+        // anon key or a publishable one.
         ...(HOSTED && ANON_KEY !== '' ? { apikey: ANON_KEY } : {}),
       },
       fetch: restFetch,
@@ -187,14 +298,8 @@ beforeAll(async () => {
   if (!harnessUp) return;
 
   const seed = clientFor(CUSTOMER_ID);
-  const phones: Record<string, string> = {
-    [CUSTOMER_ID]: '+966590000001',
-    [APPLICANT_ID]: '+966590000002',
-    [PROVIDER_ID]: '+966590000003',
-    [STRANGER_ID]: '+966590000004',
-  };
 
-  for (const [id, phone] of Object.entries(phones)) {
+  for (const [id, phone] of Object.entries(PHONES)) {
     // Hosted, these users were created through GoTrue by verify-hosted.sh.
     if (!HOSTED) await seed.rpc('test_seed_auth_user', { p_id: id, p_phone: phone });
     await clientFor(id).from('profiles').upsert({

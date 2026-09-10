@@ -35,9 +35,15 @@ import {
   parseSendResponse,
   UNIFONIC_DEFAULT_BASE_URL,
 } from '../_shared/sms.ts';
+import { apiKeyOnlyFetch, resolveSecretKey } from '../_shared/api-keys.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+// Prefers the new secret key when the project has one, so disabling the legacy
+// service_role key needs no redeploy (_shared/api-keys.ts).
+const SERVICE_KEY = resolveSecretKey({
+  secretKeys: Deno.env.get('SUPABASE_SECRET_KEYS'),
+  legacy: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+});
 
 const UNIFONIC_APP_SID = Deno.env.get('UNIFONIC_APP_SID') ?? '';
 const UNIFONIC_SENDER_ID = Deno.env.get('UNIFONIC_SENDER_ID') ?? '';
@@ -107,7 +113,11 @@ Deno.serve(async (request: Request) => {
     return refuse(400);
   }
 
-  const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+  const db = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false },
+    // Secret keys travel on `apikey` alone; a legacy JWT key is untouched.
+    global: { fetch: apiKeyOnlyFetch(SERVICE_KEY, fetch) },
+  });
 
   const claim = await db.rpc('claim_otp_send', { p_phone: phoneE164 });
   if (claim.error !== null) {
