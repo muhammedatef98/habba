@@ -108,21 +108,25 @@ values ('cc111111-0000-4000-e000-0000000000a1',
         :'mk', :'md', 2019, 'ABJ 1111');
 reset role;
 
--- Addressed to the email-only buyer. Code is '123456'.
-insert into public.ownership_transfers
-  (id, vehicle_id, from_owner_id, to_email, otp_code_hash, expires_at)
-values ('cc111111-0000-4000-e000-0000000000b1',
-        'cc111111-0000-4000-e000-0000000000a1',
-        'cc111111-0000-4000-e000-000000000001',
-        'buyer@example.com',
-        encode(sha256(convert_to('123456', 'UTF8')), 'hex'),
-        now() + interval '2 days');
+-- Addressed to the email-only buyer.
+--
+-- Created through the RPC rather than by INSERT. Since 0054 there is no other
+-- way: the table is guarded ENABLE ALWAYS and the client INSERT policy is
+-- gone. The code comes back from the mint and is never chosen here — which is
+-- the property 0054 exists to establish, so a fixture that picked its own
+-- would be testing a database that no longer exists.
+set role authenticated;
+select test.become('cc111111-0000-4000-e000-000000000001');
+select transfer_id as tid, code as otp
+from public.initiate_ownership_transfer(
+  'cc111111-0000-4000-e000-0000000000a1', null, 'buyer@example.com') \gset
+reset role;
 
 set role authenticated;
 select test.become('cc111111-0000-4000-e000-000000000002');
 select test.assert_eq(
   (select count(*)::int from public.ownership_transfers
-   where id = 'cc111111-0000-4000-e000-0000000000b1'),
+   where id = (:'tid')::uuid),
   1, 'the verified email recipient can discover the transfer waiting for them');
 reset role;
 
@@ -132,7 +136,7 @@ set role authenticated;
 select test.become('cc111111-0000-4000-e000-000000000003');
 select test.assert_eq(
   (select count(*)::int from public.ownership_transfers
-   where id = 'cc111111-0000-4000-e000-0000000000b1'),
+   where id = (:'tid')::uuid),
   0, 'an unverified account claiming that address sees nothing');
 reset role;
 
@@ -141,8 +145,7 @@ reset role;
 set role authenticated;
 select test.become('cc111111-0000-4000-e000-000000000003');
 select test.assert_raises(
-  $$select public.accept_ownership_transfer(
-      'cc111111-0000-4000-e000-0000000000b1', '123456')$$,
+  format($$select public.accept_ownership_transfer('%s', '%s')$$, :'tid', :'otp'),
   'nor accept it with the right code — acceptance checks the identity too',
   '28P01');
 reset role;
@@ -150,7 +153,7 @@ reset role;
 -- The addressed recipient accepts, and the car moves.
 set role authenticated;
 select test.become('cc111111-0000-4000-e000-000000000002');
-select public.accept_ownership_transfer('cc111111-0000-4000-e000-0000000000b1', '123456');
+select public.accept_ownership_transfer((:'tid')::uuid, :'otp');
 reset role;
 
 select test.assert_eq(
@@ -160,7 +163,7 @@ select test.assert_eq(
 
 select test.assert_eq(
   (select status::text from public.ownership_transfers
-   where id = 'cc111111-0000-4000-e000-0000000000b1'),
+   where id = (:'tid')::uuid),
   'accepted', 'and the transfer is closed');
 
 rollback;
