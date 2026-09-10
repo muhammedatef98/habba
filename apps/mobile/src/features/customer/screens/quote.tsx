@@ -18,13 +18,22 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
-import { addSar, applyRate, multiplySar, sarOrThrow, type SarAmount } from '@habba/core';
+import { Button, Card, Icon, Screen, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  addSar,
+  applyRate,
+  multiplySar,
+  sarOrThrow,
+  SAUDI_VAT_RATE,
+  type SarAmount,
+} from '@habba/core';
 import { repository } from '@/features/shared/data/repository';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { formatCount } from '@/features/shared/lib/format-number';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
 export default function QuoteScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
@@ -52,7 +61,8 @@ export default function QuoteScreen() {
   if (!isAuthenticated) return <Redirect href="/" />;
 
   const lines = parts.data ?? [];
-  const allApproved = lines.length > 0 && lines.every((line) => line.approvedByCustomer);
+  const pendingCount = lines.filter((line) => !line.approvedByCustomer).length;
+  const allApproved = lines.length > 0 && pendingCount === 0;
 
   // CLAUDE.md §2.5 / ADR-0007: exact SAR arithmetic, never float — same
   // module and same rate-rounding rule the server uses.
@@ -61,13 +71,39 @@ export default function QuoteScreen() {
     sarOrThrow('0.00'),
   );
   const labourAmount = order.data?.quotedAmount ?? sarOrThrow('0.00');
-  const vatAmount = applyRate(addSar(partsAmount, labourAmount), '0.15');
+  const vatAmount = applyRate(addSar(partsAmount, labourAmount), SAUDI_VAT_RATE);
   const totalAmount = addSar(addSar(partsAmount, labourAmount), vatAmount);
 
   return (
     <Screen scrollable>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="title">{t('quote.title')}</Text>
+      <View style={{ gap: theme.spacing.sm }}>
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+          }}
+        >
+          <Text variant="title" style={{ flex: 1 }}>
+            {t('quote.title')}
+          </Text>
+          {/* The count is the point of the screen: the technician is standing
+              still until these are answered, and a customer who cannot see how
+              many are left cannot tell whether they are done. */}
+          {lines.length > 0 ? (
+            <StatusPill
+              tone={pendingCount === 0 ? 'success' : 'active'}
+              showDot={pendingCount > 0}
+              label={
+                pendingCount === 0
+                  ? t('quote.allApprovedBadge')
+                  : t('quote.pendingBadge', {
+                      count: formatCount(pendingCount, i18n.language),
+                    })
+              }
+            />
+          ) : null}
+        </View>
         <Text variant="body" tone="muted">
           {t('quote.subtitle')}
         </Text>
@@ -75,9 +111,27 @@ export default function QuoteScreen() {
 
       <View style={{ gap: theme.spacing.md }}>
         {lines.map((line) => (
-          <Card key={line.id} testID={`quote-line-${line.id}`}>
+          <Card
+            key={line.id}
+            testID={`quote-line-${line.id}`}
+            elevation={line.approvedByCustomer ? 'none' : 'sm'}
+            style={{
+              borderWidth: 1,
+              borderColor: line.approvedByCustomer
+                ? theme.colors.successBorder
+                : theme.colors.accent,
+              backgroundColor: line.approvedByCustomer
+                ? theme.colors.successSubtle
+                : theme.colors.surface,
+            }}
+          >
             <View style={{ gap: theme.spacing.sm }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <View
+                style={{
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                  justifyContent: 'space-between',
+                }}
+              >
                 <Text variant="bodyStrong">{line.nameAr}</Text>
                 <Card
                   elevation="none"
@@ -107,27 +161,50 @@ export default function QuoteScreen() {
                 </Text>
               ) : null}
 
-              <Text variant="bodyStrong">{t('quote.unitPrice', { price: line.unitPrice })}</Text>
+              <Text variant="bodyStrong" numeric>
+                {t('quote.unitPrice', { price: formatSarDisplay(line.unitPrice) })}
+              </Text>
 
               {line.approvedByCustomer ? (
-                <Text variant="caption" style={{ color: theme.colors.success }}>
-                  {t('quote.approvedLine')}
-                </Text>
+                <View
+                  style={{
+                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                    alignItems: 'center',
+                    gap: theme.spacing.xs,
+                  }}
+                >
+                  <Icon name="check" size={theme.iconSize.sm} color={theme.colors.successFg} />
+                  <Text variant="caption" tone="success">
+                    {t('quote.approvedLine')}
+                  </Text>
+                </View>
               ) : (
-                <Button
-                  testID={`approve-part-${line.id}`}
-                  label={t('quote.approveLine')}
-                  size="medium"
-                  onPress={() => approve.mutate(line.id)}
-                  loading={approve.isPending && approve.variables === line.id}
-                />
+                <View style={{ gap: theme.spacing.sm }}>
+                  <Button
+                    testID={`approve-part-${line.id}`}
+                    label={t('quote.approveLine')}
+                    size="medium"
+                    onPress={() => approve.mutate(line.id)}
+                    loading={approve.isPending && approve.variables === line.id}
+                  />
+
+                  {/* Approving a part is the customer agreeing to pay for it.
+                      A failure that says nothing leaves them believing they
+                      approved it, and the job waiting on an approval that
+                      never landed — on the line that carries the money. */}
+                  {approve.isError && approve.variables === line.id ? (
+                    <Text variant="caption" tone="emergency">
+                      {t('quote.approveFailed')}
+                    </Text>
+                  ) : null}
+                </View>
               )}
             </View>
           </Card>
         ))}
       </View>
 
-      <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
+      <Card elevation="sm">
         <View style={{ gap: theme.spacing.xs }}>
           <SummaryRow label={t('quote.partsLabel')} value={partsAmount} />
           <SummaryRow label={t('quote.labourLabel')} value={labourAmount} />
@@ -162,12 +239,21 @@ function SummaryRow({
   strong?: boolean;
 }) {
   const { t } = useTranslation();
+  const theme = useTheme();
+
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+    <View
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        justifyContent: 'space-between',
+      }}
+    >
       <Text variant={strong ? 'bodyStrong' : 'body'} tone={strong ? 'default' : 'muted'}>
         {label}
       </Text>
-      <Text variant={strong ? 'bodyStrong' : 'body'}>{t('quote.amount', { amount: value })}</Text>
+      <Text variant={strong ? 'bodyStrong' : 'body'} tone={strong ? 'accent' : 'default'} numeric>
+        {t('quote.amount', { amount: formatSarDisplay(value) })}
+      </Text>
     </View>
   );
 }

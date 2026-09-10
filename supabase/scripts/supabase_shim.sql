@@ -79,6 +79,40 @@ begin
   -- privilege is switching into the role named by the JWT. Supabase uses the
   -- same arrangement, and it is what makes the HTTP integration tests exercise
   -- genuine role-based RLS rather than a simulation of it.
+  -- Storage runs as its own role on a hosted project, and it OWNS
+  -- `storage.objects`. That ownership is not a detail: it is what makes
+  -- `alter table storage.objects ...` fail for `postgres` with "must be owner
+  -- of table objects". Recreating the role here is what lets a migration that
+  -- would be refused hosted also be refused locally — see the storage section.
+  if not exists (select 1 from pg_roles where rolname = 'supabase_storage_admin') then
+    create role supabase_storage_admin nologin noinherit;
+  end if;
+
+  -- Same story for auth: GoTrue owns `auth.users` on a hosted project, and
+  -- `postgres` only holds the privileges Supabase granted it — select,
+  -- references and trigger. It cannot `alter table auth.users`, which is what
+  -- an `ENABLE ALWAYS` trigger needs.
+  if not exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then
+    create role supabase_auth_admin nologin noinherit;
+  end if;
+
+  -- The role migrations RUN AS.
+  --
+  -- On a hosted project that role is `postgres`, and `postgres` there is NOT a
+  -- superuser: it owns `public`, it can create roles and extensions, and it is
+  -- a member of anon/authenticated/service_role — but it does not own the
+  -- `auth` or `storage` schemas, and superuser checks do not rescue it.
+  --
+  -- Locally, migrations used to run as the cluster superuser, which bypasses
+  -- every ownership check there is. That is why 0048's
+  -- `alter table storage.objects ...` passed here and in CI and then failed on
+  -- the first real project. `local-db.sh` now applies migrations with
+  -- `SET ROLE habba_migrator`, so a statement that hosted Supabase would refuse
+  -- is refused here first.
+  if not exists (select 1 from pg_roles where rolname = 'habba_migrator') then
+    create role habba_migrator nologin nosuperuser createrole createdb;
+  end if;
+
   if not exists (select 1 from pg_roles where rolname = 'authenticator') then
     -- A password, because the CI Postgres image authenticates host connections
     -- with scram-sha-256 while the local cluster uses trust. Without one,
@@ -97,9 +131,49 @@ alter role authenticator with login password 'habba-local-only';
 
 grant anon, authenticated, service_role to authenticator;
 
+-- Hosted `postgres` holds these too, which is how a migration can `revoke ...
+-- from anon` or write a policy naming them.
+grant anon, authenticated, service_role to habba_migrator with admin option;
+
+-- Hosted `postgres` owns `public` and everything a migration creates in it,
+-- and can create new schemas in the database.
+alter schema public owner to habba_migrator;
+do $$
+begin
+  execute format('grant create, connect on database %I to habba_migrator',
+                 current_database());
+end
+$$;
+
+-- PostGIS in `extensions`, installed by the SUPERUSER — because that is how it
+-- arrives on a hosted project too. §2 of docs/supabase-setup.md is a dashboard
+-- step, not a migration: `create extension` needs privileges the project's
+-- `postgres` role does not have. 0001's `if not exists` then finds it here,
+-- exactly as it finds the dashboard's.
+create schema if not exists extensions;
+create extension if not exists postgis with schema extensions;
+grant usage on schema extensions to habba_migrator, anon, authenticated, service_role;
+-- `extensions` is created by the dashboard as `postgres` on a hosted project,
+-- so the migration role owns it there and 0001's `grant usage on schema
+-- extensions` succeeds. Without this it warns "no privileges were granted"
+-- here and nowhere else — a divergence in the harmless direction, but still a
+-- divergence.
+alter schema extensions owner to habba_migrator;
+
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
 grant select on auth.users to authenticated, service_role;
+
+-- Exactly what a hosted project grants `postgres` on GoTrue's table, and no
+-- more. SELECT and REFERENCES so `profiles.id references auth.users(id)`
+-- (0005) works — that is Supabase's own documented pattern — and TRIGGER so
+-- the equally documented `on_auth_user_created` trigger can be created.
+-- Notably absent: ownership, so `alter table auth.users ...` is refused here
+-- as it is there.
+grant usage on schema auth to habba_migrator;
+grant select, references, trigger on auth.users to habba_migrator;
+alter schema auth owner to supabase_auth_admin;
+alter table auth.users owner to supabase_auth_admin;
 
 -- Stands in for GoTrue's sign-up, which the local harness cannot run (it needs
 -- Docker). Integration tests call this to create the auth.users row that a
@@ -205,3 +279,108 @@ grant execute on function public.test_grant_role(uuid, text) to authenticated;
 --
 -- Migration 0001 now sets them, faithfully, so both environments get them from
 -- the same line of SQL. Nothing to do here.
+
+
+-- ---------------------------------------------------------------------------
+-- storage
+-- ---------------------------------------------------------------------------
+-- Enough of Supabase Storage for migrations that define buckets and object
+-- policies to apply and be tested. The real service adds an HTTP API, resumable
+-- uploads, image transformation and a worker that reaps orphans — none of which
+-- a policy test needs.
+--
+-- What IS faithful is the shape RLS depends on: `storage.objects` keyed by
+-- bucket and path, with `owner`, and `storage.foldername()` returning the path
+-- segments, because every real bucket policy is written against those.
+
+-- ---------------------------------------------------------------------------
+-- Ownership is part of the fidelity, not an implementation detail
+-- ---------------------------------------------------------------------------
+-- On a hosted project the storage schema and its tables are owned by
+-- `supabase_storage_admin`, NOT by `postgres`. Migrations run as `postgres`.
+--
+-- The first version of this shim created them as whoever ran it — `postgres` —
+-- so `alter table storage.objects enable row level security` in migration 0048
+-- succeeded locally and in CI, and failed on the first real project with
+-- "must be owner of table objects". That is the same defect shape as the
+-- schema grants in 0001: a shim more permissive than production hides a
+-- migration that cannot apply, until the one run that matters.
+--
+-- So: everything under `storage` is created and then handed to
+-- `supabase_storage_admin`, and `postgres` is deliberately NOT a member of it.
+-- A migration that needs ownership of `storage.objects` now fails here first.
+create schema if not exists storage;
+
+create table if not exists storage.buckets (
+  id          text primary key,
+  name        text not null,
+  public      boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists storage.objects (
+  id          uuid primary key default gen_random_uuid(),
+  bucket_id   text not null references storage.buckets(id) on delete cascade,
+  name        text not null,
+  owner       uuid,
+  created_at  timestamptz not null default now(),
+  metadata    jsonb,
+  unique (bucket_id, name)
+);
+
+-- Supabase's own helper: splits an object name into its path segments, so a
+-- policy can say "the first folder must be the caller's order id". Returns the
+-- segments WITHOUT the filename, matching the real implementation.
+create or replace function storage.foldername(name text)
+returns text[]
+language sql
+immutable
+parallel safe
+as $$
+  select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1];
+$$;
+
+grant usage on schema storage to anon, authenticated, service_role;
+grant select on storage.buckets to anon, authenticated;
+grant select, insert, update, delete on storage.objects to authenticated;
+
+-- RLS on `storage.objects` is the platform's, already enabled before any
+-- migration runs. Enabling it here rather than in a migration is the whole
+-- point: a migration cannot enable it, because it does not own the table.
+alter table storage.objects enable row level security;
+
+-- Deliberately NO row-level security on `storage.buckets`. The hosted run of
+-- 0048 got past `insert into storage.buckets` and failed on the next
+-- statement, so whatever the platform's arrangement there, a migration can
+-- insert a bucket. Modelling a stricter rule than the one production actually
+-- applies is the same mistake in the other direction: it fails the build for
+-- something that works.
+
+-- What a hosted project grants `postgres` on the storage tables: DML, but not
+-- ownership. The bucket insert in 0048 is fine there — it got past it, and
+-- failed on the next statement — so it must be fine here.
+-- Role grants are CLUSTER-wide and survive `drop database`, so a membership
+-- handed out by hand in an earlier session would silently persist and hand the
+-- migration role the storage owner's rights again. Revoke it every run.
+do $$
+begin
+  if pg_has_role('habba_migrator', 'supabase_storage_admin', 'MEMBER') then
+    revoke supabase_storage_admin from habba_migrator;
+  end if;
+  if pg_has_role('habba_migrator', 'supabase_auth_admin', 'MEMBER') then
+    revoke supabase_auth_admin from habba_migrator;
+  end if;
+end
+$$;
+
+grant usage on schema storage to habba_migrator;
+grant select, insert, update, delete on storage.buckets to habba_migrator;
+grant select, insert, update, delete on storage.objects to habba_migrator;
+
+-- Hand the schema over LAST, so everything above is created by the superuser
+-- running the shim and only then reassigned — mirroring how a hosted project
+-- arrives, and leaving `postgres` a non-owner exactly as it is there.
+alter schema storage owner to supabase_storage_admin;
+alter table storage.buckets owner to supabase_storage_admin;
+alter table storage.objects owner to supabase_storage_admin;
+alter function storage.foldername(text) owner to supabase_storage_admin;

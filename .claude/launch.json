@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "habba-admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@habba/admin", "dev"],
+      "port": 3100
+    }
+  ]
+}

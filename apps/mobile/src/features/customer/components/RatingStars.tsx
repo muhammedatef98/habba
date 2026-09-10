@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Text, useTheme } from '@habba/ui';
+import { Text, rowDirectionFor, useTheme } from '@habba/ui';
 
 export interface RatingStarsProps {
   readonly onRate: (stars: number) => void;
@@ -21,7 +21,12 @@ export function RatingStars({ onRate, disabled = false }: RatingStarsProps) {
   const [selected, setSelected] = useState<number | null>(null);
 
   return (
-    <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+    <View
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        gap: theme.spacing.xs,
+      }}
+    >
       {STAR_VALUES.map((value) => {
         const filled = selected !== null && value <= selected;
         return (

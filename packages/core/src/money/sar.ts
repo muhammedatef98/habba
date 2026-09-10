@@ -112,6 +112,16 @@ export function multiplySar(amount: SarAmount, quantity: number): SarAmount {
 }
 
 /**
+ * Saudi VAT, as a rate string `applyRate` accepts.
+ *
+ * CLAUDE.md §5 fixes it at 15%. A constant rather than a literal at each call
+ * site because a rate change is a legislative event, not a refactor — when it
+ * moves it must move in exactly one place, and every place that charges it
+ * must be findable by following one symbol.
+ */
+export const SAUDI_VAT_RATE = '0.15';
+
+/**
  * Multiplies by a rate (e.g. VAT 0.15) and rounds half away from zero to 2dp.
  *
  * ADR-0007: ROUND_HALF_UP, matching Postgres `numeric` `round()`. Banker's

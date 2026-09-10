@@ -6,7 +6,7 @@
  */
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { useColorScheme } from 'react-native';
+import { I18nManager, useColorScheme } from 'react-native';
 import { directionOf, type Locale } from '@habba/i18n';
 import {
   colorsFor,
@@ -32,6 +32,14 @@ export interface HabbaTheme {
   readonly colors: ColorScheme;
   readonly direction: 'rtl' | 'ltr';
   readonly isRtl: boolean;
+  /**
+   * The direction Yoga is actually laying out with — `I18nManager.isRTL`.
+   *
+   * It lags `direction` by one process start, because `forceRTL` only takes
+   * effect on the next launch. Rows have to be resolved against both; see
+   * direction.ts.
+   */
+  readonly nativeDirection: 'rtl' | 'ltr';
   readonly locale: Locale;
   readonly spacing: typeof spacing;
   readonly radius: typeof radius;
@@ -75,6 +83,7 @@ export function ThemeProvider({ children, locale, preference = 'system' }: Theme
       colors: colorsFor(mode),
       direction,
       isRtl: direction === 'rtl',
+      nativeDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
       locale,
       spacing,
       radius,

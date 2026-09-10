@@ -7,11 +7,13 @@
  * drift into marketing use.
  */
 
-import { ActivityIndicator, Pressable, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, PixelRatio, Pressable, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { scaledHeight } from './font-scale.js';
 import { useTheme } from './theme.js';
 
-export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'emergency';
+export type ButtonVariant =
+  'primary' | 'accent' | 'secondary' | 'ghost' | 'emergency' | 'emergencyOutline';
 export type ButtonSize = 'medium' | 'large';
 
 export interface ButtonProps {
@@ -62,15 +64,29 @@ export function Button({
       border: theme.colors.emergency,
       text: theme.colors.emergencyText,
     },
+    // Outlined rather than filled. Cancelling is destructive but routine, and
+    // a solid red block reads as an alarm the user has to escape — the design
+    // reserves that weight for the active-emergency bar alone.
+    emergencyOutline: {
+      background: 'transparent',
+      border: theme.colors.emergencyFg,
+      text: theme.colors.emergencyFg,
+    },
   };
 
   const surface = surfaces[variant];
-  const height = size === 'large' ? 56 : theme.minTouchTarget;
+  // Grown with the device's text setting: a 56dp box cannot hold a label that
+  // the OS has scaled to 1.5×, and the clipping that follows is how "honouring
+  // the accessibility setting" turns into "unreadable" (font-scale.ts).
+  const height = scaledHeight(
+    size === 'large' ? 56 : theme.minTouchTarget,
+    PixelRatio.getFontScale(),
+  );
 
   const base: ViewStyle = {
     minHeight: height,
     borderRadius: theme.radius.lg,
-    borderWidth: variant === 'secondary' ? 1.5 : 0,
+    borderWidth: variant === 'secondary' || variant === 'emergencyOutline' ? 1.5 : 0,
     borderColor: surface.border,
     alignItems: 'center',
     justifyContent: 'center',

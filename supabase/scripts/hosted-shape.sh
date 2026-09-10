@@ -31,7 +31,14 @@ ANON_KEY=$(HABBA_SECRET="$SECRET" node -e '
   process.stdout.write(head + "." + body + "." + sig);
 ')
 
-HABBA_GATEWAY_PORT="$PORT" node "$ROOT/supabase/scripts/hosted-shape-gateway.mjs" &
+# The fixtures' password, as verify-hosted.sh would have set it. The gateway
+# stands in for GoTrue's password grant, so both sides need the same value.
+FIXTURE_PASSWORD="hosted-shape-$$"
+
+HABBA_GATEWAY_PORT="$PORT" \
+HABBA_JWT_SECRET="$SECRET" \
+HABBA_FIXTURE_PASSWORD="$FIXTURE_PASSWORD" \
+  node "$ROOT/supabase/scripts/hosted-shape-gateway.mjs" &
 GATEWAY_PID=$!
 trap 'kill "$GATEWAY_PID" 2>/dev/null || true' EXIT
 
@@ -46,5 +53,5 @@ HABBA_HOSTED=1 \
 HABBA_REQUIRE_HARNESS=1 \
 HABBA_POSTGREST_URL="http://127.0.0.1:$PORT" \
 HABBA_ANON_KEY="$ANON_KEY" \
-HABBA_JWT_SECRET="$SECRET" \
+HABBA_FIXTURE_PASSWORD="$FIXTURE_PASSWORD" \
   pnpm --dir "$ROOT" test:rls

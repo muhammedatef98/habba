@@ -9,12 +9,14 @@
  * the address before acceptance, so this screen renders everything there is.
  */
 
-import { useEffect } from 'react';
-import { Pressable, View } from 'react-native';
+import { useCallback, useEffect } from 'react';
+import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { OpenJobCard } from '@/features/provider/components/OpenJobCard';
+import { ShiftStatusCard } from '@/features/provider/components/ShiftStatusCard';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { isBroadcastStale, LOCATION_INTERVAL_MS, useShift } from '@/features/provider/state/shift';
 import { useMode } from '@/features/shared/state/mode';
@@ -30,6 +32,18 @@ export default function ShiftScreen() {
   const lastBroadcastAt = useShift((state) => state.lastBroadcastAt);
   const markBroadcast = useShift((state) => state.markBroadcast);
   const setBroadcastError = useShift((state) => state.setBroadcastError);
+
+  /**
+   * Opening a job records that this provider looked at it (0043).
+   *
+   * Fire-and-forget: the customer's "reviewing" counter is the only thing that
+   * depends on it, and a technician must never be blocked from opening a job
+   * because a telemetry write failed.
+   */
+  const openJob = useCallback((orderId: string) => {
+    void providerRepository.markOfferViewed(orderId);
+    router.push({ pathname: '/job', params: { id: orderId } });
+  }, []);
 
   const openJobs = useQuery({
     queryKey: ['open-jobs'],
@@ -77,14 +91,11 @@ export default function ShiftScreen() {
 
   const stale = isOnline && isBroadcastStale(lastBroadcastAt);
 
+  const jobs = openJobs.data ?? [];
+
   return (
-    <Screen scrollable>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="title">{t('provider.shiftTitle')}</Text>
-        <Text variant="body" tone="muted">
-          {isOnline ? t('provider.onlineHint') : t('provider.offlineHint')}
-        </Text>
-      </View>
+    <Screen scrollable style={{ gap: theme.spacing.lg }}>
+      <Text variant="title">{t('provider.shiftTitle')}</Text>
 
       {/* The way back to the customer side (§5.1.4). A technician owns a car
           too, and their own logbook must never be more than one tap away. */}
@@ -99,20 +110,30 @@ export default function ShiftScreen() {
         }}
       />
 
-      <Button
-        testID="online-toggle"
-        label={isOnline ? t('provider.goOffline') : t('provider.goOnline')}
-        variant={isOnline ? 'secondary' : 'primary'}
-        onPress={() => toggle.mutate(!isOnline)}
-        loading={toggle.isPending}
+      <ShiftStatusCard
+        testID="shift-status"
+        isOnline={isOnline}
+        busy={toggle.isPending}
+        onToggle={() => toggle.mutate(!isOnline)}
       />
 
       {/* Online but invisible to dispatch is the state worth shouting about:
           the technician believes they are working and nothing is arriving,
           and silence looks exactly like a quiet night. */}
       {stale ? (
-        <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
-          <Text variant="caption" style={{ color: theme.colors.warning }}>
+        <Card
+          testID="location-stale"
+          elevation="none"
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            gap: theme.spacing.md,
+            backgroundColor: theme.colors.warningSubtle,
+            borderColor: theme.colors.warning,
+            borderWidth: 1,
+          }}
+        >
+          <Icon name="alert" size={theme.iconSize.md} color={theme.colors.warningFg} />
+          <Text variant="bodySmall" tone="warning" style={{ flex: 1 }}>
             {t('provider.locationStale')}
           </Text>
         </Card>
@@ -120,50 +141,41 @@ export default function ShiftScreen() {
 
       {isOnline ? (
         <View style={{ gap: theme.spacing.md }}>
-          <Text variant="heading">{t('provider.openJobs')}</Text>
-
-          {(openJobs.data ?? []).length === 0 ? (
-            <Text variant="body" tone="muted">
-              {t('provider.noOpenJobs')}
+          <View
+            style={{
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              alignItems: 'baseline',
+              gap: theme.spacing.sm,
+            }}
+          >
+            <Text variant="subheading" style={{ flex: 1 }}>
+              {t('provider.openJobs')}
             </Text>
-          ) : null}
+            {jobs.length > 0 ? (
+              <Text variant="caption" tone="muted" numeric>
+                {t('provider.openJobsCount', { count: jobs.length })}
+              </Text>
+            ) : null}
+          </View>
 
-          {(openJobs.data ?? []).map((job) => (
-            <Pressable
-              key={job.orderId}
-              testID={`job-${job.orderId}`}
-              onPress={() => router.push({ pathname: '/job', params: { id: job.orderId } })}
-              accessibilityRole="button"
-              accessibilityLabel={job.serviceNameAr}
-            >
-              <Card>
-                <View style={{ gap: theme.spacing.xs }}>
-                  <Text variant="heading">{job.serviceNameAr}</Text>
-                  <Text variant="caption" tone="muted">
-                    {/* Bucket and district. There is no address to show yet. */}
-                    {job.distanceBucket}
-                    {job.districtNameAr === null ? '' : ` · ${job.districtNameAr}`}
-                  </Text>
-                  {job.problemSummary.length > 0 ? (
-                    <Text variant="caption" tone="subtle">
-                      {job.problemSummary}
-                    </Text>
-                  ) : null}
-                  <Text variant="bodyStrong" style={{ color: theme.colors.primary }}>
-                    {t('provider.estimatedPayout', { amount: job.estimatedPayout ?? '—' })}
-                  </Text>
-                </View>
-              </Card>
-            </Pressable>
-          ))}
+          {jobs.length === 0 ? (
+            <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
+              <Text variant="bodySmall" tone="muted">
+                {t('provider.noOpenJobs')}
+              </Text>
+            </Card>
+          ) : (
+            jobs.map((job) => (
+              <OpenJobCard
+                key={job.orderId}
+                testID={`job-${job.orderId}`}
+                job={job}
+                onPress={() => openJob(job.orderId)}
+              />
+            ))
+          )}
         </View>
       ) : null}
-
-      <Button
-        label={t('provider.myJobs')}
-        variant="ghost"
-        onPress={() => router.push('/my-jobs')}
-      />
     </Screen>
   );
 }

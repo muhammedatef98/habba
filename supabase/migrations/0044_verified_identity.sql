@@ -113,16 +113,35 @@ begin
 end;
 $$;
 
--- ENABLE ALWAYS is deliberate and matters more here than usual: GoTrue writes
--- to auth.users as the `supabase_auth_admin` role, and a trigger left in its
--- default state would still fire for that — but a replica or a restore would
--- not, and the flags would silently drift from the identities they describe.
+-- ⚠️ NOT `enable always`, and not by choice.
+--
+-- `alter table auth.users ...` requires ownership of that table. GoTrue owns it
+-- as `supabase_auth_admin`, and migrations run as the project's `postgres`,
+-- which is neither the owner nor a member of the owning role — the statement is
+-- refused with "must be owner of table users". Creating the trigger is fine:
+-- that needs the TRIGGER privilege, which Supabase does grant, and it is the
+-- same privilege their own documented `on_auth_user_created` trigger uses.
+--
+-- What the default (ENABLE ORIGIN) still gives us is everything that matters in
+-- practice. GoTrue writes to auth.users as `supabase_auth_admin` in an ordinary
+-- session, and the trigger fires for that — role has nothing to do with it.
+--
+-- What is genuinely given up: a session with
+-- `session_replication_role = 'replica'` — a restore, or logical replication
+-- apply — would skip it, and the flags could drift from the identities they
+-- describe. That setting requires superuser, which nothing in this project has
+-- on a hosted database, so the exposure is a platform-side restore rather than
+-- anything we can perform or prevent. The recompute is idempotent and derives
+-- purely from `auth.users`, so re-running
+-- `refresh_identity_verification(user_id)` repairs any row after such an event.
+--
+-- The profiles trigger below KEEPS `enable always`: we own `public.profiles`,
+-- so there the guarantee is available and taken.
 drop trigger if exists sync_identity_verification on auth.users;
 create trigger sync_identity_verification
   after insert or update of phone, email, phone_confirmed_at, email_confirmed_at
   on auth.users
   for each row execute function public.on_auth_user_identity_changed();
-alter table auth.users enable always trigger sync_identity_verification;
 
 -- ---------------------------------------------------------------------------
 -- Trigger 2: the profile appears, or its identity changes

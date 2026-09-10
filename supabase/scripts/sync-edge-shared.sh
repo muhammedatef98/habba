@@ -9,6 +9,13 @@
 # run. The SMS transport in particular must stay testable: it is the module
 # that decides whether an undelivered OTP reads as delivered.
 #
+# The report renderer used to be vendored here too, for the `report` Edge
+# Function that served the public page. ADR-0019 dropped that function, so the
+# vendored copy went with it. `packages/core/src/report/{render,qr}.ts` — the
+# part that took work — is still there: restoring the public page means adding
+# back one Deno file, a `generate_report` alongside the generators below, and
+# one entry in MODULES.
+#
 #   --check   exit non-zero if any copy is stale (used by CI)
 
 set -euo pipefail
@@ -30,24 +37,18 @@ header() {
     ''
 }
 
-generate_report() {
-  header 'packages/core/src/report/{types,qr,render}.ts'
-
-  # The three modules are concatenated, so the cross-imports between them go.
-  grep -v "^import .*'\./types\.js';$" "$CORE/report/types.ts"
-  printf '\n'
-  cat "$CORE/report/qr.ts"
-  printf '\n'
-  grep -vE "^import .*'\./(types|qr)\.js';$" "$CORE/report/render.ts"
-}
-
 generate_sms() {
   header 'packages/core/src/sms/unifonic.ts'
   cat "$CORE/sms/unifonic.ts"
 }
 
+generate_api_keys() {
+  header 'packages/core/src/supabase/api-keys.ts'
+  cat "$CORE/supabase/api-keys.ts"
+}
+
 # name → generator
-MODULES=("report:generate_report" "sms:generate_sms")
+MODULES=("sms:generate_sms" "api-keys:generate_api_keys")
 
 mkdir -p "$SHARED"
 status=0

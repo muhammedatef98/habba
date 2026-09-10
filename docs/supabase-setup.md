@@ -59,18 +59,34 @@ error three migrations later.
 
 **Settings → API** and **Settings → Database**:
 
-| What               | Where                                   | Goes                                  |
-| ------------------ | --------------------------------------- | ------------------------------------- |
-| Project URL        | Settings → API                          | `EXPO_PUBLIC_SUPABASE_URL` (app)      |
-| `anon` public key  | Settings → API                          | `EXPO_PUBLIC_SUPABASE_ANON_KEY` (app) |
-| `service_role` key | Settings → API                          | **server only** — never in the app    |
-| JWT secret         | Settings → API → JWT Settings           | verification script only              |
-| Connection string  | Settings → Database → Connection string | verification script only              |
+| What              | Where                                   | Goes                                         |
+| ----------------- | --------------------------------------- | -------------------------------------------- |
+| Project URL       | Settings → API                          | `EXPO_PUBLIC_SUPABASE_URL` (app)             |
+| Publishable key   | Settings → API Keys                     | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (app) |
+| Secret key        | Settings → API Keys                     | **server only** — never in the app           |
+| Connection string | Settings → Database → Connection string | verification script only                     |
 
-The `anon` key is designed to be public and ships in the bundle; it is useless
-unless RLS is wrong, which is what §6 re-checks. The `service_role` key bypasses
+On a project that has not migrated yet, the legacy `anon` and `service_role`
+keys (Settings → API) fill the same two rows and everything here works
+unchanged — the app reads `EXPO_PUBLIC_SUPABASE_ANON_KEY` when the publishable
+one is absent, and the scripts detect which kind of key they were given.
+
+**No JWT secret.** Nothing in this repo needs it any more: the verification
+suite signs its fixtures in through GoTrue and uses the tokens it gets back, so
+it works whatever the project signs with. That is deliberate — under the
+[JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys) system
+the legacy secret becomes verify-only and cannot be read back, and a suite that
+minted its own tokens would be testing a signing path the app never uses.
+
+The publishable key is designed to be public and ships in the bundle; it is
+useless unless RLS is wrong, which is what §6 re-checks. The secret key bypasses
 RLS entirely — it belongs in Edge Function secrets and nowhere else, ever
 (CLAUDE.md §5.1.6).
+
+⚠️ A secret key is **not** a JWT, so it must travel on the `apikey` header
+alone; sent as a bearer token the platform answers `Invalid JWT`. Both Edge
+Functions and `verify-hosted.sh` decide this per key, so they are correct
+before and after the swap — see `packages/core/src/supabase/api-keys.ts`.
 
 ## 4. Apply the migrations
 
@@ -81,7 +97,8 @@ export SUPABASE_DB_URL='postgresql://postgres.<ref>:<password>@<host>:5432/postg
 ./supabase/scripts/verify-hosted.sh --migrate-only
 ```
 
-That applies `0001`–`0043` in order and then the seed (cities, 20 makes and
+That applies every file in `supabase/migrations/` in numeric order — starting
+at `0001` — and then the seed (cities, 20 makes and
 their models, the service catalogue, maintenance rules). It refuses to run
 against a database that already holds vehicles, so it cannot be pointed at
 production by accident.
@@ -157,7 +174,10 @@ So delivery goes through a **Send SMS auth hook**:
    # UNIFONIC_BASE_URL only if Unifonic gave you a different API host
    ```
 
-   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically.
+   `SUPABASE_URL` is injected automatically, along with the keys: legacy
+   projects get `SUPABASE_SERVICE_ROLE_KEY`, migrated ones also get
+   `SUPABASE_SECRET_KEYS` (a JSON object of name → key). The functions prefer
+   the latter, so disabling the legacy key needs no redeploy.
 
 3. **Register the hook.** Authentication → Hooks → **Send SMS** → enable →
    HTTP → URI `https://<ref>.supabase.co/functions/v1/send-sms-hook`.
@@ -242,18 +262,22 @@ logbook".
 
 ```bash
 export SUPABASE_URL='https://<ref>.supabase.co'
-export SUPABASE_ANON_KEY='<anon key>'
-export SUPABASE_SERVICE_ROLE_KEY='<service role key>'
-export SUPABASE_JWT_SECRET='<JWT secret>'
+export SUPABASE_ANON_KEY='<publishable or anon key>'
+export SUPABASE_SERVICE_ROLE_KEY='<secret or service_role key>'
 export SUPABASE_DB_URL='postgresql://...'
 
 ./supabase/scripts/verify-hosted.sh
 ```
 
-It creates four test users through GoTrue's admin API, seeds the provider
-records, approves one of them through a privileged SQL write, and then runs
-`tests/rls.spec.ts` — **the same 17 assertions CI runs locally** — over HTTPS
-with minted JWTs.
+It creates four test users through GoTrue's admin API — each with a phone, an
+email and a password generated for this run — seeds the provider records,
+approves one of them through a privileged SQL write, and then runs
+`tests/rls.spec.ts` — **the same 17 assertions CI runs locally** — over HTTPS,
+holding real GoTrue sessions obtained by signing those fixtures in.
+
+Email sign-in must be enabled on the project (it is by default). The fixtures
+carry a phone as their product identity and an email only so the sign-in does
+not depend on the phone provider being configured.
 
 Expect `Tests 17 passed`. Anything else means the hosted project does not
 enforce what the local one does, and the launch stops there.
@@ -266,19 +290,50 @@ if the project is heading for production.
 > production would be exactly the privilege escalation that migrations 0036 and
 > 0040 exist to prevent. `verify-hosted.sh` does not apply it.
 
-## 7. Deploy the report function
+## 7. Apply the storage policies (dashboard SQL editor)
 
-```bash
-supabase functions deploy report
-supabase secrets set HABBA_PUBLIC_BASE_URL='https://habba.sa'
+Migration `0048` creates the private `triage-media` bucket. It deliberately
+does **not** create the RLS policies on it, and cannot:
+
+```
+ERROR: must be owner of table objects
 ```
 
-تقرير هبّة is served at `/functions/v1/report/<token>`. Point whatever domain
-you use for share links at it, and set `EXPO_PUBLIC_REPORT_BASE_URL` in the app
-to match — the QR on the report encodes that URL, so a mismatch produces a code
-that scans to nothing.
+`storage.objects` is owned by `supabase_storage_admin`. `create policy` needs
+ownership of the table it is on, and the project's `postgres` role — the one
+`psql` and `verify-hosted.sh` connect as — is neither the owner nor a member of
+the owning role. This is the same shape as PostGIS in §2: a privileged one-off
+that a migration cannot perform.
 
-## 8. Point the app at the project
+**Dashboard → SQL Editor**, paste and run once, after the migrations:
+
+```
+supabase/storage/triage-media-policies.sql
+```
+
+**How to tell it worked:** §6's run prints `storage policies for triage-media
+are in place`. Until then it prints a warning naming this step — and video
+triage uploads are refused, because RLS denies by default. The failure mode of
+forgetting is a closed bucket, never an open one.
+
+> The local harness applies the same file as the storage owner
+> (`local-db.sh`), so `supabase/tests/24_triage_media_storage.sql` exercises
+> the real policies rather than a weaker stand-in. Suite `31` asserts the
+> harness has not quietly given itself ownership it would not have here.
+
+## 8. There is no report function to deploy
+
+تقرير هبّة used to be an Edge Function serving a public page at
+`/functions/v1/report/<token>`. **ADR-0019 dropped it.** The report is now
+generated on the device as a PDF and shared as a file, so there is no endpoint
+to deploy, no domain to register and no `HABBA_PUBLIC_BASE_URL` to set.
+
+`generate_habba_report()` and the token still exist, unchanged: the payload is
+issued and frozen exactly as before, and the app reads it back by token to
+render the document. ADR-0019 lists the steps to bring the public page back if
+that decision is reversed.
+
+## 9. Point the app at the project
 
 ```bash
 cp apps/mobile/.env.example apps/mobile/.env.local
@@ -288,7 +343,6 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false
-EXPO_PUBLIC_REPORT_BASE_URL=https://habba.sa/r
 ```
 
 Restart Metro. With those set, the app switches from the in-memory repository
@@ -301,7 +355,7 @@ EXPO_PUBLIC_SUPABASE_URL --value ...`.
 **Leave `EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false`** until the KYC vault is real
 and an ops console exists to approve applications (ADR-0017).
 
-## 9. Before real users
+## 10. Before real users
 
 - **Backups.** Free plan keeps daily backups for 7 days. Production wants Pro
   and PITR. The logbook is the product; losing a week of it is losing the moat.

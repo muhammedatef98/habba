@@ -14,8 +14,10 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { parseSaudiPhone } from '@habba/core';
-import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
+import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
+import { Button, Card, Field, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+// The password provider is gone (PR #5); the same two helpers live beside the
+// OTP one, which is now the only way an email becomes an identity.
 import { isValidEmail, normaliseEmail } from '@/features/shared/lib/email-otp-provider';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/features/shared/state/session';
@@ -89,7 +91,12 @@ export default function SaveAccountScreen() {
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          gap: theme.spacing.sm,
+        }}
+      >
         <View style={{ flex: 1 }}>
           <Button
             testID="save-method-phone"
@@ -135,6 +142,10 @@ export default function SaveAccountScreen() {
           }}
           placeholder={t('auth.phonePlaceholder')}
           error={error}
+          // Same affix as the sign-in screen: a guest attaching a number here
+          // is answering the same question, and answering it differently on
+          // two screens is how a product stops feeling like one product.
+          prefix={`+${SAUDI_COUNTRY_CODE}`}
           keyboardType="phone-pad"
           autoComplete="tel"
           maxLength={16}
