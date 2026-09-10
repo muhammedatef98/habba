@@ -13,7 +13,8 @@
 # Function that served the public page. ADR-0019 dropped that function, so the
 # vendored copy went with it. `packages/core/src/report/{render,qr}.ts` — the
 # part that took work — is still there: restoring the public page means adding
-# back one Deno file and one line to MODULES below.
+# back one Deno file, a `generate_report` alongside the generators below, and
+# one entry in MODULES.
 #
 #   --check   exit non-zero if any copy is stale (used by CI)
 
@@ -41,8 +42,13 @@ generate_sms() {
   cat "$CORE/sms/unifonic.ts"
 }
 
+generate_api_keys() {
+  header 'packages/core/src/supabase/api-keys.ts'
+  cat "$CORE/supabase/api-keys.ts"
+}
+
 # name → generator
-MODULES=("sms:generate_sms")
+MODULES=("sms:generate_sms" "api-keys:generate_api_keys")
 
 mkdir -p "$SHARED"
 status=0

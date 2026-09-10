@@ -59,18 +59,34 @@ error three migrations later.
 
 **Settings → API** and **Settings → Database**:
 
-| What               | Where                                   | Goes                                  |
-| ------------------ | --------------------------------------- | ------------------------------------- |
-| Project URL        | Settings → API                          | `EXPO_PUBLIC_SUPABASE_URL` (app)      |
-| `anon` public key  | Settings → API                          | `EXPO_PUBLIC_SUPABASE_ANON_KEY` (app) |
-| `service_role` key | Settings → API                          | **server only** — never in the app    |
-| JWT secret         | Settings → API → JWT Settings           | verification script only              |
-| Connection string  | Settings → Database → Connection string | verification script only              |
+| What              | Where                                   | Goes                                         |
+| ----------------- | --------------------------------------- | -------------------------------------------- |
+| Project URL       | Settings → API                          | `EXPO_PUBLIC_SUPABASE_URL` (app)             |
+| Publishable key   | Settings → API Keys                     | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (app) |
+| Secret key        | Settings → API Keys                     | **server only** — never in the app           |
+| Connection string | Settings → Database → Connection string | verification script only                     |
 
-The `anon` key is designed to be public and ships in the bundle; it is useless
-unless RLS is wrong, which is what §6 re-checks. The `service_role` key bypasses
+On a project that has not migrated yet, the legacy `anon` and `service_role`
+keys (Settings → API) fill the same two rows and everything here works
+unchanged — the app reads `EXPO_PUBLIC_SUPABASE_ANON_KEY` when the publishable
+one is absent, and the scripts detect which kind of key they were given.
+
+**No JWT secret.** Nothing in this repo needs it any more: the verification
+suite signs its fixtures in through GoTrue and uses the tokens it gets back, so
+it works whatever the project signs with. That is deliberate — under the
+[JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys) system
+the legacy secret becomes verify-only and cannot be read back, and a suite that
+minted its own tokens would be testing a signing path the app never uses.
+
+The publishable key is designed to be public and ships in the bundle; it is
+useless unless RLS is wrong, which is what §6 re-checks. The secret key bypasses
 RLS entirely — it belongs in Edge Function secrets and nowhere else, ever
 (CLAUDE.md §5.1.6).
+
+⚠️ A secret key is **not** a JWT, so it must travel on the `apikey` header
+alone; sent as a bearer token the platform answers `Invalid JWT`. Both Edge
+Functions and `verify-hosted.sh` decide this per key, so they are correct
+before and after the swap — see `packages/core/src/supabase/api-keys.ts`.
 
 ## 4. Apply the migrations
 
@@ -158,7 +174,10 @@ So delivery goes through a **Send SMS auth hook**:
    # UNIFONIC_BASE_URL only if Unifonic gave you a different API host
    ```
 
-   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically.
+   `SUPABASE_URL` is injected automatically, along with the keys: legacy
+   projects get `SUPABASE_SERVICE_ROLE_KEY`, migrated ones also get
+   `SUPABASE_SECRET_KEYS` (a JSON object of name → key). The functions prefer
+   the latter, so disabling the legacy key needs no redeploy.
 
 3. **Register the hook.** Authentication → Hooks → **Send SMS** → enable →
    HTTP → URI `https://<ref>.supabase.co/functions/v1/send-sms-hook`.
@@ -194,18 +213,22 @@ logbook".
 
 ```bash
 export SUPABASE_URL='https://<ref>.supabase.co'
-export SUPABASE_ANON_KEY='<anon key>'
-export SUPABASE_SERVICE_ROLE_KEY='<service role key>'
-export SUPABASE_JWT_SECRET='<JWT secret>'
+export SUPABASE_ANON_KEY='<publishable or anon key>'
+export SUPABASE_SERVICE_ROLE_KEY='<secret or service_role key>'
 export SUPABASE_DB_URL='postgresql://...'
 
 ./supabase/scripts/verify-hosted.sh
 ```
 
-It creates four test users through GoTrue's admin API, seeds the provider
-records, approves one of them through a privileged SQL write, and then runs
-`tests/rls.spec.ts` — **the same 17 assertions CI runs locally** — over HTTPS
-with minted JWTs.
+It creates four test users through GoTrue's admin API — each with a phone, an
+email and a password generated for this run — seeds the provider records,
+approves one of them through a privileged SQL write, and then runs
+`tests/rls.spec.ts` — **the same 17 assertions CI runs locally** — over HTTPS,
+holding real GoTrue sessions obtained by signing those fixtures in.
+
+Email sign-in must be enabled on the project (it is by default). The fixtures
+carry a phone as their product identity and an email only so the sign-in does
+not depend on the phone provider being configured.
 
 Expect `Tests 17 passed`. Anything else means the hosted project does not
 enforce what the local one does, and the launch stops there.
