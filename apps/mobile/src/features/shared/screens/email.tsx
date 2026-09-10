@@ -1,13 +1,20 @@
 /**
- * Email sign-in and registration — the secondary auth route.
+ * Email sign-in — the secondary auth route, by one-time code.
  *
- * §9.1 specifies phone OTP, and phone remains the default and primary path
- * for the Saudi market. This exists for people who prefer email or whose
- * number is between SIMs; it is deliberately reached from a secondary button
- * rather than presented as an equal choice.
+ * §9.1 specifies phone OTP, and phone remains the default and primary path for
+ * the Saudi market. This exists for people who prefer email or whose number is
+ * between SIMs; it is deliberately reached from a secondary button rather than
+ * presented as an equal choice.
  *
- * One screen handles both modes because the fields are identical and the only
- * difference is which call is made — two near-identical screens would drift.
+ * There is no password and no separate "register" mode. An address that has
+ * never signed in becomes an account when its code is typed back — the same
+ * shape as the phone flow, where nobody registers either. That removes a
+ * second secret, a reset flow, and the "is this a sign-in or a sign-up?"
+ * question the user could not answer about themselves anyway.
+ *
+ * Two steps in one screen because they share the address and the error slot:
+ * splitting them would mean passing a half-finished sign-in through a route
+ * param, which is how a code ends up in a URL.
  */
 
 import { useState } from 'react';
@@ -16,15 +23,15 @@ import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
 import {
-  MIN_PASSWORD_LENGTH,
+  EMAIL_OTP_LENGTH,
   isValidEmail,
   normaliseEmail,
-} from '@/features/shared/lib/email-auth-provider';
-import { emailAuthProvider } from '@/features/shared/lib/email-auth';
+} from '@/features/shared/lib/email-otp-provider';
+import { emailOtpProvider } from '@/features/shared/lib/email-otp';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
-type Mode = 'signIn' | 'register';
+type Step = 'address' | 'code';
 
 export default function EmailScreen() {
   const { t } = useTranslation();
@@ -33,44 +40,63 @@ export default function EmailScreen() {
   const locale = useSession((state) => state.locale);
   const signIn = useSession((state) => state.signIn);
 
-  const [mode, setMode] = useState<Mode>('signIn');
+  const [step, setStep] = useState<Step>('address');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
 
   if (isAuthenticated) return <Redirect href="/vehicles" />;
 
-  async function handleSubmit() {
+  async function handleSend() {
     setBusy(true);
     setError(undefined);
 
-    const result =
-      mode === 'register'
-        ? await emailAuthProvider.register(email, password)
-        : await emailAuthProvider.signIn(email, password);
+    const result = await emailOtpProvider.send(email);
+    setBusy(false);
 
     if (!result.ok) {
-      setBusy(false);
       // CLAUDE.md §12: plain Arabic, with a next action — never a raw code.
       setError(
         {
           invalid_email: t('auth.errors.invalidEmail'),
-          weak_password: t('auth.errors.weakPassword', { length: MIN_PASSWORD_LENGTH }),
-          email_taken: t('auth.errors.emailTaken'),
-          unknown_email: t('auth.errors.unknownEmail'),
-          wrong_password: t('auth.errors.wrongPassword'),
+          rate_limited: t('auth.errors.rateLimited'),
           transport_failed: t('auth.errors.network'),
         }[result.reason],
       );
       return;
     }
 
+    setStep('code');
+  }
+
+  async function handleVerify() {
+    setBusy(true);
+    setError(undefined);
+
+    const result = await emailOtpProvider.verify(email, code);
+
+    if (!result.ok) {
+      setBusy(false);
+      setError(
+        {
+          invalid_code: t('auth.errors.invalidCode'),
+          expired: t('auth.errors.codeExpired'),
+          too_many_attempts: t('auth.errors.tooManyAttempts'),
+        }[result.reason],
+      );
+      return;
+    }
+
+    // The address is the identity; the name is what the person is called. An
+    // empty name falls back to the address rather than blocking the sign-in on
+    // a field nobody has to fill in.
+    const normalised = normaliseEmail(email);
     const profile = await repository.upsertProfile({
-      fullName: mode === 'register' ? fullName.trim() : normaliseEmail(email),
+      fullName: fullName.trim().length > 1 ? fullName.trim() : normalised,
       phone: null,
-      email: result.email,
+      email: normalised,
       isGuest: false,
       preferredLocale: locale,
     });
@@ -80,88 +106,90 @@ export default function EmailScreen() {
     router.replace('/vehicles');
   }
 
-  const canSubmit =
-    isValidEmail(email) &&
-    password.length >= MIN_PASSWORD_LENGTH &&
-    (mode === 'signIn' || fullName.trim().length > 1);
-
   return (
     <Screen scrollable>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.sm }}>
-          <Text variant="title">
-            {mode === 'register' ? t('auth.emailRegisterTitle') : t('auth.emailSignInTitle')}
-          </Text>
+          <Text variant="title">{t('auth.emailSignInTitle')}</Text>
           <Text variant="body" tone="muted">
-            {t('auth.emailSubtitle')}
+            {step === 'address' ? t('auth.emailSubtitle') : t('auth.emailCodeSubtitle', { email })}
           </Text>
         </View>
 
-        <Field
-          testID="email-input"
-          label={t('auth.emailLabel')}
-          value={email}
-          onChangeText={(value) => {
-            setEmail(value);
-            if (error !== undefined) setError(undefined);
-          }}
-          placeholder="name@example.com"
-          keyboardType="email-address"
-          textContentType="emailAddress"
-          autoComplete="email"
-          autoCapitalize="none"
-          // Email addresses read left-to-right even in an Arabic UI.
-          forceLtrInput
-        />
+        {step === 'address' ? (
+          <>
+            <Field
+              testID="email-input"
+              label={t('auth.emailLabel')}
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                if (error !== undefined) setError(undefined);
+              }}
+              placeholder="name@example.com"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
+              autoCapitalize="none"
+              error={error}
+              // Email addresses read left-to-right even in an Arabic UI.
+              forceLtrInput
+            />
 
-        {mode === 'register' ? (
-          <Field
-            testID="email-name-input"
-            label={t('auth.nameLabel')}
-            value={fullName}
-            onChangeText={setFullName}
-            autoComplete="name"
-          />
-        ) : null}
+            <Button
+              testID="email-submit"
+              label={t('auth.emailSendCode')}
+              onPress={() => void handleSend()}
+              loading={busy}
+              disabled={!isValidEmail(email)}
+            />
+          </>
+        ) : (
+          <>
+            <Field
+              testID="email-code-input"
+              label={t('auth.codeLabel')}
+              value={code}
+              onChangeText={(value) => {
+                setCode(value.replace(/\D/g, '').slice(0, EMAIL_OTP_LENGTH));
+                if (error !== undefined) setError(undefined);
+              }}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
+              error={error}
+              forceLtrInput
+            />
 
-        <Field
-          testID="password-input"
-          label={t('auth.passwordLabel')}
-          value={password}
-          onChangeText={(value) => {
-            setPassword(value);
-            if (error !== undefined) setError(undefined);
-          }}
-          hint={
-            mode === 'register'
-              ? t('auth.passwordHint', { length: MIN_PASSWORD_LENGTH })
-              : undefined
-          }
-          error={error}
-          secureTextEntry
-          revealLabels={{ show: t('auth.showPassword'), hide: t('auth.hidePassword') }}
-          textContentType={mode === 'register' ? 'newPassword' : 'password'}
-          autoCapitalize="none"
-          forceLtrInput
-        />
+            <Field
+              testID="email-name-input"
+              label={t('auth.nameLabel')}
+              hint={t('auth.nameOptionalHint')}
+              value={fullName}
+              onChangeText={setFullName}
+              autoComplete="name"
+            />
 
-        <Button
-          testID="email-submit"
-          label={mode === 'register' ? t('auth.emailRegisterAction') : t('auth.emailSignInAction')}
-          onPress={() => void handleSubmit()}
-          loading={busy}
-          disabled={!canSubmit}
-        />
+            <Button
+              testID="email-verify"
+              label={t('auth.emailVerifyAction')}
+              onPress={() => void handleVerify()}
+              loading={busy}
+              disabled={code.length !== EMAIL_OTP_LENGTH}
+            />
 
-        <Button
-          testID="email-toggle-mode"
-          label={mode === 'register' ? t('auth.haveAccount') : t('auth.needAccount')}
-          variant="ghost"
-          onPress={() => {
-            setMode(mode === 'register' ? 'signIn' : 'register');
-            setError(undefined);
-          }}
-        />
+            <Button
+              testID="email-change-address"
+              label={t('auth.emailChangeAddress')}
+              variant="ghost"
+              onPress={() => {
+                setStep('address');
+                setCode('');
+                setError(undefined);
+              }}
+            />
+          </>
+        )}
 
         <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
       </View>

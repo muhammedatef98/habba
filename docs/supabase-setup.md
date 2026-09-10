@@ -192,6 +192,55 @@ So delivery goes through a **Send SMS auth hook**:
    enforced in Postgres by migration `0042`, because Edge Functions are
    stateless and a counter in process memory resets on every cold start.
 
+### 5c. Email OTP — the second way in, and the one that does not wait
+
+Phone stays primary (§9.1), but a CITC sender ID takes weeks and email takes an
+afternoon. Email OTP is what lets the app reach real users in the meantime, and
+it is worth setting up even once SMS works: some people simply prefer it, and
+an account between SIMs still needs a way in.
+
+1. **Authentication → Providers → Email → enable.** Leave "Confirm email" on.
+
+2. **Set the OTP expiry.** Authentication → Providers → Email → Email OTP
+   Expiration. Must equal `EMAIL_OTP_TTL_SECONDS` in `email-otp-provider.ts`
+   (3600s). Deliberately longer than the SMS code's 120s: an email sits in an
+   inbox the user may not have open, and a two-minute code turns an ordinary
+   delay into a failed sign-in.
+
+3. **Make the message carry a CODE, not a link.** This is the step everyone
+   misses. Supabase sends a Magic Link by default, and `signInWithOtp` is the
+   same endpoint for both — the difference is the template. Authentication →
+   Email Templates → **Magic Link**, and include the token:
+
+   ```html
+   <h2>رمز الدخول إلى هبّة</h2>
+   <p>الرمز: {{ .Token }}</p>
+   <p>صالح لمدة ساعة. إذا لم تطلبه، تجاهل هذه الرسالة.</p>
+   ```
+
+   Without `{{ .Token }}` the user receives a link, the app asks for six digits,
+   and there is nothing to type.
+
+4. **Configure SMTP.** The built-in sender is rate-limited to a handful of
+   messages an hour and is for development only — it will not carry a launch.
+   Project Settings → Authentication → SMTP Settings, pointed at Resend (or any
+   provider); you need a verified sending domain, which is the slow part and is
+   still hours rather than weeks.
+
+5. **Rate limits.** Authentication → Rate limits → Email. Note the asymmetry,
+   which is deliberate and recorded in ADR-0020: the per-number limit the
+   product promises for SMS (5/hour) is enforced in Postgres by migration
+   `0042`, because Edge Functions are stateless. **Email has no per-address
+   equivalent** — its limiting is Supabase's, project-wide. Closing that gap
+   needs a Send Email hook and a generalisation of 0042's ledger; it is written
+   down in the ADR rather than half-built.
+
+**How to tell it worked:** in the app, «الدخول بالبريد الإلكتروني» → an
+address → a six-digit code arrives → typing it signs you in, and
+`select email, email_verified from profiles` shows `t`. That flag is derived
+from `auth.users.email_confirmed_at` by migration `0044` — nothing else in the
+system can set it, including a fixture.
+
 ### 5b. Before real SMS will actually arrive
 
 - A **Unifonic account** with credit, and an **AppSid**.

@@ -143,16 +143,18 @@ rollback;
 
 begin;
 
-insert into auth.users (id, phone) values
-  ('33333333-0000-4000-7777-000000000004', '+966509300013'),
-  ('44444444-0000-4000-7777-000000000005', '+966509300014');
+-- The confirmation timestamps are what make these numbers verified: since
+-- 0044 `phone_verified` is DERIVED from auth.users, so a fixture can no longer
+-- assert it — which is the property, not an inconvenience. (This test used to
+-- insert `phone_verified => true` directly; the trigger now recomputes it to
+-- false, and the assertion below failed until the fixture told the truth.)
+insert into auth.users (id, phone, phone_confirmed_at) values
+  ('33333333-0000-4000-7777-000000000004', '+966509300013', now()),
+  ('44444444-0000-4000-7777-000000000005', '+966509300014', now());
 
--- The recipient's phone_verified = true here stands in for Supabase Auth's
--- own SMS verification having already run before this profile existed — not
--- something this policy grants, only something it now requires.
-insert into public.profiles (id, full_name, phone, phone_verified) values
-  ('33333333-0000-4000-7777-000000000004', 'البائع', '+966509300013', true),
-  ('44444444-0000-4000-7777-000000000005', 'المشتري', '+966509300014', true);
+insert into public.profiles (id, full_name, phone) values
+  ('33333333-0000-4000-7777-000000000004', 'البائع', '+966509300013'),
+  ('44444444-0000-4000-7777-000000000005', 'المشتري', '+966509300014');
 
 insert into public.vehicle_makes (id, name_ar, name_en) values
   ('a0000000-0000-4000-7777-000000000002', 'م', 'MakeXfer2');

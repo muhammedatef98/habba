@@ -16,7 +16,9 @@ import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
 import { Button, Card, Field, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
-import { isValidEmail, normaliseEmail } from '@/features/shared/lib/email-auth-provider';
+// The password provider is gone (PR #5); the same two helpers live beside the
+// OTP one, which is now the only way an email becomes an identity.
+import { isValidEmail, normaliseEmail } from '@/features/shared/lib/email-otp-provider';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/features/shared/state/session';
 
