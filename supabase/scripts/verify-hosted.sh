@@ -231,5 +231,88 @@ if [ "$MODE" != "--migrate-only" ]; then
     pnpm --dir "$ROOT" test:rls
 fi
 
+# ---------------------------------------------------------------------------
+# The PDPL erasure path (migration 0043), hosted
+# ---------------------------------------------------------------------------
+# 22_account_deletion.sql covers this locally, where auth.users is a shim table
+# and the delete is issued by psql. Hosted it is a different act: the request
+# goes to GoTrue, and the cascade runs auth.users → profiles → user_roles,
+# through the ENABLE ALWAYS guard, as the platform's own role rather than ours.
+# 0040 made that impossible and nothing noticed for three migrations, so the
+# hosted claim is worth making directly rather than by analogy.
+if [ "$MODE" != "--migrate-only" ]; then
+  require SUPABASE_URL
+  require SUPABASE_SERVICE_ROLE_KEY
+  require SUPABASE_DB_URL
+
+  echo
+  echo "── account deletion, the way an erasure request actually arrives"
+
+  ERASE_ID='aa000000-0000-4000-8000-000000000009'
+  create_user "$ERASE_ID" '+966590000009'
+
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q <<SQL
+do \$\$
+begin
+  insert into public.profiles (id, full_name, phone)
+  values ('$ERASE_ID', 'حساب للحذف', '+966590000009')
+  on conflict (id) do nothing;
+
+  perform public.begin_privileged_write();
+  perform public.grant_user_role('$ERASE_ID'::uuid, 'technician'::public.user_role, null::uuid);
+  perform public.end_privileged_write();
+
+  if (select count(*) from public.user_roles
+      where user_id = '$ERASE_ID' and revoked_at is null) <> 2 then
+    raise exception 'setup failed: expected customer + technician before deletion';
+  end if;
+end \$\$;
+SQL
+
+  # The erasure itself: GoTrue, not SQL. Everything below hangs off this one
+  # DELETE by way of two cascades.
+  erase_code=$(curl -sS -o /dev/null -w '%{http_code}' \
+    -X DELETE "$SUPABASE_URL/auth/v1/admin/users/$ERASE_ID" \
+    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+  case "$erase_code" in
+    2*) printf '   deleted the auth user (HTTP %s)\n' "$erase_code" ;;
+    *) echo "error: deleting the auth user returned HTTP $erase_code" >&2; exit 1 ;;
+  esac
+
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q <<SQL
+do \$\$
+begin
+  if exists (select 1 from public.profiles where id = '$ERASE_ID') then
+    raise exception 'FAIL: the profile survived the account deletion';
+  end if;
+  raise notice '   ok  the profile is gone';
+
+  if exists (select 1 from public.user_roles where user_id = '$ERASE_ID') then
+    raise exception 'FAIL: role rows survived the account deletion';
+  end if;
+  raise notice '   ok  and the cascade took its role rows with it';
+end \$\$;
+
+-- The other half of 0043: the fix is a condition, not an exemption. If it had
+-- been an exemption this would now succeed and any user could strip another's
+-- roles — which is the thing the guard exists to stop.
+do \$\$
+begin
+  perform set_config('request.jwt.claims',
+    '{"sub":"aa000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+  perform set_config('role', 'authenticated', true);
+
+  delete from public.user_roles
+  where user_id = 'aa000000-0000-4000-8000-000000000001';
+
+  raise exception 'FAIL: a signed-in user deleted their own role rows';
+exception
+  when insufficient_privilege then
+    raise notice '   ok  a live account still cannot delete its own role rows';
+end \$\$;
+SQL
+fi
+
 echo
 echo "hosted verification complete"
