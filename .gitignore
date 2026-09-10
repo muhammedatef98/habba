@@ -43,3 +43,10 @@ supabase/.tmp/
 
 # Output of the CI bundle check (pnpm bundle)
 .expo-bundle-check/
+
+# Design-canvas build output. `docs/design/ownership-transfer/build.py` emits the
+# artboards, and the seeded canvas is ~2.5 MB of editor payload — regenerate it
+# rather than version it. The published canvas is the shared copy.
+docs/design/**/*.dc.html
+docs/design/**/canvas.json
+docs/design/**/*.seeded.html
