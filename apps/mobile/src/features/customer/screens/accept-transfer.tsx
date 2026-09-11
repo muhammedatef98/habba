@@ -161,31 +161,58 @@ export default function AcceptTransferScreen() {
             </Text>
           </Card>
 
-          <View style={{ gap: theme.spacing.sm }}>
-            <CodeInput
-              testID="accept-code"
-              value={code}
-              onChangeText={(value) => {
-                setCode(value);
-                setCodeError(undefined);
-              }}
-              length={CODE_LENGTH}
-              label={t('transfer.acceptCodeLabel')}
-              error={codeError}
-              autoFocus
-            />
-            <Text variant="caption" tone="muted">
-              {t('transfer.acceptCodeHint')}
-            </Text>
-          </View>
+          {transfer.attemptsExhausted ? (
+            // The code field is replaced rather than disabled underneath a
+            // warning: there is nothing left to type, and a form that still
+            // looks typeable invites a sixth attempt that would be refused with
+            // the same «الرمز غير صحيح» as the first five.
+            //
+            // Safe to say here and nowhere else (0057): this screen is reached
+            // only through `pending_ownership_transfer_for_me`, which requires a
+            // VERIFIED identity the transfer is addressed to (0045). Anyone
+            // reading this could already read the row, so they learn nothing
+            // about which cars have a handover open. `acceptTransfer` is
+            // deliberately left undifferentiated — it answers a locked transfer
+            // exactly as it answers a typo.
+            <Card
+              testID="accept-exhausted"
+              elevation="sm"
+              style={{ gap: theme.spacing.sm, borderColor: theme.colors.warningFg }}
+            >
+              <Text variant="bodyStrong">{t('transfer.acceptExhaustedTitle')}</Text>
+              <Text variant="bodySmall" tone="muted">
+                {t('transfer.acceptExhaustedBody')}
+              </Text>
+            </Card>
+          ) : (
+            <>
+              <View style={{ gap: theme.spacing.sm }}>
+                <CodeInput
+                  testID="accept-code"
+                  value={code}
+                  onChangeText={(value) => {
+                    setCode(value);
+                    setCodeError(undefined);
+                  }}
+                  length={CODE_LENGTH}
+                  label={t('transfer.acceptCodeLabel')}
+                  error={codeError}
+                  autoFocus
+                />
+                <Text variant="caption" tone="muted">
+                  {t('transfer.acceptCodeHint')}
+                </Text>
+              </View>
 
-          <Button
-            testID="accept-submit"
-            label={t('transfer.acceptAction')}
-            loading={accept.isPending}
-            disabled={code.length < CODE_LENGTH}
-            onPress={() => accept.mutate(transfer.transferId)}
-          />
+              <Button
+                testID="accept-submit"
+                label={t('transfer.acceptAction')}
+                loading={accept.isPending}
+                disabled={code.length < CODE_LENGTH}
+                onPress={() => accept.mutate(transfer.transferId)}
+              />
+            </>
+          )}
 
           <Text variant="caption" tone="subtle">
             {t('transfer.acceptExpires', {

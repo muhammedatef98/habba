@@ -275,3 +275,131 @@ nothing about a car is revealed by it.
   is worth adding when those screens are next touched.
 - Nothing migrates. `failed_attempts` defaults to 0 and `locked_at` to null, and
   there are no accepted transfers in any project.
+
+---
+
+# Amendment — the lock stops being invisible (0057)
+
+**Status:** accepted
+**Date:** 2026-09-11
+**Amends:** the previous amendment's last consequence but one
+
+The amendment above ends by accepting that "a seller cannot see that a transfer
+has been locked" and calling a seller-only read of it worth adding later. Later
+is now, because that consequence was understated. The lock was invisible to
+_both_ parties, and the result was a dead end nobody could leave:
+
+- the seller's screen said «بانتظار قبول المشتري» over a code that had stopped
+  working, with no way to learn otherwise;
+- the recipient got the same undifferentiated refusal a typo produces, and read
+  it as a typo;
+- and because a locked row stays `pending`, the partial unique index went on
+  counting it, so the car could not be transferred to anyone until somebody
+  cancelled by hand or the seven days ran out.
+
+## Decision: surface the lock through the reads, never through `accept`
+
+The indistinguishable-refusal rule is a property of the **accept response**,
+and it is why that rule exists: `accept` is the surface an attacker can call
+about a car they know nothing about. It is unchanged — seven reasons, one NULL,
+asserted in `supabase/tests/35` against a locked transfer specifically.
+
+The lock is surfaced through the two **read** paths instead, each of which
+already decides who may see the row at all:
+
+| who           | through                                   | gate                                                    |
+| ------------- | ----------------------------------------- | ------------------------------------------------------- |
+| the seller    | `outgoing_ownership_transfer(vehicle_id)` | owns the vehicle                                        |
+| the recipient | `pending_ownership_transfer_for_me()`     | a verified identity the transfer is addressed to (0045) |
+
+Both return `attempts_exhausted`, a boolean derived from `locked_at`. Neither
+returns `locked_at` or `failed_attempts`: those stay off every client surface,
+where `supabase/tests/17`'s standing audit keeps them. "It is shut, ask for a
+new code" is something a person can act on; "you have two guesses left" is a
+hint to whoever is guessing.
+
+A caller who cannot read the row learns nothing either way, so showing the lock
+to someone who could already read it adds no way to probe which vehicles have a
+handover open — which is the only thing the rule was protecting.
+
+`outgoing_ownership_transfer` replaces a direct select in the repository, and
+fixes a second thing while it is there. Since 0056 a lapsed row is retired to
+`expired` by the sweep or by the first attempt on it, so a query filtered on
+`status = 'pending'` stopped returning it — which would have shown a seller
+coming back on day eight a fresh warning screen with no account of where their
+transfer went, the exact thing the expired state was written to prevent. One
+window's worth of recently-expired rows is returned for that reason, and no
+more: a transfer that ran out two months ago is not news.
+
+## Decision: cancel and re-issue are one act
+
+`reissue_ownership_transfer(transfer_id)` withdraws the handover and issues a
+fresh code to the same address in one transaction. It is one call rather than
+two because two calls are a worse product and a worse guarantee:
+
+- between them the car has no transfer and the screen has no state;
+- a cancel whose re-issue then fails — an open warranty claim, a dropped
+  connection — leaves the seller worse off than before they tapped;
+- and the address has to be carried from the row rather than re-typed, because
+  re-typing it is how a buyer who is already waiting gets addressed to a typo.
+
+It is the sender's call only. A recipient who could re-issue could mint
+themselves an unlimited supply of attempts by resetting the row they are locked
+out of. It composes the existing `cancel_ownership_transfer` and
+`initiate_ownership_transfer` rather than reimplementing either, so every rule
+that applied to a first issue — the warranty-claim refusal above all — applies
+to a re-issue too, and a refused re-issue rolls the cancel back with it.
+
+Cancelling a locked transfer plainly also works, because a locked row is still
+`pending` and that is what `cancel_ownership_transfer` matches on. That was an
+assumption until 0057; `supabase/tests/35` now asserts it, since the seller's
+only manual remedy rested on it.
+
+## Decision: every undifferentiated refusal is written down
+
+One NULL for seven reasons is right for the caller and useless for the people
+who support it. If `accept` ever returns NULL because of a **bug** — a profile
+row missing, a verification flag that stopped syncing, an identity comparison
+that quietly stopped matching — every screen in the product calls it a wrong
+code, and the bug is invisible forever. The `not_addressed` path is the one
+that would hide it: from the outside, a legitimate buyer whose verified flag
+broke is indistinguishable from a stranger with a forwarded link.
+
+So the reason is written server-side, as a `reason` column on the
+`transfer_accept_attempts` ledger 0056 already writes one row to per attempt:
+`accepted`, `rate_limited`, `not_found`, `expired`, `cancelled`,
+`already_accepted`, `locked`, `not_addressed`, `wrong_code`. Same table rather
+than a new one — one accept call is one row there already, it is already closed
+to clients, and it already has the retention an account id plus a timestamp
+needs under ADR-0010.
+
+Closed to clients means closed to **both parties**: neither the seller nor the
+recipient can read it. Support can, through `service_role`, and cannot rewrite
+or delete it — the guard from 0056 is `ENABLE ALWAYS`, so the account that reads
+the ledger cannot edit the record of what it did.
+
+`supabase/tests/35` asserts that no attempt which reached a decision leaves
+`reason` null. The single exception is structural and documented in the
+migration: an open warranty claim still raises, and raising rolls the ledger row
+back with everything else. That refusal is visible as an error anyway, which is
+the whole reason it is allowed to raise.
+
+## Consequences
+
+- The seller's screen gains a sixth state, `exhausted`, between `pending` and
+  `expired`. It reads in the same register as `expired` — state what happened,
+  say what did not change, offer the one action that helps — because five
+  mis-heard digits at a kerb is an ordinary thing to happen and neither party
+  did anything wrong.
+- The recipient's screen replaces the code field with «انتهت محاولات الرمز»
+  rather than disabling it under a warning. There is nothing left to type, and a
+  form that still looks typeable invites a sixth attempt refused with the same
+  message as the first five.
+- `OwnershipTransfer` and `IncomingTransfer` gain `attemptsExhausted`;
+  `Repository` gains `reissueTransfer`. `InMemoryRepository` mirrors both,
+  including that re-issue is one act and that the refusal stays
+  undifferentiated.
+- `accept-transfer.tsx`'s unreachable `'not found'` branch is still there,
+  still deliberately. It belongs to the screens pass, not this one.
+- Nothing migrates. `reason` is null for rows written before 0057, which is
+  exactly what "we did not record it then" should look like.

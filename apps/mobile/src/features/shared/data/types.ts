@@ -380,6 +380,15 @@ export interface OwnershipTransfer {
   readonly status: OwnershipTransferStatus;
   readonly expiresAt: string;
   readonly createdAt: string;
+  /**
+   * The buyer has spent all five attempts and the code is dead (0056).
+   *
+   * A derived fact, never the count behind it: "ask for a new code" is
+   * something the seller can act on, "two guesses left" is a hint to whoever is
+   * guessing. It is not on `status` for the same reason — `status` is on the
+   * recipient's read surface, and the count is on nobody's.
+   */
+  readonly attemptsExhausted: boolean;
 }
 
 /**
@@ -417,6 +426,16 @@ export interface IncomingTransfer {
   readonly habbaVerified: number;
   readonly firstRecordAt: string | null;
   readonly openWarranties: number;
+  /**
+   * The five attempts on this transfer are spent (0056) — stop typing and ask
+   * the seller for a new code.
+   *
+   * Safe to show here and nowhere else: reaching this row at all requires a
+   * verified identity the transfer is addressed to (0045), so anyone who reads
+   * this could already read the row. `acceptTransfer` is deliberately NOT told
+   * apart — it answers a locked transfer exactly as it answers a typo.
+   */
+  readonly attemptsExhausted: boolean;
 }
 
 /**

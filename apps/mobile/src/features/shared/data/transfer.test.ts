@@ -121,6 +121,57 @@ describe('ownership transfer', () => {
     expect(timeline.filter((event) => event.eventType === 'ownership_transferred')).toHaveLength(0);
   });
 
+  test('the lock is visible to both sides, while the refusal stays undifferentiated', async () => {
+    const minted = await repo.initiateTransfer({ vehicleId, phone: '+966505550000' });
+
+    expect((await repo.getOutgoingTransfer(vehicleId))?.attemptsExhausted).toBe(false);
+    expect((await repo.getIncomingTransfer())?.attemptsExhausted).toBe(false);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(repo.acceptTransfer(minted.id, '000000')).rejects.toThrow(/Incorrect code/);
+    }
+
+    // The dead end 0057 closes: the row is still `pending`, so without this the
+    // seller's screen goes on saying "waiting for the buyer" over a code that
+    // has stopped working, and the buyer goes on being told they typed it wrong.
+    expect((await repo.getOutgoingTransfer(vehicleId))?.attemptsExhausted).toBe(true);
+    expect((await repo.getIncomingTransfer())?.attemptsExhausted).toBe(true);
+
+    // And the thing that must NOT have changed. The reads are gated on being
+    // able to see the row at all; `acceptTransfer` is not, so it stays the same
+    // one answer for every refusal.
+    await expect(repo.acceptTransfer(minted.id, minted.code)).rejects.toThrow(/Incorrect code/);
+  });
+
+  test('re-issuing is one act: the old code dies and a new one works', async () => {
+    const locked = await repo.initiateTransfer({ vehicleId, phone: '+966505550000' });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(repo.acceptTransfer(locked.id, '000000')).rejects.toThrow(/Incorrect code/);
+    }
+
+    const fresh = await repo.reissueTransfer(locked.id);
+
+    expect(fresh.id).not.toBe(locked.id);
+    expect(fresh.code).not.toBe(locked.code);
+
+    // Carried from the row rather than re-typed: re-typing the address is how a
+    // buyer who is already waiting gets addressed to a typo.
+    const outgoing = await repo.getOutgoingTransfer(vehicleId);
+    expect(outgoing?.id).toBe(fresh.id);
+    expect(outgoing?.toPhone).toBe('+966505550000');
+    expect(outgoing?.attemptsExhausted).toBe(false);
+
+    await expect(repo.acceptTransfer(locked.id, locked.code)).rejects.toThrow(/Incorrect code/);
+    await expect(repo.acceptTransfer(fresh.id, fresh.code)).resolves.toBe(vehicleId);
+  });
+
+  test('there is nothing to re-issue on a transfer that is not pending', async () => {
+    const minted = await repo.initiateTransfer({ vehicleId, phone: '+966505550000' });
+    await repo.cancelTransfer(minted.id);
+
+    await expect(repo.reissueTransfer(minted.id)).rejects.toThrow(/no longer pending/);
+  });
+
   test('cancelling and re-issuing is the remedy for a locked transfer', async () => {
     const locked = await repo.initiateTransfer({ vehicleId, phone: '+966505550000' });
     for (let attempt = 0; attempt < 5; attempt += 1) {

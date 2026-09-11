@@ -7,19 +7,28 @@
  * report page, then 0037 gated discovery on a flag nothing set — and 0044/0045
  * reopened it in the database. This screen is the half no human could reach.
  *
- * One route, five states, because they are one act and the seller should never
+ * One route, six states, because they are one act and the seller should never
  * wonder which screen they are on:
  *
- *   warn     what the logbook leaving actually costs, with the PDF offer while
- *            taking it is still possible
- *   address  phone or email, and a review before anything is created
- *   code     the six digits, shown once, read aloud rather than sent
- *   pending  the wait, and the withdrawal
- *   expired  the seven days running out, which is a state and not an error
+ *   warn      what the logbook leaving actually costs, with the PDF offer while
+ *             taking it is still possible
+ *   address   phone or email, and a review before anything is created
+ *   code      the six digits, shown once, read aloud rather than sent
+ *   pending   the wait, and the withdrawal
+ *   expired   the seven days running out, which is a state and not an error
+ *   exhausted the buyer spent all five attempts and the code is dead (0056/0057)
  *
- * The route opens straight into `pending` or `expired` when the car already has
- * a transfer — coming back to check on one is the common visit, not starting
- * another.
+ * The route opens straight into `pending`, `exhausted` or `expired` when the
+ * car already has a transfer — coming back to check on one is the common visit,
+ * not starting another.
+ *
+ * `exhausted` exists because the state underneath it used to be invisible: the
+ * row locks but stays `pending`, so this screen said «بانتظار قبول المشتري»
+ * over a code that had stopped working, and the car stayed blocked until
+ * somebody cancelled by hand. Its action is `reissueTransfer`, which is one
+ * call rather than cancel-then-initiate: two taps would leave a window where
+ * the car has no transfer, and a cancel whose re-issue then failed would take
+ * away what the seller had.
  *
  * The code is deliberately held in component state and nowhere else. It is
  * returned by the server exactly once; the row stores a hash, and no client can
@@ -124,6 +133,25 @@ export default function TransferScreen() {
     },
   });
 
+  // Cancel and re-issue as one act. It lands on the same `code` screen a first
+  // issue lands on, because from the seller's side that is what just happened:
+  // there is a new code to read to the buyer, and nothing else changed.
+  const reissue = useMutation({
+    mutationFn: (transferId: string) => repository.reissueTransfer(transferId),
+    onSuccess: (minted) => {
+      setMintedCode(minted.code);
+      setActionError(null);
+      setStage('code');
+      void queryClient.invalidateQueries({ queryKey: ['transfer', 'outgoing', id] });
+    },
+    onError: (error: Error) =>
+      setActionError(
+        error.message.toLowerCase().includes('warranty claim is open')
+          ? t('transfer.errors.claimOpen')
+          : t('transfer.errors.reissueFailed'),
+      ),
+  });
+
   // The same issue-read-render-share sequence the logbook uses. It is offered
   // HERE, on the warning screen, because after acceptance the seller can no
   // longer generate a report for this car at all — offering the export
@@ -223,6 +251,15 @@ export default function TransferScreen() {
             setMintedCode(null);
             setStage('warn');
           }}
+        />
+      ) : pending !== null && pending.attemptsExhausted && remainingDays > 0 ? (
+        // Ahead of `pending`: a locked transfer IS still pending, and saying
+        // «بانتظار قبول المشتري» over a code that stopped working is the exact
+        // dead end this state was added to close.
+        <ExhaustedTransfer
+          to={pending.toPhone ?? pending.toEmail ?? ''}
+          reissuing={reissue.isPending}
+          onReissue={() => reissue.mutate(pending.id)}
         />
       ) : pending !== null && remainingDays > 0 ? (
         <PendingTransfer
@@ -586,6 +623,56 @@ function PendingTransfer({
         variant="secondary"
         loading={cancelling}
         onPress={onCancel}
+      />
+    </View>
+  );
+}
+
+/**
+ * The buyer spent all five attempts, and the code is dead (0056).
+ *
+ * Same register as `ExpiredTransfer`, and for the same reason: nothing went
+ * wrong that anybody needs to answer for. Somebody misheard six digits at a
+ * kerb five times, which is an ordinary thing to happen. So it says what
+ * happened, says what did not change, and offers the one action that helps —
+ * without telling the seller their buyer is careless or the buyer that they are
+ * suspected of anything.
+ *
+ * One button, and it is `reissueTransfer`: the server cancels and re-issues in
+ * one transaction, so the seller never holds a car with no transfer on it.
+ */
+function ExhaustedTransfer({
+  to,
+  reissuing,
+  onReissue,
+}: {
+  readonly to: string;
+  readonly reissuing: boolean;
+  readonly onReissue: () => void;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+
+  return (
+    <View style={{ gap: theme.spacing.lg }}>
+      <Card testID="transfer-exhausted" elevation="sm" style={{ gap: theme.spacing.md }}>
+        <Text variant="subheading">{t('transfer.exhaustedTitle')}</Text>
+        <Text variant="body" tone="muted">
+          {t('transfer.exhaustedBody')}
+        </Text>
+        <Text variant="bodySmall" tone="subtle">
+          {t('transfer.pendingTo', { to })}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {t('transfer.exhaustedHint')}
+        </Text>
+      </Card>
+
+      <Button
+        testID="transfer-reissue"
+        label={t('transfer.exhaustedAction')}
+        loading={reissuing}
+        onPress={onReissue}
       />
     </View>
   );

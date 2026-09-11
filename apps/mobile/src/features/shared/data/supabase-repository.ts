@@ -347,6 +347,7 @@ interface OwnershipTransferRow {
   readonly status: OwnershipTransferStatus;
   readonly expires_at: string;
   readonly created_at: string;
+  readonly attempts_exhausted: boolean;
 }
 
 interface IncomingTransferRow {
@@ -362,6 +363,7 @@ interface IncomingTransferRow {
   readonly habba_verified: number;
   readonly first_record_at: string | null;
   readonly open_warranties: number;
+  readonly attempts_exhausted: boolean;
 }
 
 interface VehicleWarrantyRow {
@@ -1215,29 +1217,27 @@ export class SupabaseRepository implements Repository {
   }
 
   async getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null> {
-    // `otp_code_hash` is absent from this column list because it is absent
-    // from the grant: asking for it fails the whole request with a permission
-    // error rather than returning a null column.
-    const { data, error } = await this.client
-      .from('ownership_transfers')
-      .select('id, vehicle_id, to_phone, to_email, status, expires_at, created_at')
-      .eq('vehicle_id', vehicleId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // An RPC rather than a select on the table (0057). `locked_at` and
+    // `failed_attempts` are off the client grant and stay off it, so the lock
+    // can only reach the seller as the derived `attempts_exhausted` — the fact
+    // they can act on, never the count that would tell a guesser how much
+    // guessing is left.
+    //
+    // It also returns a recently-expired row, which a `status = 'pending'`
+    // filter no longer can: since 0056 a lapsed transfer is retired by the
+    // sweep or by the first attempt on it.
+    const { data, error } = await this.client.rpc('outgoing_ownership_transfer', {
+      p_vehicle_id: vehicleId,
+    });
 
     if (error !== null) throw new Error(`getOutgoingTransfer: ${error.message}`);
-    if (data === null) return null;
 
-    const row = data as OwnershipTransferRow;
+    const row = (data as readonly OwnershipTransferRow[] | null)?.[0];
+    if (row === undefined) return null;
 
-    // The row can still SAY `pending` past its expiry: `expire_ownership_transfers`
-    // runs on initiation and on a sweep, not on a clock. It is returned all the
-    // same, restated as `expired`, because the seller coming back on day eight
-    // needs to be told the code stopped working — dropping the row here would
-    // show them a fresh warning screen with no account of where their transfer
-    // went.
+    // A pending row can still be past its expiry between one sweep and the
+    // next. Restated here rather than dropped, because the seller coming back
+    // on day eight needs to be told the code stopped working.
     const lapsed = new Date(row.expires_at).getTime() <= Date.now();
 
     return {
@@ -1248,6 +1248,7 @@ export class SupabaseRepository implements Repository {
       status: lapsed ? 'expired' : row.status,
       expiresAt: row.expires_at,
       createdAt: row.created_at,
+      attemptsExhausted: row.attempts_exhausted,
     };
   }
 
@@ -1257,6 +1258,21 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`cancelTransfer: ${error.message}`);
+  }
+
+  async reissueTransfer(transferId: string): Promise<MintedTransfer> {
+    // One call, one transaction: the server cancels and re-issues together
+    // (0057), so there is no window in which the seller has neither.
+    const { data, error } = await this.client.rpc('reissue_ownership_transfer', {
+      p_transfer_id: transferId,
+    });
+
+    if (error !== null) throw new Error(`reissueTransfer: ${error.message}`);
+
+    const row = (data as readonly MintedTransferRow[] | null)?.[0];
+    if (row === undefined) throw new Error('reissueTransfer: no transfer returned');
+
+    return { id: row.transfer_id, code: row.code, expiresAt: row.expires_at };
   }
 
   async getIncomingTransfer(): Promise<IncomingTransfer | null> {
@@ -1280,6 +1296,10 @@ export class SupabaseRepository implements Repository {
       habbaVerified: row.habba_verified,
       firstRecordAt: row.first_record_at,
       openWarranties: row.open_warranties,
+      // Safe here and not in `acceptTransfer` (0057): reaching this row needs a
+      // verified identity the transfer is addressed to, so it tells the reader
+      // nothing they could not already see.
+      attemptsExhausted: row.attempts_exhausted,
     };
   }
 

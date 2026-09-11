@@ -228,6 +228,17 @@ export interface Repository {
   /** Withdraws a pending handover. Sender only, server-enforced. */
   cancelTransfer(transferId: string): Promise<void>;
   /**
+   * Withdraws a handover and issues a fresh code to the same address, in one
+   * call (0057).
+   *
+   * The seller's remedy when the buyer has burned all five attempts. It is one
+   * method rather than `cancel` then `initiate` because the server does it in
+   * one transaction: between two calls there is a window where the car has no
+   * transfer, and a cancel whose re-issue then fails leaves the seller worse
+   * off than before they tapped.
+   */
+  reissueTransfer(transferId: string): Promise<MintedTransfer>;
+  /**
    * A handover waiting for THIS user, with the logbook's weight attached.
    *
    * Null is the answer for "nothing waiting", for "addressed to an identity
@@ -1352,6 +1363,7 @@ export class InMemoryRepository implements Repository {
       status: 'pending',
       expiresAt,
       createdAt: new Date().toISOString(),
+      attemptsExhausted: false,
     };
 
     this.transfers.push(transfer);
@@ -1360,21 +1372,45 @@ export class InMemoryRepository implements Repository {
     return { id: transfer.id, code, expiresAt };
   }
 
+  async reissueTransfer(transferId: string): Promise<MintedTransfer> {
+    const existing = this.transfers.find((transfer) => transfer.id === transferId);
+    if (existing === undefined || existing.status !== 'pending') {
+      throw new Error('reissueTransfer: transfer not found, or no longer pending');
+    }
+
+    // Cancel then re-issue, in that order and with nothing between them: the
+    // server does both in one transaction (0057), so a stub that could land
+    // half of it would let a screen be built against a state production never
+    // produces.
+    await this.cancelTransfer(transferId);
+    return this.initiateTransfer({
+      vehicleId: existing.vehicleId,
+      ...(existing.toPhone !== null ? { phone: existing.toPhone } : {}),
+      ...(existing.toEmail !== null ? { email: existing.toEmail } : {}),
+    });
+  }
+
   async getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null> {
     this.expireTransfers();
     // `expired` is returned alongside `pending`, mirroring the Supabase
     // implementation: the seller has to be told the seven days ran out, and a
     // repository that swallowed the row would leave that screen unreachable in
     // development and reachable in production.
-    return (
+    const transfer =
       [...this.transfers]
         .reverse()
         .find(
-          (transfer) =>
-            transfer.vehicleId === vehicleId &&
-            (transfer.status === 'pending' || transfer.status === 'expired'),
-        ) ?? null
-    );
+          (candidate) =>
+            candidate.vehicleId === vehicleId &&
+            (candidate.status === 'pending' || candidate.status === 'expired'),
+        ) ?? null;
+
+    if (transfer === null) return null;
+
+    // Derived on read rather than stored on the row, mirroring
+    // `outgoing_ownership_transfer()`: the server keeps the count in a column
+    // no client can select and hands back only this boolean.
+    return { ...transfer, attemptsExhausted: this.isExhausted(transfer.id) };
   }
 
   async cancelTransfer(transferId: string): Promise<void> {
@@ -1412,7 +1448,16 @@ export class InMemoryRepository implements Repository {
       habbaVerified: events.filter((event) => event.provenance === 'habba_verified').length,
       firstRecordAt: occurred[0] ?? null,
       openWarranties: 0,
+      // Shown to the recipient because reaching this row at all means they are
+      // the verified identity it is addressed to (0045/0057). `acceptTransfer`
+      // below is deliberately not told apart by it.
+      attemptsExhausted: this.isExhausted(transfer.id),
     };
+  }
+
+  /** Five wrong codes on this transfer — the lock, as a derived fact. */
+  private isExhausted(transferId: string): boolean {
+    return (this.transferAttempts.get(transferId) ?? 0) >= TRANSFER_ATTEMPT_LIMIT;
   }
 
   async acceptTransfer(transferId: string, code: string): Promise<string> {
@@ -1430,10 +1475,10 @@ export class InMemoryRepository implements Repository {
       throw new Error('Incorrect code');
     }
 
-    const failed = this.transferAttempts.get(transferId) ?? 0;
-    if (failed >= TRANSFER_ATTEMPT_LIMIT) {
+    if (this.isExhausted(transferId)) {
       throw new Error('Incorrect code');
     }
+    const failed = this.transferAttempts.get(transferId) ?? 0;
 
     if (this.transferCodes.get(transferId) !== code) {
       this.transferAttempts.set(transferId, failed + 1);
