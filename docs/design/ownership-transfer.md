@@ -31,17 +31,17 @@ it**, which is what this design is for.
 
 ## The screens
 
-| # | Artboard   | What it settles |
-| - | ---------- | --------------- |
-| 1 | `Main`     | Where «نقل الملكية» lives in the logbook |
-| 2 | `Warning`  | What the seller is about to give up |
-| 3 | `Address`  | Phone or email, and what is shown before confirming |
-| 4 | `Code`     | The handover code, shown once |
-| 5 | `Pending`  | The seller waiting, and cancelling |
-| 6 | `Accept`   | The recipient who already has an account |
-| 7 | `Welcome`  | The recipient who does not — the acquisition moment |
-| 8 | `Handover` | The seller afterwards: kept and lost, stated |
-| 9 | `Years`    | The logbook grouped by year (parked separately) |
+| #   | Artboard   | What it settles                                     |
+| --- | ---------- | --------------------------------------------------- |
+| 1   | `Main`     | Where «نقل الملكية» lives in the logbook            |
+| 2   | `Warning`  | What the seller is about to give up                 |
+| 3   | `Address`  | Phone or email, and what is shown before confirming |
+| 4   | `Code`     | The handover code, shown once                       |
+| 5   | `Pending`  | The seller waiting, and cancelling                  |
+| 6   | `Accept`   | The recipient who already has an account            |
+| 7   | `Welcome`  | The recipient who does not — the acquisition moment |
+| 8   | `Handover` | The seller afterwards: kept and lost, stated        |
+| 9   | `Years`    | The logbook grouped by year (parked separately)     |
 
 ## Decisions
 
@@ -124,3 +124,25 @@ what the seller keeps (their orders and invoices) and what they lose.
 - Screen 5 has an expired state. Both repositories return a lapsed transfer
   rather than dropping it, so the seller is told the seven days ran out instead
   of being shown a fresh warning screen.
+
+### 3. Expiry runs, and the code cannot be guessed (0056)
+
+Two of the three defects above were fixed in halves, and 0056 closes them.
+
+- **Expiry now has three chances.** 0054 expired on initiation only, so a
+  lapsed row stayed `pending` in the table and the only thing keeping it from
+  being _accepted_ was a `where` clause in a read. Acceptance now retires it
+  too, and a pg_cron sweep runs quarter-hourly where the project has the
+  extension — attempted and announced by the migration, never assumed.
+- **Five wrong codes lock a transfer, terminally.** Hiding `otp_code_hash`
+  closed the offline search; six digits with unlimited attempts through the
+  accept endpoint is still a few hours of HTTP. There is a second, per-caller
+  limit behind it, because four guesses each on a thousand cars would otherwise
+  cost nothing. Neither counter is readable by anyone, and a locked transfer is
+  refused exactly the way a wrong code is.
+
+One consequence reaches these screens without changing them: every refusal from
+acceptance now arrives as the same `Error('Incorrect code')`, so screen 8's
+«انتهت صلاحية الطلب» branch is no longer reachable from a failed accept. It
+still fires when the incoming transfer is gone. ADR-0021's amendment has the
+reasoning, including why a refusal stopped being an exception.

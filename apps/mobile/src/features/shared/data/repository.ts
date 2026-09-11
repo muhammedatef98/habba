@@ -256,6 +256,9 @@ export interface TransferAddress {
 /** Seven days, matching `ownership_transfer_window()` in migration 0054. */
 const TRANSFER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Five wrong codes, matching `transfer_attempt_limit()` in migration 0056. */
+const TRANSFER_ATTEMPT_LIMIT = 5;
+
 const MAKES: readonly VehicleMake[] = [
   { id: 'make-toyota', nameAr: 'تويوتا', nameEn: 'Toyota' },
   { id: 'make-hyundai', nameAr: 'هيونداي', nameEn: 'Hyundai' },
@@ -920,6 +923,16 @@ export class InMemoryRepository implements Repository {
    * be written against a lookup production refuses.
    */
   private readonly transferCodes = new Map<string, string>();
+  /**
+   * Transfer id → wrong codes presented so far, and whether that has locked it.
+   *
+   * Separate from the transfer for the same reason as the code above: neither
+   * counter is on any client-readable surface in production (0056), so a stub
+   * that put them on the row would let a screen be written against a lookup
+   * production refuses. Five wrong codes lock, and locked is terminal — the
+   * correct code stops working and the seller has to cancel and re-issue.
+   */
+  private readonly transferAttempts = new Map<string, number>();
   private profile: Profile | null = null;
   private application: ProviderApplication | null = null;
   private applicationType: 'individual' | 'workshop' = 'individual';
@@ -1408,12 +1421,22 @@ export class InMemoryRepository implements Repository {
     const index = this.transfers.findIndex((transfer) => transfer.id === transferId);
     const transfer = index < 0 ? undefined : this.transfers[index];
 
+    // One refusal for all of them, mirroring 0056: no such transfer, already
+    // used, lapsed, locked, addressed to someone else, wrong code. The server
+    // returns NULL for every one of these and the Supabase repository turns
+    // that into this same Error, so a screen cannot come to depend on telling
+    // them apart in development and then find it cannot in production.
     if (transfer === undefined || transfer.status !== 'pending') {
-      throw new Error('Transfer not found, already used, or expired');
+      throw new Error('Incorrect code');
     }
-    // Same refusal for a wrong code as the server gives, and deliberately the
-    // same one it gives for "this transfer is not addressed to you".
+
+    const failed = this.transferAttempts.get(transferId) ?? 0;
+    if (failed >= TRANSFER_ATTEMPT_LIMIT) {
+      throw new Error('Incorrect code');
+    }
+
     if (this.transferCodes.get(transferId) !== code) {
+      this.transferAttempts.set(transferId, failed + 1);
       throw new Error('Incorrect code');
     }
 
@@ -1422,6 +1445,7 @@ export class InMemoryRepository implements Repository {
       status: 'accepted',
     };
     this.transferCodes.delete(transferId);
+    this.transferAttempts.delete(transferId);
 
     // The car does not leave the dev account, because there is only one. The
     // timeline event is written all the same: it is what the logbook shows a

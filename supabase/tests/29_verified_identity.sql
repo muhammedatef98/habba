@@ -144,10 +144,11 @@ reset role;
 -- forwarded link must not be enough.
 set role authenticated;
 select test.become('cc111111-0000-4000-e000-000000000003');
-select test.assert_raises(
-  format($$select public.accept_ownership_transfer('%s', '%s')$$, :'tid', :'otp'),
-  'nor accept it with the right code — acceptance checks the identity too',
-  '28P01');
+select test.assert_eq(
+  public.accept_ownership_transfer((:'tid')::uuid, :'otp'),
+  null::uuid,
+  'nor accept it with the right code — acceptance checks the identity too, and '
+  'refuses it the way it refuses a wrong code (0056)');
 reset role;
 
 -- The addressed recipient accepts, and the car moves.

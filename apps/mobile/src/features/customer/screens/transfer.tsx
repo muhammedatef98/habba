@@ -151,7 +151,7 @@ export default function TransferScreen() {
       ? t('logbook.vehicleUnknown')
       : (car.nickname?.trim().length ?? 0) > 0
         ? (car.nickname as string)
-        : (describeVehicleModel(car, sources) || vehicleLabel(car, sources));
+        : describeVehicleModel(car, sources) || vehicleLabel(car, sources);
 
   const pending = outgoing.data ?? null;
   const remainingDays = pending === null ? 0 : daysUntil(pending.expiresAt);
@@ -163,7 +163,11 @@ export default function TransferScreen() {
       const parsed = parseSaudiPhone(phone);
       if (!parsed.ok) {
         setAddressError(
-          t(parsed.error === 'empty' ? 'transfer.errors.addressRequired' : 'transfer.errors.phoneShape'),
+          t(
+            parsed.error === 'empty'
+              ? 'transfer.errors.addressRequired'
+              : 'transfer.errors.phoneShape',
+          ),
         );
         return;
       }
@@ -607,11 +611,7 @@ function ExpiredTransfer({ onRestart }: { readonly onRestart: () => void }) {
         </Text>
       </Card>
 
-      <Button
-        testID="transfer-restart"
-        label={t('transfer.expiredAction')}
-        onPress={onRestart}
-      />
+      <Button testID="transfer-restart" label={t('transfer.expiredAction')} onPress={onRestart} />
     </View>
   );
 }

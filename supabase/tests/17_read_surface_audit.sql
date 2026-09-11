@@ -197,11 +197,14 @@ select test.assert_raises(
   'without the otp hash, which is not on the client-readable surface at all',
   '42501');
 
--- Wrong code is rejected without consuming the transfer.
-select test.assert_raises(
-  format($$select public.accept_ownership_transfer('%s', '000000')$$, :'xfer2'),
-  'the wrong code is rejected',
-  '28P01');
+-- Wrong code is rejected without consuming the transfer. As NULL rather than
+-- as an exception since 0056: a refusal that raised would roll back the
+-- failure counter it had just written, and a counter that rolls back cannot
+-- lock anything.
+select test.assert_eq(
+  public.accept_ownership_transfer((:'xfer2')::uuid, '000000'),
+  null::uuid,
+  'the wrong code is refused');
 
 select test.assert_eq(
   (select status from public.ownership_transfers
@@ -233,10 +236,11 @@ select test.assert(
   ),
   'the logbook records that the car changed hands');
 
-select test.assert_raises(
-  format($$select public.accept_ownership_transfer('%s', '%s')$$, :'xfer2', :'code2'),
-  'an already-accepted transfer cannot be replayed',
-  'P0002');
+select test.assert_eq(
+  public.accept_ownership_transfer((:'xfer2')::uuid, :'code2'),
+  null::uuid,
+  'an already-accepted transfer cannot be replayed — and the replay is refused '
+  'exactly the way a wrong code is (0056)');
 
 reset role;
 rollback;
@@ -286,7 +290,14 @@ create temporary table no_select_columns (table_name text, column_name text)
   on commit drop;
 insert into no_select_columns values
   ('providers', 'national_id_encrypted'),
-  ('providers', 'iban_encrypted');
+  ('providers', 'iban_encrypted'),
+  -- 0054: six digits behind sha256 is a million-candidate offline search, so a
+  -- recipient holding the hash holds the code.
+  ('ownership_transfers', 'otp_code_hash'),
+  -- 0056: how many guesses are left, and whether the row is already shut. Both
+  -- are readable only by the party who does not need to know.
+  ('ownership_transfers', 'failed_attempts'),
+  ('ownership_transfers', 'locked_at');
 
 select test.assert_eq(
   (select coalesce(string_agg(c.table_name || '.' || c.column_name, ', '), '(none)')

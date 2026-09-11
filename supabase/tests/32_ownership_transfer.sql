@@ -269,14 +269,23 @@ select public.end_privileged_write();
 
 set role authenticated;
 select test.become('ee111111-0000-4000-b000-000000000002');
-select test.assert_raises(
-  format($$select public.accept_ownership_transfer('%s', '%s')$$, :'tid2', :'otp2'),
-  'an expired transfer cannot be accepted, code or no code',
-  'P0002');
+select test.assert_eq(
+  public.accept_ownership_transfer((:'tid2')::uuid, :'otp2'),
+  null::uuid,
+  'an expired transfer cannot be accepted, code or no code');
+
 select test.assert_eq(
   (select count(*)::int from public.pending_ownership_transfer_for_me()),
   0, 'and drops out of the recipient''s preview');
 reset role;
+
+-- 0056: the attempt RETIRES the lapsed row rather than merely filtering it out.
+-- Before that, the row stayed `pending` and went on occupying the vehicle's one
+-- pending slot in `ownership_transfers_one_pending_idx`. Read outside the
+-- recipient's session, because an expired row is no longer theirs to see.
+select test.assert_eq(
+  (select status::text from public.ownership_transfers where id = (:'tid2')::uuid),
+  'expired', 'and the attempt to use it is what retired it');
 
 -- The sweep is not client-facing: called with no argument it would retire
 -- every seller's transfers.
@@ -287,8 +296,9 @@ select test.assert_raises(
   '42501');
 reset role;
 
--- Issuing a new one retires the stale row on the way past, which is what frees
--- the car from the partial unique index.
+-- The car is free again: the lapsed row no longer occupies the vehicle's one
+-- pending slot. (That initiation ALSO expires on the way past is proved in 34
+-- against a row nothing has touched — here the accept above already retired it.)
 set role authenticated;
 select test.become('ee111111-0000-4000-b000-000000000001');
 select transfer_id as tid3, code as otp3
@@ -297,8 +307,8 @@ from public.initiate_ownership_transfer(
 reset role;
 
 select test.assert_eq(
-  (select status::text from public.ownership_transfers where id = (:'tid2')::uuid),
-  'expired', 'the stale transfer is retired rather than left blocking the car');
+  (select status::text from public.ownership_transfers where id = (:'tid3')::uuid),
+  'pending', 'a lapse does not lock the car out of ever being transferred again');
 
 
 -- ---------------------------------------------------------------------------
@@ -307,10 +317,10 @@ select test.assert_eq(
 set role authenticated;
 select test.become('ee111111-0000-4000-b000-000000000002');
 
-select test.assert_raises(
-  format($$select public.accept_ownership_transfer('%s', '000000')$$, :'tid3'),
-  'a wrong code is refused',
-  '28P01');
+select test.assert_eq(
+  public.accept_ownership_transfer((:'tid3')::uuid, '000000'),
+  null::uuid,
+  'a wrong code is refused');
 
 select public.accept_ownership_transfer((:'tid3')::uuid, :'otp3');
 reset role;
@@ -354,10 +364,10 @@ reset role;
 -- Used once. A replayed code against a closed transfer must not reopen it.
 set role authenticated;
 select test.become('ee111111-0000-4000-b000-000000000002');
-select test.assert_raises(
-  format($$select public.accept_ownership_transfer('%s', '%s')$$, :'tid3', :'otp3'),
-  'an accepted transfer cannot be accepted twice',
-  'P0002');
+select test.assert_eq(
+  public.accept_ownership_transfer((:'tid3')::uuid, :'otp3'),
+  null::uuid,
+  'an accepted transfer cannot be accepted twice');
 reset role;
 
 rollback;

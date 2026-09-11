@@ -1289,11 +1289,19 @@ export class SupabaseRepository implements Repository {
       p_otp_code: code,
     });
 
-    // Left as the server wrote it. The refusals here are deliberately
-    // indistinguishable from one another — a wrong code and a transfer
-    // addressed to someone else give the same message — and rewording them on
-    // the way past would undo that.
+    // Left as the server wrote it. What still raises is deliberately narrow
+    // (0056): an unauthenticated caller, and an open warranty claim — which is
+    // reachable only by someone who has already presented the correct code, and
+    // is the one refusal a person can act on.
     if (error !== null) throw new Error(`acceptTransfer: ${error.message}`);
+
+    // Every refusal a caller must not be able to tell apart comes back as NULL
+    // rather than as an error, because an exception in Postgres is a rollback
+    // and would have discarded the attempt counters the refusal just wrote
+    // (0056). Seven different reasons, one message: no such transfer, not
+    // pending, lapsed, locked after five wrong codes, addressed to someone
+    // else, wrong code, or this caller over their hourly limit.
+    if (data === null) throw new Error('Incorrect code');
 
     return data as string;
   }
