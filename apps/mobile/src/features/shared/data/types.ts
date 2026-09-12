@@ -456,6 +456,82 @@ export interface VehicleWarranty {
   readonly hasOpenClaim: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// القادم — the care section (0058–0062, ADR-0022)
+// ---------------------------------------------------------------------------
+
+/**
+ * One tracked item on one car, with BOTH due axes reported separately.
+ *
+ * `isDue` deliberately does not carry enough information to write a sentence
+ * with. ADR-0022's rule is that a distance-based item may never be stated as a
+ * certainty — the app cannot see the odometer between readings — and a client
+ * holding only one boolean has no way to honour that. So the split survives all
+ * the way from `vehicle_maintenance_status()` to the screen, and
+ * `lib/care-language.ts` is the only thing allowed to turn it into copy.
+ *
+ * `itemType` is a string rather than a union on purpose: the catalogue it comes
+ * from is data (0059), so brakes and tyres arrive as seed rows and must not
+ * need a client release to be rendered.
+ */
+export interface MaintenanceItem {
+  readonly itemId: string;
+  readonly itemType: string;
+  readonly nameAr: string;
+  readonly nameEn: string;
+  /** What «احجز الآن» books. Null when the catalogue has no service linked. */
+  readonly serviceId: string | null;
+  readonly intervalKm: number | null;
+  readonly intervalMonths: number | null;
+  /** Lifetime km at the last service, not the cluster reading (0058). */
+  readonly lastDoneKm: number | null;
+  readonly lastDoneAt: string | null;
+  readonly dueAtKm: number | null;
+  readonly dueAtDate: string | null;
+  readonly kmRemaining: number | null;
+  readonly daysRemaining: number | null;
+  readonly dueByKm: boolean;
+  readonly dueByDate: boolean;
+  readonly isDue: boolean;
+  readonly isApproaching: boolean;
+  /** True whenever the distance axis is in play. See ADR-0022. */
+  readonly kmIsEstimated: boolean;
+  readonly snoozedUntil: string | null;
+  /** When the odometer was last actually read. How stale the estimate is. */
+  readonly lastReadingAt: string | null;
+}
+
+export type VehicleDocumentType = 'registration' | 'insurance' | 'periodic_inspection';
+
+/**
+ * الاستمارة، التأمين، الفحص الدوري — the only part of القادم that is certain.
+ *
+ * An expiry date is a date somebody read off a document. Nothing is inferred,
+ * so nothing is hedged, and that contrast is what makes the hedging on the
+ * maintenance side read as honesty rather than as vagueness.
+ */
+export interface VehicleDocument {
+  readonly documentId: string;
+  readonly docType: VehicleDocumentType;
+  readonly expiresAt: string;
+  readonly daysRemaining: number;
+  readonly isExpired: boolean;
+  readonly isExpiring: boolean;
+}
+
+/**
+ * The two questions asked when a car is added, and no more (ADR-0022).
+ *
+ * Both optional, and approximate answers are expected — the screen says so.
+ * An empty baseline is a valid answer: it leaves the section waiting rather
+ * than blocking the car from being added.
+ */
+export interface VehicleCareBaseline {
+  readonly odometerKm?: number | undefined;
+  readonly lastOilKm?: number | undefined;
+  readonly lastOilAt?: string | undefined;
+}
+
 // Re-exported here (not just from @habba/core) so every screen imports domain
 // types from one place — data/types.ts — rather than mixing import sources.
 export type { FulfilmentMode, OrderStatus };

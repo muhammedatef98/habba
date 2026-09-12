@@ -25,6 +25,7 @@ import {
   SAUDI_VAT_RATE,
 } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
+import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-language.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
@@ -37,6 +38,7 @@ import type {
   DispatchTelemetry,
   JobProgress,
   MaintenanceAlert,
+  MaintenanceItem,
   OrderSummary,
   NewBookingInput,
   NewEmergencyOrderInput,
@@ -56,6 +58,8 @@ import type {
   TimelineEvent,
   UserRole,
   Vehicle,
+  VehicleCareBaseline,
+  VehicleDocument,
   VehicleMake,
   VehicleModel,
   VehicleWarranty,
@@ -255,6 +259,35 @@ export interface Repository {
    * cover and cannot read the order that carries it.
    */
   listVehicleWarranties(vehicleId: string): Promise<readonly VehicleWarranty[]>;
+
+  // القادم — the care section (0058–0062, ADR-0022).
+  //
+  // Note what is missing here too: nothing records an odometer reading. That
+  // is `recordMileage`, which since 0058 writes the series AND the logbook in
+  // one call — a second method would be a second way to say the same thing and
+  // the two would drift.
+  /**
+   * What this car is due for, with both due axes reported separately.
+   *
+   * The split is not detail: the app cannot see the odometer between readings,
+   * so a distance-based item is an estimate permanently, and only
+   * `lib/care-language.ts` may turn these fields into a sentence.
+   */
+  listMaintenanceItems(vehicleId: string): Promise<readonly MaintenanceItem[]>;
+  /** الاستمارة، التأمين، الفحص الدوري — expiry dates, which ARE certain. */
+  listVehicleDocuments(vehicleId: string): Promise<readonly VehicleDocument[]>;
+  /**
+   * The two questions asked when a car is added, and no more.
+   *
+   * Approximate answers are expected and the screen says so. Called after
+   * `addVehicle`, never instead of it: a car that is added and then fails here
+   * is still on file.
+   */
+  startVehicleCare(vehicleId: string, baseline: VehicleCareBaseline): Promise<void>;
+  /** «تم» — done outside Habba. Recorded at where the car is now. */
+  markMaintenanceItemDone(itemId: string): Promise<void>;
+  /** «ذكّرني لاحقًا» — silences the notification, not the row. */
+  snoozeMaintenanceItem(itemId: string, days: number): Promise<void>;
 }
 
 /** Exactly one of `phone` or `email` — the server refuses both and neither. */
@@ -522,6 +555,60 @@ const EMERGENCY_SERVICES: readonly Service[] = [
  * `requiresVehicle: false` because the whole point is that the car is not
  * yours yet (§7 — the inspection is how the buyer becomes a customer).
  */
+/**
+ * The two items 0059 seeds, mirrored for the dev repository.
+ *
+ * Both point at the SAME service, which is not a mistake to tidy up:
+ * «تغيير زيت وفلتر» is one job and one invoice line, and two things that wear.
+ * One completed order closes both, which is what `absorbOrderIntoCare` proves.
+ */
+interface CareItemRow {
+  readonly itemId: string;
+  readonly itemType: string;
+  readonly nameAr: string;
+  readonly nameEn: string;
+  readonly serviceId: string | null;
+  readonly intervalKm: number | null;
+  readonly intervalMonths: number | null;
+  readonly lastDoneKm: number | null;
+  readonly lastDoneAt: string | null;
+  readonly snoozedUntil: string | null;
+}
+
+const SEEDED_CARE_ITEMS = [
+  {
+    itemType: 'engine_oil',
+    nameAr: 'زيت المحرك',
+    nameEn: 'Engine oil',
+    serviceId: 'svc-oil',
+    intervalKm: 7000,
+    intervalMonths: 6,
+  },
+  {
+    itemType: 'oil_filter',
+    nameAr: 'فلتر الزيت',
+    nameEn: 'Oil filter',
+    serviceId: 'svc-oil',
+    intervalKm: 7000,
+    intervalMonths: 6,
+  },
+] as const;
+
+function addMonths(from: string, months: number): string | null {
+  const start = new Date(from);
+  if (Number.isNaN(start.getTime())) return null;
+  const due = new Date(start);
+  due.setMonth(due.getMonth() + months);
+  return due.toISOString().slice(0, 10);
+}
+
+/** Negative once the date has passed, which is what "overdue" reads from. */
+function wholeDaysUntil(date: string, now: number = Date.now()): number {
+  const target = new Date(date).getTime();
+  if (Number.isNaN(target)) return 0;
+  return Math.ceil((target - now) / (24 * 60 * 60 * 1000));
+}
+
 const BOOKABLE_SERVICES: readonly Service[] = [
   {
     id: 'svc-oil',
@@ -948,6 +1035,16 @@ export class InMemoryRepository implements Repository {
   private application: ProviderApplication | null = null;
   private applicationType: 'individual' | 'workshop' = 'individual';
   private counter = 0;
+  /**
+   * vehicle id → the car's own maintenance schedule.
+   *
+   * Mutable rows, unlike the `MaintenanceItem` the interface returns: the due
+   * fields on that type are DERIVED (0059 computes them in SQL), and storing
+   * them would let the stub hold a due state that no longer follows from the
+   * car's mileage — which is exactly the bug the server design avoids.
+   */
+  private readonly careItems = new Map<string, CareItemRow[]>();
+  private readonly careDocuments = new Map<string, VehicleDocument[]>();
 
   async listMakes() {
     return MAKES;
@@ -1325,6 +1422,9 @@ export class InMemoryRepository implements Repository {
       attachments: [],
     });
     this.timeline.set(order.vehicleId, events);
+
+    // 0061: a closed job fills the care section in, with nobody typing.
+    this.absorbOrderIntoCare(order.vehicleId, order.serviceId);
   }
 
   async rateOrder(): Promise<void> {
@@ -1524,6 +1624,154 @@ export class InMemoryRepository implements Repository {
     // for cover that does not exist — the exact lie ADR-0021 was written to
     // stop the report telling.
     return [];
+  }
+
+  // القادم ------------------------------------------------------------------
+  // The stub computes the due state the same way 0059 does — from the car's
+  // current mileage and the dates on the row — rather than storing it. A stub
+  // that stored "due" would let a screen be written against a flag the server
+  // does not have, and would go on saying an item was due after the mileage
+  // that made it due had been superseded.
+
+  async startVehicleCare(vehicleId: string, baseline: VehicleCareBaseline): Promise<void> {
+    const vehicle = this.vehicles.get(vehicleId);
+    if (vehicle === undefined) throw new Error('not_found');
+
+    if (baseline.odometerKm !== undefined && baseline.odometerKm > 0) {
+      await this.recordMileage(vehicleId, baseline.odometerKm);
+    }
+
+    const existing = this.careItems.get(vehicleId) ?? [];
+    const rows = SEEDED_CARE_ITEMS.map((seed) => {
+      const found = existing.find((row) => row.itemType === seed.itemType);
+      if (found !== undefined) return found;
+      return {
+        itemId: `care-${vehicleId}-${seed.itemType}`,
+        ...seed,
+        // `??` rather than an overwrite, mirroring the server: a car that
+        // already has real history must not have it replaced by an estimate.
+        lastDoneKm: baseline.lastOilKm ?? null,
+        lastDoneAt: baseline.lastOilAt ?? null,
+        snoozedUntil: null,
+      } satisfies CareItemRow;
+    });
+
+    this.careItems.set(vehicleId, rows);
+  }
+
+  async listMaintenanceItems(vehicleId: string): Promise<readonly MaintenanceItem[]> {
+    const vehicle = this.vehicles.get(vehicleId);
+    const rows = this.careItems.get(vehicleId) ?? [];
+    const nowKm = vehicle?.currentMileage ?? 0;
+
+    return rows.map((row) => {
+      const dueAtKm =
+        row.intervalKm !== null && row.lastDoneKm !== null ? row.lastDoneKm + row.intervalKm : null;
+      const dueAtDate =
+        row.intervalMonths !== null && row.lastDoneAt !== null
+          ? addMonths(row.lastDoneAt, row.intervalMonths)
+          : null;
+      const kmRemaining = dueAtKm === null ? null : dueAtKm - nowKm;
+      const daysRemaining = dueAtDate === null ? null : wholeDaysUntil(dueAtDate);
+      const dueByKm = kmRemaining !== null && kmRemaining <= 0;
+      const dueByDate = daysRemaining !== null && daysRemaining <= 0;
+
+      return {
+        itemId: row.itemId,
+        itemType: row.itemType,
+        nameAr: row.nameAr,
+        nameEn: row.nameEn,
+        serviceId: row.serviceId,
+        intervalKm: row.intervalKm,
+        intervalMonths: row.intervalMonths,
+        lastDoneKm: row.lastDoneKm,
+        lastDoneAt: row.lastDoneAt,
+        dueAtKm,
+        dueAtDate,
+        kmRemaining,
+        daysRemaining,
+        dueByKm,
+        dueByDate,
+        isDue: dueByKm || dueByDate,
+        isApproaching:
+          (kmRemaining !== null && kmRemaining <= CARE_LEAD_KM) ||
+          (daysRemaining !== null && daysRemaining <= CARE_LEAD_DAYS),
+        // Always, whenever the distance axis is in play. ADR-0022.
+        kmIsEstimated: row.intervalKm !== null,
+        snoozedUntil: row.snoozedUntil,
+        // The stub has no reading timestamp of its own; the screen treats
+        // null as "we do not know how stale this is", which is the truth.
+        lastReadingAt: null,
+      } satisfies MaintenanceItem;
+    });
+  }
+
+  async listVehicleDocuments(vehicleId: string): Promise<readonly VehicleDocument[]> {
+    return (this.careDocuments.get(vehicleId) ?? []).map((document) => {
+      const daysRemaining = wholeDaysUntil(document.expiresAt);
+      return {
+        ...document,
+        daysRemaining,
+        isExpired: daysRemaining < 0,
+        isExpiring: daysRemaining <= CARE_LEAD_DAYS,
+      };
+    });
+  }
+
+  async markMaintenanceItemDone(itemId: string): Promise<void> {
+    this.updateCareItem(itemId, (row, vehicleId) => ({
+      ...row,
+      lastDoneKm: this.vehicles.get(vehicleId)?.currentMileage ?? row.lastDoneKm,
+      lastDoneAt: new Date().toISOString(),
+      // A snooze was a request to be asked again about something outstanding.
+      snoozedUntil: null,
+    }));
+  }
+
+  async snoozeMaintenanceItem(itemId: string, days: number): Promise<void> {
+    const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    this.updateCareItem(itemId, (row) => ({ ...row, snoozedUntil: until }));
+  }
+
+  private updateCareItem(
+    itemId: string,
+    change: (row: CareItemRow, vehicleId: string) => CareItemRow,
+  ): void {
+    for (const [vehicleId, rows] of this.careItems) {
+      const index = rows.findIndex((row) => row.itemId === itemId);
+      if (index === -1) continue;
+      const next = [...rows];
+      next[index] = change(rows[index] as CareItemRow, vehicleId);
+      this.careItems.set(vehicleId, next);
+      return;
+    }
+    throw new Error('not_found');
+  }
+
+  /**
+   * 0061's auto-fill, mirrored.
+   *
+   * Without it the dev section decays exactly as the real one would have: the
+   * owner books an oil change through the app, it completes, and the schedule
+   * goes on saying the oil is overdue. A stub that let that happen would make
+   * the section look broken in development and hide the migration that stops
+   * it in production.
+   */
+  private absorbOrderIntoCare(vehicleId: string, serviceId: string): void {
+    const rows = this.careItems.get(vehicleId);
+    if (rows === undefined) return;
+
+    const now = new Date().toISOString();
+    const mileage = this.vehicles.get(vehicleId)?.currentMileage ?? null;
+
+    this.careItems.set(
+      vehicleId,
+      rows.map((row) =>
+        row.serviceId === serviceId
+          ? { ...row, lastDoneKm: mileage, lastDoneAt: now, snoozedUntil: null }
+          : row,
+      ),
+    );
   }
 
   private expireTransfers(): void {

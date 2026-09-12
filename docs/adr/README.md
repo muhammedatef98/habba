@@ -28,6 +28,10 @@ the record itself rather than left to be inferred.
 | [0015](0015-local-verification-harness.md)                  | Postgres + PostGIS + PostgREST harness, no Docker                    | **Accepted** | Phase 1                              |
 | [0016](0016-roles-as-a-join-table.md)                       | Roles as `user_roles`; one app, two route groups                     | **Accepted** | Phase 1 (Amendment A)                |
 | [0017](0017-report-qr-and-kyc-sealing.md)                   | In-page report QR; KYC sealing seam (stub pending 0010)              | **Accepted** | Phase 2                              |
+| [0019](0019-report-as-in-app-pdf.md)                        | تقرير هبّة as a PDF generated on the device, not a public page       | **Accepted** | Phase 2                              |
+| [0020](0020-email-identity-and-verification.md)             | Email as a second way in, and what "verified" means                  | **Accepted** | Phase 1                              |
+| [0021](0021-warranty-follows-the-car.md)                    | **A warranty follows the car, not the payer**                        | **Accepted** | Phase 3                              |
+| [0022](0022-odometer-series-and-the-notification-cap.md)    | Odometer as a series; one notification per vehicle per day           | **Accepted** | Phase 4                              |
 
 ## Blocking Phase 1
 

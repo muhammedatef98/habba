@@ -92,7 +92,13 @@
       "mileageImplausible": "Check that reading — the number doesn't look right.",
       "saveFailed": "We couldn't save this vehicle. Check your connection and try again."
     },
-    "mileageHint": "Helps us predict when the next service is due"
+    "mileageHint": "Helps us predict when the next service is due",
+    "lastOilLabel": "Last oil change",
+    "lastOilHint": "Approximate is fine — the reading or the date, whichever you remember.",
+    "lastOilKmLabel": "At what mileage?",
+    "lastOilMonthsLabel": "Or how many months ago?",
+    "lastOilMonths": "{{count}} months ago",
+    "lastOilUnknown": "I do not remember"
   },
   "logbook": {
     "title": "Vehicle logbook",
@@ -676,5 +682,36 @@
     "warrantiesBody": "A warranty follows the car. If ownership moves, it moves with it.",
     "warrantyRemaining": "{{days}} days left",
     "warrantyOpenClaim": "Claim open"
+  },
+  "care": {
+    "title": "Coming up",
+    "subtitle": "What your car needs soon — and which parts of that are certain.",
+    "happened": "What happened",
+    "empty": "Nothing tracked yet. Add your last oil change and we will follow it from there.",
+    "nothingDue": "Nothing due soon. We will tell you when something is.",
+    "estimateNote": "Distance estimates come from your last odometer reading. Confirm it to sharpen them.",
+    "lastReading": "Last reading: {{date}}",
+    "lastReadingUnknown": "No recent odometer reading",
+    "updateReading": "Confirm your odometer",
+    "done": "Done",
+    "snooze": "Remind me later",
+    "book": "Book now",
+    "snoozedUntil": "Snoozed until {{date}}",
+    "item": {
+      "dueNow": "Due now",
+      "likelyDue": "Likely due — confirm your odometer",
+      "inDays": "In {{days}} days",
+      "afterKm": "Expected in about {{km}} km — confirm your odometer",
+      "unknown": "We do not know when this was last done — tell us and we will track it"
+    },
+    "doc": {
+      "title": "Car documents",
+      "expired": "Expired {{days}} days ago",
+      "today": "Expires today",
+      "inDays": "Expires in {{days}} days",
+      "registration": "Registration",
+      "insurance": "Insurance",
+      "periodic_inspection": "Periodic inspection"
+    }
   }
 }
