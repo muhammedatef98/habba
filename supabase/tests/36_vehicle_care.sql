@@ -11,7 +11,10 @@
 --   * a snoozed item is silent, and an item already sent stays silent for the
 --     repeat window (§9);
 --   * odometer history, the schedule and the documents follow the car through a
---     handover — and the reminder history does not (§11).
+--     handover — and neither the reminder history nor the seller's snooze does
+--     (§11);
+--   * `vehicles.current_mileage` is the series head and nothing else, for every
+--     vehicle in the database (§13).
 
 \echo '── vehicle care'
 
@@ -101,6 +104,13 @@ select test.assert_eq(
   (select interval_km from public.vehicle_maintenance_items
    where vehicle_id = 'cc000000-0000-4000-c000-0000000000a1' and item_type = 'engine_oil'),
   7000, 'the item starts on the catalogue default');
+
+-- 0063. `vehicles.current_mileage` is no longer a number of its own; it is the
+-- head of the series, written by one trigger.
+select test.assert_eq(
+  (select current_mileage from public.vehicles
+   where id = 'cc000000-0000-4000-c000-0000000000a1'),
+  80000, 'and the vehicle row shows the series head, not a number of its own');
 
 
 -- ---------------------------------------------------------------------------
@@ -194,6 +204,14 @@ select test.assert_eq(
    order by r.series desc, r.km desc, r.recorded_at desc limit 1),
   2, 'as a new series, not as an edit');
 
+-- THE assertion 0063 exists for. Under `greatest()` this column would still
+-- read 240,000 — and تقرير هبّة would print 240,000 for a car whose dashboard
+-- says 0, which is the report lying in public.
+select test.assert_eq(
+  (select current_mileage from public.vehicles
+   where id = 'cc000000-0000-4000-c000-0000000000a2'),
+  0, 'and the vehicle row FALLS with it, because the odometer is no longer monotonic');
+
 -- What the rule in §2 would otherwise have made impossible forever.
 select public.record_mileage('cc000000-0000-4000-c000-0000000000a2', 300);
 select test.assert_eq(
@@ -226,6 +244,11 @@ select test.assert_eq(
   (select count(*)::int from public.vehicle_odometer_readings
    where vehicle_id = 'cc000000-0000-4000-c000-0000000000a2'),
   4, 'and nothing was deleted: every reading ever taken is still there');
+
+select test.assert_eq(
+  (select current_mileage from public.vehicles
+   where id = 'cc000000-0000-4000-c000-0000000000a2'),
+  500, 'a correction moves the vehicle row too — one number, one writer');
 
 -- A car with no readings has nothing to replace, and allowing it would mint a
 -- series whose offset nothing supports.
@@ -669,6 +692,20 @@ select test.assert_eq(
    where vehicle_id = 'cc000000-0000-4000-c000-0000000000a1'),
   0, 'and none of the reminder history');
 
+-- Nor the seller's deferrals (0063). §9 snoozed the oil for thirty days; a
+-- buyer who inherited that would open the section on the day they bought the
+-- car and be told nothing about the one thing it is actually overdue for.
+select test.assert_eq(
+  (select count(*)::int from public.vehicle_maintenance_items
+   where vehicle_id = 'cc000000-0000-4000-c000-0000000000a1'
+     and snoozed_until is not null),
+  0, 'and not the seller''s «ذكّرني لاحقاً» either');
+
+select test.assert_eq(
+  (select is_due from public.vehicle_maintenance_status(
+     'cc000000-0000-4000-c000-0000000000a1') where item_type = 'engine_oil'),
+  true, 'so the buyer is told on day one what the car is actually due for');
+
 reset role;
 set role authenticated;
 select test.become('cc111111-0000-4000-c000-000000000001');
@@ -706,6 +743,14 @@ select test.assert_eq(
   'cc111111-0000-4000-c000-000000000002'::uuid,
   'and the reminder is addressed to them, not to the previous owner');
 
+-- The strongest form of the assertion above: the item the SELLER silenced is
+-- the one the BUYER is told about.
+select test.assert_eq(
+  (select count(*)::int from public.vehicle_reminders r,
+     lateral jsonb_array_elements(r.items) e
+   where r.id = (:'buyers')::uuid and e ->> 'key' = 'engine_oil'),
+  1, 'including the item the seller had snoozed');
+
 
 -- ---------------------------------------------------------------------------
 -- 12. The sweep says whether it is actually scheduled
@@ -730,6 +775,37 @@ select test.assert_raises(
   'and neither is the question of whether it is scheduled',
   '42501');
 reset role;
+
+
+-- ---------------------------------------------------------------------------
+-- 13. One number, asserted across the whole database
+-- ---------------------------------------------------------------------------
+-- 0063's claim is that `vehicles.current_mileage` is DERIVED — the head of the
+-- series and nothing else. A claim like that is worth exactly as much as the
+-- test that walks every row and checks it, because the way it fails is that
+-- somebody adds a second writer and nothing complains.
+--
+-- Every vehicle in the database, not only this suite's: the fixtures above and
+-- every other suite's cars have all been through the timeline path, which is
+-- where a reintroduced `greatest()` would live.
+select test.assert_eq(
+  (select coalesce(string_agg(v.id::text || ' (' || v.current_mileage || ' vs '
+                              || coalesce(h.km::text, 'null') || ')', ', '), '(none)')
+   from public.vehicles v
+   cross join lateral public.odometer_head(v.id) h
+   where v.current_mileage is distinct from h.km),
+  '(none)',
+  'every vehicle with readings shows its series head, and nothing else');
+
+-- And the other half of the same claim: a car that has told us a mileage has a
+-- series to hold it, so the fallback in vehicle_lifetime_km is for cars that
+-- have told us nothing rather than for cars that used the old screen.
+select test.assert_eq(
+  (select count(*)::int from public.vehicles v
+   where v.current_mileage > 0
+     and not exists (
+       select 1 from public.vehicle_odometer_readings r where r.vehicle_id = v.id)),
+  0, 'and a stated mileage always seeded a series to hold it');
 
 rollback;
 

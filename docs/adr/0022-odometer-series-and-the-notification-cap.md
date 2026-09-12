@@ -1,7 +1,7 @@
 # ADR-0022 — The odometer is a series, and one car gets one notification a day
 
 **Status:** accepted
-**Date:** 2026-09-11
+**Date:** 2026-09-11 (amended 2026-09-12 — see 0063)
 **Builds on:** ADR-0003 (append-only), ADR-0004 (concurrency), ADR-0010 (retention),
 ADR-0012 (client-asserted time), ADR-0021 (what follows the car)
 
@@ -88,15 +88,67 @@ Nothing is edited and nothing is deleted. A correction is a new reading that
 re-anchors the scale, and the readings that were wrong stay visible as the record
 of what was believed — ADR-0003's rule, which was never special to the timeline.
 
-### What this does not fix
+### `vehicles.current_mileage` is derived from the head (amended, 0063)
 
-`vehicles.current_mileage` is still raised by `greatest()` and still ends up
-holding the pre-swap high-water mark. It is left alone: the series is the
-authority for everything in this slice, the column is what the home screen and
-0028 already read, and rewriting it would change behaviour in three features this
-slice is not about. The asymmetry is recorded here rather than in a comment
-because the next person to touch mileage needs to know which of the two is the
-answer.
+**This section originally said the column was left alone and recorded the
+asymmetry as documentation. That was wrong and is superseded.** Two places
+holding the same number is not something a comment fixes, and the stale one was
+the one تقرير هبّة PRINTS: on a car whose cluster had been replaced the report
+would have gone on showing the old cluster's high-water mark. A report that
+overstates a car's odometer is the same failure ADR-0021 was written to stop,
+in the same place, in front of the same buyer.
+
+Every reader was surveyed before choosing between deriving the column and
+dropping it:
+
+| reader                                 | wants                                |
+| -------------------------------------- | ------------------------------------ |
+| `generate_habba_report` (0014/0046)    | the number on the dashboard          |
+| `estimate_current_mileage` (0028)      | a fallback when the timeline is bare |
+| `record_mileage` (0058)                | the floor a new reading must clear   |
+| `vehicle_lifetime_km` (0058)           | a fallback when the series is empty  |
+| the provider's job list                | the reading on the car it joined     |
+| `convert_inspection_to_vehicle` (0033) | the reading the inspection took      |
+
+Not one wants a high-water mark. Every one wants `odometer_head().km`.
+
+**Decision: derive it.** 0040 dropped `profiles.role` and the argument there
+does not transfer — a stale role is a live privilege claim, and no reader
+needed it as a column. Here two readers do: the report reads it off the
+`vehicles` row it has already selected, and the provider's job list gets it
+through a nested select in one round trip. Replacing those with a function call
+per row is a worse system, not a cleaner one.
+
+What makes "derived" true rather than asserted, all in 0063:
+
+- exactly **one** writer, `sync_vehicle_odometer()`, on insert into the series —
+  and it RECOMPUTES from `odometer_head()` rather than trusting the row that
+  fired it, because after `replace_odometer_cluster` the head is whichever
+  reading is highest in the highest series;
+- `append_vehicle_timeline_event` stops writing the column and **feeds the
+  series** instead, so every mileage the product captures — a manual reading, a
+  backfilled past service, an inspection's subject mileage, a technician's
+  completion reading — arrives by one road, where before only the two paths
+  0058 and 0061 wired by hand did;
+- the client cannot write it at all (0034's guard, unchanged);
+- a vehicle created with a stated mileage **seeds** the series, so "has
+  readings" means "has ever told us anything" rather than "used the new screen"
+  — without which the first honest backfill would have become the head and
+  dragged the column down to it;
+- and `supabase/tests/36` walks **every vehicle in the database** asserting
+  `current_mileage = odometer_head().km`, because the way a claim like this
+  fails is that somebody adds a second writer and nothing complains.
+
+`greatest()` is gone. The column can now fall, which is the entire defect. It
+remains what it always was for a car that has told us nothing: the value stated
+when the car was added, which is also what `vehicle_lifetime_km` falls back to.
+
+One consequence of feeding the series from the timeline had to be handled
+explicitly. `end_privileged_write()` is a single transaction-local GUC, so a
+nested call that closes it closes it for the caller too — reopening the hole
+0033 exists to close, for the rest of that transaction. Every function 0063
+touches now saves the flag and restores it (`end_privileged_write_unless`)
+rather than assuming it found nothing open.
 
 ### `record_mileage` had to be rebuilt, not merely added to
 
@@ -106,13 +158,13 @@ reading from the new cluster would have been refused for being lower than one
 this cluster has never shown — the mileage screen would have become permanently
 unusable on exactly the cars 0058 exists for.
 
-So the comparison moves to the series head, and the same call now writes both
-representations: the reading (what predictions are computed from) and the
-timeline event (what the owner and a buyer read). **One call, so the two cannot
-disagree.** An explicitly backdated low reading is still accepted — backfilling
-history is the point of Phase 2 — and goes to the timeline only, where it is
-history, never to the series, where it would break the one invariant the series
-has.
+So the comparison moves to the series head. It first wrote both
+representations itself — the reading and the timeline event — and since 0063 it
+writes only the timeline event, because the timeline is what feeds the series.
+**One road in, so the two cannot disagree.** An explicitly backdated low reading
+is still accepted — backfilling history is the point of Phase 2 — and reaches
+the timeline, where it is history; the series refuses it on its own terms,
+because taking it would break the one invariant the series has.
 
 ---
 
@@ -270,8 +322,12 @@ ever tells them, and it is answered by closing the app.
 ## Consequences
 
 - `record_mileage` keeps its signature and its return type but changes what it
-  compares against and now writes two rows. Callers are unaffected; the mileage
-  screen needed no change.
+  compares against. Callers are unaffected; the mileage screen needed no change.
+- `append_vehicle_timeline_event` no longer writes `vehicles.current_mileage`, and
+  writes an odometer reading instead. Every existing caller — past services,
+  inspections, order completions — therefore feeds the series without being
+  changed, and `absorb_order_into_vehicle_care` (0061) stops appending a reading of
+  its own.
 - `vehicle_maintenance_items` and `vehicle_documents` are **owner-writable with no
   column guard**, unlike `orders`, `vehicles` or `providers`. Nothing on them is a
   trust surface: no money, no dispatch, no provenance, and no line on تقرير هبّة,
@@ -282,15 +338,32 @@ ever tells them, and it is answered by closing the app.
   `vehicle_timeline`. A car with readings cannot be deleted — which is what
   append-only means, and is better than a cascade the immutable trigger would
   refuse as a confusing foreign-key error.
-- **A snooze transfers with the car.** `snoozed_until` is a column on
-  `vehicle_maintenance_items`, which is keyed on the vehicle, so a buyer inherits a
-  deferral the seller set. Accepted rather than fixed: clearing snoozes would mean
-  coupling `accept_ownership_transfer` to this slice, the item is still listed on
-  the screen (the snooze silences the notification, not the row), and the buyer can
-  act on it. Worth revisiting if it surprises anybody.
+- **A snooze does NOT transfer with the car (amended, 0063).** This originally
+  read the other way and accepted the inheritance to avoid coupling ownership
+  change to this slice. That was the wrong trade: the schedule is a fact about the
+  car and a deferral is a fact about a person, and the consequence was that a
+  buyer's first experience of the section was a screen saying nothing about a car
+  that was overdue. §1.3 calls the handover the acquisition moment; silence is not
+  one.
+
+  The coupling is accepted and placed on `vehicles.owner_id` rather than inside
+  `accept_ownership_transfer`. The narrower coupling would have been the weaker
+  guarantee: ownership also moves when ops corrects a mistake, and will move by
+  whatever path is written next. A trigger on the fact cannot be routed around.
+  Only `snoozed_until` is cleared — the schedule, the series and the documents all
+  belong to the car and still travel with it.
+
 - `file_path` on `vehicle_documents` exists and is written by nothing. Deliberate:
   when uploads arrive they are a screen and a storage policy in the shape 0048
   used, not a migration against a table that by then has rows in every project.
-- Nothing migrates. Every table is new, every existing car starts with no readings
-  and falls back to `vehicles.current_mileage`, and no reminder can be sent about a
-  car whose owner has told us nothing.
+- **0063 migrates, and it is the only part of this ADR that does.** Every vehicle
+  carrying a stated mileage and no readings is seeded with one, and every vehicle
+  with readings is brought onto the derived value, in one backfill at the foot of
+  the migration. On a fresh database both statements match zero rows, which is why
+  they are safe to run unconditionally. Everything else here is new tables and new
+  functions: no reminder can be sent about a car whose owner has told us nothing,
+  and no existing row changes meaning.
+- There is still no client path to `replace_odometer_cluster`. The RPC is granted
+  and tested, and `record_mileage`'s refusal names it, but no screen calls it — so
+  an owner whose cluster was swapped currently needs support. That is a screen, not
+  a migration, and it belongs with the next pass over the vehicle screens.
