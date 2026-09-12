@@ -219,7 +219,13 @@ describe.skipIf(!harnessUp)('the care section against real PostgREST + RLS', () 
 
     const documents = await repo.listVehicleDocuments(vehicleId);
     const insurance = documents.find((document) => document.docType === 'insurance');
-    expect(insurance?.daysRemaining).toBe(5);
+    // 4 or 5, not exactly 5. `expires_at` is a UTC date built here and
+    // `days_remaining` is `expires_at - current_date` evaluated in the
+    // database's timezone — so a run either side of local midnight legitimately
+    // differs by a day. Pinning 5 would be a test that fails at 3am for a
+    // reason that has nothing to do with the code.
+    expect(insurance?.daysRemaining).toBeGreaterThanOrEqual(4);
+    expect(insurance?.daysRemaining).toBeLessThanOrEqual(5);
     expect(insurance?.isExpiring).toBe(true);
     expect(insurance?.isExpired).toBe(false);
     // `file_path` is reserved and written by nothing in this slice (0060).
