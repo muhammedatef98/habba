@@ -30,6 +30,7 @@ import type {
   JobProgress,
   IncomingTransfer,
   MaintenanceAlert,
+  MaintenanceItem,
   MintedTransfer,
   OrderSummary,
   OwnershipTransfer,
@@ -51,6 +52,9 @@ import type {
   TimelineEvent,
   UserRole,
   Vehicle,
+  VehicleCareBaseline,
+  VehicleDocument,
+  VehicleDocumentType,
   VehicleMake,
   VehicleModel,
   VehicleWarranty,
@@ -375,6 +379,38 @@ interface VehicleWarrantyRow {
   readonly warranty_expires_at: string;
   readonly days_remaining: number;
   readonly has_open_claim: boolean;
+}
+
+interface MaintenanceItemRow {
+  readonly item_id: string;
+  readonly item_type: string;
+  readonly name_ar: string;
+  readonly name_en: string;
+  readonly service_id: string | null;
+  readonly interval_km: number | null;
+  readonly interval_months: number | null;
+  readonly last_done_km: number | null;
+  readonly last_done_at: string | null;
+  readonly due_at_km: number | null;
+  readonly due_at_date: string | null;
+  readonly km_remaining: number | null;
+  readonly days_remaining: number | null;
+  readonly due_by_km: boolean;
+  readonly due_by_date: boolean;
+  readonly is_due: boolean;
+  readonly is_approaching: boolean;
+  readonly km_is_estimated: boolean;
+  readonly snoozed_until: string | null;
+  readonly last_reading_at: string | null;
+}
+
+interface VehicleDocumentRow {
+  readonly document_id: string;
+  readonly doc_type: VehicleDocumentType;
+  readonly expires_at: string;
+  readonly days_remaining: number;
+  readonly is_expired: boolean;
+  readonly is_expiring: boolean;
 }
 
 function unwrap<T>(
@@ -1343,5 +1379,92 @@ export class SupabaseRepository implements Repository {
       daysRemaining: row.days_remaining,
       hasOpenClaim: row.has_open_claim,
     }));
+  }
+
+  // القادم -------------------------------------------------------------------
+
+  async listMaintenanceItems(vehicleId: string): Promise<readonly MaintenanceItem[]> {
+    const { data, error } = await this.client.rpc('vehicle_maintenance_status', {
+      p_vehicle_id: vehicleId,
+    });
+
+    if (error !== null) throw new Error(`listMaintenanceItems: ${error.message}`);
+
+    return ((data as readonly MaintenanceItemRow[] | null) ?? []).map((row) => ({
+      itemId: row.item_id,
+      itemType: row.item_type,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      serviceId: row.service_id,
+      intervalKm: row.interval_km,
+      intervalMonths: row.interval_months,
+      lastDoneKm: row.last_done_km,
+      lastDoneAt: row.last_done_at,
+      dueAtKm: row.due_at_km,
+      dueAtDate: row.due_at_date,
+      kmRemaining: row.km_remaining,
+      daysRemaining: row.days_remaining,
+      // Both axes, carried through unflattened. Collapsing them here would
+      // leave the screen unable to honour ADR-0022's rule about what it may
+      // claim, and the rule would be lost in the data layer rather than
+      // debated in the one that renders.
+      dueByKm: row.due_by_km,
+      dueByDate: row.due_by_date,
+      isDue: row.is_due,
+      isApproaching: row.is_approaching,
+      kmIsEstimated: row.km_is_estimated,
+      snoozedUntil: row.snoozed_until,
+      lastReadingAt: row.last_reading_at,
+    }));
+  }
+
+  async listVehicleDocuments(vehicleId: string): Promise<readonly VehicleDocument[]> {
+    const { data, error } = await this.client.rpc('vehicle_document_status', {
+      p_vehicle_id: vehicleId,
+    });
+
+    if (error !== null) throw new Error(`listVehicleDocuments: ${error.message}`);
+
+    return ((data as readonly VehicleDocumentRow[] | null) ?? []).map((row) => ({
+      documentId: row.document_id,
+      docType: row.doc_type,
+      expiresAt: row.expires_at,
+      daysRemaining: row.days_remaining,
+      isExpired: row.is_expired,
+      isExpiring: row.is_expiring,
+    }));
+  }
+
+  async startVehicleCare(vehicleId: string, baseline: VehicleCareBaseline): Promise<void> {
+    // One RPC, not three writes. The baseline has to land atomically: a car
+    // whose odometer saved and whose oil answer did not is a car the section
+    // will confidently tell the owner is overdue.
+    const { error } = await this.client.rpc('start_vehicle_care', {
+      p_vehicle_id: vehicleId,
+      p_odometer_km: baseline.odometerKm ?? null,
+      p_last_oil_km: baseline.lastOilKm ?? null,
+      p_last_oil_at: baseline.lastOilAt ?? null,
+    });
+
+    if (error !== null) throw new Error(`startVehicleCare: ${error.message}`);
+  }
+
+  async markMaintenanceItemDone(itemId: string): Promise<void> {
+    // No distance argument: the server records where the car is NOW, which is
+    // the only number the owner can be sure of when they tap «تم».
+    const { error } = await this.client.rpc('mark_maintenance_item_done', {
+      p_item_id: itemId,
+    });
+
+    if (error !== null) throw new Error(`markMaintenanceItemDone: ${error.message}`);
+  }
+
+  async snoozeMaintenanceItem(itemId: string, days: number): Promise<void> {
+    const { error } = await this.client.rpc('snooze_maintenance_item', {
+      p_item_id: itemId,
+      p_days: days,
+    });
+
+    if (error !== null) throw new Error(`snoozeMaintenanceItem: ${error.message}`);
   }
 }

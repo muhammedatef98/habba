@@ -28,7 +28,8 @@ insert into expected_guarded (table_name) values
   ('profiles'),            -- 0036  (privilege escalation)
   ('habba_reports'),       -- 0036  (report tampering)
   ('appointment_slots'),   -- 0036  (booked_count)
-  ('order_offers');        -- 0042  (self-acceptance bypassing escrow)
+  ('order_offers'),        -- 0042  (self-acceptance bypassing escrow)
+  ('vehicle_reminders');   -- 0062  (only `response` is the client's to write)
 
 -- Tables whose only update policy is ops-gated. RLS alone is a sufficient
 -- answer there: `using (is_ops())` already restricts the whole row.
@@ -45,7 +46,15 @@ create temporary table expected_self_owned (table_name text primary key) on comm
 insert into expected_self_owned (table_name) values
   ('provider_services'),   -- own service list; price guarded separately
   ('provider_locations'),  -- own position, overwritten every 20s
-  ('workshops');           -- own address and hours
+  ('workshops'),           -- own address and hours
+  -- 0059/0060. The owner's own maintenance schedule and their own document
+  -- expiry dates, scoped by owns_vehicle(). Every column is theirs to set
+  -- because nothing here is a trust surface: no money, no dispatch, no
+  -- provenance, and no line on تقرير هبّة — the report is computed from
+  -- vehicle_timeline, which these tables cannot reach. An owner writing a
+  -- wrong interval gets their own reminders wrong, and nothing else.
+  ('vehicle_maintenance_items'),
+  ('vehicle_documents');
 
 
 -- 1. Every table a client can update is accounted for --------------------------
@@ -176,7 +185,10 @@ select test.assert(
 
 -- 5. Append-only tables have no client write path --------------------------------
 -- vehicle_timeline is the moat; zatca_invoices and inspection_reports are
--- records of fact. All three are written only by SECURITY DEFINER functions.
+-- records of fact; vehicle_odometer_readings (0058) is the series every
+-- prediction is computed from, and a client that could write one could choose
+-- its own series and its own lifetime distance. All are written only by
+-- SECURITY DEFINER functions.
 select test.assert_eq(
   (select coalesce(string_agg(c.relname, ', '), '(none)')
    from pg_class c
@@ -184,7 +196,7 @@ select test.assert_eq(
    join pg_policy p on p.polrelid = c.oid
    where n.nspname = 'public'
      and c.relname in ('vehicle_timeline', 'zatca_invoices', 'inspection_reports',
-                       'order_events', 'payout_orders')
+                       'order_events', 'payout_orders', 'vehicle_odometer_readings')
      and p.polcmd in ('*', 'w', 'a')),
   '(none)',
   'append-only and system-written tables expose no client INSERT or UPDATE policy');

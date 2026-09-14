@@ -22,12 +22,19 @@
  * تقرير هبّة lives inside the coverage card rather than as a loose amber button
  * halfway down, because generating it is the thing you do *because of* the
  * coverage number, not a separate errand.
+ *
+ * Since 0058–0062 the screen has two sections rather than one: **القادم** (what
+ * the car needs next) above **حصل** (what has happened to it). One screen, not
+ * two, and حصل is this same timeline rather than a new history surface —
+ * ADR-0022. The forward half is only meaningful next to the record behind it:
+ * "the oil is likely due" means something different on a car whose last three
+ * services are in the logbook than on one whose owner typed a number once.
  */
 
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -41,6 +48,7 @@ import {
   useTheme,
 } from '@habba/ui';
 import { CoverageBar } from '@/features/customer/components/logbook/CoverageBar';
+import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCare';
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
@@ -53,7 +61,17 @@ import {
   type LogbookFilter,
 } from '@/features/shared/lib/logbook-filter';
 import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
+import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import type { MaintenanceItem } from '@/features/shared/data/types';
+
+/**
+ * «ذكّرني لاحقاً» defers by a fortnight, matching `care_default_snooze_days()`
+ * (0062). Not offered as a picker: a screen that asks "for how long?" turns a
+ * dismissal into a decision, and the point of the button is to let someone get
+ * on with their day.
+ */
+const CARE_SNOOZE_DAYS = 14;
 
 const FILTER_LABEL_KEY: Readonly<Record<LogbookFilter, string>> = {
   all: 'logbook.filterAll',
@@ -65,6 +83,7 @@ const FILTER_LABEL_KEY: Readonly<Record<LogbookFilter, string>> = {
 export default function LogbookScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isArabic = i18n.language.startsWith('ar');
@@ -89,6 +108,66 @@ export default function LogbookScreen() {
     queryKey: ['warranties', id],
     queryFn: () => repository.listVehicleWarranties(id ?? ''),
     enabled: id !== undefined,
+  });
+
+  const care = useQuery({
+    queryKey: ['care', id],
+    queryFn: () => repository.listMaintenanceItems(id ?? ''),
+    enabled: id !== undefined,
+  });
+
+  const documents = useQuery({
+    queryKey: ['care-documents', id],
+    queryFn: () => repository.listVehicleDocuments(id ?? ''),
+    enabled: id !== undefined,
+  });
+
+  // «تم» and «ذكّرني لاحقاً» both change what القادم says, so both refetch it.
+  // Optimism here would be the wrong trade: the due state is computed from the
+  // odometer server-side, and a screen that guessed it would occasionally show
+  // an item as settled that the next sweep still reminds about.
+  const actOnItem = useMutation({
+    mutationFn: async (action: { itemId: string; kind: 'done' | 'snooze' }) => {
+      if (action.kind === 'done') {
+        await repository.markMaintenanceItemDone(action.itemId);
+        return;
+      }
+      await repository.snoozeMaintenanceItem(action.itemId, CARE_SNOOZE_DAYS);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['care', id] });
+      // «تم» writes a reading, which is a logbook entry.
+      await queryClient.invalidateQueries({ queryKey: ['timeline', id] });
+    },
+  });
+
+  /**
+   * «احجز الآن» — §7.2's one-tap booking with the right service pre-selected.
+   *
+   * The catalogue is fetched HERE rather than on mount: it is needed only if
+   * the button is pressed, and the vehicle screen should not pay for a service
+   * list most visits never look at. `fetchQuery` shares the cache entry the
+   * booking screen itself uses, so the trip is usually free anyway.
+   *
+   * A service that is no longer bookable still navigates, with the car chosen.
+   * Refusing to move would leave the owner staring at a button that does
+   * nothing; the booking screen can say what is available far better than this
+   * one can.
+   */
+  const startBooking = useMutation({
+    mutationFn: async (item: MaintenanceItem) => {
+      const draft = useBookingDraft.getState();
+      if (id !== undefined) draft.selectVehicle(id);
+      if (item.serviceId === null) return;
+
+      const services = await queryClient.fetchQuery({
+        queryKey: ['bookable-services'],
+        queryFn: () => repository.listBookableServices(),
+      });
+      const service = services.find((candidate) => candidate.id === item.serviceId);
+      if (service !== undefined) draft.selectService(service);
+    },
+    onSettled: () => router.push('/booking'),
   });
 
   const makes = useQuery({ queryKey: ['makes'], queryFn: () => repository.listMakes() });
@@ -170,6 +249,39 @@ export default function LogbookScreen() {
             </Text>
           ) : null}
         </View>
+      </View>
+
+      {/* القادم, above حصل and OUTSIDE the timeline's loading branches: what
+          the car needs next does not depend on the logbook having loaded, and
+          a dropped timeline fetch must not take the section that can book a
+          service down with it. */}
+      <View style={{ gap: theme.spacing.md }}>
+        <SectionHeader title={t('care.title')} />
+        {care.isPending || documents.isPending ? (
+          <SkeletonCard testID="care-skeleton" lines={2} />
+        ) : care.isError || documents.isError ? (
+          <ErrorState
+            testID="care-error"
+            message={t('errors.offline')}
+            retryLabel={t('common.retry')}
+            retrying={care.isFetching || documents.isFetching}
+            onRetry={() => {
+              void care.refetch();
+              void documents.refetch();
+            }}
+          />
+        ) : (
+          <UpcomingCare
+            testID="care-section"
+            items={care.data ?? []}
+            documents={documents.data ?? []}
+            busyItemId={actOnItem.isPending ? (actOnItem.variables?.itemId ?? null) : null}
+            onDone={(itemId) => actOnItem.mutate({ itemId, kind: 'done' })}
+            onSnooze={(itemId) => actOnItem.mutate({ itemId, kind: 'snooze' })}
+            onBook={(item) => startBooking.mutate(item)}
+            onConfirmOdometer={() => router.push({ pathname: '/mileage', params: { id } })}
+          />
+        )}
       </View>
 
       {/* The one screen the product cannot afford to be wrong about. Telling
@@ -273,8 +385,10 @@ export default function LogbookScreen() {
           </Card>
 
           <View style={{ gap: theme.spacing.md }}>
+            {/* حصل. The same timeline, under the name the section has on the
+                screen — not a second history surface (ADR-0022). */}
             <SectionHeader
-              title={t('logbook.title')}
+              title={t('care.happened')}
               actionLabel={t('logbook.addRecord')}
               onAction={() => router.push({ pathname: '/record-service', params: { id } })}
             />
