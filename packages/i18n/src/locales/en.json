@@ -141,7 +141,7 @@
     "errors": {
       "descriptionRequired": "Describe the service.",
       "futureDate": "A service cannot be dated in the future.",
-      "mileageTooLow": "That reading is below the recorded {{current}} km. Check the number.",
+      "mileageTooLow": "That reading is below the last recorded {{current}} km. Check the number — and if the instrument cluster was replaced, contact support to restart the readings.",
       "reportChainBroken": "The report could not be issued because this logbook failed verification. Contact support.",
       "reportFailed": "The report could not be issued. Try again.",
       "reportShareUnavailable": "The report was created, but this device could not open a share sheet.",

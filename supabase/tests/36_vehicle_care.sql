@@ -24,14 +24,19 @@ select public.test_seed_auth_user('cc111111-0000-4000-c000-000000000001', '+9665
 select public.test_seed_auth_user('cc111111-0000-4000-c000-000000000002', '+966505300002');
 select public.test_seed_auth_user('cc111111-0000-4000-c000-000000000003', '+966505300003');
 select public.test_seed_auth_user('cc111111-0000-4000-c000-000000000004', '+966505300004');
+-- An operator. Since 0064 a series replacement is support's to run, so §3 needs
+-- somebody the database agrees is one.
+select public.test_seed_auth_user('cc111111-0000-4000-c000-000000000005', '+966505300005');
 
 insert into public.profiles (id, full_name, phone) values
   ('cc111111-0000-4000-c000-000000000001', 'المالك', '+966505300001'),
   ('cc111111-0000-4000-c000-000000000002', 'المشتري', '+966505300002'),
   ('cc111111-0000-4000-c000-000000000003', 'صاحب الورشة', '+966505300003'),
-  ('cc111111-0000-4000-c000-000000000004', 'غريب', '+966505300004');
+  ('cc111111-0000-4000-c000-000000000004', 'غريب', '+966505300004'),
+  ('cc111111-0000-4000-c000-000000000005', 'مشغّل الدعم', '+966505300005');
 
 select test.grant_role('cc111111-0000-4000-c000-000000000003', 'workshop_admin');
+select test.grant_role('cc111111-0000-4000-c000-000000000005', 'ops');
 
 insert into public.cities (id, name_ar, name_en, region_ar, region_en, centroid) values
   ('cc000000-0000-4000-c000-00000000000c', 'الخبر', 'KhobarCare', 'المنطقة الشرقية',
@@ -181,10 +186,19 @@ select test.assert_eq(
    order by r.series desc, r.km desc, r.recorded_at desc limit 1),
   240000, 'lifetime distance starts equal to the cluster reading');
 
--- The cluster is swapped and the new one reads zero.
+-- The cluster is swapped and the new one reads zero. Run as SUPPORT (0064):
+-- the owner has no path to this, by design — a button that re-anchors the
+-- number تقرير هبّة prints is an invitation to clock a car. Suite 37 covers the
+-- grant and the ledger; this section is still about the arithmetic.
+reset role;
+set role service_role;
 select public.replace_odometer_cluster(
   'cc000000-0000-4000-c000-0000000000a2', 0, 'cluster_replaced',
-  'عدّاد جديد') as swap \gset
+  'المالك أحضر فاتورة تركيب عدّاد جديد من الوكالة',
+  'cc111111-0000-4000-c000-000000000005') as swap \gset
+reset role;
+set role authenticated;
+select test.become('cc111111-0000-4000-c000-000000000001');
 
 select test.assert_eq(
   (select r.km from public.vehicle_odometer_readings r
@@ -231,8 +245,15 @@ select test.assert_eq(
 -- The other reason. A slipped digit — 2,400,000 typed for 240,000 — would lock
 -- the car out of every future reading under §2. `correction` re-anchors the
 -- scale WITHOUT crediting the car with distance it never travelled.
+reset role;
+set role service_role;
 select public.replace_odometer_cluster(
-  'cc000000-0000-4000-c000-0000000000a2', 500, 'correction', 'رقم خاطئ');
+  'cc000000-0000-4000-c000-0000000000a2', 500, 'correction',
+  'المالك أدخل 2,400,000 بدل 240,000 — تأكدنا من الصورة',
+  'cc111111-0000-4000-c000-000000000005');
+reset role;
+set role authenticated;
+select test.become('cc111111-0000-4000-c000-000000000001');
 
 select test.assert_eq(
   (select r.series_offset_km + r.km from public.vehicle_odometer_readings r
@@ -257,11 +278,18 @@ insert into public.vehicles (id, owner_id, make_id, model_id, year, plate_en) va
    'cc000000-0000-4000-c000-000000000001', 'cc000000-0000-4000-c000-000000000002',
    2021, 'ABJ 7003');
 
+reset role;
+set role service_role;
 select test.assert_raises(
   $$select public.replace_odometer_cluster(
-      'cc000000-0000-4000-c000-0000000000a3', 10, 'cluster_replaced')$$,
+      'cc000000-0000-4000-c000-0000000000a3', 10, 'cluster_replaced',
+      'لا توجد قراءات بعد — للتأكد فقط',
+      'cc111111-0000-4000-c000-000000000005')$$,
   'a car with no readings cannot start a second series',
   'P0002');
+reset role;
+set role authenticated;
+select test.become('cc111111-0000-4000-c000-000000000001');
 
 reset role;
 

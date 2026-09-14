@@ -363,7 +363,19 @@ ever tells them, and it is answered by closing the app.
   they are safe to run unconditionally. Everything else here is new tables and new
   functions: no reminder can be sent about a car whose owner has told us nothing,
   and no existing row changes meaning.
-- There is still no client path to `replace_odometer_cluster`. The RPC is granted
-  and tested, and `record_mileage`'s refusal names it, but no screen calls it — so
-  an owner whose cluster was swapped currently needs support. That is a screen, not
-  a migration, and it belongs with the next pass over the vehicle screens.
+- ~~There is still no client path to `replace_odometer_cluster`.~~ **Resolved in
+  0064, and not with a screen.** This consequence understated the damage twice
+  over. The refusal is permanent — every reading a new cluster can produce is
+  below the old head — so the care section went dead for that vehicle, and the
+  message pointed at a function name. And "no screen" was never a control: the
+  RPC was granted to `authenticated`, so any owner could POST to it and re-anchor
+  their own odometer downwards; the missing UI only made that inconvenient.
+
+  0064 makes the stated path real instead of building the button: the refusal
+  names support, the function is reachable by `service_role` and nothing else,
+  every call names an operator who holds `ops` and is written to
+  `odometer_series_interventions`, and
+  `docs/runbooks/odometer-cluster-replacement.md` says how to verify a claim
+  before running it. A screen for an operation that re-anchors the number تقرير
+  هبّة prints, on a case most owners meet once or never, is an invitation to
+  clock a car in two taps.
