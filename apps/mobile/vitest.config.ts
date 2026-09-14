@@ -25,6 +25,13 @@ export default defineConfig({
         find: /^expo-constants$/,
         replacement: path.resolve(__dirname, 'test/stubs/expo-constants.ts'),
       },
+      // Same reason, one module further down: data/repository.ts reaches
+      // state/session → lib/preferences → expo-secure-store, so without this
+      // the whole data layer was unloadable here and had no unit tests at all.
+      {
+        find: /^expo-secure-store$/,
+        replacement: path.resolve(__dirname, 'test/stubs/expo-secure-store.ts'),
+      },
       // `.js` specifiers are correct for tsc's Node resolution but there is no
       // build step here, so map them back onto the TypeScript sources — the
       // same retry metro.config.js performs.

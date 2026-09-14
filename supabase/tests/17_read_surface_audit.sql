@@ -105,13 +105,15 @@ insert into public.vehicles (id, owner_id, make_id, model_id, year, plate_en) va
 -- The transfer targets a phone with no profile yet — the exact "recipient
 -- has no account" case the phone match exists to serve, and the exact
 -- window the old policy left open.
-insert into public.ownership_transfers
-  (id, vehicle_id, from_owner_id, to_phone, otp_code_hash, expires_at, created_by)
-values
-  ('70000000-0000-4000-7777-000000000001', 'd0000000-0000-4000-7777-000000000001',
-   '33333333-0000-4000-7777-000000000001', '+966509300011',
-   encode(sha256(convert_to('481923', 'UTF8')), 'hex'),
-   now() + interval '1 day', '33333333-0000-4000-7777-000000000001');
+-- Through the RPC: since 0054 the table is guarded ENABLE ALWAYS and there is
+-- no INSERT policy, so this is the only way a transfer comes into existence.
+-- The id and the code come back from the mint rather than being chosen here.
+set role authenticated;
+select test.become('33333333-0000-4000-7777-000000000001');
+select transfer_id as xfer
+from public.initiate_ownership_transfer(
+  'd0000000-0000-4000-7777-000000000001', '+966509300011', null) \gset
+reset role;
 
 set role authenticated;
 
@@ -166,13 +168,15 @@ insert into public.vehicles (id, owner_id, make_id, model_id, year, plate_en) va
    'a0000000-0000-4000-7777-000000000002', 'b0000000-0000-4000-7777-000000000002',
    2020, 'ABJ 78');
 
-insert into public.ownership_transfers
-  (id, vehicle_id, from_owner_id, to_phone, otp_code_hash, expires_at, created_by)
-values
-  ('70000000-0000-4000-7777-000000000002', 'd0000000-0000-4000-7777-000000000002',
-   '33333333-0000-4000-7777-000000000004', '+966509300014',
-   encode(sha256(convert_to('481923', 'UTF8')), 'hex'),
-   now() + interval '1 day', '33333333-0000-4000-7777-000000000004');
+-- Minted by the server (0054). The code is read back here because the test is
+-- the seller, who is handed it exactly once — the same thing the app does with
+-- it, and the only moment it exists in plaintext anywhere.
+set role authenticated;
+select test.become('33333333-0000-4000-7777-000000000004');
+select transfer_id as xfer2, code as code2
+from public.initiate_ownership_transfer(
+  'd0000000-0000-4000-7777-000000000002', '+966509300014', null) \gset
+reset role;
 
 set role authenticated;
 
@@ -180,28 +184,37 @@ set role authenticated;
 -- created, can see it — this is the discovery UX the policy exists for.
 select test.become('44444444-0000-4000-7777-000000000005');
 select test.assert_eq(
-  (select otp_code_hash from public.ownership_transfers
-   where id = '70000000-0000-4000-7777-000000000002'),
-  encode(sha256(convert_to('481923', 'UTF8')), 'hex'),
-  'the verified recipient can discover the transfer waiting for them');
+  (select count(*)::int from public.ownership_transfers
+   where id = (:'xfer2')::uuid),
+  1, 'the verified recipient can discover the transfer waiting for them');
 
--- Wrong code is rejected without consuming the transfer.
+-- ...and the row they discover no longer carries the hash of the code they are
+-- meant to be told. It used to, and this assertion used to READ it: six digits
+-- behind sha256 is a million-candidate offline search, so a recipient holding
+-- the hash held the code (0054).
 select test.assert_raises(
-  $$select public.accept_ownership_transfer(
-      '70000000-0000-4000-7777-000000000002', '000000')$$,
-  'the wrong code is rejected',
-  '28P01');
+  format($$select otp_code_hash from public.ownership_transfers where id = '%s'$$, :'xfer2'),
+  'without the otp hash, which is not on the client-readable surface at all',
+  '42501');
+
+-- Wrong code is rejected without consuming the transfer. As NULL rather than
+-- as an exception since 0056: a refusal that raised would roll back the
+-- failure counter it had just written, and a counter that rolls back cannot
+-- lock anything.
+select test.assert_eq(
+  public.accept_ownership_transfer((:'xfer2')::uuid, '000000'),
+  null::uuid,
+  'the wrong code is refused');
 
 select test.assert_eq(
   (select status from public.ownership_transfers
-   where id = '70000000-0000-4000-7777-000000000002'),
+   where id = (:'xfer2')::uuid),
   'pending'::ownership_transfer_status,
   'a failed attempt leaves the transfer pending');
 
 -- The correct code transfers ownership, records the timeline event, and
 -- flips status so a repeat cannot replay it.
-select public.accept_ownership_transfer(
-  '70000000-0000-4000-7777-000000000002', '481923');
+select public.accept_ownership_transfer((:'xfer2')::uuid, :'code2');
 
 select test.assert_eq(
   (select owner_id from public.vehicles
@@ -211,7 +224,7 @@ select test.assert_eq(
 
 select test.assert_eq(
   (select status from public.ownership_transfers
-   where id = '70000000-0000-4000-7777-000000000002'),
+   where id = (:'xfer2')::uuid),
   'accepted'::ownership_transfer_status,
   'the transfer is marked accepted');
 
@@ -223,11 +236,11 @@ select test.assert(
   ),
   'the logbook records that the car changed hands');
 
-select test.assert_raises(
-  $$select public.accept_ownership_transfer(
-      '70000000-0000-4000-7777-000000000002', '481923')$$,
-  'an already-accepted transfer cannot be replayed',
-  'P0002');
+select test.assert_eq(
+  public.accept_ownership_transfer((:'xfer2')::uuid, :'code2'),
+  null::uuid,
+  'an already-accepted transfer cannot be replayed — and the replay is refused '
+  'exactly the way a wrong code is (0056)');
 
 reset role;
 rollback;
@@ -277,7 +290,14 @@ create temporary table no_select_columns (table_name text, column_name text)
   on commit drop;
 insert into no_select_columns values
   ('providers', 'national_id_encrypted'),
-  ('providers', 'iban_encrypted');
+  ('providers', 'iban_encrypted'),
+  -- 0054: six digits behind sha256 is a million-candidate offline search, so a
+  -- recipient holding the hash holds the code.
+  ('ownership_transfers', 'otp_code_hash'),
+  -- 0056: how many guesses are left, and whether the row is already shut. Both
+  -- are readable only by the party who does not need to know.
+  ('ownership_transfers', 'failed_attempts'),
+  ('ownership_transfers', 'locked_at');
 
 select test.assert_eq(
   (select coalesce(string_agg(c.table_name || '.' || c.column_name, ', '), '(none)')

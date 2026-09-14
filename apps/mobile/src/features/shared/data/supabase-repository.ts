@@ -28,8 +28,12 @@ import type {
   CompletionMedia,
   EscrowStatus,
   JobProgress,
+  IncomingTransfer,
   MaintenanceAlert,
+  MintedTransfer,
   OrderSummary,
+  OwnershipTransfer,
+  OwnershipTransferStatus,
   NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
@@ -49,8 +53,14 @@ import type {
   Vehicle,
   VehicleMake,
   VehicleModel,
+  VehicleWarranty,
 } from './types.js';
-import type { GuestUpgradeInput, PastServiceInput, Repository } from './repository.js';
+import type {
+  GuestUpgradeInput,
+  PastServiceInput,
+  Repository,
+  TransferAddress,
+} from './repository.js';
 
 interface DispatchTelemetryRow {
   readonly contacted_count: number;
@@ -323,6 +333,50 @@ function toTimelineEvent(row: TimelineRow): TimelineEvent {
  * `T | null`, and inference otherwise carries the null into T, so callers end
  * up re-checking something this function has already guaranteed.
  */
+interface MintedTransferRow {
+  readonly transfer_id: string;
+  readonly code: string;
+  readonly expires_at: string;
+}
+
+interface OwnershipTransferRow {
+  readonly id: string;
+  readonly vehicle_id: string;
+  readonly to_phone: string | null;
+  readonly to_email: string | null;
+  readonly status: OwnershipTransferStatus;
+  readonly expires_at: string;
+  readonly created_at: string;
+  readonly attempts_exhausted: boolean;
+}
+
+interface IncomingTransferRow {
+  readonly transfer_id: string;
+  readonly expires_at: string;
+  readonly make_ar: string;
+  readonly make_en: string;
+  readonly model_ar: string;
+  readonly model_en: string;
+  readonly model_year: number;
+  readonly plate: string | null;
+  readonly records_total: number;
+  readonly habba_verified: number;
+  readonly first_record_at: string | null;
+  readonly open_warranties: number;
+  readonly attempts_exhausted: boolean;
+}
+
+interface VehicleWarrantyRow {
+  readonly order_id: string;
+  readonly service_ar: string;
+  readonly service_en: string;
+  readonly provider_name_ar: string | null;
+  readonly completed_at: string;
+  readonly warranty_expires_at: string;
+  readonly days_remaining: number;
+  readonly has_open_claim: boolean;
+}
+
 function unwrap<T>(
   result: { data: T | null; error: { message: string } | null },
   context: string,
@@ -1140,5 +1194,154 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`rateOrder: ${error.message}`);
+  }
+
+  // نقل الملكية ---------------------------------------------------------------
+  async initiateTransfer(input: TransferAddress): Promise<MintedTransfer> {
+    // Returns a SET OF one row, so PostgREST hands back an array. The code is
+    // in it exactly once and is never readable again — not by a second call,
+    // not by reading the row, which does not expose `otp_code_hash` to any
+    // client at all (0054).
+    const { data, error } = await this.client.rpc('initiate_ownership_transfer', {
+      p_vehicle_id: input.vehicleId,
+      p_to_phone: input.phone ?? null,
+      p_to_email: input.email ?? null,
+    });
+
+    if (error !== null) throw new Error(`initiateTransfer: ${error.message}`);
+
+    const row = (data as readonly MintedTransferRow[] | null)?.[0];
+    if (row === undefined) throw new Error('initiateTransfer: no transfer returned');
+
+    return { id: row.transfer_id, code: row.code, expiresAt: row.expires_at };
+  }
+
+  async getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null> {
+    // An RPC rather than a select on the table (0057). `locked_at` and
+    // `failed_attempts` are off the client grant and stay off it, so the lock
+    // can only reach the seller as the derived `attempts_exhausted` — the fact
+    // they can act on, never the count that would tell a guesser how much
+    // guessing is left.
+    //
+    // It also returns a recently-expired row, which a `status = 'pending'`
+    // filter no longer can: since 0056 a lapsed transfer is retired by the
+    // sweep or by the first attempt on it.
+    const { data, error } = await this.client.rpc('outgoing_ownership_transfer', {
+      p_vehicle_id: vehicleId,
+    });
+
+    if (error !== null) throw new Error(`getOutgoingTransfer: ${error.message}`);
+
+    const row = (data as readonly OwnershipTransferRow[] | null)?.[0];
+    if (row === undefined) return null;
+
+    // A pending row can still be past its expiry between one sweep and the
+    // next. Restated here rather than dropped, because the seller coming back
+    // on day eight needs to be told the code stopped working.
+    const lapsed = new Date(row.expires_at).getTime() <= Date.now();
+
+    return {
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      toPhone: row.to_phone,
+      toEmail: row.to_email,
+      status: lapsed ? 'expired' : row.status,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+      attemptsExhausted: row.attempts_exhausted,
+    };
+  }
+
+  async cancelTransfer(transferId: string): Promise<void> {
+    const { error } = await this.client.rpc('cancel_ownership_transfer', {
+      p_transfer_id: transferId,
+    });
+
+    if (error !== null) throw new Error(`cancelTransfer: ${error.message}`);
+  }
+
+  async reissueTransfer(transferId: string): Promise<MintedTransfer> {
+    // One call, one transaction: the server cancels and re-issues together
+    // (0057), so there is no window in which the seller has neither.
+    const { data, error } = await this.client.rpc('reissue_ownership_transfer', {
+      p_transfer_id: transferId,
+    });
+
+    if (error !== null) throw new Error(`reissueTransfer: ${error.message}`);
+
+    const row = (data as readonly MintedTransferRow[] | null)?.[0];
+    if (row === undefined) throw new Error('reissueTransfer: no transfer returned');
+
+    return { id: row.transfer_id, code: row.code, expiresAt: row.expires_at };
+  }
+
+  async getIncomingTransfer(): Promise<IncomingTransfer | null> {
+    const { data, error } = await this.client.rpc('pending_ownership_transfer_for_me');
+
+    if (error !== null) throw new Error(`getIncomingTransfer: ${error.message}`);
+
+    const row = (data as readonly IncomingTransferRow[] | null)?.[0];
+    if (row === undefined) return null;
+
+    return {
+      transferId: row.transfer_id,
+      expiresAt: row.expires_at,
+      makeAr: row.make_ar,
+      makeEn: row.make_en,
+      modelAr: row.model_ar,
+      modelEn: row.model_en,
+      year: row.model_year,
+      plate: row.plate,
+      recordsTotal: row.records_total,
+      habbaVerified: row.habba_verified,
+      firstRecordAt: row.first_record_at,
+      openWarranties: row.open_warranties,
+      // Safe here and not in `acceptTransfer` (0057): reaching this row needs a
+      // verified identity the transfer is addressed to, so it tells the reader
+      // nothing they could not already see.
+      attemptsExhausted: row.attempts_exhausted,
+    };
+  }
+
+  async acceptTransfer(transferId: string, code: string): Promise<string> {
+    const { data, error } = await this.client.rpc('accept_ownership_transfer', {
+      p_transfer_id: transferId,
+      p_otp_code: code,
+    });
+
+    // Left as the server wrote it. What still raises is deliberately narrow
+    // (0056): an unauthenticated caller, and an open warranty claim — which is
+    // reachable only by someone who has already presented the correct code, and
+    // is the one refusal a person can act on.
+    if (error !== null) throw new Error(`acceptTransfer: ${error.message}`);
+
+    // Every refusal a caller must not be able to tell apart comes back as NULL
+    // rather than as an error, because an exception in Postgres is a rollback
+    // and would have discarded the attempt counters the refusal just wrote
+    // (0056). Seven different reasons, one message: no such transfer, not
+    // pending, lapsed, locked after five wrong codes, addressed to someone
+    // else, wrong code, or this caller over their hourly limit.
+    if (data === null) throw new Error('Incorrect code');
+
+    return data as string;
+  }
+
+  async listVehicleWarranties(vehicleId: string): Promise<readonly VehicleWarranty[]> {
+    const { data, error } = await this.client.rpc('vehicle_warranties', {
+      p_vehicle_id: vehicleId,
+    });
+
+    if (error !== null) throw new Error(`listVehicleWarranties: ${error.message}`);
+
+    return ((data as readonly VehicleWarrantyRow[] | null) ?? []).map((row) => ({
+      orderId: row.order_id,
+      serviceAr: row.service_ar,
+      serviceEn: row.service_en,
+      providerNameAr: row.provider_name_ar,
+      completedAt: row.completed_at,
+      expiresAt: row.warranty_expires_at,
+      daysRemaining: row.days_remaining,
+      hasOpenClaim: row.has_open_claim,
+    }));
   }
 }

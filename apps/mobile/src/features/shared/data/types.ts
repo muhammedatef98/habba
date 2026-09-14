@@ -369,6 +369,93 @@ export interface NewRatingInput {
   readonly comment?: string | undefined;
 }
 
+export type OwnershipTransferStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
+
+/** A handover the signed-in user started, as they can read it back. */
+export interface OwnershipTransfer {
+  readonly id: string;
+  readonly vehicleId: string;
+  readonly toPhone: string | null;
+  readonly toEmail: string | null;
+  readonly status: OwnershipTransferStatus;
+  readonly expiresAt: string;
+  readonly createdAt: string;
+  /**
+   * The buyer has spent all five attempts and the code is dead (0056).
+   *
+   * A derived fact, never the count behind it: "ask for a new code" is
+   * something the seller can act on, "two guesses left" is a hint to whoever is
+   * guessing. It is not on `status` for the same reason — `status` is on the
+   * recipient's read surface, and the count is on nobody's.
+   */
+  readonly attemptsExhausted: boolean;
+}
+
+/**
+ * What `initiate_ownership_transfer` returns, and the only moment the code
+ * exists in plaintext anywhere.
+ *
+ * It is deliberately not part of `OwnershipTransfer`: the row stores a hash,
+ * the client cannot read even that (0054), and a seller who loses the code
+ * cancels and re-issues rather than looking it up. Nothing may persist this.
+ */
+export interface MintedTransfer {
+  readonly id: string;
+  readonly code: string;
+  readonly expiresAt: string;
+}
+
+/**
+ * A handover waiting for the signed-in user — the acquisition moment (§1.3).
+ *
+ * The recipient cannot read `vehicles` or `vehicle_timeline` for this car until
+ * they accept, so every field here comes from
+ * `pending_ownership_transfer_for_me()`. It carries the weight of the logbook
+ * on purpose: that is what the screen is asking them to want.
+ */
+export interface IncomingTransfer {
+  readonly transferId: string;
+  readonly expiresAt: string;
+  readonly makeAr: string;
+  readonly makeEn: string;
+  readonly modelAr: string;
+  readonly modelEn: string;
+  readonly year: number;
+  readonly plate: string | null;
+  readonly recordsTotal: number;
+  readonly habbaVerified: number;
+  readonly firstRecordAt: string | null;
+  readonly openWarranties: number;
+  /**
+   * The five attempts on this transfer are spent (0056) — stop typing and ask
+   * the seller for a new code.
+   *
+   * Safe to show here and nowhere else: reaching this row at all requires a
+   * verified identity the transfer is addressed to (0045), so anyone who reads
+   * this could already read the row. `acceptTransfer` is deliberately NOT told
+   * apart — it answers a locked transfer exactly as it answers a typo.
+   */
+  readonly attemptsExhausted: boolean;
+}
+
+/**
+ * Live cover on a car, for whoever owns it now (ADR-0021).
+ *
+ * Not `active_warranties`, which is scoped by `orders` RLS and therefore
+ * answers "what did I pay for" rather than "what is covered on this car". The
+ * two differ the moment a car changes hands, and the report prints the second.
+ */
+export interface VehicleWarranty {
+  readonly orderId: string;
+  readonly serviceAr: string;
+  readonly serviceEn: string;
+  readonly providerNameAr: string | null;
+  readonly completedAt: string;
+  readonly expiresAt: string;
+  readonly daysRemaining: number;
+  readonly hasOpenClaim: boolean;
+}
+
 // Re-exported here (not just from @habba/core) so every screen imports domain
 // types from one place — data/types.ts — rather than mixing import sources.
 export type { FulfilmentMode, OrderStatus };

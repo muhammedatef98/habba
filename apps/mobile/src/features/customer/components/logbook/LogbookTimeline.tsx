@@ -29,6 +29,7 @@ import {
   formatHijriDate,
   formatMonthLabel,
   monthKey,
+  yearKey,
 } from '@/features/shared/lib/dates';
 import type { Provenance, TimelineEvent } from '@/features/shared/data/types';
 
@@ -56,6 +57,19 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
     provenance === 'habba_verified' ? theme.colors.verified : theme.colors.selfReported;
 
   let lastMonth: string | null = null;
+  let lastYear: string | null = null;
+
+  // Counted up front so the year band can carry its own weight — "14 records,
+  // 9 verified" — rather than being a bare number that says nothing about what
+  // is under it. Cheap: the logbook is a page of events, not a feed.
+  const perYear = new Map<string, { total: number; verified: number }>();
+  for (const event of events) {
+    const key = yearKey(event.occurredAt);
+    const bucket = perYear.get(key) ?? { total: 0, verified: 0 };
+    bucket.total += 1;
+    if (event.provenance === 'habba_verified') bucket.verified += 1;
+    perYear.set(key, bucket);
+  }
 
   return (
     <View testID={testID}>
@@ -63,6 +77,11 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
         const month = monthKey(event.occurredAt);
         const startsMonth = month !== lastMonth;
         lastMonth = month;
+
+        const year = yearKey(event.occurredAt);
+        const startsYear = year !== lastYear;
+        lastYear = year;
+        const yearCounts = perYear.get(year);
 
         const isLast = index === events.length - 1;
         const hijri = formatHijriDate(event.occurredAt, i18n.language);
@@ -72,12 +91,45 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
 
         return (
           <Fragment key={event.id}>
+            {/* The year band NESTS the month grouping rather than replacing
+                it. A logbook is read at two scales — "which year did I own it
+                through this" and "was that before or after Ramadan" — and the
+                month headings answer the second. Dropping them for years would
+                trade a fine-grained answer for a coarse one. */}
+            {startsYear ? (
+              <View
+                style={{
+                  marginTop: index === 0 ? 0 : theme.spacing.xl,
+                  marginBottom: theme.spacing.sm,
+                  paddingVertical: theme.spacing.xs,
+                  paddingHorizontal: theme.spacing.md,
+                  borderRadius: theme.radius.sm,
+                  backgroundColor: theme.colors.surfaceSunken,
+                  // On dark, the sunken surface sits too close to the page to
+                  // separate on its own — the band read as a gap rather than
+                  // as a heading until this border was added.
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                }}
+              >
+                <Text variant="label">{t('logbook.yearHeading', { year })}</Text>
+                {yearCounts !== undefined ? (
+                  <Text variant="caption" tone="muted">
+                    {t('logbook.yearSummary', {
+                      count: formatCount(yearCounts.total, i18n.language),
+                      verified: formatCount(yearCounts.verified, i18n.language),
+                    })}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
             {startsMonth ? (
               <Text
                 variant="label"
                 tone="subtle"
                 style={{
-                  marginTop: index === 0 ? 0 : theme.spacing.lg,
+                  marginTop: startsYear ? 0 : theme.spacing.lg,
                   marginBottom: theme.spacing.sm,
                 }}
               >

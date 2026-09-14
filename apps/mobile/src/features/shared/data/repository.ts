@@ -44,6 +44,9 @@ import type {
   NewVehicleInput,
   Order,
   OrderPart,
+  IncomingTransfer,
+  MintedTransfer,
+  OwnershipTransfer,
   Profile,
   ProviderApplication,
   ProviderApplicationInput,
@@ -55,6 +58,7 @@ import type {
   Vehicle,
   VehicleMake,
   VehicleModel,
+  VehicleWarranty,
 } from './types.js';
 
 export interface GuestUpgradeInput {
@@ -203,7 +207,68 @@ export interface Repository {
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
   rateOrder(input: NewRatingInput): Promise<void>;
+
+  // نقل الملكية — the handover (0011, completed in 0054).
+  //
+  // Note what is missing: nothing here creates an `ownership_transfers` row,
+  // chooses an OTP or sets an expiry. It cannot — the table is guarded and the
+  // INSERT policy is gone — and the shape of this interface is meant to make
+  // that obvious rather than to hide it behind a method that would fail.
+  /**
+   * Starts a handover and returns the code EXACTLY once (§2.2).
+   *
+   * The code is minted, hashed and stored server-side; the plaintext comes
+   * back here and nowhere else, ever again. It must not be persisted, logged
+   * or put in a query cache that survives the screen — the seller reads it
+   * aloud to the buyer and that is the whole delivery mechanism.
+   */
+  initiateTransfer(input: TransferAddress): Promise<MintedTransfer>;
+  /** The live handover on a car, if there is one. Null once it closes. */
+  getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null>;
+  /** Withdraws a pending handover. Sender only, server-enforced. */
+  cancelTransfer(transferId: string): Promise<void>;
+  /**
+   * Withdraws a handover and issues a fresh code to the same address, in one
+   * call (0057).
+   *
+   * The seller's remedy when the buyer has burned all five attempts. It is one
+   * method rather than `cancel` then `initiate` because the server does it in
+   * one transaction: between two calls there is a window where the car has no
+   * transfer, and a cancel whose re-issue then fails leaves the seller worse
+   * off than before they tapped.
+   */
+  reissueTransfer(transferId: string): Promise<MintedTransfer>;
+  /**
+   * A handover waiting for THIS user, with the logbook's weight attached.
+   *
+   * Null is the answer for "nothing waiting", for "addressed to an identity
+   * you have not verified", and for "expired" — indistinguishable on purpose,
+   * because telling a stranger which one it is tells them a transfer exists.
+   */
+  getIncomingTransfer(): Promise<IncomingTransfer | null>;
+  /** Accepts with the spoken code. Returns the vehicle id now owned. */
+  acceptTransfer(transferId: string, code: string): Promise<string>;
+  /**
+   * Live cover on a car, for whoever owns it now (ADR-0021).
+   *
+   * Distinct from anything under `orders`: after a handover the buyer owns the
+   * cover and cannot read the order that carries it.
+   */
+  listVehicleWarranties(vehicleId: string): Promise<readonly VehicleWarranty[]>;
 }
+
+/** Exactly one of `phone` or `email` — the server refuses both and neither. */
+export interface TransferAddress {
+  readonly vehicleId: string;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
+}
+
+/** Seven days, matching `ownership_transfer_window()` in migration 0054. */
+const TRANSFER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Five wrong codes, matching `transfer_attempt_limit()` in migration 0056. */
+const TRANSFER_ATTEMPT_LIMIT = 5;
 
 const MAKES: readonly VehicleMake[] = [
   { id: 'make-toyota', nameAr: 'تويوتا', nameEn: 'Toyota' },
@@ -859,6 +924,26 @@ export class InMemoryRepository implements Repository {
   private readonly vehicles = new Map<string, Vehicle>();
   private readonly timeline = new Map<string, TimelineEvent[]>();
   private readonly orders = new DevOrderSimulator();
+  private transfers: OwnershipTransfer[] = [];
+  /**
+   * Transfer id → the minted code.
+   *
+   * Separate from the transfer itself, and never returned by any read, because
+   * the server stores only a hash and does not let a client read even that
+   * (0054). A dev repository that kept the code on the row would let a screen
+   * be written against a lookup production refuses.
+   */
+  private readonly transferCodes = new Map<string, string>();
+  /**
+   * Transfer id → wrong codes presented so far, and whether that has locked it.
+   *
+   * Separate from the transfer for the same reason as the code above: neither
+   * counter is on any client-readable surface in production (0056), so a stub
+   * that put them on the row would let a screen be written against a lookup
+   * production refuses. Five wrong codes lock, and locked is terminal — the
+   * correct code stops working and the seller has to cancel and re-issue.
+   */
+  private readonly transferAttempts = new Map<string, number>();
   private profile: Profile | null = null;
   private application: ProviderApplication | null = null;
   private applicationType: 'individual' | 'workshop' = 'individual';
@@ -1245,6 +1330,209 @@ export class InMemoryRepository implements Repository {
   async rateOrder(): Promise<void> {
     // No read surface depends on the dev rating yet — accepting and
     // discarding it is enough to exercise the flow offline.
+  }
+
+  // نقل الملكية --------------------------------------------------------------
+  // The dev stub mirrors the server where the server's behaviour is what the
+  // screens are built against: the code is minted HERE and returned once, the
+  // plaintext is never stored, and only the hash-equivalent is kept — so a
+  // screen that tried to read the code back would fail in development exactly
+  // as it fails in production.
+  //
+  // What it cannot mirror is the identity check: there is one account in the
+  // dev repository, so `getIncomingTransfer` answers from whatever this device
+  // last created. That is enough to build the accept screen against and is not
+  // enough to prove anything — the identity rule is proved in tests/32.
+  async initiateTransfer(input: TransferAddress): Promise<MintedTransfer> {
+    if ((input.phone === undefined) === (input.email === undefined)) {
+      throw new Error('initiateTransfer: address exactly one of phone or email');
+    }
+    if (this.transfers.some((t) => t.vehicleId === input.vehicleId && t.status === 'pending')) {
+      throw new Error('initiateTransfer: a transfer is already pending for this vehicle');
+    }
+
+    this.counter += 1;
+    const code = `${Math.floor(Math.random() * 1_000_000)}`.padStart(6, '0');
+    const expiresAt = new Date(Date.now() + TRANSFER_WINDOW_MS).toISOString();
+
+    const transfer: OwnershipTransfer = {
+      id: `xfer-${this.counter}`,
+      vehicleId: input.vehicleId,
+      toPhone: input.phone ?? null,
+      toEmail: input.email ?? null,
+      status: 'pending',
+      expiresAt,
+      createdAt: new Date().toISOString(),
+      attemptsExhausted: false,
+    };
+
+    this.transfers.push(transfer);
+    this.transferCodes.set(transfer.id, code);
+
+    return { id: transfer.id, code, expiresAt };
+  }
+
+  async reissueTransfer(transferId: string): Promise<MintedTransfer> {
+    const existing = this.transfers.find((transfer) => transfer.id === transferId);
+    if (existing === undefined || existing.status !== 'pending') {
+      throw new Error('reissueTransfer: transfer not found, or no longer pending');
+    }
+
+    // Cancel then re-issue, in that order and with nothing between them: the
+    // server does both in one transaction (0057), so a stub that could land
+    // half of it would let a screen be built against a state production never
+    // produces.
+    await this.cancelTransfer(transferId);
+    return this.initiateTransfer({
+      vehicleId: existing.vehicleId,
+      ...(existing.toPhone !== null ? { phone: existing.toPhone } : {}),
+      ...(existing.toEmail !== null ? { email: existing.toEmail } : {}),
+    });
+  }
+
+  async getOutgoingTransfer(vehicleId: string): Promise<OwnershipTransfer | null> {
+    this.expireTransfers();
+    // `expired` is returned alongside `pending`, mirroring the Supabase
+    // implementation: the seller has to be told the seven days ran out, and a
+    // repository that swallowed the row would leave that screen unreachable in
+    // development and reachable in production.
+    const transfer =
+      [...this.transfers]
+        .reverse()
+        .find(
+          (candidate) =>
+            candidate.vehicleId === vehicleId &&
+            (candidate.status === 'pending' || candidate.status === 'expired'),
+        ) ?? null;
+
+    if (transfer === null) return null;
+
+    // Derived on read rather than stored on the row, mirroring
+    // `outgoing_ownership_transfer()`: the server keeps the count in a column
+    // no client can select and hands back only this boolean.
+    return { ...transfer, attemptsExhausted: this.isExhausted(transfer.id) };
+  }
+
+  async cancelTransfer(transferId: string): Promise<void> {
+    const index = this.transfers.findIndex((transfer) => transfer.id === transferId);
+    if (index < 0) return;
+    const existing = this.transfers[index];
+    if (existing === undefined || existing.status !== 'pending') return;
+    this.transfers[index] = { ...existing, status: 'cancelled' };
+  }
+
+  async getIncomingTransfer(): Promise<IncomingTransfer | null> {
+    this.expireTransfers();
+
+    const transfer = this.transfers.find((candidate) => candidate.status === 'pending');
+    if (transfer === undefined) return null;
+
+    const vehicle = this.vehicles.get(transfer.vehicleId);
+    if (vehicle === undefined) return null;
+
+    const events = this.timeline.get(transfer.vehicleId) ?? [];
+    const make = MAKES.find((candidate) => candidate.id === vehicle.makeId);
+    const model = MODELS.find((candidate) => candidate.id === vehicle.modelId);
+    const occurred = events.map((event) => event.occurredAt).sort();
+
+    return {
+      transferId: transfer.id,
+      expiresAt: transfer.expiresAt,
+      makeAr: make?.nameAr ?? '',
+      makeEn: make?.nameEn ?? '',
+      modelAr: model?.nameAr ?? '',
+      modelEn: model?.nameEn ?? '',
+      year: vehicle.year,
+      plate: vehicle.plateNormalised,
+      recordsTotal: events.length,
+      habbaVerified: events.filter((event) => event.provenance === 'habba_verified').length,
+      firstRecordAt: occurred[0] ?? null,
+      openWarranties: 0,
+      // Shown to the recipient because reaching this row at all means they are
+      // the verified identity it is addressed to (0045/0057). `acceptTransfer`
+      // below is deliberately not told apart by it.
+      attemptsExhausted: this.isExhausted(transfer.id),
+    };
+  }
+
+  /** Five wrong codes on this transfer — the lock, as a derived fact. */
+  private isExhausted(transferId: string): boolean {
+    return (this.transferAttempts.get(transferId) ?? 0) >= TRANSFER_ATTEMPT_LIMIT;
+  }
+
+  async acceptTransfer(transferId: string, code: string): Promise<string> {
+    this.expireTransfers();
+
+    const index = this.transfers.findIndex((transfer) => transfer.id === transferId);
+    const transfer = index < 0 ? undefined : this.transfers[index];
+
+    // One refusal for all of them, mirroring 0056: no such transfer, already
+    // used, lapsed, locked, addressed to someone else, wrong code. The server
+    // returns NULL for every one of these and the Supabase repository turns
+    // that into this same Error, so a screen cannot come to depend on telling
+    // them apart in development and then find it cannot in production.
+    if (transfer === undefined || transfer.status !== 'pending') {
+      throw new Error('Incorrect code');
+    }
+
+    if (this.isExhausted(transferId)) {
+      throw new Error('Incorrect code');
+    }
+    const failed = this.transferAttempts.get(transferId) ?? 0;
+
+    if (this.transferCodes.get(transferId) !== code) {
+      this.transferAttempts.set(transferId, failed + 1);
+      throw new Error('Incorrect code');
+    }
+
+    this.transfers[index] = {
+      ...transfer,
+      status: 'accepted',
+    };
+    this.transferCodes.delete(transferId);
+    this.transferAttempts.delete(transferId);
+
+    // The car does not leave the dev account, because there is only one. The
+    // timeline event is written all the same: it is what the logbook shows a
+    // buyer, and a stub that skipped it would hide the moat's own record of
+    // the handover from every screen built against it.
+    const events = this.timeline.get(transfer.vehicleId) ?? [];
+    const now = new Date().toISOString();
+    this.timeline.set(transfer.vehicleId, [
+      {
+        id: `evt-transfer-${transferId}`,
+        vehicleId: transfer.vehicleId,
+        eventType: 'ownership_transferred',
+        provenance: 'habba_verified',
+        summaryAr: 'انتقلت ملكية السيارة إلى مالك جديد',
+        summaryEn: 'Ownership transferred to a new owner',
+        occurredAt: now,
+        recordedAt: now,
+        mileage: null,
+        details: {},
+        attachments: [],
+      },
+      ...events,
+    ]);
+
+    return transfer.vehicleId;
+  }
+
+  async listVehicleWarranties(_vehicleId: string): Promise<readonly VehicleWarranty[]> {
+    // The dev order simulator carries no warranty windows, so there is nothing
+    // honest to return. An invented warranty here would put «ساري» on a screen
+    // for cover that does not exist — the exact lie ADR-0021 was written to
+    // stop the report telling.
+    return [];
+  }
+
+  private expireTransfers(): void {
+    const now = Date.now();
+    this.transfers = this.transfers.map((transfer) =>
+      transfer.status === 'pending' && new Date(transfer.expiresAt).getTime() <= now
+        ? { ...transfer, status: 'expired' }
+        : transfer,
+    );
   }
 
   // Roles ---------------------------------------------------------------------
