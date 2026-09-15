@@ -12,11 +12,16 @@
 
 begin;
 
-insert into auth.users (id, phone) values
-  ('11111111-0000-4000-e000-000000000001', '+966507000001'),  -- owner at the time
-  ('22222222-0000-4000-e000-000000000002', '+966507000002'),  -- assigned tech
-  ('33333333-0000-4000-e000-000000000003', '+966507000003'),  -- another tech
-  ('44444444-0000-4000-e000-000000000004', '+966507000004');  -- the buyer, later
+-- Seeded through the shim's GoTrue stand-in rather than a bare INSERT: that
+-- leaves `phone_confirmed_at` null, so `phone_verified` is false (0044) and
+-- `accept_ownership_transfer` refuses — silently, because since 0056 it returns
+-- NULL for every refusal rather than raising. A fixture that got this wrong
+-- would show the transfer "succeeding" and the ownership never moving, which is
+-- exactly how the first version of this suite failed.
+select public.test_seed_auth_user('11111111-0000-4000-e000-000000000001', '+966507000001');  -- owner at the time
+select public.test_seed_auth_user('22222222-0000-4000-e000-000000000002', '+966507000002');  -- assigned tech
+select public.test_seed_auth_user('33333333-0000-4000-e000-000000000003', '+966507000003');  -- another tech
+select public.test_seed_auth_user('44444444-0000-4000-e000-000000000004', '+966507000004');  -- the buyer, later
 
 insert into public.profiles (id, full_name, phone) values
   ('11111111-0000-4000-e000-000000000001', 'المالك', '+966507000001'),
@@ -174,8 +179,27 @@ reset role;
 -- at zero CAC. A logbook whose every photo 403s is not the thing that sells the
 -- car, so the read policy authorises on owns_vehicle rather than on who placed
 -- the order.
-update public.vehicles set owner_id = '44444444-0000-4000-e000-000000000004'
- where id = 'd0000000-0000-4000-e000-000000000001';
+--
+-- Through the real نقل الملكية flow, not an UPDATE: `guard_vehicle_columns`
+-- refuses a direct `owner_id` write ("Ownership changes through a transfer, not
+-- directly"), and a test that bypassed the guard would prove the photos follow
+-- a transfer that cannot actually happen.
+set role authenticated;
+select test.become('11111111-0000-4000-e000-000000000001');
+select transfer_id as tid, code as otp
+from public.initiate_ownership_transfer(
+  'd0000000-0000-4000-e000-000000000001', '+966507000004', null) \gset
+reset role;
+
+set role authenticated;
+select test.become('44444444-0000-4000-e000-000000000004');
+-- Asserted, not just called. Since 0056 every refusal returns NULL rather than
+-- raising, so an unchecked call would let a transfer that never happened look
+-- like one that did — and the assertions below would then be testing nothing.
+select test.assert(
+  public.accept_ownership_transfer((:'tid')::uuid, :'otp') is not null,
+  'the buyer accepts the handover');
+reset role;
 
 set role authenticated;
 
@@ -198,15 +222,19 @@ reset role;
 -- The status list here is the one record_completion_evidence (0032) accepts. If
 -- the two drift, the bucket takes a file the row referencing it cannot be
 -- written for.
-update public.orders set completion_mileage = 61000,
-       completion_media = '[{"url":"x/before.jpg","kind":"before"},
-                            {"url":"x/after.jpg","kind":"after"}]'::jsonb
- where id = 'f0000000-0000-4000-e000-000000000001';
-update public.orders set status = 'awaiting_approval'
- where id = 'f0000000-0000-4000-e000-000000000001';
-
+-- Through the RPC, as the provider. `guard_order_columns` (0033) refuses anyone
+-- else the evidence columns outright, so a direct UPDATE here would fail — and
+-- the hand-back below needs real evidence on the row, because
+-- `assert_completion_evidence` refuses the transition without it.
 set role authenticated;
 select test.become('22222222-0000-4000-e000-000000000002');
+
+select public.record_completion_evidence(
+  'f0000000-0000-4000-e000-000000000001', 61000,
+  '[{"url":"x/before.jpg","kind":"before"},{"url":"x/after.jpg","kind":"after"}]'::jsonb);
+
+update public.orders set status = 'awaiting_approval'
+ where id = 'f0000000-0000-4000-e000-000000000001';
 
 select test.assert_raises(
   $$insert into storage.objects (bucket_id, name)

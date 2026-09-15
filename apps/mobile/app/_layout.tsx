@@ -36,6 +36,7 @@ import { detectDeviceLocale, initI18n } from '@/features/shared/lib/i18n';
 import { readStoredLocale, readStoredTheme } from '@/features/shared/lib/preferences';
 import { syncLayoutDirection } from '@/features/shared/lib/rtl';
 import { OfflineNotice } from '@/features/shared/components/OfflineNotice';
+import { usePushNotifications } from '@/features/shared/hooks/use-push-notifications';
 import { useMode } from '@/features/shared/state/mode';
 import { useSession } from '@/features/shared/state/session';
 
@@ -51,6 +52,20 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/**
+ * Push lives in a child rather than in `RootLayout` itself.
+ *
+ * `usePushNotifications` reads the user's roles through TanStack Query to
+ * decide whether a job-offer tap may switch to provider mode, and
+ * `RootLayout` is the component that CREATES the QueryClientProvider — a hook
+ * called there would be outside its own provider. Rendering nothing: it is
+ * mounted for its effects, next to the navigator so it comes up with it.
+ */
+function PushNotifications() {
+  usePushNotifications();
+  return null;
+}
 
 export default function RootLayout() {
   const locale = useSession((state) => state.locale);
@@ -151,6 +166,7 @@ export default function RootLayout() {
               screen below it stopped filling the window. */}
           <View style={{ flex: 1 }}>
             <OfflineNotice testID="offline-notice" />
+            <PushNotifications />
             <View style={{ flex: 1 }}>
               <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
             </View>

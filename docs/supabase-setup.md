@@ -330,6 +330,53 @@ no way to close it.
 > rather than a weaker stand-in. Suite `31` asserts the harness has not quietly
 > given itself ownership it would not have here.
 
+## 7b. Deploy the two schedulers
+
+Dispatch and notifications both need something to ask them a question on a
+clock. Neither can be a database trigger: there is no event at 45 seconds, only
+the absence of one, and absence does not fire.
+
+```
+supabase functions deploy dispatch-tick
+supabase functions deploy push-tick
+```
+
+Secrets (Dashboard → Edge Functions → Secrets, or `supabase secrets set`):
+
+| Secret                       | Used by         | Notes                                                                                                                    |
+| ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `HABBA_DISPATCH_TICK_SECRET` | `dispatch-tick` | Any long random string.                                                                                                  |
+| `HABBA_PUSH_TICK_SECRET`     | `push-tick`     | A **different** long random string.                                                                                      |
+| `EXPO_ACCESS_TOKEN`          | `push-tick`     | Optional. Required only if the Expo project has "enhanced security" on, which makes unauthenticated sends fail with 401. |
+
+Both functions hold the service role and refuse everything without their
+secret — `push-tick` can notify every device in the country, so an open URL is
+a megaphone. Absent secret means the endpoint returns 404, never open.
+
+Schedule both at roughly **15 seconds** (`pg_cron`, or any external scheduler
+that can POST with a header):
+
+```
+POST https://<project>.supabase.co/functions/v1/push-tick
+x-habba-tick: <HABBA_PUSH_TICK_SECRET>
+```
+
+Overlapping runs are safe. `claim_notification_batch` takes a lease on what it
+claims (`notification_claim_lease()`, 2 minutes), so a tick that starts while
+the previous one is still sending finds nothing — and a sender that dies
+mid-batch has its rows released rather than stranded.
+
+**How to tell it worked:** the response body is
+`{"claimed":n,"sent":n,"failed":0,"retired":0}`. A rising `retired` is normal
+(uninstalled apps); a rising `failed` with `sent: 0` means Expo is rejecting
+the project, which is `EXPO_ACCESS_TOKEN`.
+
+> ⚠️ Push tokens are minted against an **EAS project id**, read from
+> `expoConfig.extra.eas.projectId`. A build without one registers nothing and
+> reports `unavailable` — silently and correctly, since there is no token to
+> be had. If technicians report receiving no job offers, check this before
+> anything server-side.
+
 ## 8. There is no report function to deploy
 
 تقرير هبّة used to be an Edge Function serving a public page at

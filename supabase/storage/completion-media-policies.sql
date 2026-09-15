@@ -9,18 +9,28 @@
 --
 -- The local harness applies this file as the storage owner (local-db.sh), so
 -- supabase/tests/37_completion_media_storage.sql exercises the real policies.
+--
+-- Drops before creating, so re-running it on a project that already has an
+-- earlier version is safe. That is not hypothetical: 0066 corrected the read
+-- path here, and a project set up before it needs this file applied again.
+
+drop policy if exists completion_media_insert_provider on storage.objects;
+drop policy if exists completion_media_read_provider on storage.objects;
+drop policy if exists completion_media_read_vehicle_owner on storage.objects;
 
 -- Objects are keyed `<order_id>/<filename>`, so the first path segment is the
 -- authorisation subject — the same convention as triage-media.
+--
+-- ⚠️ Every predicate below goes through a `security definer` function rather
+-- than an inline subquery over `public.orders`. A storage policy runs as the
+-- INVOKING user, so an inline subquery is filtered by that user's own RLS on
+-- `orders` — which is how the first version of this file silently denied the
+-- new owner of a transferred car every photo in their inherited logbook. See
+-- 0066.
 
 
 -- The ASSIGNED provider uploads, and only while the job is in a state where
 -- evidence may still be recorded.
---
--- Those three statuses are not a guess: they are exactly the list
--- `record_completion_evidence` (0032) accepts. If the two ever disagree, the
--- bucket would take a file that the row referencing it cannot be written for —
--- an orphan photo of someone's car with nothing pointing at it.
 --
 -- After the job leaves those statuses the photos are timeline attachments under
 -- the hash chain (ADR-0004). Letting new files appear against a closed order
@@ -30,14 +40,7 @@ create policy completion_media_insert_provider on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'completion-media'
-    and exists (
-      select 1
-        from public.orders o
-        join public.providers pr on pr.id = o.provider_id
-       where o.id::text = (storage.foldername(name))[1]
-         and pr.owner_profile_id = (select auth.uid())
-         and o.status in ('in_progress', 'arrived', 'checked_in')
-    )
+    and public.may_write_completion_media((storage.foldername(name))[1])
   );
 
 -- The provider reads back what they took — a technician who cannot see the
@@ -49,13 +52,7 @@ create policy completion_media_read_provider on storage.objects
   for select to authenticated
   using (
     bucket_id = 'completion-media'
-    and exists (
-      select 1
-        from public.orders o
-        join public.providers pr on pr.id = o.provider_id
-       where o.id::text = (storage.foldername(name))[1]
-         and pr.owner_profile_id = (select auth.uid())
-    )
+    and public.is_assigned_provider_on_order((storage.foldername(name))[1])
   );
 
 -- Whoever owns the car reads them, which is deliberately NOT "whoever placed
@@ -65,18 +62,11 @@ create policy completion_media_read_provider on storage.objects
 -- authorises on `owns_vehicle`, not on `orders.customer_id`. Mirroring it is
 -- what makes §1.3 work: after نقل الملكية the buyer inherits the logbook, and a
 -- logbook whose every photo 403s is not the thing that sells the car.
---
--- `is_ops()` is here for the same reason it is on the timeline policy — dispute
--- resolution has to be able to look at the evidence.
 create policy completion_media_read_vehicle_owner on storage.objects
   for select to authenticated
   using (
     bucket_id = 'completion-media'
-    and exists (
-      select 1 from public.orders o
-       where o.id::text = (storage.foldername(name))[1]
-         and (public.owns_vehicle(o.vehicle_id) or public.is_ops())
-    )
+    and public.may_read_completion_media((storage.foldername(name))[1])
   );
 
 -- ⚠️ No update and no delete policy, for anyone — the same omission as

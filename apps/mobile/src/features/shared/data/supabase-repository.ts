@@ -665,6 +665,25 @@ export class SupabaseRepository implements Repository {
     };
   }
 
+  /**
+   * Errors are swallowed on purpose, and this is the one place in this class
+   * where that is right.
+   *
+   * Registration runs on every launch, unprompted, while the person is trying
+   * to get somewhere else. Surfacing a failure would put an error on a screen
+   * nobody asked a question on; throwing would take down whatever mounted the
+   * hook. The cost of silence is bounded: the next launch registers again, and
+   * an unregistered recipient's notifications are never claimed at all (0065),
+   * so they expire rather than queue up and arrive in a batch days later.
+   */
+  async registerPushToken(token: string, platform: 'ios' | 'android'): Promise<void> {
+    await this.client.rpc('register_push_token', { p_token: token, p_platform: platform });
+  }
+
+  async unregisterPushToken(token: string): Promise<void> {
+    await this.client.rpc('unregister_push_token', { p_token: token });
+  }
+
   async listCities(): Promise<readonly City[]> {
     const { data, error } = await this.client
       .from('cities')

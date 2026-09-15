@@ -104,6 +104,29 @@ decides only what renders and what the client will send — a user still holds n
 provider role until approval, and RLS refuses every provider read regardless
 (§5.1.3).
 
+## Push notifications
+
+Nothing to configure here, and one thing that cannot be configured here.
+
+Registration happens on the launch after sign-in and needs an **EAS project id**
+— `expoConfig.extra.eas.projectId`, which `eas init` writes and which Expo Go
+does not have. Without it `ExpoPushProvider.register()` returns `unavailable`,
+the app carries on silently, and no notification will ever arrive. That is the
+correct behaviour on a simulator and the first thing to check if technicians
+report receiving no job offers on a real build.
+
+What the device does is hand the server a token, and nothing else. What is worth
+notifying, to whom, in which language and for how long it stays true is decided
+in Postgres (0065) and sent by the `push-tick` Edge Function — a client that
+could trigger a notification could trigger one for anybody. See §7b of
+`docs/supabase-setup.md` for deploying the scheduler.
+
+Android gets two channels, created at registration. `job-offers` is MAX
+importance and bypasses Do Not Disturb because it is a person waiting at the
+roadside; everything else is ordinary. ⚠️ A channel's importance is fixed for
+the lifetime of an install — re-creating it later does not raise it — so a job
+offer that lands in a silent channel on day one is silent forever.
+
 ## Pointing it at Supabase
 
 Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in

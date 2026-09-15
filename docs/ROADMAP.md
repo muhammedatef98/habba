@@ -114,9 +114,12 @@ never been done.
   satisfied every check and pointed at nothing.~~ **Fixed** — `expo-camera`
   capture and a real upload to the `completion-media` bucket (0064); a failed
   upload leaves the gap open instead of going green.
-- **No push notifications anywhere in the repo.** A technician learns about a
-  job only by polling every ten seconds with the app in the foreground. For
-  on-demand dispatch this is the largest remaining gap.
+- ~~No push notifications anywhere in the repo. A technician learns about a job
+  only by polling every ten seconds with the app in the foreground.~~ **Built**
+  — 0065/0066, the `push-tick` Edge Function, and `expo-notifications` on the
+  device. A trigger enqueues into `notification_outbox` in the same transaction
+  as the event; the function is pure transport. A job offer carries no address
+  (ADR-0013 applies to a lock screen too) and expires with the offer.
 - **No earnings surface.** `commission_rates`, `payouts` and `payout_orders`
   (0031) have RLS and no screen, and `listMyJobs` filters to live statuses — so
   there is no completed-work history of any kind.

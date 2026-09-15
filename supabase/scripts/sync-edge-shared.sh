@@ -47,8 +47,13 @@ generate_api_keys() {
   cat "$CORE/supabase/api-keys.ts"
 }
 
+generate_push() {
+  header 'packages/core/src/push/expo-push.ts'
+  cat "$CORE/push/expo-push.ts"
+}
+
 # name → generator
-MODULES=("sms:generate_sms" "api-keys:generate_api_keys")
+MODULES=("sms:generate_sms" "api-keys:generate_api_keys" "push:generate_push")
 
 mkdir -p "$SHARED"
 status=0

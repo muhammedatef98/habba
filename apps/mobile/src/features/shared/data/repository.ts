@@ -139,6 +139,22 @@ export interface Repository {
   applyAsProvider(input: ProviderApplicationInput): Promise<ProviderApplication>;
   listCities(): Promise<readonly City[]>;
 
+  /**
+   * Hands the server this device's push token (0065).
+   *
+   * ⚠️ Not `upsert into device_push_tokens`. The RPC behind it reassigns a
+   * token that already belongs to someone else, which is what happens when two
+   * people use one phone — and which no RLS policy could express without
+   * letting a caller write another user's row.
+   *
+   * Never throws. Notifications are how work arrives, but a failure to
+   * register must not break the launch that discovered it: the next launch
+   * tries again, and the outbox holds the notification until its TTL.
+   */
+  registerPushToken(token: string, platform: 'ios' | 'android'): Promise<void>;
+  /** Retires this device's token on sign-out, so the next person does not get their notifications. */
+  unregisterPushToken(token: string): Promise<void>;
+
   // Phase 2. Note there is still no method that writes a timeline row with a
   // caller-chosen provenance — that remains impossible by construction.
   recordPastService(input: PastServiceInput): Promise<void>;
@@ -1829,6 +1845,17 @@ export class InMemoryRepository implements Repository {
 
   async listCities(): Promise<readonly City[]> {
     return CITIES;
+  }
+
+  // There is no notification service behind the dev build, and `DevPushProvider`
+  // never produces a token to pass here — so these exist to satisfy the
+  // interface and do nothing, rather than pretending a device is registered.
+  async registerPushToken(): Promise<void> {
+    /* no-op */
+  }
+
+  async unregisterPushToken(): Promise<void> {
+    /* no-op */
   }
 
   private bumpMileage(vehicleId: string, mileage: number | undefined): void {
