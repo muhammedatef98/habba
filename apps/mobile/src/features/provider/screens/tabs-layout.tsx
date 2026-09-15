@@ -49,6 +49,17 @@ export default function ProviderTabsLayout() {
           tabBarIcon: ({ color }) => <Icon name="wrench" color={color} />,
         }}
       />
+      {/* Third, not second. The order is what a technician reaches for through
+          a shift: what can I take, what am I on, what have I made. Earnings is
+          the one they open at the end of the day rather than mid-job, and it is
+          the only tab that was missing while `payouts` sat unread since 0031. */}
+      <Tabs.Screen
+        name="earnings"
+        options={{
+          title: t('provider.navEarnings'),
+          tabBarIcon: ({ color }) => <Icon name="wallet" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

@@ -11,11 +11,13 @@
  * permission model rather than working around it.
  */
 
-import type {
-  CompletionMediaItem,
-  CompletionMediaKind,
-  FulfilmentMode,
-  OrderStatus,
+import {
+  sarOrThrow,
+  type CompletionMediaItem,
+  type CompletionMediaKind,
+  type FulfilmentMode,
+  type OrderStatus,
+  type SarAmount,
 } from '@habba/core';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { locationProvider } from '@/features/shared/lib/location.js';
@@ -48,6 +50,50 @@ export interface AssignedJob {
   readonly requiresCompletionPhotos: boolean;
   readonly requiresCompletionMileage: boolean;
   readonly vehicleCurrentMileage: number | null;
+}
+
+export type PayoutStatus = 'pending' | 'approved' | 'paid' | 'failed';
+
+/**
+ * One job's contribution to what the technician is owed.
+ *
+ * ⚠️ `gross` includes VAT and `commission` is taken only on parts + labour, so
+ * `net` is NOT `gross × (1 − rate)`. The three are carried separately rather
+ * than derived on the device because the server is the only thing allowed to
+ * decide them (0067) — and because a screen that recomputed them would be a
+ * second implementation of the arithmetic that pays this person.
+ */
+export interface EarningLine {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly serviceNameAr: string;
+  readonly completedAt: string;
+  readonly gross: SarAmount;
+  readonly commission: SarAmount;
+  readonly net: SarAmount;
+}
+
+export interface EarningsSummary {
+  readonly unsettledCount: number;
+  readonly unsettledGross: SarAmount;
+  readonly unsettledCommission: SarAmount;
+  readonly unsettledNet: SarAmount;
+  /** Only payouts actually marked `paid`. An approved one is a promise. */
+  readonly paidNet: SarAmount;
+  readonly lastPaidAt: string | null;
+}
+
+export interface PayoutSummary {
+  readonly id: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly grossAmount: SarAmount;
+  readonly commission: SarAmount;
+  readonly netAmount: SarAmount;
+  readonly orderCount: number;
+  readonly status: PayoutStatus;
+  readonly paidAt: string | null;
+  readonly reference: string | null;
 }
 
 export interface Position {
@@ -108,6 +154,56 @@ export interface ProviderRepository {
     mileage: number,
     media: readonly CompletionMediaItem[],
   ): Promise<void>;
+
+  /**
+   * الأرباح. What this provider is owed and what they have been paid.
+   *
+   * ⚠️ None of these take a provider id, and that is the access control rather
+   * than a convenience: the RPCs behind them read `current_provider_id()`
+   * server-side. The id-taking version, `payable_order_lines`, is revoked from
+   * `authenticated` entirely (0067) — an argument is a thing a client can
+   * change, and this one would change whose earnings you read.
+   */
+  getEarningsSummary(): Promise<EarningsSummary | null>;
+  listUnsettledEarnings(): Promise<readonly EarningLine[]>;
+  listPayouts(): Promise<readonly PayoutSummary[]>;
+  listPayoutLines(payoutId: string): Promise<readonly EarningLine[]>;
+}
+
+/**
+ * Postgres `numeric` arrives as a JS number through PostgREST.
+ *
+ * Routed through `sarOrThrow` rather than kept as a number, because
+ * `SarAmount` is the only form the rest of the app will do arithmetic or
+ * comparison on (ADR-0007) — and because a float that silently became
+ * 474.99999999999994 must fail loudly here rather than be shown to someone as
+ * what they are owed.
+ */
+function toSar(value: number | string | null): SarAmount {
+  if (value === null) return sarOrThrow('0.00');
+  return sarOrThrow(typeof value === 'string' ? value : value.toFixed(2));
+}
+
+interface EarningLineRow {
+  order_id: string;
+  order_number: string;
+  service_name_ar: string;
+  completed_at: string;
+  gross: number | string;
+  commission: number | string;
+  net: number | string;
+}
+
+function toEarningLine(row: EarningLineRow): EarningLine {
+  return {
+    orderId: row.order_id,
+    orderNumber: row.order_number,
+    serviceNameAr: row.service_name_ar,
+    completedAt: row.completed_at,
+    gross: toSar(row.gross),
+    commission: toSar(row.commission),
+    net: toSar(row.net),
+  };
 }
 
 interface OpenJobRow {
@@ -312,6 +408,78 @@ export class SupabaseProviderRepository implements ProviderRepository {
     });
     if (error !== null) throw new Error(`recordEvidence: ${error.message}`);
   }
+
+  async getEarningsSummary(): Promise<EarningsSummary | null> {
+    const { data, error } = await this.client.rpc('my_earnings_summary');
+    if (error !== null) throw new Error(`getEarningsSummary: ${error.message}`);
+
+    // Returns no row for a user with no provider record. Null rather than a
+    // zeroed summary, so the screen can tell "nothing yet" from "not a
+    // provider" instead of showing someone a confident 0.00 ﷼.
+    const row = (data as readonly Record<string, number | string | null>[] | null)?.[0];
+    if (row === undefined) return null;
+
+    return {
+      unsettledCount: Number(row['unsettled_count'] ?? 0),
+      unsettledGross: toSar(row['unsettled_gross'] ?? null),
+      unsettledCommission: toSar(row['unsettled_commission'] ?? null),
+      unsettledNet: toSar(row['unsettled_net'] ?? null),
+      paidNet: toSar(row['paid_net'] ?? null),
+      lastPaidAt: (row['last_paid_at'] as string | null) ?? null,
+    };
+  }
+
+  async listUnsettledEarnings(): Promise<readonly EarningLine[]> {
+    const { data, error } = await this.client.rpc('my_unsettled_orders');
+    if (error !== null) throw new Error(`listUnsettledEarnings: ${error.message}`);
+    return (data as EarningLineRow[]).map(toEarningLine);
+  }
+
+  async listPayouts(): Promise<readonly PayoutSummary[]> {
+    // A plain table read: `payouts_read` (0031) already scopes it to
+    // `current_provider_id()`, so there is nothing for an RPC to add.
+    const { data, error } = await this.client
+      .from('payouts')
+      .select(
+        'id, period_start, period_end, gross_amount, commission, net_amount, ' +
+          'order_count, status, paid_at, reference',
+      )
+      .order('period_end', { ascending: false });
+
+    if (error !== null) throw new Error(`listPayouts: ${error.message}`);
+
+    return (data as unknown as PayoutRow[]).map((row) => ({
+      id: row.id,
+      periodStart: row.period_start,
+      periodEnd: row.period_end,
+      grossAmount: toSar(row.gross_amount),
+      commission: toSar(row.commission),
+      netAmount: toSar(row.net_amount),
+      orderCount: row.order_count,
+      status: row.status,
+      paidAt: row.paid_at,
+      reference: row.reference,
+    }));
+  }
+
+  async listPayoutLines(payoutId: string): Promise<readonly EarningLine[]> {
+    const { data, error } = await this.client.rpc('my_payout_lines', { p_payout_id: payoutId });
+    if (error !== null) throw new Error(`listPayoutLines: ${error.message}`);
+    return (data as EarningLineRow[]).map(toEarningLine);
+  }
+}
+
+interface PayoutRow {
+  id: string;
+  period_start: string;
+  period_end: string;
+  gross_amount: number | string;
+  commission: number | string;
+  net_amount: number | string;
+  order_count: number;
+  status: PayoutStatus;
+  paid_at: string | null;
+  reference: string | null;
 }
 
 interface OrderRow {
@@ -452,6 +620,69 @@ export class InMemoryProviderRepository implements ProviderRepository {
     if (job !== undefined) {
       this.jobs.set(orderId, { ...job, completionMileage: mileage, completionMedia: media });
     }
+  }
+
+  /**
+   * Fixed figures, and they reconcile.
+   *
+   * 345 + 230 gross, commission taken on parts+labour only (60 + 40), so the
+   * net is 475 — the same worked example as `supabase/tests/39`. A dev fixture
+   * whose three numbers do not add up teaches whoever is building the screen to
+   * ignore the one property the screen exists to show.
+   */
+  async getEarningsSummary(): Promise<EarningsSummary | null> {
+    return {
+      unsettledCount: 2,
+      unsettledGross: sarOrThrow('575.00'),
+      unsettledCommission: sarOrThrow('100.00'),
+      unsettledNet: sarOrThrow('475.00'),
+      paidNet: sarOrThrow('1840.00'),
+      lastPaidAt: '2026-09-01T09:00:00.000Z',
+    };
+  }
+
+  async listUnsettledEarnings(): Promise<readonly EarningLine[]> {
+    return [
+      {
+        orderId: 'dev-done-1',
+        orderNumber: 'HB-DEV-000041',
+        serviceNameAr: 'بطارية — شحن أو تبديل',
+        completedAt: '2026-09-12T18:20:00.000Z',
+        gross: sarOrThrow('345.00'),
+        commission: sarOrThrow('60.00'),
+        net: sarOrThrow('285.00'),
+      },
+      {
+        orderId: 'dev-done-2',
+        orderNumber: 'HB-DEV-000039',
+        serviceNameAr: 'تغيير زيت',
+        completedAt: '2026-09-10T11:05:00.000Z',
+        gross: sarOrThrow('230.00'),
+        commission: sarOrThrow('40.00'),
+        net: sarOrThrow('190.00'),
+      },
+    ];
+  }
+
+  async listPayouts(): Promise<readonly PayoutSummary[]> {
+    return [
+      {
+        id: 'dev-payout-1',
+        periodStart: '2026-08-01',
+        periodEnd: '2026-08-31',
+        grossAmount: sarOrThrow('2300.00'),
+        commission: sarOrThrow('460.00'),
+        netAmount: sarOrThrow('1840.00'),
+        orderCount: 8,
+        status: 'paid',
+        paidAt: '2026-09-01T09:00:00.000Z',
+        reference: 'HB-PAY-0801',
+      },
+    ];
+  }
+
+  async listPayoutLines(): Promise<readonly EarningLine[]> {
+    return this.listUnsettledEarnings();
   }
 }
 

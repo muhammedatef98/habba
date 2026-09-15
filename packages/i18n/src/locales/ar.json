@@ -491,6 +491,34 @@
     "decline": "غير متاح حالياً",
     "declined": "تم رفض الطلب"
   },
+  "earnings": {
+    "title": "الأرباح",
+    "sar": "{{amount}} ﷼",
+    "unsettledLabel": "مستحق لك",
+    "unsettledCount": "من {{count}} عمل مكتمل",
+    "unsettledNone": "لا يوجد عمل بانتظار الصرف",
+    "gross": "الإجمالي",
+    "commission": "عمولة هبّة",
+    "net": "الصافي لك",
+    "vatNote": "العمولة تُحسب على قطع الغيار والأجرة فقط، وليست على الضريبة. ضريبة القيمة المضافة ما زالت داخل المبلغ الصافي وهي من مسؤوليتك.",
+    "paidToDate": "مدفوع لك",
+    "lastPaid": "آخر دفعة في {{date}}",
+    "unsettledJobs": "أعمال بانتظار الصرف",
+    "lineCommission": "عمولة {{amount}}",
+    "payouts": "الدفعات",
+    "period": "{{from}} — {{to}}",
+    "payoutJobs": "{{count}} عمل",
+    "noPayoutsTitle": "ما في دفعات بعد",
+    "noPayoutsBody": "أول دفعة تظهر هنا بعد نهاية فترة التسوية. المستحق لك محسوب فوق من الآن.",
+    "reference": "رقم الحوالة",
+    "paidOn": "دُفعت في {{date}}",
+    "status": {
+      "pending": "قيد الإعداد",
+      "approved": "معتمدة",
+      "paid": "مدفوعة",
+      "failed": "فشل التحويل"
+    }
+  },
   "provider": {
     "shiftTitle": "ورديتك",
     "goOnline": "ابدأ الاستقبال",
@@ -575,6 +603,7 @@
     },
     "navShift": "الوردية",
     "navJobs": "طلباتي",
+    "navEarnings": "الأرباح",
     "statusOnline": "أنت متاح الآن",
     "statusOffline": "أنت غير متاح",
     "shiftSubtitleOnline": "يُشارك موقعك أثناء العمل فقط، ويتوقّف فور إيقاف الاستقبال.",

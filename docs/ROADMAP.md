@@ -120,9 +120,13 @@ never been done.
   device. A trigger enqueues into `notification_outbox` in the same transaction
   as the event; the function is pure transport. A job offer carries no address
   (ADR-0013 applies to a lock screen too) and expires with the offer.
-- **No earnings surface.** `commission_rates`, `payouts` and `payout_orders`
+- ~~No earnings surface. `commission_rates`, `payouts` and `payout_orders`
   (0031) have RLS and no screen, and `listMyJobs` filters to live statuses — so
-  there is no completed-work history of any kind.
+  there is no completed-work history of any kind.~~ **Built** — 0067 and an
+  الأرباح tab. The figure shown and the figure paid come from one function
+  (`payable_order_lines`), which `build_payout` was rebuilt to call; suite 39
+  asserts they agree to the halala. Commission is displayed rather than netted
+  out quietly.
 - **No quote or parts capture.** `orders.quoted_amount` and `order_parts` exist
   and `nextJobStep` handles `quoted`, but nothing in the app creates a quote, so
   an order cannot reach that status. Differentiators 3 and 6 are backend-only.

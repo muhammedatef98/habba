@@ -491,6 +491,34 @@
     "decline": "Can't take this one",
     "declined": "Offer declined"
   },
+  "earnings": {
+    "title": "Earnings",
+    "sar": "SAR {{amount}}",
+    "unsettledLabel": "Owed to you",
+    "unsettledCount": "from {{count}} completed jobs",
+    "unsettledNone": "No work awaiting payout",
+    "gross": "Total",
+    "commission": "Habba commission",
+    "net": "Your net",
+    "vatNote": "Commission is taken on parts and labour only, never on the VAT. The VAT is still inside your net amount and remains your responsibility.",
+    "paidToDate": "Paid to you",
+    "lastPaid": "Last paid on {{date}}",
+    "unsettledJobs": "Jobs awaiting payout",
+    "lineCommission": "commission {{amount}}",
+    "payouts": "Payouts",
+    "period": "{{from}} — {{to}}",
+    "payoutJobs": "{{count}} jobs",
+    "noPayoutsTitle": "No payouts yet",
+    "noPayoutsBody": "Your first payout appears here after the settlement period closes. What you are owed is shown above in the meantime.",
+    "reference": "Transfer reference",
+    "paidOn": "Paid on {{date}}",
+    "status": {
+      "pending": "Being prepared",
+      "approved": "Approved",
+      "paid": "Paid",
+      "failed": "Transfer failed"
+    }
+  },
   "provider": {
     "shiftTitle": "Your shift",
     "goOnline": "Go online",
@@ -575,6 +603,7 @@
     },
     "navShift": "Shift",
     "navJobs": "My jobs",
+    "navEarnings": "Earnings",
     "statusOnline": "You're available",
     "statusOffline": "You're not available",
     "shiftSubtitleOnline": "Your location is shared only while you're working, and stops the moment you go offline.",
