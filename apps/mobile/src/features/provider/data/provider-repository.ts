@@ -13,6 +13,8 @@
 
 import {
   sarOrThrow,
+  type InspectionResultEntry,
+  type InspectionTemplateSection,
   type CompletionMediaItem,
   type CompletionMediaKind,
   type FulfilmentMode,
@@ -37,12 +39,22 @@ export interface OpenJob {
   readonly estimatedPayout: string | null;
 }
 
+export type ServiceCategory = 'emergency' | 'periodic' | 'inspection' | 'wash' | 'bodywork';
+
 export interface AssignedJob {
   readonly orderId: string;
   readonly orderNumber: string;
   readonly status: OrderStatus;
   readonly fulfilmentMode: FulfilmentMode;
   readonly serviceNameAr: string;
+  /**
+   * What kind of work this is.
+   *
+   * Carried so the job screen can offer the inspection form on an inspection
+   * and not on a battery swap. Deriving it from the service NAME would be a
+   * string match against copy somebody will edit.
+   */
+  readonly serviceCategory: ServiceCategory;
   /** Only present once assigned — before that the server will not return it. */
   readonly addressAr: string | null;
   readonly problemDescription: string | null;
@@ -183,6 +195,46 @@ export interface ProviderRepository {
   addQuotePart(orderId: string, part: NewQuotePart): Promise<void>;
   removeQuotePart(partId: string): Promise<void>;
   setLabour(orderId: string, labour: SarAmount): Promise<void>;
+
+  /**
+   * الفحص. The template an inspection is filled against, and the filing of it.
+   *
+   * ⚠️ `submitInspection` sends ratings and notes — never a score and never a
+   * recommendation. `submit_inspection_report` (0026) computes both from the
+   * weighted template, and the table has no INSERT policy at all, so a
+   * hand-written row carrying a flattering score is not something the client
+   * can produce. That is the property the whole feature rests on: a buyer is
+   * about to hand over money on the strength of this number.
+   */
+  getInspectionTemplate(key: string): Promise<InspectionTemplateRow | null>;
+  submitInspection(input: InspectionSubmission): Promise<string>;
+}
+
+export interface InspectionTemplateRow {
+  readonly id: string;
+  readonly key: string;
+  readonly nameAr: string;
+  readonly sections: readonly InspectionTemplateSection[];
+}
+
+export interface InspectionSubmission {
+  readonly orderId: string;
+  readonly templateKey: string;
+  readonly results: Readonly<Record<string, Record<string, InspectionResultEntry>>>;
+  /**
+   * The car's identity, carried by the report itself.
+   *
+   * A pre-purchase inspection runs against a car nobody in the system owns, so
+   * there is no `vehicles` row to borrow a VIN and plate from — and the server
+   * refuses a report that identifies its subject by neither (0026's
+   * `inspection_subject_identified`).
+   */
+  readonly subjectVin: string | null;
+  readonly subjectPlate: string | null;
+  readonly subjectMakeAr: string | null;
+  readonly subjectModelAr: string | null;
+  readonly subjectYear: number | null;
+  readonly subjectMileage: number | null;
 }
 
 /** What the provider types in. Everything else about the line is derived. */
@@ -554,6 +606,47 @@ export class SupabaseProviderRepository implements ProviderRepository {
     });
     if (error !== null) throw new Error(`setLabour: ${error.message}`);
   }
+
+  async getInspectionTemplate(key: string): Promise<InspectionTemplateRow | null> {
+    const { data, error } = await this.client
+      .from('inspection_templates')
+      .select('id, key, name_ar, sections')
+      .eq('key', key)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error !== null) throw new Error(`getInspectionTemplate: ${error.message}`);
+    if (data === null) return null;
+
+    const row = data as unknown as {
+      id: string;
+      key: string;
+      name_ar: string;
+      sections: InspectionTemplateSection[];
+    };
+
+    return { id: row.id, key: row.key, nameAr: row.name_ar, sections: row.sections };
+  }
+
+  async submitInspection(input: InspectionSubmission): Promise<string> {
+    const { data, error } = await this.client.rpc('submit_inspection_report', {
+      p_order_id: input.orderId,
+      p_template_key: input.templateKey,
+      p_results: input.results,
+      p_subject_vin: input.subjectVin,
+      p_subject_plate: input.subjectPlate,
+      p_subject_make_ar: input.subjectMakeAr,
+      p_subject_model_ar: input.subjectModelAr,
+      p_subject_year: input.subjectYear,
+      p_subject_mileage: input.subjectMileage,
+    });
+
+    // ⚠️ Surfaced, never swallowed. The server refuses an incomplete report and
+    // names what is missing; an inspector who saw that silently succeed would
+    // walk away believing they had filed something.
+    if (error !== null) throw new Error(error.message);
+    return data as string;
+  }
 }
 
 interface OrderPartRow {
@@ -592,6 +685,7 @@ interface OrderRow {
   completion_media: CompletionMediaItem[] | null;
   services: {
     name_ar: string;
+    category: ServiceCategory;
     requires_completion_photos: boolean;
     requires_completion_mileage: boolean;
   } | null;
@@ -606,6 +700,7 @@ function toAssignedJob(row: unknown): AssignedJob {
     status: order.status,
     fulfilmentMode: order.fulfilment_mode,
     serviceNameAr: order.services?.name_ar ?? '',
+    serviceCategory: order.services?.category ?? 'emergency',
     addressAr: order.service_address_ar,
     problemDescription: order.problem_description,
     completionMileage: order.completion_mileage,
@@ -676,6 +771,7 @@ export class InMemoryProviderRepository implements ProviderRepository {
       status: 'accepted',
       fulfilmentMode: 'mobile_ondemand',
       serviceNameAr: 'بطارية — شحن أو تبديل',
+      serviceCategory: 'emergency',
       addressAr: 'حي الفيصلية، شارع ١٢',
       problemDescription: 'السيارة ما تشتغل',
       completionMileage: null,
@@ -818,6 +914,48 @@ export class InMemoryProviderRepository implements ProviderRepository {
   async setLabour(): Promise<void> {
     // No totals to recompute: there is no order row here carrying them, and
     // inventing one would be inventing the arithmetic 0068 keeps on the server.
+  }
+
+  /**
+   * A two-section stand-in, not the real eleven-section template.
+   *
+   * Enough to exercise the capture screen's navigation, progress and
+   * completeness behaviour offline. Deliberately includes one optional item and
+   * one required one in the same section, because that is the combination the
+   * screen gets wrong if `required` is ignored.
+   */
+  async getInspectionTemplate(key: string): Promise<InspectionTemplateRow | null> {
+    return {
+      id: 'dev-template-1',
+      key,
+      nameAr: 'فحص ما قبل الشراء (نسخة التطوير)',
+      sections: [
+        {
+          key: 'engine',
+          title_ar: 'المحرّك',
+          items: [
+            { key: 'oil_leaks', label_ar: 'تسريب زيت', required: true, weight: 2 },
+            { key: 'cold_start', label_ar: 'التشغيل البارد', required: true },
+            { key: 'belts', label_ar: 'السيور' },
+          ],
+        },
+        {
+          key: 'brakes',
+          title_ar: 'الفرامل',
+          items: [
+            { key: 'pads', label_ar: 'الفحمات', required: true },
+            { key: 'discs', label_ar: 'الهوبات', required: true },
+          ],
+        },
+      ],
+    };
+  }
+
+  async submitInspection(): Promise<string> {
+    // No scoring here on purpose. The score is the server's (0026) and a dev
+    // stub that invented one would teach whoever builds against it that the
+    // client may produce a number a buyer will act on.
+    return 'dev-inspection-report-1';
   }
 }
 

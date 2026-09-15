@@ -175,8 +175,24 @@ buyer purchases, the report converts into a new `vehicles` row with the
 inspection as its first timeline event.
 
 **Where it stands.** Migrations 0026–0027, covered by `09_inspections.sql`
-including the conversion. No customer or provider screens at all — this phase
-is backend-only.
+including the conversion. The real eleven-section pre-purchase template is
+seeded, weighted and Arabic-labelled.
+
+The **provider capture screen** now exists: section-at-a-time navigation with
+per-section progress, the four ratings `rating_to_score` understands, a note
+field that appears only under a fault, and the missing-items list rendered in
+Arabic labels BEFORE submitting — `unansweredRequired` in @habba/core mirrors
+`submit_inspection_report`'s completeness rule, including the case the two
+could disagree on (an entry carrying a note but no rating is not an answer).
+
+⚠️ No score is computed on the device. The weighted score and the
+buy/negotiate/avoid recommendation are the server's, and `inspection_reports`
+has no INSERT policy at all — a report carrying a flattering number is not
+something the app can produce.
+
+**Still missing:** the customer's report viewer and the buyer→owner conversion
+screen over `convert_inspection_to_vehicle` (0027). The renderer for the public
+page already exists in `packages/core/src/report/inspection.ts`.
 
 ---
 

@@ -559,6 +559,32 @@
       "saveFailed": "The line couldn't be saved. Check your connection and try again."
     }
   },
+  "inspection": {
+    "subtitle": "Rate every item, and add a note wherever something is wrong. The buyer reads this before paying.",
+    "subjectTitle": "The car inspected",
+    "subjectHint": "A pre-purchase inspection runs against a car that is not registered with Habba, so the report carries its identity itself. Enter the plate or the VIN — at least one.",
+    "plateLabel": "Plate number",
+    "vinLabel": "VIN",
+    "vinHint": "17 characters, never containing I, O or Q",
+    "mileageLabel": "Odometer reading",
+    "sections": "Inspection sections",
+    "progress": "{{done}} of {{total}}",
+    "required": "Required",
+    "noteLabel": "Note",
+    "rating": {
+      "pass": "Pass",
+      "attention": "Attention",
+      "fail": "Fail",
+      "na": "N/A"
+    },
+    "stillNeeded": "{{count}} required items outstanding",
+    "andMore": "and {{count}} more",
+    "needsSubject": "Add a plate or a VIN — the report has to identify the car that was inspected.",
+    "submit": "Submit the report",
+    "scoreNote": "The score and recommendation are computed on the server from the template's weights. You describe the car's condition; you do not grade it.",
+    "noTemplate": "The inspection template is unavailable.",
+    "openInspection": "Open the inspection form"
+  },
   "provider": {
     "shiftTitle": "Your shift",
     "goOnline": "Go online",

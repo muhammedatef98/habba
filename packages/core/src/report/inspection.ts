@@ -110,6 +110,77 @@ export function collectFindings(
   return findings.sort((a, b) => b.weight - a.weight).map(({ weight: _weight, ...rest }) => rest);
 }
 
+/**
+ * Which required items an inspector has not answered yet, as `section.item`.
+ *
+ * ⚠️ This mirrors the completeness check inside `submit_inspection_report`
+ * (0026), and the mirroring is the point. That function refuses a partial
+ * report with a list of keys — correct, and useless to someone standing beside
+ * a car with a phone: they discover eleven items are missing only after
+ * tapping submit, and the error names them in `section.item` form rather than
+ * in words.
+ *
+ * Keeping it here rather than in the screen means it is a pure function with
+ * tests, and the same shape the server enforces. The server stays the
+ * authority: this makes the refusal predictable, it does not replace it.
+ *
+ * Returns keys rather than labels so the caller can decide how to render them —
+ * the capture screen turns them into Arabic labels, the parity test compares
+ * them with what Postgres reports.
+ */
+export function unansweredRequired(
+  sections: readonly InspectionTemplateSection[],
+  results: Readonly<Record<string, Record<string, InspectionResultEntry>>>,
+): readonly string[] {
+  const missing: string[] = [];
+
+  for (const section of sections) {
+    const answered = results[section.key] ?? {};
+    for (const item of section.items) {
+      if (item.required !== true) continue;
+      // ⚠️ The server tests `->> 'rating' is null`, so an entry present with no
+      // rating counts as unanswered. Checking only for the entry's existence
+      // would let a note without a rating pass here and fail there.
+      const rating = answered[item.key]?.rating;
+      if (rating === undefined) missing.push(`${section.key}.${item.key}`);
+    }
+  }
+
+  return missing;
+}
+
+/** Whether every required item has a rating. */
+export function isInspectionComplete(
+  sections: readonly InspectionTemplateSection[],
+  results: Readonly<Record<string, Record<string, InspectionResultEntry>>>,
+): boolean {
+  return unansweredRequired(sections, results).length === 0;
+}
+
+/**
+ * How many of a section's items still need answering.
+ *
+ * Per-section rather than overall, because an eleven-section template is
+ * navigated one section at a time and "6 of 9 done" on the row is what tells
+ * an inspector where to go next.
+ */
+export function sectionProgress(
+  section: InspectionTemplateSection,
+  results: Readonly<Record<string, Record<string, InspectionResultEntry>>>,
+): { readonly answered: number; readonly total: number; readonly requiredMissing: number } {
+  const answered = results[section.key] ?? {};
+  let done = 0;
+  let missing = 0;
+
+  for (const item of section.items) {
+    const rating = answered[item.key]?.rating;
+    if (rating !== undefined) done += 1;
+    else if (item.required === true) missing += 1;
+  }
+
+  return { answered: done, total: section.items.length, requiredMissing: missing };
+}
+
 export function countByRating(report: InspectionReport): Record<ItemRating, number> {
   const counts: Record<ItemRating, number> = { pass: 0, attention: 0, fail: 0, na: 0 };
 

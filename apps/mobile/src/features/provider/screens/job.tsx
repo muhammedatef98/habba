@@ -139,6 +139,26 @@ export default function JobScreen() {
         </View>
       </Card>
 
+      {/* الفحص, on an inspection job and nowhere else. Decided from the
+          service CATEGORY rather than its name: a string match against copy
+          somebody will eventually edit is not a decision. */}
+      {data.serviceCategory === 'inspection' && canRecordEvidence(data.status) ? (
+        <Card>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('inspection.sections')}</Text>
+            <Text variant="caption" tone="muted">
+              {t('inspection.subtitle')}
+            </Text>
+            <Button
+              testID="open-inspection"
+              label={t('inspection.openInspection')}
+              variant="accent"
+              onPress={() => router.push({ pathname: '/inspection', params: { id: data.orderId } })}
+            />
+          </View>
+        </Card>
+      ) : null}
+
       {/* The quote, on the same window as the evidence — both are things that
           have to be done while the technician is still standing next to the
           car. An unapproved part line blocks the hand-back exactly as missing
