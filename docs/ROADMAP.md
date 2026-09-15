@@ -202,6 +202,30 @@ open decision 2.
 
 ---
 
+### Function grants — a closed class, and how
+
+0001 sets `alter default privileges in schema public grant all on functions to
+anon, authenticated, service_role`, so **every function arrives executable by
+any signed-in user**. `grant execute … to service_role` beneath a definition
+reads like a restriction and is not one, and `revoke … from public` does not
+help because the grant is held directly by the named roles.
+
+Eight functions shipped that way and were closed in 0069 — five from 0065's
+push work (including `claim_notification_batch`, which returned every user's
+notification text and Expo push tokens), plus `broadcast_order`,
+`run_maintenance_scan` and `order_parts_total`. `scan_vehicle_maintenance` and
+`estimate_current_mileage` were scoped to the caller's own vehicle rather than
+revoked.
+
+`supabase/tests/41_function_surface_audit.sql` now makes this a build step: any
+definer function taking an identifier, reachable by a signed-in user, must be
+on an explicit list. It found `broadcast_order`, which hand-probing had missed —
+a made-up order id returns `no_data_found`, which reads like a refusal.
+
+The moat held throughout: `append_vehicle_timeline_event`, `record_past_service`,
+`record_mileage`, `generate_habba_report` and `initiate_ownership_transfer` all
+refuse a vehicle that is not yours.
+
 ## Open decisions
 
 From HANDOFF.md §9. These block real work, and none of them is a coding task.
