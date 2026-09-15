@@ -95,6 +95,7 @@ insert into expected_exposed (name) values
   ('outgoing_ownership_transfer'),     -- 32
   ('owns_vehicle'),                    -- boolean about the CALLER
   ('record_completion_evidence'),      -- 11: assigned provider
+  ('record_ops_action'),               -- 42: carries its own is-ops guard
   ('record_mileage'),                  -- 02: owns_vehicle
   ('record_past_service'),             -- 02: owns_vehicle
   ('reissue_ownership_transfer'),      -- 34

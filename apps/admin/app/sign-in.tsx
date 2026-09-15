@@ -13,13 +13,22 @@
 import { useState } from 'react';
 import { opsAuth, type Operator } from '@/lib/ops-session';
 
-const MESSAGES: Record<'bad_credentials' | 'not_ops' | 'transport_failed', string> = {
+const MESSAGES: Record<
+  'bad_credentials' | 'not_ops' | 'second_factor_not_enrolled' | 'transport_failed',
+  string
+> = {
   bad_credentials: 'البريد أو كلمة المرور غير صحيحة.',
   // Deliberately not "you are not ops". The person may be a legitimate
   // technician or customer who typed the wrong URL; telling them their account
   // lacks a role they have never heard of is confusing, and confirming that
   // the credentials WERE right hands a prober information.
   not_ops: 'هذا الحساب لا يملك صلاحية الدخول إلى لوحة التشغيل.',
+  // ⚠️ Refused, not waved through. Amendment B makes 2FA mandatory, and an
+  // exemption for "the account that hasn't set it up yet" is how a mandatory
+  // control quietly becomes an optional one. Enrolment is done by an existing
+  // super_admin — see apps/admin/README.md.
+  second_factor_not_enrolled:
+    'هذا الحساب بدون تحقّق بخطوتين. التحقّق بخطوتين إلزامي للوحة التشغيل — راجع مسؤول النظام لتفعيله.',
   transport_failed: 'تعذّر الاتصال. حاول مرة أخرى.',
 };
 
@@ -28,18 +37,39 @@ export function SignIn({ onSignedIn }: { readonly onSignedIn: (operator: Operato
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Non-null once the password step has passed and a factor is challenged. */
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [code, setCode] = useState('');
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError(null);
 
-    const result = await opsAuth.signIn(email, password);
+    const result =
+      factorId === null
+        ? await opsAuth.signIn(email, password)
+        : await opsAuth.verifySecondFactor(factorId, code);
+
     setBusy(false);
 
     if (result.ok) {
       onSignedIn(result.operator);
       return;
+    }
+
+    if (result.reason === 'needs_second_factor') {
+      setFactorId(result.factorId);
+      // The password is not kept once it has done its job.
+      setPassword('');
+      return;
+    }
+
+    // Back to the start on a failed code: a stale challenge cannot be retried,
+    // and leaving the code field up would let someone grind at it.
+    if (factorId !== null) {
+      setFactorId(null);
+      setCode('');
     }
     setError(MESSAGES[result.reason]);
   };
@@ -95,24 +125,44 @@ export function SignIn({ onSignedIn }: { readonly onSignedIn: (operator: Operato
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
+            readOnly={factorId !== null}
             required
             dir="ltr"
             style={fieldStyle}
           />
         </label>
 
-        <label style={{ display: 'grid', gap: 'var(--space-xs)' }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>كلمة المرور</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-            dir="ltr"
-            style={fieldStyle}
-          />
-        </label>
+        {factorId === null ? (
+          <label style={{ display: 'grid', gap: 'var(--space-xs)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>كلمة المرور</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+              dir="ltr"
+              style={fieldStyle}
+            />
+          </label>
+        ) : (
+          <label style={{ display: 'grid', gap: 'var(--space-xs)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>رمز التحقّق</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              required
+              dir="ltr"
+              style={fieldStyle}
+            />
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+              من تطبيق المصادقة على جوالك.
+            </span>
+          </label>
+        )}
 
         {error !== null ? (
           <p style={{ margin: 0, color: 'var(--color-emergency-fg)', fontSize: 'var(--text-sm)' }}>
@@ -133,7 +183,7 @@ export function SignIn({ onSignedIn }: { readonly onSignedIn: (operator: Operato
             opacity: busy ? 0.6 : 1,
           }}
         >
-          {busy ? 'جارٍ الدخول…' : 'دخول'}
+          {busy ? 'جارٍ الدخول…' : factorId === null ? 'متابعة' : 'دخول'}
         </button>
       </form>
     </main>

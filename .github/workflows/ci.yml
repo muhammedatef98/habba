@@ -34,6 +34,13 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
+      # Amendment B (§5.1.6) requires this by name: a CI check that fails the
+      # build if a service-role secret is reachable from a client bundle. It
+      # greps source rather than build output, so it fails on the commit rather
+      # than after a deploy.
+      - name: Server-only secrets stay server-only
+        run: ./supabase/scripts/check-secret-exposure.sh
+
       - name: Unit tests
         run: pnpm -r test
 
