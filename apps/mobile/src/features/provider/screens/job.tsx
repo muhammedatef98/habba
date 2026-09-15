@@ -139,6 +139,28 @@ export default function JobScreen() {
         </View>
       </Card>
 
+      {/* The quote, on the same window as the evidence — both are things that
+          have to be done while the technician is still standing next to the
+          car. An unapproved part line blocks the hand-back exactly as missing
+          photos do (0068), so burying it a screen deeper than the thing it
+          blocks would be the wrong way round. */}
+      {canRecordEvidence(data.status) ? (
+        <Card>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('quoteBuild.title')}</Text>
+            <Text variant="caption" tone="muted">
+              {t('quoteBuild.subtitle')}
+            </Text>
+            <Button
+              testID="open-quote"
+              label={t('quoteBuild.openQuote')}
+              variant="secondary"
+              onPress={() => router.push({ pathname: '/quote', params: { id: data.orderId } })}
+            />
+          </View>
+        </Card>
+      ) : null}
+
       {canRecordEvidence(data.status) ? (
         <Card elevation={evidenceReady ? 'sm' : 'none'}>
           <View style={{ gap: theme.spacing.sm }}>

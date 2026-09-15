@@ -127,9 +127,16 @@ never been done.
   (`payable_order_lines`), which `build_payout` was rebuilt to call; suite 39
   asserts they agree to the halala. Commission is displayed rather than netted
   out quietly.
-- **No quote or parts capture.** `orders.quoted_amount` and `order_parts` exist
-  and `nextJobStep` handles `quoted`, but nothing in the app creates a quote, so
-  an order cannot reach that status. Differentiators 3 and 6 are backend-only.
+- ~~No quote or parts capture. `orders.quoted_amount` and `order_parts` exist
+  and `nextJobStep` handles `quoted`, but nothing in the app creates a quote.~~
+  **Parts and labour built** — 0068 and a عرض السعر screen, so differentiator 6
+  is reachable. `parts_amount` is now DERIVED from the lines rather than
+  asserted by the provider, which closed a bypass: the customer-approval gate
+  in 0032 reads `if new.parts_amount > 0`, and that column is written by the
+  same person the gate checks.
+  **Still missing: the pre-dispatch quote** (differentiator 3) — a price offered
+  from the triage clip before driving out. That one moves `searching → quoted`
+  and belongs with the dispatch state machine rather than with parts.
 - **The triage clip cannot be watched.** `OpenJobCard` shows a "has video"
   badge with no player, which is the feature's entire point.
 - **No rating, verification-status, workshop-schedule or inspection screens.**

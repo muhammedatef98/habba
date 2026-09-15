@@ -20,6 +20,7 @@ import {
   type SarAmount,
 } from '@habba/core';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
+import type { OrderPart } from '@/features/shared/data/types.js';
 import { locationProvider } from '@/features/shared/lib/location.js';
 import type { LocationProvider } from '@/features/shared/lib/location-provider.js';
 
@@ -168,6 +169,30 @@ export interface ProviderRepository {
   listUnsettledEarnings(): Promise<readonly EarningLine[]>;
   listPayouts(): Promise<readonly PayoutSummary[]>;
   listPayoutLines(payoutId: string): Promise<readonly EarningLine[]>;
+
+  /**
+   * عرض السعر — the parts and labour that make up what the customer is asked
+   * to approve (§1's sixth differentiator).
+   *
+   * ⚠️ No method sets a total. `parts_amount`, `vat_amount` and `total_amount`
+   * are derived server-side from the lines and the labour (0068); a client that
+   * could write them would be a second implementation of the VAT arithmetic,
+   * and the one that decides what the customer pays.
+   */
+  listQuoteParts(orderId: string): Promise<readonly OrderPart[]>;
+  addQuotePart(orderId: string, part: NewQuotePart): Promise<void>;
+  removeQuotePart(partId: string): Promise<void>;
+  setLabour(orderId: string, labour: SarAmount): Promise<void>;
+}
+
+/** What the provider types in. Everything else about the line is derived. */
+export interface NewQuotePart {
+  readonly nameAr: string;
+  readonly partNumber: string | null;
+  readonly isOem: boolean;
+  readonly quantity: number;
+  readonly unitPrice: SarAmount;
+  readonly warrantyDays: number | null;
 }
 
 /**
@@ -467,6 +492,80 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`listPayoutLines: ${error.message}`);
     return (data as EarningLineRow[]).map(toEarningLine);
   }
+
+  async listQuoteParts(orderId: string): Promise<readonly OrderPart[]> {
+    const { data, error } = await this.client
+      .from('order_parts')
+      .select(
+        'id, order_id, name_ar, part_number, is_oem, quantity, unit_price, ' +
+          'warranty_days, approved_by_customer',
+      )
+      .eq('order_id', orderId)
+      .order('created_at');
+
+    if (error !== null) throw new Error(`listQuoteParts: ${error.message}`);
+
+    return (data as unknown as OrderPartRow[]).map((row) => ({
+      id: row.id,
+      orderId: row.order_id,
+      nameAr: row.name_ar,
+      partNumber: row.part_number,
+      isOem: row.is_oem,
+      quantity: row.quantity,
+      unitPrice: toSar(row.unit_price),
+      warrantyDays: row.warranty_days,
+      approvedByCustomer: row.approved_by_customer,
+    }));
+  }
+
+  /**
+   * A plain INSERT, not an RPC.
+   *
+   * `order_parts_write_provider` (0022) already scopes writes to the assigned
+   * provider, `guard_order_part_window` (0068) refuses a line on a job that is
+   * no longer open, and the reprice trigger recomputes the order's totals the
+   * moment the row lands. There is nothing left for an RPC to add — and one
+   * that took the totals as arguments would be handing the client the decision
+   * this whole design keeps on the server.
+   */
+  async addQuotePart(orderId: string, part: NewQuotePart): Promise<void> {
+    const { error } = await this.client.from('order_parts').insert({
+      order_id: orderId,
+      name_ar: part.nameAr,
+      part_number: part.partNumber,
+      is_oem: part.isOem,
+      quantity: part.quantity,
+      unit_price: part.unitPrice,
+      warranty_days: part.warrantyDays,
+    });
+
+    if (error !== null) throw new Error(`addQuotePart: ${error.message}`);
+  }
+
+  async removeQuotePart(partId: string): Promise<void> {
+    const { error } = await this.client.from('order_parts').delete().eq('id', partId);
+    if (error !== null) throw new Error(`removeQuotePart: ${error.message}`);
+  }
+
+  async setLabour(orderId: string, labour: SarAmount): Promise<void> {
+    const { error } = await this.client.rpc('set_order_labour', {
+      p_order_id: orderId,
+      p_labour: labour,
+    });
+    if (error !== null) throw new Error(`setLabour: ${error.message}`);
+  }
+}
+
+interface OrderPartRow {
+  id: string;
+  order_id: string;
+  name_ar: string;
+  part_number: string | null;
+  is_oem: boolean;
+  quantity: number;
+  unit_price: number | string;
+  warranty_days: number | null;
+  approved_by_customer: boolean;
 }
 
 interface PayoutRow {
@@ -683,6 +782,42 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async listPayoutLines(): Promise<readonly EarningLine[]> {
     return this.listUnsettledEarnings();
+  }
+
+  private readonly parts = new Map<string, OrderPart[]>();
+
+  async listQuoteParts(orderId: string): Promise<readonly OrderPart[]> {
+    return this.parts.get(orderId) ?? [];
+  }
+
+  async addQuotePart(orderId: string, part: NewQuotePart): Promise<void> {
+    const lines = this.parts.get(orderId) ?? [];
+    lines.push({
+      id: `dev-part-${lines.length + 1}-${Date.now()}`,
+      orderId,
+      nameAr: part.nameAr,
+      partNumber: part.partNumber,
+      isOem: part.isOem,
+      quantity: part.quantity,
+      unitPrice: part.unitPrice,
+      warrantyDays: part.warrantyDays,
+      // Never pre-approved. The dev build must not make the approval gate look
+      // like it passes itself — that gate is the whole point of the screen.
+      approvedByCustomer: false,
+    });
+    this.parts.set(orderId, lines);
+  }
+
+  async removeQuotePart(partId: string): Promise<void> {
+    for (const [orderId, lines] of this.parts) {
+      const kept = lines.filter((line) => line.id !== partId);
+      if (kept.length !== lines.length) this.parts.set(orderId, kept);
+    }
+  }
+
+  async setLabour(): Promise<void> {
+    // No totals to recompute: there is no order row here carrying them, and
+    // inventing one would be inventing the arithmetic 0068 keeps on the server.
   }
 }
 
