@@ -11,8 +11,15 @@
  * permission model rather than working around it.
  */
 
-import type { CompletionMediaItem, FulfilmentMode, OrderStatus } from '@habba/core';
+import type {
+  CompletionMediaItem,
+  CompletionMediaKind,
+  FulfilmentMode,
+  OrderStatus,
+} from '@habba/core';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
+import { locationProvider } from '@/features/shared/lib/location.js';
+import type { LocationProvider } from '@/features/shared/lib/location-provider.js';
 
 export interface OpenJob {
   readonly orderId: string;
@@ -49,9 +56,22 @@ export interface Position {
   readonly heading?: number | undefined;
 }
 
+/**
+ * Why this is a result and not a thrown error.
+ *
+ * A denied location permission is a normal outcome, not an exception: the
+ * technician tapped "don't allow" once, months ago, and has no idea that is why
+ * no work is arriving. The two failures need different words on the screen —
+ * one is fixed in iOS Settings and the other fixes itself when they drive out
+ * of the basement — so the reason has to survive the trip back to the caller.
+ */
+export type PositionResult =
+  | { readonly ok: true; readonly position: Position }
+  | { readonly ok: false; readonly reason: 'permission_denied' | 'unavailable' };
+
 export interface ProviderRepository {
   setOnline(online: boolean): Promise<void>;
-  currentPosition(): Promise<Position>;
+  currentPosition(): Promise<PositionResult>;
   broadcastLocation(position: Position): Promise<void>;
   listOpenJobs(): Promise<readonly OpenJob[]>;
   listMyJobs(): Promise<readonly AssignedJob[]>;
@@ -69,6 +89,20 @@ export interface ProviderRepository {
   acceptJob(orderId: string): Promise<void>;
   advanceJob(orderId: string, toStatus: OrderStatus): Promise<void>;
   checkInVehicle(orderId: string): Promise<void>;
+  /**
+   * Stores one evidence photo and returns the reference to record on the order,
+   * or null if it did not land.
+   *
+   * ⚠️ Null must never be treated as "close enough". Until this resolves with a
+   * path there is no photo, and an item added to `completion_media` anyway is a
+   * timeline attachment pointing at nothing — signed, hash-chained, and empty.
+   * That is the failure 0064 was written about.
+   */
+  uploadCompletionPhoto(
+    orderId: string,
+    kind: CompletionMediaKind,
+    uri: string,
+  ): Promise<string | null>;
   recordEvidence(
     orderId: string,
     mileage: number,
@@ -89,7 +123,10 @@ interface OpenJobRow {
 }
 
 export class SupabaseProviderRepository implements ProviderRepository {
-  constructor(private readonly client: NonNullable<ReturnType<typeof getSupabaseClient>>) {}
+  constructor(
+    private readonly client: NonNullable<ReturnType<typeof getSupabaseClient>>,
+    private readonly location: LocationProvider = locationProvider,
+  ) {}
 
   async setOnline(online: boolean): Promise<void> {
     // Going offline also clears the stored position server-side — battery and
@@ -98,10 +135,31 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`setOnline: ${error.message}`);
   }
 
-  async currentPosition(): Promise<Position> {
-    // expo-location is wired in the native build; this keeps the data layer
-    // free of a native dependency so it stays testable in Node.
-    throw new Error('currentPosition must be supplied by the platform layer');
+  /**
+   * ⚠️ This used to throw unconditionally, with a comment promising that the
+   * native build supplied it. Nothing did. On a hosted project every broadcast
+   * tick raised, `update_provider_location` was never called, and
+   * `match_providers` — which filters on a fix newer than
+   * `location_freshness_limit()` — could not see the technician at all. They
+   * went online, watched "موقعك قديم" forever, and received no work, with no
+   * way to tell that from a quiet night.
+   *
+   * The provider it now uses is the same one the customer's emergency flow has
+   * used since it was built (`shared/lib/location.ts`): real GPS in a build
+   * that can ask for permission, the fixed Dammam stub otherwise.
+   */
+  async currentPosition(): Promise<PositionResult> {
+    const result = await this.location.getCurrentLocation();
+    if (!result.ok) return { ok: false, reason: result.reason };
+
+    return {
+      ok: true,
+      position: {
+        lon: result.location.lon,
+        lat: result.location.lat,
+        heading: result.location.heading ?? undefined,
+      },
+    };
   }
 
   async broadcastLocation(position: Position): Promise<void> {
@@ -203,6 +261,44 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`checkInVehicle: ${error.message}`);
   }
 
+  /**
+   * Uploads to the private `completion-media` bucket (0064).
+   *
+   * Keyed `<order_id>/<filename>`, because the bucket's policies authorise on
+   * the first path segment — an object anywhere else matches no order and is
+   * refused. Nothing here checks that; RLS does.
+   *
+   * What comes back is the PATH, not a signed URL. The same reasoning as the
+   * triage clip: a signed URL expires, and this reference is about to be
+   * written into a timeline attachment that is permanent and hash-chained. A
+   * row whose contents stop resolving after an hour is not a record.
+   *
+   * Unlike the triage clip, a failure here is NOT swallowed. That clip is a
+   * courtesy and the rescue proceeds without it; this photo is the thing the
+   * customer's resale value is made of, and the server will refuse to let the
+   * job be handed back without it. Returning null so the screen can say so is
+   * the entire point.
+   */
+  async uploadCompletionPhoto(
+    orderId: string,
+    kind: CompletionMediaKind,
+    uri: string,
+  ): Promise<string | null> {
+    try {
+      const response = await fetch(uri);
+      const body = await response.arrayBuffer();
+      const path = `${orderId}/${kind}-${Date.now()}.jpg`;
+
+      const upload = await this.client.storage
+        .from('completion-media')
+        .upload(path, body, { contentType: 'image/jpeg', upsert: false });
+
+      return upload.error === null ? path : null;
+    } catch {
+      return null;
+    }
+  }
+
   async recordEvidence(
     orderId: string,
     mileage: number,
@@ -262,8 +358,8 @@ export class InMemoryProviderRepository implements ProviderRepository {
     this.online = online;
   }
 
-  async currentPosition(): Promise<Position> {
-    return { lon: 46.6753, lat: 24.7136 };
+  async currentPosition(): Promise<PositionResult> {
+    return { ok: true, position: { lon: 46.6753, lat: 24.7136 } };
   }
 
   async broadcastLocation(): Promise<void> {
@@ -330,6 +426,21 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async checkInVehicle(orderId: string): Promise<void> {
     await this.advanceJob(orderId, 'checked_in');
+  }
+
+  /**
+   * There is no bucket in the dev build, so this names itself as a stand-in.
+   *
+   * The `dev://` scheme is deliberate and the reason it is here rather than in
+   * the screen. A fabricated reference that read `habba://captured/...` used to
+   * live in `evidence.tsx`, which meant it applied to a real hosted build too:
+   * the gap list cleared, the server's before/after count was satisfied, and a
+   * hash-chained attachment pointed at a file that had never existed. Confined
+   * to the in-memory repository — which only exists when there is no Supabase
+   * project at all (ADR-0010) — it can no longer reach a customer's logbook.
+   */
+  async uploadCompletionPhoto(orderId: string, kind: CompletionMediaKind): Promise<string | null> {
+    return `dev://${orderId}/${kind}-${Date.now()}.jpg`;
   }
 
   async recordEvidence(

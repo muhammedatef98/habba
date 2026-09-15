@@ -24,9 +24,11 @@ import {
   checkMileage,
   missingEvidence,
   type CompletionMediaItem,
+  type CompletionMediaKind,
   type EvidenceGap,
 } from '@habba/core';
 import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
+import { EvidenceCamera } from '@/features/provider/components/EvidenceCamera';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 
 const GAP_LABEL_KEY: Record<EvidenceGap, string> = {
@@ -49,6 +51,12 @@ export default function EvidenceScreen() {
 
   const [mileageText, setMileageText] = useState('');
   const [media, setMedia] = useState<readonly CompletionMediaItem[]>([]);
+
+  /** Which photo the camera is open for, if any. */
+  const [capturing, setCapturing] = useState<CompletionMediaKind | null>(null);
+  /** Which photo is in flight, so the button can say so and cannot be re-tapped. */
+  const [uploading, setUploading] = useState<CompletionMediaKind | null>(null);
+  const [uploadFailed, setUploadFailed] = useState(false);
 
   const save = useMutation({
     mutationFn: () => providerRepository.recordEvidence(id ?? '', Number(mileageText), media),
@@ -84,16 +92,46 @@ export default function EvidenceScreen() {
     mileage === null ? null : checkMileage(mileage, data.vehicleCurrentMileage, 1);
 
   /**
-   * Stands in for the camera. The native build replaces this with
-   * expo-image-picker plus an upload to Supabase Storage; keeping the capture
-   * behind one function means the screen's logic — which is the part that
-   * matters — does not depend on a native module.
+   * ⚠️ The photo is added to `media` ONLY after the upload returns a path.
+   *
+   * This used to fabricate `habba://captured/<kind>/<timestamp>` and add it
+   * immediately. Everything downstream then agreed the evidence existed: the
+   * gap list cleared, `assert_completion_evidence` counted one before and one
+   * after, the job was handed back, and the timeline took a hash-chained
+   * attachment pointing at a file that had never been written. The chain
+   * verified perfectly over nothing, which is the one outcome §2.4 exists to
+   * prevent — and the resale report is built on those attachments.
+   *
+   * So a failed upload leaves the gap open and says so. A technician told to
+   * retake the photo is a minor annoyance; a logbook full of dead references is
+   * the moat quietly emptying.
    */
-  function addPhoto(kind: 'before' | 'after') {
-    setMedia((current) => [
-      ...current.filter((item) => item.kind !== kind),
-      { url: `habba://captured/${kind}/${Date.now()}`, kind },
-    ]);
+  const orderId = data.orderId;
+
+  async function attachPhoto(kind: CompletionMediaKind, uri: string) {
+    setCapturing(null);
+    setUploading(kind);
+    setUploadFailed(false);
+
+    const path = await providerRepository.uploadCompletionPhoto(orderId, kind, uri);
+
+    setUploading(null);
+    if (path === null) {
+      setUploadFailed(true);
+      return;
+    }
+
+    setMedia((current) => [...current.filter((item) => item.kind !== kind), { url: path, kind }]);
+  }
+
+  if (capturing !== null) {
+    return (
+      <EvidenceCamera
+        kind={capturing}
+        onCaptured={(uri) => void attachPhoto(capturing, uri)}
+        onCancel={() => setCapturing(null)}
+      />
+    );
   }
 
   return (
@@ -142,7 +180,9 @@ export default function EvidenceScreen() {
                 : t('provider.addBefore')
             }
             variant={media.some((m) => m.kind === 'before') ? 'secondary' : 'accent'}
-            onPress={() => addPhoto('before')}
+            loading={uploading === 'before'}
+            disabled={uploading !== null}
+            onPress={() => setCapturing('before')}
           />
           <Button
             testID="add-after"
@@ -152,8 +192,18 @@ export default function EvidenceScreen() {
                 : t('provider.addAfter')
             }
             variant={media.some((m) => m.kind === 'after') ? 'secondary' : 'accent'}
-            onPress={() => addPhoto('after')}
+            loading={uploading === 'after'}
+            disabled={uploading !== null}
+            onPress={() => setCapturing('after')}
           />
+
+          {/* Said plainly, because the old behaviour was to say nothing and
+              carry on as though the photo had been taken. */}
+          {uploadFailed ? (
+            <Text testID="upload-failed" variant="caption" tone="emergency">
+              {t('provider.uploadFailed')}
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -176,7 +226,9 @@ export default function EvidenceScreen() {
         testID="save-evidence"
         label={t('common.save')}
         onPress={() => save.mutate()}
-        disabled={gaps.length > 0 || mileageWarning === 'below_recorded'}
+        // Saving mid-upload would record the media list as it stands, which is
+        // the list without the photo currently in flight.
+        disabled={gaps.length > 0 || mileageWarning === 'below_recorded' || uploading !== null}
         loading={save.isPending}
       />
 

@@ -292,8 +292,9 @@ if the project is heading for production.
 
 ## 7. Apply the storage policies (dashboard SQL editor)
 
-Migration `0048` creates the private `triage-media` bucket. It deliberately
-does **not** create the RLS policies on it, and cannot:
+Migrations `0048` and `0064` create the private `triage-media` and
+`completion-media` buckets. They deliberately do **not** create the RLS
+policies on them, and cannot:
 
 ```
 ERROR: must be owner of table objects
@@ -305,21 +306,29 @@ ownership of the table it is on, and the project's `postgres` role — the one
 the owning role. This is the same shape as PostGIS in §2: a privileged one-off
 that a migration cannot perform.
 
-**Dashboard → SQL Editor**, paste and run once, after the migrations:
+**Dashboard → SQL Editor**, paste and run once each, after the migrations:
 
 ```
 supabase/storage/triage-media-policies.sql
+supabase/storage/completion-media-policies.sql
 ```
 
-**How to tell it worked:** §6's run prints `storage policies for triage-media
-are in place`. Until then it prints a warning naming this step — and video
-triage uploads are refused, because RLS denies by default. The failure mode of
-forgetting is a closed bucket, never an open one.
+**How to tell it worked:** §6's run prints `storage policies for <bucket> are
+in place`, once per bucket. Until then it prints a warning naming this step —
+and uploads to that bucket are refused, because RLS denies by default. The
+failure mode of forgetting is a closed bucket, never an open one.
 
-> The local harness applies the same file as the storage owner
-> (`local-db.sh`), so `supabase/tests/24_triage_media_storage.sql` exercises
-> the real policies rather than a weaker stand-in. Suite `31` asserts the
-> harness has not quietly given itself ownership it would not have here.
+⚠️ `completion-media` is the one to not forget. Without it a technician can do
+the work and then be unable to hand the job back at all: the before/after
+photos will not upload, and `assert_completion_evidence` (0032) refuses the
+transition without them. They are stuck beside a car with a finished repair and
+no way to close it.
+
+> The local harness applies both files as the storage owner (`local-db.sh`), so
+> `supabase/tests/24_triage_media_storage.sql` and
+> `supabase/tests/37_completion_media_storage.sql` exercise the real policies
+> rather than a weaker stand-in. Suite `31` asserts the harness has not quietly
+> given itself ownership it would not have here.
 
 ## 8. There is no report function to deploy
 

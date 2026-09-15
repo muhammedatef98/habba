@@ -133,25 +133,40 @@ if [ "$MODE" != "--verify-only" ]; then
   # have it. Attempting it is how 0048 failed on its first hosted run. They are
   # applied once from the dashboard SQL editor; this only reports whether that
   # has been done, because the bucket is closed and unusable until it has.
-  triage_policies=$(psql "$SUPABASE_DB_URL" -t -A -c \
-    "select count(*) from pg_policies
-      where schemaname = 'storage' and tablename = 'objects'
-        and policyname like 'triage_media%'" 2>/dev/null || echo 0)
+  #
+  # One entry per bucket: policy-name prefix, how many policies that file
+  # creates, the file, and what breaks while it is missing. Adding a bucket
+  # without adding a line here means its policies can be forgotten silently,
+  # which is the failure this check exists to prevent.
+  for spec in \
+    "triage_media|3|triage-media-policies.sql|Video triage uploads" \
+    "completion_media|3|completion-media-policies.sql|Completion evidence photo uploads"
+  do
+    prefix=${spec%%|*}; rest=${spec#*|}
+    expected=${rest%%|*}; rest=${rest#*|}
+    file=${rest%%|*}; consequence=${rest#*|}
+    bucket=${file%-policies.sql}
 
-  if [ "$triage_policies" = "3" ]; then
-    echo "── storage policies for triage-media are in place"
-  else
-    echo
-    echo "⚠️  triage-media storage policies are NOT applied ($triage_policies of 3)."
-    echo "    Video triage uploads will be refused until they are."
-    echo
-    echo "    Open Dashboard → SQL Editor and run:"
-    echo "      supabase/storage/triage-media-policies.sql"
-    echo
-    echo "    They cannot be applied from here: storage.objects is owned by"
-    echo "    supabase_storage_admin, and this connection is not."
-    echo
-  fi
+    found=$(psql "$SUPABASE_DB_URL" -t -A -c \
+      "select count(*) from pg_policies
+        where schemaname = 'storage' and tablename = 'objects'
+          and policyname like '${prefix}%'" 2>/dev/null || echo 0)
+
+    if [ "$found" = "$expected" ]; then
+      echo "── storage policies for $bucket are in place"
+    else
+      echo
+      echo "⚠️  $bucket storage policies are NOT applied ($found of $expected)."
+      echo "    $consequence will be refused until they are."
+      echo
+      echo "    Open Dashboard → SQL Editor and run:"
+      echo "      supabase/storage/$file"
+      echo
+      echo "    They cannot be applied from here: storage.objects is owned by"
+      echo "    supabase_storage_admin, and this connection is not."
+      echo
+    fi
+  done
 fi
 
 # ---------------------------------------------------------------------------

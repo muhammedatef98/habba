@@ -12,6 +12,36 @@ import * as Location from 'expo-location';
 export interface DeviceLocation {
   readonly lon: number;
   readonly lat: number;
+  /**
+   * Degrees clockwise from true north, when the device can say — used to point
+   * the technician's arrow on the customer's tracking map.
+   *
+   * Optional because most callers have no use for it, and null far more often
+   * than you would expect: a stationary phone has no bearing to report, and
+   * neither does a simulator. See `normaliseHeading` for why it is never passed
+   * through raw.
+   */
+  readonly heading?: number | null;
+}
+
+/**
+ * Turns whatever the platform reports into a bearing or nothing.
+ *
+ * expo-location reports `-1` for "unknown", which is not a compass bearing and
+ * would be stored as one: `update_provider_location` takes the number it is
+ * given. A customer watching the tracking map would see the arrow snap to a
+ * direction the technician is provably not facing, which is worse than an arrow
+ * that does not rotate at all.
+ *
+ * Out-of-range values are dropped for the same reason rather than wrapped —
+ * a device reporting 400° is a device whose compass should not be trusted to
+ * have meant 40°.
+ */
+export function normaliseHeading(heading: number | null | undefined): number | null {
+  if (heading === null || heading === undefined) return null;
+  if (!Number.isFinite(heading)) return null;
+  if (heading < 0 || heading > 360) return null;
+  return heading;
 }
 
 export type LocationResult =
@@ -64,7 +94,11 @@ export class ExpoLocationProvider implements LocationProvider {
 
       return {
         ok: true,
-        location: { lon: position.coords.longitude, lat: position.coords.latitude },
+        location: {
+          lon: position.coords.longitude,
+          lat: position.coords.latitude,
+          heading: normaliseHeading(position.coords.heading),
+        },
       };
     } catch {
       // Indoors, airplane mode, a simulator with no location set — all of

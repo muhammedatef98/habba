@@ -23,14 +23,40 @@ export const LOCATION_INTERVAL_MS = 20_000;
  */
 export const LOCATION_STALE_AFTER_MS = 5 * 60_000;
 
+/**
+ * Why the position did not reach the server, in the three shapes that need
+ * different words on the screen.
+ *
+ *   * `permission_denied` — the technician refused location access, probably
+ *     months ago and to a different screen. Nothing on this phone will change
+ *     that except a trip to Settings.
+ *   * `unavailable` — no fix right now: a basement, a tunnel, airplane mode. It
+ *     resolves itself the moment they drive out.
+ *   * `rejected` — a fix was obtained and the server would not take it. That is
+ *     the network, or an account that is no longer an approved provider.
+ */
+export type BroadcastFailure = 'permission_denied' | 'unavailable' | 'rejected';
+
+/**
+ * Whether retrying is pointless.
+ *
+ * A denial does not resolve itself, so the loop stops rather than waking the
+ * GPS every twenty seconds for an answer that cannot change — which would cost
+ * battery on the phone whose battery is the technician's working day, and bury
+ * the one message that would actually fix it under a retry that never succeeds.
+ */
+export function isBroadcastBlocked(failure: BroadcastFailure | null): boolean {
+  return failure === 'permission_denied';
+}
+
 interface ShiftState {
   readonly isOnline: boolean;
   readonly lastBroadcastAt: number | null;
-  readonly broadcastError: string | null;
+  readonly broadcastError: BroadcastFailure | null;
 
   setOnline: (online: boolean) => void;
   markBroadcast: (at: number) => void;
-  setBroadcastError: (message: string | null) => void;
+  setBroadcastError: (failure: BroadcastFailure | null) => void;
 }
 
 export const useShift = create<ShiftState>((set) => ({

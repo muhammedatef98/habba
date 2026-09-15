@@ -32,6 +32,12 @@ export default defineConfig({
         find: /^expo-secure-store$/,
         replacement: path.resolve(__dirname, 'test/stubs/expo-secure-store.ts'),
       },
+      // And again for the provider data layer, which resolves the technician's
+      // position through shared/lib/location.ts.
+      {
+        find: /^expo-location$/,
+        replacement: path.resolve(__dirname, 'test/stubs/expo-location.ts'),
+      },
       // `.js` specifiers are correct for tsc's Node resolution but there is no
       // build step here, so map them back onto the TypeScript sources — the
       // same retry metro.config.js performs.
