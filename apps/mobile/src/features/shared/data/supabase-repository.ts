@@ -13,7 +13,37 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
+import {
+  sarOrThrow,
+  type HabbaReport,
+  type InspectionReport,
+  type InspectionTemplateSection,
+  type Recommendation,
+  type SarAmount,
+} from '@habba/core';
+
+interface InspectionReportRow {
+  id: string;
+  order_id: string;
+  completed_at: string | null;
+  overall_score: number | null;
+  recommendation: Recommendation | null;
+  subject_plate: string | null;
+  subject_vin: string | null;
+  subject_make_ar: string | null;
+  subject_model_ar: string | null;
+  subject_year: number | null;
+  vehicle_id: string | null;
+}
+
+interface InspectionDetailRow extends InspectionReportRow {
+  subject_mileage: number | null;
+  results: InspectionReport['results'];
+  inspection_templates:
+    | { key: string; name_ar: string; sections: readonly InspectionTemplateSection[] }
+    | { key: string; name_ar: string; sections: readonly InspectionTemplateSection[] }[]
+    | null;
+}
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import type {
@@ -61,6 +91,7 @@ import type {
 } from './types.js';
 import type {
   GuestUpgradeInput,
+  InspectionSummary,
   PastServiceInput,
   Repository,
   TransferAddress,
@@ -1176,6 +1207,105 @@ export class SupabaseRepository implements Repository {
       radiusKm: row.radius_m / 1000,
       ...(row.area_median_seconds !== null ? { areaMedianSeconds: row.area_median_seconds } : {}),
     };
+  }
+
+  async listMyInspections(): Promise<readonly InspectionSummary[]> {
+    // RLS on `inspection_reports` (0026) admits the customer on the order and
+    // the provider who performed it, so there is no id to pass and nothing for
+    // an RPC to scope.
+    const rows = unwrap(
+      await this.client
+        .from('inspection_reports')
+        .select(
+          'id, order_id, completed_at, overall_score, recommendation, ' +
+            'subject_plate, subject_vin, subject_make_ar, subject_model_ar, subject_year, vehicle_id',
+        )
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false }),
+      'listMyInspections',
+    );
+
+    return (rows as unknown as readonly InspectionReportRow[]).map((row) => ({
+      id: row.id,
+      orderId: row.order_id,
+      completedAt: row.completed_at,
+      overallScore: row.overall_score,
+      recommendation: row.recommendation,
+      subjectPlate: row.subject_plate,
+      subjectVin: row.subject_vin,
+      subjectMakeAr: row.subject_make_ar,
+      subjectModelAr: row.subject_model_ar,
+      subjectYear: row.subject_year,
+      vehicleId: row.vehicle_id,
+    }));
+  }
+
+  /**
+   * The full report, assembled into the shape `@habba/core` renders.
+   *
+   * ⚠️ Read by ROW id under RLS, not through `get_inspection_report(token)`.
+   * That function exists for the anonymous public link — a seller showing the
+   * report to buyers — and deliberately carries no customer identity. The
+   * person who PAID for the inspection reaches it as themselves, and requiring
+   * them to hold a share token to read their own report would be the wrong way
+   * round.
+   */
+  async getInspectionDetail(reportId: string): Promise<InspectionReport | null> {
+    const { data, error } = await this.client
+      .from('inspection_reports')
+      .select(
+        'id, completed_at, overall_score, recommendation, results, ' +
+          'subject_plate, subject_vin, subject_make_ar, subject_model_ar, subject_year, subject_mileage, ' +
+          'inspection_templates(key, name_ar, sections)',
+      )
+      .eq('id', reportId)
+      .maybeSingle();
+
+    if (error !== null) throw new Error(`getInspectionDetail: ${error.message}`);
+    if (data === null) return null;
+
+    const row = data as unknown as InspectionDetailRow;
+    const template = Array.isArray(row.inspection_templates)
+      ? row.inspection_templates[0]
+      : row.inspection_templates;
+    if (template === undefined || template === null) return null;
+
+    return {
+      report_version: 1,
+      completed_at: row.completed_at ?? '',
+      subject: {
+        ...(row.subject_vin === null ? {} : { vin: row.subject_vin }),
+        ...(row.subject_plate === null ? {} : { plate: row.subject_plate }),
+        ...(row.subject_make_ar === null ? {} : { make_ar: row.subject_make_ar }),
+        ...(row.subject_model_ar === null ? {} : { model_ar: row.subject_model_ar }),
+        ...(row.subject_year === null ? {} : { year: row.subject_year }),
+        ...(row.subject_mileage === null ? {} : { mileage: row.subject_mileage }),
+      },
+      overall_score: row.overall_score,
+      recommendation: row.recommendation,
+      template: { key: template.key, name_ar: template.name_ar, sections: template.sections },
+      results: row.results,
+    };
+  }
+
+  async convertInspectionToVehicle(
+    reportId: string,
+    makeId: string,
+    modelId: string,
+    nickname: string | null,
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('convert_inspection_to_vehicle', {
+      p_report_id: reportId,
+      p_make_id: makeId,
+      p_model_id: modelId,
+      p_nickname: nickname,
+    });
+
+    // Surfaced verbatim: the server distinguishes an unfinished inspection from
+    // one already attached to a vehicle, and those are different things for the
+    // buyer to do next.
+    if (error !== null) throw new Error(error.message);
+    return data as string;
   }
 
   async listOrderParts(orderId: string): Promise<readonly OrderPart[]> {

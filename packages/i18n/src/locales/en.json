@@ -592,6 +592,23 @@
     "unavailable": "No video is available for this job.",
     "privacy": "This video belongs to this job and cannot be shared. The link expires in minutes."
   },
+  "inspectionReport": {
+    "title": "Inspection report",
+    "findings": "Findings",
+    "noFindings": "Nothing was flagged on this car.",
+    "score": "Score",
+    "scoreNote": "The score is computed on the server from the item weights: brakes do not count the same as interior trim, and items that do not apply are excluded from the average rather than scored zero.",
+    "allSections": "Every item",
+    "recommendation": {
+      "buy": "Suitable to buy",
+      "negotiate": "Worth negotiating",
+      "avoid": "Best avoided"
+    },
+    "convertTitle": "Did you buy the car?",
+    "convertBody": "Add it to your account and this inspection becomes the first entry in its logbook — your ownership starts with a documented history instead of a blank page.",
+    "convert": "Add this car to my account",
+    "myInspections": "Inspections"
+  },
   "provider": {
     "shiftTitle": "Your shift",
     "goOnline": "Go online",

@@ -15,7 +15,28 @@
  * shape of this interface reflects the shape of the security model.
  */
 
-import type { HabbaReport } from '@habba/core';
+import type { HabbaReport, InspectionReport, Recommendation } from '@habba/core';
+
+/**
+ * One inspection this user paid for, as a list row.
+ *
+ * `vehicleId` is null until the buyer converts (0027) — which is the whole
+ * shape of a pre-purchase inspection: it is about a car they are considering,
+ * not one they own.
+ */
+export interface InspectionSummary {
+  readonly id: string;
+  readonly orderId: string;
+  readonly completedAt: string | null;
+  readonly overallScore: number | null;
+  readonly recommendation: Recommendation | null;
+  readonly subjectPlate: string | null;
+  readonly subjectVin: string | null;
+  readonly subjectMakeAr: string | null;
+  readonly subjectModelAr: string | null;
+  readonly subjectYear: number | null;
+  readonly vehicleId: string | null;
+}
 import {
   addSar,
   applyRate,
@@ -222,6 +243,30 @@ export interface Repository {
    */
   getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null>;
   listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
+
+  /**
+   * الفحص, from the side that paid for it.
+   *
+   * A pre-purchase inspection is the one order that runs against a car nobody
+   * owns yet (§7 — the inspection is how the buyer becomes a customer), so the
+   * report carries its own subject identity and has no `vehicle_id` until the
+   * buyer actually purchases.
+   */
+  listMyInspections(): Promise<readonly InspectionSummary[]>;
+  getInspectionDetail(reportId: string): Promise<InspectionReport | null>;
+  /**
+   * The buyer purchased. Turns the report into a `vehicles` row with the
+   * inspection as its first timeline event (0027).
+   *
+   * ⚠️ This is §1's third moat reason working: the new owner arrives with a
+   * documented history already in place, at zero acquisition cost.
+   */
+  convertInspectionToVehicle(
+    reportId: string,
+    makeId: string,
+    modelId: string,
+    nickname: string | null,
+  ): Promise<string>;
   approveOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
@@ -1398,6 +1443,95 @@ export class InMemoryRepository implements Repository {
   // plausible ETA here would hide the fact that the real one is not yet read.
   async getOrderProgress(_orderId: string): Promise<JobProgress | null> {
     return null;
+  }
+
+  /**
+   * Two fixtures that read like real outcomes.
+   *
+   * One `negotiate` with real faults and one already converted, because the
+   * screen's two interesting states are "there is something wrong with this
+   * car" and "this car is now in my logbook". A single flawless `buy` fixture
+   * would leave the findings list — the part a buyer actually reads — never
+   * rendered in development.
+   */
+  async listMyInspections(): Promise<readonly InspectionSummary[]> {
+    return [
+      {
+        id: 'dev-inspection-1',
+        orderId: 'dev-order-insp-1',
+        completedAt: '2026-09-12T13:40:00.000Z',
+        overallScore: 68,
+        recommendation: 'negotiate',
+        subjectPlate: 'أ ب ج ٤٤٥٥',
+        subjectVin: null,
+        subjectMakeAr: 'تويوتا',
+        subjectModelAr: 'كامري',
+        subjectYear: 2019,
+        vehicleId: null,
+      },
+      {
+        id: 'dev-inspection-2',
+        orderId: 'dev-order-insp-2',
+        completedAt: '2026-08-02T09:15:00.000Z',
+        overallScore: 88,
+        recommendation: 'buy',
+        subjectPlate: 'د ه و ١١٢٢',
+        subjectVin: null,
+        subjectMakeAr: 'هونداي',
+        subjectModelAr: 'النترا',
+        subjectYear: 2021,
+        vehicleId: 'veh-1',
+      },
+    ];
+  }
+
+  async getInspectionDetail(reportId: string): Promise<InspectionReport | null> {
+    if (reportId !== 'dev-inspection-1') return null;
+    return {
+      report_version: 1,
+      completed_at: '2026-09-12T13:40:00.000Z',
+      subject: {
+        plate: 'أ ب ج ٤٤٥٥',
+        make_ar: 'تويوتا',
+        model_ar: 'كامري',
+        year: 2019,
+        mileage: 142000,
+      },
+      overall_score: 68,
+      recommendation: 'negotiate',
+      template: {
+        key: 'pre_purchase_v1',
+        name_ar: 'فحص ما قبل الشراء',
+        sections: [
+          {
+            key: 'engine',
+            title_ar: 'المحرّك',
+            items: [
+              { key: 'oil_leaks', label_ar: 'تسريب زيت', weight: 2 },
+              { key: 'noises', label_ar: 'أصوات غير طبيعية', weight: 2 },
+            ],
+          },
+          {
+            key: 'brakes',
+            title_ar: 'الفرامل',
+            items: [{ key: 'pads', label_ar: 'الفحمات' }],
+          },
+        ],
+      },
+      results: {
+        engine: {
+          oil_leaks: { rating: 'fail', note: 'تسريب واضح من جوان غطاء البلوف' },
+          noises: { rating: 'attention', note: 'صوت خفيف عند البرودة' },
+        },
+        brakes: { pads: { rating: 'pass' } },
+      },
+    };
+  }
+
+  async convertInspectionToVehicle(): Promise<string> {
+    // No vehicle is created here: the conversion writes a timeline event
+    // through the append-only path, which the in-memory build does not model.
+    throw new Error('not_available_offline');
   }
 
   async listOrderParts(orderId: string) {
