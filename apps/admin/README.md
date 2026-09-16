@@ -135,6 +135,12 @@ non-public env var, and a literal key committed to a source file.
 (Amendment B). No hardcoded URLs, no hardcoded keys, no `if (production)`
 branches.
 
+**The project already exists**: `habba-admin`, on the Hobby team
+`muhammedatef98s-projects`, linked to this repository with root directory
+`apps/admin`. It builds on every push — `main` to production, any other branch
+to a preview URL. The steps below are what it was created with, and what to
+repeat if it is ever recreated.
+
 1. Import the repo into Vercel and set the root directory to `apps/admin`.
 2. Build command `pnpm build`, install command `pnpm install --frozen-lockfile`
    (run from the repo root; the monorepo is pnpm workspaces).
@@ -143,6 +149,20 @@ branches.
 4. Restrict access at the edge if you can — a Vercel deployment protection rule
    or an IP allowlist. The database refuses a non-operator regardless, but there
    is no reason for the sign-in page to be reachable from the open internet.
+
+### ⚠️ What a deployment without step 3 actually is
+
+`ops-repository.ts` falls back to an in-memory stand-in when
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are absent —
+`isLive` is exactly `url !== '' && key !== ''`. That is the right behaviour for
+a laptop with no project (ADR-0010 is still open), and it is a trap on a public
+URL: the console looks like it works, an operator "approves" a provider, and
+nothing anywhere is approved. The screen is honest about it — but read the
+banner before believing a queue.
+
+So a deployment with no environment variables is a LOOK at the console, not a
+console. Until a Supabase project exists, that is all it can be, and calling it
+anything else would mean an application somebody was told was approved was not.
 
 **How to tell it worked:** sign in as an operator and the board loads with live
 orders. Sign in as a technician and you get «هذا الحساب لا يملك صلاحية الدخول»
