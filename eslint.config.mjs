@@ -17,6 +17,7 @@ export default tseslint.config(
       // and linting it reports on Metro's own `__d()` module registrations.
       '**/.expo-bundle-check/**',
       '**/.web-build/**',
+      '**/.web-check/**',
       '**/.web-publish/**',
       '**/coverage/**',
       '**/*.d.ts',

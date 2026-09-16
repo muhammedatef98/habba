@@ -107,6 +107,36 @@ export default function VideoTriageScreen() {
 
   return (
     <Screen scrollable>
+      {/* ⚠️ The order is ALREADY placed. Say so first, and as a fact.
+          
+          This file's own docstring claimed the screen said so — and it did,
+          in a grey caption under a heading about filming, above a large
+          permission box asking for the camera. Read in the order a person
+          actually reads it, the screen was: "record a video", "we need camera
+          access", [Allow]. Somebody who declines, or whose permission prompt
+          does not appear, sees no confirmation anywhere that their emergency
+          request went out at all — and concludes it did not. It did: matching
+          started before this screen mounted.
+          
+          A confirmation banner, in the success tone the rest of the app uses
+          for a thing that has happened, above everything optional. */}
+      <Card
+        testID="triage-order-placed"
+        elevation="none"
+        style={{
+          backgroundColor: theme.colors.successSubtle,
+          borderColor: theme.colors.successBorder,
+          borderWidth: 1,
+        }}
+      >
+        <Text variant="bodyStrong" tone="success">
+          {t('emergency.triageOrderPlaced')}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {t('emergency.triageOrderPlacedBody')}
+        </Text>
+      </Card>
+
       <Card>
         <View style={{ gap: theme.spacing.sm }}>
           <Text variant="subheading">{t('emergency.triageTitle')}</Text>

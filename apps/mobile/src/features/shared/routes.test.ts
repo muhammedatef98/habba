@@ -292,6 +292,40 @@ describe('every screen has a way in', () => {
   });
 });
 
+describe('every link points at a route that exists', () => {
+  /**
+   * ⚠️ The mirror of the check above, and the half that was missing.
+   *
+   * "Every screen has a way in" says nothing about whether a link goes
+   * anywhere. `become-provider` redirected to `/profile` long after that route
+   * was deleted — so an applicant whose application was approved while they
+   * were still on the success screen was thrown to "Unmatched Route". Every
+   * test passed: the route it pointed at was gone, so there was nothing left
+   * to check for reachability.
+   *
+   * A dead link is worse than an orphan screen. An orphan is a feature nobody
+   * finds; a dead link is a feature that ends in an error page mid-flow.
+   */
+  const declared = new Set(routeFiles.map(routePathOf));
+
+  /** Route params (`/logbook?id=…`) and group prefixes are not part of the path. */
+  function pathOnly(target: string): string {
+    return withoutGroups(target).split('?')[0] ?? target;
+  }
+
+  test.each([...navigatedTo].sort().map((target) => [target] as const))('%s resolves', (target) => {
+    // Relative and external targets are not this file's business.
+    if (!target.startsWith('/')) return;
+
+    const path = pathOnly(target);
+    expect(
+      declared.has(path),
+      `Nothing serves ${path}. Either the route was deleted and this link ` +
+        'was left behind, or the link has a typo — both end at "Unmatched Route".',
+    ).toBe(true);
+  });
+});
+
 describe('no route is ambiguous', () => {
   const byRoute = new Map<string, string[]>();
   for (const file of routeFiles) {

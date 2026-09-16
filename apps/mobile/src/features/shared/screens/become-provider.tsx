@@ -47,7 +47,14 @@ export default function BecomeProviderScreen() {
   // already held and there is nothing here to apply for. The redirect happens
   // before render, so with the flag off no field that asks for a national ID or
   // an IBAN is ever mounted — not disabled, not hidden, not mounted.
-  if (!canApply) return <Redirect href="/profile" />;
+  //
+  // ⚠️ `/account`, not `/profile`. That route was deleted when the account tab
+  // took over the upgrade card, and this line kept pointing at it — so the
+  // moment the application was approved, `canApply` flipped false and this
+  // screen redirected to a route that no longer exists. The success screen
+  // below is rendered AFTER this check, so an applicant sitting on «وصلنا
+  // طلبك» watched it turn into "Unmatched Route".
+  if (!canApply) return <Redirect href="/account" />;
 
   async function handleSubmit() {
     setError(undefined);

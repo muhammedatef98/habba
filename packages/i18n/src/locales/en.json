@@ -371,7 +371,10 @@
     "triageRetake": "Record again",
     "triageUse": "Use this clip",
     "triageRecorded": "Clip recorded ({{seconds}}s)",
-    "triageFailed": "Recording failed. You can continue without video."
+    "triageFailed": "Recording failed. You can continue without video.",
+    "mapUnavailableWeb": "The map is not part of the browser preview. The phone app shows it in full.",
+    "triageOrderPlaced": "Your request is on its way ✓",
+    "triageOrderPlacedBody": "We're finding you a technician now. The next step is entirely optional — you can skip it."
   },
   "tracking": {
     "title": "Track request",
