@@ -704,7 +704,8 @@
     "activeJobsTitle": "In progress",
     "noMyJobs": "No jobs in progress. Nearby requests appear on the shift screen.",
     "goToShift": "Open shift",
-    "sarSuffix": "SAR"
+    "sarSuffix": "SAR",
+    "navSchedule": "Schedule"
   },
   "profile": {
     "title": "My account",
@@ -844,6 +845,49 @@
       "registration": "Registration",
       "insurance": "Insurance",
       "periodic_inspection": "Periodic inspection"
+    }
+  },
+  "schedule": {
+    "title": "Workshop schedule",
+    "subtitle": "The times customers can book. Anything not published here does not exist to them.",
+    "publishTitle": "Publish appointments",
+    "publishHint": "Set your opening hours once, and they appear to customers as bookable times.",
+    "openPublish": "Publish new times",
+    "publishBody": "Starting today. Hours that have already passed are not published — they cannot be booked.",
+    "publish": "Publish",
+    "daysLabel": "Number of days",
+    "startHourLabel": "Opening hour (24h)",
+    "endHourLabel": "Closing hour (24h)",
+    "slotMinutesLabel": "Appointment length (minutes)",
+    "capacityLabel": "Cars per appointment",
+    "capacityHint": "How many cars the workshop takes at the same time.",
+    "publishedCount": "{{count}} new appointment added.",
+    "publishedNone": "Nothing new — these times are already published.",
+    "publishFailed": "Could not publish. Check the hours and try again.",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "dayFree": "{{count}} place free",
+    "dayFull": "Full",
+    "emptyTitle": "No appointments published",
+    "emptyBody": "No customer can book your workshop until you publish your opening hours.",
+    "booked": "{{booked}} of {{capacity}} booked",
+    "open": "Open",
+    "full": "Full",
+    "blocked": "Closed",
+    "block": "Stop bookings",
+    "unblock": "Reopen",
+    "blockHint": "Stops new bookings only. Appointments already taken stay exactly as they are.",
+    "unblockHint": "Shows the time to customers again.",
+    "blockFailed": "Could not update the appointment. Try again.",
+    "delete": "Delete",
+    "deleteBooked": "Someone has booked this time, so it cannot be deleted. Stop bookings instead if you want to close it.",
+    "deleteFailed": "Could not delete the appointment. Try again.",
+    "errors": {
+      "days": "Between 1 and 14 days.",
+      "hours": "The day has to start before it ends, and the hours run 0 to 24.",
+      "tooShort": "The appointment is longer than the working day. Shorten it or extend the day.",
+      "slotMinutes": "Between 15 minutes and 8 hours.",
+      "capacity": "Between 1 and 20 cars."
     }
   }
 }

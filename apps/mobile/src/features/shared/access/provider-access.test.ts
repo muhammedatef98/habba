@@ -23,7 +23,9 @@ import {
   assertProviderApplicationsAllowed,
   canApplyAsProvider,
   canEnterProviderMode,
+  canManageSchedule,
   holdsProviderRole,
+  holdsWorkshopRole,
 } from './provider-access.js';
 import type { UserRole } from '@/features/shared/data/types';
 
@@ -81,6 +83,31 @@ describe('with ENABLE_PROVIDER_MODE on', () => {
     // must read as "not a provider" — showing the switcher on an unanswered
     // question is the one outcome that must not happen.
     expect(canEnterProviderMode({ roles: [], ...on })).toBe(false);
+  });
+});
+
+describe('the schedule belongs to workshops', () => {
+  const on = { providerModeEnabled: true } as const;
+
+  test('a mobile technician is not offered a calendar of bays they do not have', () => {
+    expect(holdsWorkshopRole(TECHNICIAN)).toBe(false);
+    expect(canManageSchedule({ roles: TECHNICIAN, ...on })).toBe(false);
+  });
+
+  test('a workshop is', () => {
+    expect(holdsWorkshopRole(WORKSHOP)).toBe(true);
+    expect(canManageSchedule({ roles: WORKSHOP, ...on })).toBe(true);
+  });
+
+  test('a customer is not, whatever the flag says', () => {
+    expect(canManageSchedule({ roles: CUSTOMER, ...on })).toBe(false);
+    expect(canManageSchedule({ roles: [], ...on })).toBe(false);
+  });
+
+  test('and neither is a workshop while the flag is off', () => {
+    // The tab hangs off the provider group, so it inherits that gate rather
+    // than reimplementing half of it.
+    expect(canManageSchedule({ roles: WORKSHOP, providerModeEnabled: false })).toBe(false);
   });
 });
 

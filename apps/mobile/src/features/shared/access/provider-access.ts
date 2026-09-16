@@ -38,6 +38,22 @@ export function holdsProviderRole(roles: readonly UserRole[]): boolean {
 }
 
 /**
+ * Whether «مواعيد الورشة» renders.
+ *
+ * A calendar of appointment slots is meaningless to a mobile technician — they
+ * have no bays and no address for a customer to drive to — so the tab is a
+ * workshop's, not every provider's. `workshop_admin` is granted by 0040 from
+ * `providers.provider_type`, which is exactly the fact being asked about.
+ *
+ * Renders only; `generate_slots` reads `current_provider_id()` server-side and
+ * the write policy on `appointment_slots` scopes every row to it, so hiding
+ * the tab is a courtesy to the technician, never the control (§5.1.3).
+ */
+export function holdsWorkshopRole(roles: readonly UserRole[]): boolean {
+  return roles.includes('workshop_admin');
+}
+
+/**
  * Whether to show «اشتغل معنا كفنّي» and let the KYC form open.
  *
  * False while the flag is off — the point of the flag is that no ID or IBAN is
@@ -58,6 +74,11 @@ export function canApplyAsProvider(input: ProviderAccessInput): boolean {
  */
 export function canEnterProviderMode(input: ProviderAccessInput): boolean {
   return flagOf(input) && holdsProviderRole(input.roles);
+}
+
+/** The schedule surface: provider mode reachable AND this provider is a workshop. */
+export function canManageSchedule(input: ProviderAccessInput): boolean {
+  return canEnterProviderMode(input) && holdsWorkshopRole(input.roles);
 }
 
 /**

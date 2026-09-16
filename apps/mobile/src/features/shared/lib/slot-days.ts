@@ -8,14 +8,25 @@
  * `startsAt` is UTC, and Riyadh is +03.
  */
 
-import type { AppointmentSlot } from '@/features/shared/data/types';
+/**
+ * The only thing grouping needs to know about a slot.
+ *
+ * Generic rather than tied to `AppointmentSlot`, because the workshop reads
+ * its own calendar through a different shape (`ScheduleSlot`, which carries
+ * the booked count and the block flag a customer must never see). Both group
+ * into days by the same local-time rule, and a second copy of that rule is a
+ * second chance to get the +03 boundary wrong.
+ */
+export interface DatedSlot {
+  readonly startsAt: string;
+}
 
-export interface SlotDay {
+export interface SlotDay<T extends DatedSlot = DatedSlot> {
   /** Local calendar key, `YYYY-MM-DD`. Stable enough to use as a React key. */
   readonly key: string;
   /** Midnight local on that day, for formatting the strip label. */
   readonly date: Date;
-  readonly slots: readonly AppointmentSlot[];
+  readonly slots: readonly T[];
 }
 
 function localDayKey(date: Date): string {
@@ -24,8 +35,8 @@ function localDayKey(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-export function groupSlotsByDay(slots: readonly AppointmentSlot[]): readonly SlotDay[] {
-  const byKey = new Map<string, { date: Date; slots: AppointmentSlot[] }>();
+export function groupSlotsByDay<T extends DatedSlot>(slots: readonly T[]): readonly SlotDay<T>[] {
+  const byKey = new Map<string, { date: Date; slots: T[] }>();
 
   for (const slot of slots) {
     const startsAt = new Date(slot.startsAt);

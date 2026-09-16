@@ -14,10 +14,15 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Icon, useTheme } from '@habba/ui';
+import { useCanManageSchedule } from '@/features/shared/hooks/use-roles';
 
 export default function ProviderTabsLayout() {
   const { t } = useTranslation();
   const theme = useTheme();
+  // A calendar of appointment bays means nothing to a mobile technician, and a
+  // tab that opens on an empty screen is worse than no tab. `href: null`
+  // removes the route rather than hiding a button that still resolves.
+  const canManageSchedule = useCanManageSchedule();
 
   return (
     <Tabs
@@ -58,6 +63,21 @@ export default function ProviderTabsLayout() {
         options={{
           title: t('provider.navEarnings'),
           tabBarIcon: ({ color }) => <Icon name="wallet" color={color} />,
+        }}
+      />
+      {/* Fourth and workshop-only. It sits after earnings because publishing a
+          month of availability is a weekly job, not one done between cars —
+          and because a technician never sees it at all, the order a technician
+          reads is left undisturbed. */}
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: t('provider.navSchedule'),
+          // Spread rather than `href: undefined`: under
+          // `exactOptionalPropertyTypes` an explicit undefined is not the same
+          // as an absent key, and `href` takes a route or null, never both.
+          ...(canManageSchedule ? {} : { href: null }),
+          tabBarIcon: ({ color }) => <Icon name="calendar" color={color} />,
         }}
       />
     </Tabs>

@@ -13,7 +13,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { repository } from '@/features/shared/data/repository';
-import { canApplyAsProvider, canEnterProviderMode } from '@/features/shared/access/provider-access';
+import {
+  canApplyAsProvider,
+  canEnterProviderMode,
+  canManageSchedule,
+} from '@/features/shared/access/provider-access';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
 export function useRoles() {
@@ -38,6 +42,18 @@ export function useRoles() {
 export function useIsApprovedProvider(): boolean {
   const roles = useRoles();
   return canEnterProviderMode({ roles: roles.data ?? [] });
+}
+
+/**
+ * Whether «مواعيد الورشة» renders — a workshop's calendar, not a technician's.
+ *
+ * False while loading, same as the gate above: a tab that flickers into
+ * existence and out again as the roles query settles is worse than one that
+ * appears a beat late.
+ */
+export function useCanManageSchedule(): boolean {
+  const roles = useRoles();
+  return canManageSchedule({ roles: roles.data ?? [] });
 }
 
 /** Whether «اشتغل معنا كفنّي» is offered and the KYC form may open. */

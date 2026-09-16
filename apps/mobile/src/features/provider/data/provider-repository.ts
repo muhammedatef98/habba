@@ -239,6 +239,45 @@ export interface ProviderRepository {
    * because the technician can act on none of them differently.
    */
   getTriageClip(orderId: string): Promise<TriageClip | null>;
+
+  /**
+   * مواعيد الورشة. The slots customers book against.
+   *
+   * Phase 4's concurrency guarantee has been proved since 0024 —
+   * `slot-concurrency-test.sh` runs 16 clients at a capacity-3 slot and exactly
+   * 3 win — and no workshop has ever been able to create one. The customer
+   * booking flow was reading a table nobody could fill.
+   */
+  listMySlots(fromIso: string, days: number): Promise<readonly ScheduleSlot[]>;
+  generateSlots(input: SlotGeneration): Promise<number>;
+  setSlotBlocked(slotId: string, blocked: boolean): Promise<void>;
+  /**
+   * Removes a slot nobody has booked.
+   *
+   * ⚠️ Throws on a booked one, and that refusal comes from Postgres:
+   * `orders.slot_id` is `on delete restrict` (0019). A workshop tidying next
+   * week's calendar cannot delete the appointment somebody is driving to.
+   */
+  deleteSlot(slotId: string): Promise<void>;
+}
+
+export interface ScheduleSlot {
+  readonly id: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly capacity: number;
+  /** Counted by Habba, never set by the provider (0036). */
+  readonly bookedCount: number;
+  readonly isBlocked: boolean;
+}
+
+export interface SlotGeneration {
+  readonly fromIso: string;
+  readonly days: number;
+  readonly startHour: number;
+  readonly endHour: number;
+  readonly slotMinutes: number;
+  readonly capacity: number;
 }
 
 export interface InspectionTemplateRow {
@@ -667,6 +706,87 @@ export class SupabaseProviderRepository implements ProviderRepository {
     return { url: signed.data.signedUrl, expiresInSeconds: TRIAGE_CLIP_URL_SECONDS };
   }
 
+  async listMySlots(fromIso: string, days: number): Promise<readonly ScheduleSlot[]> {
+    const until = new Date(new Date(fromIso).getTime() + days * 86_400_000).toISOString();
+
+    // `appointment_slots_write` (0022) scopes writes to this provider, but the
+    // READ policy is `using (true)` — customers have to see every workshop's
+    // availability to book. So this filters by provider explicitly, which is
+    // the one place in this file a client-side filter is correct: it is
+    // choosing WHOSE calendar to show, not enforcing who may see it.
+    const providerId = await this.currentProviderId();
+    if (providerId === null) return [];
+
+    const { data, error } = await this.client
+      .from('appointment_slots')
+      .select('id, starts_at, ends_at, capacity, booked_count, is_blocked')
+      .eq('provider_id', providerId)
+      .gte('starts_at', fromIso)
+      .lt('starts_at', until)
+      .order('starts_at');
+
+    if (error !== null) throw new Error(`listMySlots: ${error.message}`);
+
+    return (data as unknown as SlotRow[]).map((row) => ({
+      id: row.id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      capacity: row.capacity,
+      bookedCount: row.booked_count,
+      isBlocked: row.is_blocked,
+    }));
+  }
+
+  /** This provider's own id, for the one read that needs to name it. */
+  private async currentProviderId(): Promise<string | null> {
+    const { data, error } = await this.client.from('providers').select('id').limit(1).maybeSingle();
+    if (error !== null || data === null) return null;
+    return (data as { id: string }).id;
+  }
+
+  async generateSlots(input: SlotGeneration): Promise<number> {
+    const { data, error } = await this.client.rpc('generate_slots', {
+      p_from: input.fromIso.slice(0, 10),
+      p_days: input.days,
+      p_start_hour: input.startHour,
+      p_end_hour: input.endHour,
+      p_slot_minutes: input.slotMinutes,
+      p_capacity: input.capacity,
+    });
+
+    if (error !== null) throw new Error(error.message);
+    return (data as number | null) ?? 0;
+  }
+
+  async setSlotBlocked(slotId: string, blocked: boolean): Promise<void> {
+    // ⚠️ Blocking hides a slot from NEW bookings and leaves existing ones
+    // standing. That is the correct semantic and the screen says so: a workshop
+    // closing early must not silently cancel the appointment somebody is
+    // already driving to.
+    const { error } = await this.client
+      .from('appointment_slots')
+      .update({ is_blocked: blocked })
+      .eq('id', slotId);
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async deleteSlot(slotId: string): Promise<void> {
+    const { error } = await this.client.from('appointment_slots').delete().eq('id', slotId);
+    if (error === null) return;
+
+    // ⚠️ The FK refusal gets a name, not a passthrough.
+    //
+    // `orders.slot_id` is `on delete restrict` (0019), so a slot somebody has
+    // booked comes back as 23503 with an English constraint message. The
+    // screen needs to say «هذا الموعد محجوز» in Arabic, and matching on the
+    // text of a Postgres error is how that breaks on the next upgrade — so the
+    // code is what is matched, and the token is what the screen sees. The
+    // in-memory repository raises the same token, which is what makes that
+    // path reachable in the dev build.
+    if (error.code === '23503') throw new Error('slot_has_bookings');
+    throw new Error(error.message);
+  }
+
   async getInspectionTemplate(key: string): Promise<InspectionTemplateRow | null> {
     const { data, error } = await this.client
       .from('inspection_templates')
@@ -707,6 +827,15 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(error.message);
     return data as string;
   }
+}
+
+interface SlotRow {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+  booked_count: number;
+  is_blocked: boolean;
 }
 
 interface OrderPartRow {
@@ -1009,6 +1138,63 @@ export class InMemoryProviderRepository implements ProviderRepository {
         },
       ],
     };
+  }
+
+  private devSlots: ScheduleSlot[] | null = null;
+
+  /**
+   * A day of slots, one of them part-booked and one full.
+   *
+   * The interesting states are "somebody is coming" and "no room left" — a
+   * fixture of empty slots would leave the counts and the delete refusal
+   * unexercised, and those are the parts a workshop reads.
+   */
+  async listMySlots(): Promise<readonly ScheduleSlot[]> {
+    this.devSlots ??= [
+      {
+        id: 'dev-slot-1',
+        startsAt: '2026-09-17T06:00:00.000Z',
+        endsAt: '2026-09-17T07:00:00.000Z',
+        capacity: 3,
+        bookedCount: 1,
+        isBlocked: false,
+      },
+      {
+        id: 'dev-slot-2',
+        startsAt: '2026-09-17T07:00:00.000Z',
+        endsAt: '2026-09-17T08:00:00.000Z',
+        capacity: 3,
+        bookedCount: 3,
+        isBlocked: false,
+      },
+      {
+        id: 'dev-slot-3',
+        startsAt: '2026-09-17T08:00:00.000Z',
+        endsAt: '2026-09-17T09:00:00.000Z',
+        capacity: 3,
+        bookedCount: 0,
+        isBlocked: true,
+      },
+    ];
+    return this.devSlots;
+  }
+
+  async generateSlots(): Promise<number> {
+    return 0;
+  }
+
+  async setSlotBlocked(slotId: string, blocked: boolean): Promise<void> {
+    this.devSlots =
+      this.devSlots?.map((slot) => (slot.id === slotId ? { ...slot, isBlocked: blocked } : slot)) ??
+      null;
+  }
+
+  async deleteSlot(slotId: string): Promise<void> {
+    const slot = this.devSlots?.find((candidate) => candidate.id === slotId);
+    // The same refusal Postgres gives, so the screen's error path is reachable
+    // offline rather than discovered against a real booking.
+    if (slot !== undefined && slot.bookedCount > 0) throw new Error('slot_has_bookings');
+    this.devSlots = this.devSlots?.filter((candidate) => candidate.id !== slotId) ?? null;
   }
 
   async getTriageClip(): Promise<TriageClip | null> {
