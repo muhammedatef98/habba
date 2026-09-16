@@ -14,9 +14,21 @@ import type {
   PayoutRow,
   PayoutStatus,
   ProviderReview,
+  ServiceRow,
   VerificationEvent,
   VerificationStatus,
 } from './types';
+
+interface ServiceDbRow {
+  readonly id: string;
+  readonly category: string;
+  readonly name_ar: string;
+  readonly name_en: string;
+  readonly base_price: number | string | null;
+  readonly est_duration_min: number;
+  readonly supported_modes: readonly string[];
+  readonly is_active: boolean;
+}
 
 interface PayoutDbRow {
   readonly id: string;
@@ -271,6 +283,60 @@ class SupabaseOpsRepository implements OpsRepository {
       id: row.id,
       nameAr: row.business_name_ar,
     }));
+  }
+
+  async listServices(): Promise<readonly ServiceRow[]> {
+    // Inactive ones included: `services_read` (0022) admits them for ops
+    // precisely so somebody can find a service they retired and put it back.
+    const { data, error } = await this.client
+      .from('services')
+      .select(
+        'id, category, name_ar, name_en, base_price, est_duration_min, supported_modes, is_active',
+      )
+      .order('category')
+      .order('name_ar');
+
+    if (error !== null) throw new Error(`listServices: ${error.message}`);
+
+    return (data as unknown as ServiceDbRow[]).map((row) => ({
+      id: row.id,
+      category: row.category,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      // Null survives as null. See the note on `ServiceRow`.
+      basePrice: row.base_price === null ? null : money(row.base_price),
+      estDurationMin: row.est_duration_min,
+      supportedModes: row.supported_modes,
+      isActive: row.is_active,
+    }));
+  }
+
+  async setServicePrice(serviceId: string, basePrice: string | null): Promise<void> {
+    const { error } = await this.client
+      .from('services')
+      .update({ base_price: basePrice })
+      .eq('id', serviceId);
+    if (error !== null) throw new Error(`setServicePrice: ${error.message}`);
+  }
+
+  async setServiceActive(serviceId: string, isActive: boolean): Promise<void> {
+    const { error } = await this.client
+      .from('services')
+      .update({ is_active: isActive })
+      .eq('id', serviceId);
+    if (error !== null) throw new Error(`setServiceActive: ${error.message}`);
+  }
+
+  async cancelOrder(orderId: string, reason: string): Promise<void> {
+    // A direct update under `orders_update_ops` (0022). The state machine still
+    // checks the transition is legal, and `guard_order_columns` lets ops past
+    // its column rules — so a completed order is refused here by 0020 rather
+    // than by this console deciding what is terminal.
+    const { error } = await this.client
+      .from('orders')
+      .update({ status: 'cancelled', cancellation_reason: reason })
+      .eq('id', orderId);
+    if (error !== null) throw new Error(error.message);
   }
 }
 
@@ -530,6 +596,86 @@ class InMemoryOpsRepository implements OpsRepository {
     return this.providers
       .filter((provider) => provider.verificationStatus === 'approved')
       .map((provider) => ({ id: provider.id, nameAr: provider.businessNameAr }));
+  }
+
+  /**
+   * A catalogue with all three shapes on it: priced, quote-only, and retired.
+   *
+   * The quote-only row is the one worth having — a fixture where every service
+   * carried a price would leave the null branch of the screen unexercised, and
+   * that branch is the difference between «بحسب المعاينة» and advertising a tow
+   * for 0.00 ﷼.
+   */
+  private readonly services: ServiceRow[] = [
+    {
+      id: 'svc-dev-battery',
+      category: 'emergency',
+      nameAr: 'بطارية — شحن أو تبديل',
+      nameEn: 'Battery jump or replacement',
+      basePrice: '150.00',
+      estDurationMin: 30,
+      supportedModes: ['mobile_ondemand'],
+      isActive: true,
+    },
+    {
+      id: 'svc-dev-tow',
+      category: 'emergency',
+      nameAr: 'ونش/سحب',
+      nameEn: 'Towing',
+      basePrice: null,
+      estDurationMin: 60,
+      supportedModes: ['mobile_ondemand'],
+      isActive: true,
+    },
+    {
+      id: 'svc-dev-wash',
+      category: 'wash',
+      nameAr: 'غسيل متنقل',
+      nameEn: 'Mobile wash',
+      basePrice: '80.00',
+      estDurationMin: 45,
+      supportedModes: ['mobile_scheduled'],
+      isActive: false,
+    },
+  ];
+
+  async listServices(): Promise<readonly ServiceRow[]> {
+    return this.services;
+  }
+
+  async setServicePrice(serviceId: string, basePrice: string | null): Promise<void> {
+    const index = this.services.findIndex((row) => row.id === serviceId);
+    if (index < 0) return;
+    this.services[index] = { ...(this.services[index] as ServiceRow), basePrice };
+  }
+
+  async setServiceActive(serviceId: string, isActive: boolean): Promise<void> {
+    const index = this.services.findIndex((row) => row.id === serviceId);
+    if (index < 0) return;
+    this.services[index] = { ...(this.services[index] as ServiceRow), isActive };
+  }
+
+  async cancelOrder(orderId: string, reason: string): Promise<void> {
+    // Mirrors the server's rule rather than accepting anything: the customer is
+    // told something, and "cancelled by ops" with no sentence behind it is not
+    // something to tell them.
+    if (reason.trim() === '') throw new Error('A cancellation needs a stated reason');
+
+    const index = this.board.findIndex((row) => row.orderId === orderId);
+    if (index < 0) return;
+    this.board.splice(index, 1);
+
+    this.audit.unshift({
+      id: String(this.audit.length + 1),
+      actorId: 'ops-dev-1',
+      actorRole: 'ops',
+      action: 'UPDATE',
+      targetTable: 'orders',
+      targetId: orderId,
+      changedColumns: ['status', 'cancellation_reason'],
+      at: new Date().toISOString(),
+      ip: '127.0.0.1',
+    });
   }
 }
 

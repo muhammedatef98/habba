@@ -19,6 +19,7 @@ import { isLive, opsRepository } from '@/data/ops-repository';
 import { opsAuth, type Operator } from '@/lib/ops-session';
 import { SignIn } from './sign-in';
 import { Board } from './board';
+import { Catalogue } from './catalogue';
 import { Payouts } from './payouts';
 import { AuditLog } from './audit';
 import type { ProviderReview, VerificationStatus } from '@/data/types';
@@ -58,13 +59,14 @@ export default function AdminEntry() {
   return <Console operator={operator} onSignedOut={() => setOperator(null)} />;
 }
 
-type Section = 'board' | 'verification' | 'payouts' | 'audit';
+type Section = 'board' | 'verification' | 'catalogue' | 'payouts' | 'audit';
 
 const SECTIONS: readonly { readonly id: Section; readonly label: string }[] = [
   // The board first: it is what an operator opens a shift on, and what they
   // return to between everything else.
   { id: 'board', label: 'اللوحة' },
   { id: 'verification', label: 'مراجعة مقدّمي الخدمة' },
+  { id: 'catalogue', label: 'الخدمات' },
   // Then the money, then the record of who touched it. That order is the
   // console's whole shape: what is happening, who may work, who gets paid,
   // and what was done — each one the thing you reach for after the one before.
@@ -146,6 +148,8 @@ function Console({
         <Board />
       ) : section === 'verification' ? (
         <VerificationQueue />
+      ) : section === 'catalogue' ? (
+        <Catalogue />
       ) : section === 'payouts' ? (
         <Payouts />
       ) : (

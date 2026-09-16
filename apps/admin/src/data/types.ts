@@ -77,6 +77,25 @@ export interface AuditEntry {
   readonly ip: string | null;
 }
 
+/**
+ * One row of the service catalogue.
+ *
+ * ⚠️ `basePrice` is nullable and that is a real state, not missing data: 0017
+ * uses null for "quote only", a service whose price the provider sets per job
+ * because it cannot be known up front — bodywork, a tow of unknown distance.
+ * A console that rendered null as `0.00` would be advertising free labour.
+ */
+export interface ServiceRow {
+  readonly id: string;
+  readonly category: string;
+  readonly nameAr: string;
+  readonly nameEn: string;
+  readonly basePrice: string | null;
+  readonly estDurationMin: number;
+  readonly supportedModes: readonly string[];
+  readonly isActive: boolean;
+}
+
 export interface OpsRepository {
   /** Live orders, ordered by trouble rather than by time (0046). */
   listBoard(): Promise<readonly BoardOrder[]>;
@@ -115,6 +134,39 @@ export interface OpsRepository {
   listAuditLog(limit: number): Promise<readonly AuditEntry[]>;
   /** The providers a payout can be built for — approved ones, by name. */
   listPayableProviders(): Promise<readonly { readonly id: string; readonly nameAr: string }[]>;
+
+  /**
+   * الخدمات. The catalogue every price in the app comes from.
+   *
+   * ⚠️ Editing this changes what customers are quoted from the next booking
+   * onwards, and changes NOTHING about an order already placed: `orders`
+   * carries its own `quoted_amount`, captured when the order was made. That is
+   * the property that makes this screen safe to have — a price correction can
+   * never re-price work somebody already agreed to.
+   */
+  listServices(): Promise<readonly ServiceRow[]>;
+  setServicePrice(serviceId: string, basePrice: string | null): Promise<void>;
+  /**
+   * Takes a service off the menu, or puts it back.
+   *
+   * Not a delete, and there is no delete: `orders.service_id` is a foreign key,
+   * so removing a service would orphan every order that ever used it — and the
+   * logbook entries those orders wrote are the product. `is_active = false`
+   * hides it from customers (`services_read`, 0022) and leaves the history
+   * intact.
+   */
+  setServiceActive(serviceId: string, isActive: boolean): Promise<void>;
+
+  /**
+   * Cancels an order from the board, with a stated reason.
+   *
+   * For the one case the board exists to surface: a request nobody can serve,
+   * sitting in `searching` while a customer waits next to a broken-down car.
+   * The reason is required because the customer will be told something, and
+   * "cancelled by ops" with no sentence behind it is not something to tell
+   * them.
+   */
+  cancelOrder(orderId: string, reason: string): Promise<void>;
 }
 
 /** What the board is telling the operator to look at (0046). */

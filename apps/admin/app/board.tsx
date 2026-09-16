@@ -83,10 +83,25 @@ function age(seconds: number): string {
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 }
 
+/** Shared by the inline cancel controls. */
+const actionStyle = {
+  padding: 'var(--space-sm) var(--space-md)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--color-border-strong)',
+  background: 'var(--color-surface)',
+  color: 'var(--color-text)',
+  fontSize: 'var(--text-sm)',
+  minHeight: 44,
+} as const;
+
 export function Board() {
   const [orders, setOrders] = useState<readonly BoardOrder[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -98,6 +113,25 @@ export function Board() {
       setLoading(false);
     }
   }, []);
+
+  async function cancel(orderId: string) {
+    if (reason.trim() === '') {
+      setActionError('سبب الإلغاء مطلوب.');
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    try {
+      await opsRepository.cancelOrder(orderId, reason.trim());
+      setCancelling(null);
+      setReason('');
+      await load();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'تعذّر إلغاء الطلب');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -159,6 +193,21 @@ export function Board() {
           gap: 'var(--space-sm)',
         }}
       >
+        {actionError !== null ? (
+          <li
+            role="alert"
+            style={{
+              listStyle: 'none',
+              padding: 'var(--space-md)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-emergency-subtle)',
+              color: 'var(--color-emergency-fg)',
+              fontSize: 'var(--text-sm)',
+            }}
+          >
+            {actionError}
+          </li>
+        ) : null}
         {orders.map((order) => {
           const flag = ATTENTION[order.attention];
           return (
@@ -247,6 +296,74 @@ export function Board() {
                   {age(order.statusAgeSeconds)}
                 </span>
               </div>
+
+              {/* ⚠️ The action the board was built to make possible, and did not
+                  offer. The whole point of surfacing «لا أحد متاح» after three
+                  dispatch rounds is that somebody can act on it — and until now
+                  an operator who saw it could only watch. A request nobody can
+                  serve, with a customer waiting next to a broken-down car, has
+                  to be endable.
+
+                  The reason is required, and not as a formality: the customer
+                  is told something, and "cancelled by ops" with no sentence
+                  behind it is not something to tell them. */}
+              {cancelling === order.orderId ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 'var(--space-sm)',
+                    flexWrap: 'wrap',
+                    marginTop: 'var(--space-sm)',
+                  }}
+                >
+                  <input
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="سبب الإلغاء — يُبلَّغ به العميل"
+                    style={{ ...actionStyle, flex: 1, minWidth: 220 }}
+                  />
+                  <button
+                    onClick={() => void cancel(order.orderId)}
+                    disabled={busy}
+                    style={{
+                      ...actionStyle,
+                      background: 'var(--color-emergency)',
+                      color: 'var(--color-emergency-text)',
+                      border: 'none',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ألغِ الطلب
+                  </button>
+                  <button
+                    onClick={() => setCancelling(null)}
+                    style={{ ...actionStyle, background: 'transparent', border: 'none' }}
+                  >
+                    تراجع
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setCancelling(order.orderId);
+                    setReason('');
+                    setActionError(null);
+                  }}
+                  style={{
+                    ...actionStyle,
+                    marginTop: 'var(--space-sm)',
+                    justifySelf: 'start',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--color-text-link)',
+                    fontWeight: 600,
+                    padding: 0,
+                    minHeight: 32,
+                  }}
+                >
+                  إلغاء الطلب
+                </button>
+              )}
             </li>
           );
         })}
