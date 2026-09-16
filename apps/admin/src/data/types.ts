@@ -139,6 +139,43 @@ export interface VehicleModelRow {
   readonly isActive: boolean;
 }
 
+/** 0028: 'generic' is an industry interval; 'oem' is manufacturer guidance. */
+export type MaintenanceConfidence = 'generic' | 'oem';
+
+/**
+ * One predictive-maintenance rule — the engine behind §1's fourth
+ * differentiator, "your timing belt is due in ~1,400 km".
+ *
+ * ⚠️ Two properties decide whether a rule does anything at all, and neither is
+ * visible from the row itself.
+ *
+ * **It must have an interval.** `maintenance_rules_has_interval` requires a km
+ * or a month figure. A rule with neither cannot fire, and would sit in the
+ * table looking like coverage while alerting nobody.
+ *
+ * **Only the most specific rule per service fires.** `applicable_rules` (0029)
+ * is `distinct on (service_id)`, ordered model-rule, then make-rule, then
+ * generic, then by `created_at`. So a SECOND rule at the same specificity for
+ * the same service never runs — and being newer does not help it, it hurts:
+ * the older one wins the tiebreak. The console flags that rather than letting
+ * an operator "correct" a rule by adding another one beside it.
+ */
+export interface MaintenanceRuleRow {
+  readonly id: string;
+  readonly serviceId: string;
+  readonly serviceNameAr: string;
+  readonly makeId: string | null;
+  readonly modelId: string | null;
+  readonly nameAr: string;
+  readonly nameEn: string;
+  readonly dueEveryKm: number | null;
+  readonly dueEveryMonths: number | null;
+  readonly firstDueKm: number | null;
+  readonly confidence: MaintenanceConfidence;
+  readonly isActive: boolean;
+  readonly createdAt: string;
+}
+
 export interface OpsRepository {
   /** Live orders, ordered by trouble rather than by time (0046). */
   listBoard(): Promise<readonly BoardOrder[]>;
@@ -244,6 +281,21 @@ export interface OpsRepository {
   listModels(): Promise<readonly VehicleModelRow[]>;
   createModel(model: Omit<VehicleModelRow, 'id' | 'isActive'>): Promise<void>;
   setModelActive(modelId: string, isActive: boolean): Promise<void>;
+
+  /**
+   * قواعد الصيانة — what the app is allowed to predict about a customer's car.
+   *
+   * ⚠️ `confidence` is a truth claim, not a label. 0028 is explicit that a
+   * generic interval must not masquerade as manufacturer guidance, and the
+   * value changes what the alert is permitted to say. Marking an invented
+   * interval `oem` makes Habba tell somebody their manufacturer requires work
+   * that no manufacturer asked for.
+   */
+  listMaintenanceRules(): Promise<readonly MaintenanceRuleRow[]>;
+  createMaintenanceRule(
+    rule: Omit<MaintenanceRuleRow, 'id' | 'isActive' | 'serviceNameAr' | 'createdAt'>,
+  ): Promise<void>;
+  setMaintenanceRuleActive(ruleId: string, isActive: boolean): Promise<void>;
 }
 
 /** What the board is telling the operator to look at (0046). */

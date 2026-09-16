@@ -21,6 +21,7 @@ import { SignIn } from './sign-in';
 import { Board } from './board';
 import { Catalogue } from './catalogue';
 import { ReferenceData } from './reference';
+import { MaintenanceRules } from './maintenance';
 import { Payouts } from './payouts';
 import { AuditLog } from './audit';
 import type { ProviderReview, VerificationStatus } from '@/data/types';
@@ -60,7 +61,8 @@ export default function AdminEntry() {
   return <Console operator={operator} onSignedOut={() => setOperator(null)} />;
 }
 
-type Section = 'board' | 'verification' | 'catalogue' | 'reference' | 'payouts' | 'audit';
+type Section =
+  'board' | 'verification' | 'catalogue' | 'reference' | 'maintenance' | 'payouts' | 'audit';
 
 const SECTIONS: readonly { readonly id: Section; readonly label: string }[] = [
   // The board first: it is what an operator opens a shift on, and what they
@@ -69,6 +71,7 @@ const SECTIONS: readonly { readonly id: Section; readonly label: string }[] = [
   { id: 'verification', label: 'مراجعة مقدّمي الخدمة' },
   { id: 'catalogue', label: 'الخدمات' },
   { id: 'reference', label: 'البيانات المرجعية' },
+  { id: 'maintenance', label: 'قواعد الصيانة' },
   // Then the money, then the record of who touched it. That order is the
   // console's whole shape: what is happening, who may work, who gets paid,
   // and what was done — each one the thing you reach for after the one before.
@@ -154,6 +157,8 @@ function Console({
         <Catalogue />
       ) : section === 'reference' ? (
         <ReferenceData />
+      ) : section === 'maintenance' ? (
+        <MaintenanceRules />
       ) : section === 'payouts' ? (
         <Payouts />
       ) : (

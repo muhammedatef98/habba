@@ -11,6 +11,8 @@ import type {
   AuditEntry,
   BoardOrder,
   CityRow,
+  MaintenanceConfidence,
+  MaintenanceRuleRow,
   OpsRepository,
   PayoutRow,
   PayoutStatus,
@@ -87,6 +89,22 @@ interface MakeDbRow {
   readonly name_en: string;
   readonly sort_order: number;
   readonly is_active: boolean;
+}
+
+interface MaintenanceRuleDbRow {
+  readonly id: string;
+  readonly service_id: string;
+  readonly make_id: string | null;
+  readonly model_id: string | null;
+  readonly name_ar: string;
+  readonly name_en: string;
+  readonly due_every_km: number | null;
+  readonly due_every_months: number | null;
+  readonly first_due_km: number | null;
+  readonly confidence: MaintenanceConfidence;
+  readonly is_active: boolean;
+  readonly created_at: string;
+  readonly services: readonly { readonly name_ar: string }[] | null;
 }
 
 interface ModelDbRow {
@@ -536,6 +554,66 @@ class SupabaseOpsRepository implements OpsRepository {
     if (error !== null) throw new Error(error.message);
   }
 
+  async listMaintenanceRules(): Promise<readonly MaintenanceRuleRow[]> {
+    const { data, error } = await this.client
+      .from('maintenance_rules')
+      .select(
+        'id, service_id, make_id, model_id, name_ar, name_en, due_every_km, ' +
+          'due_every_months, first_due_km, confidence, is_active, created_at, services(name_ar)',
+      )
+      // ⚠️ `created_at` ascending, matching `applicable_rules` (0029). The
+      // order the screen shows is the order the scan resolves in, so the rule
+      // listed first for a service is the one that actually fires.
+      .order('created_at', { ascending: true });
+
+    if (error !== null) throw new Error(`listMaintenanceRules: ${error.message}`);
+
+    return (data as unknown as MaintenanceRuleDbRow[]).map((row) => ({
+      id: row.id,
+      serviceId: row.service_id,
+      serviceNameAr: row.services?.[0]?.name_ar ?? row.service_id,
+      makeId: row.make_id,
+      modelId: row.model_id,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      dueEveryKm: row.due_every_km,
+      dueEveryMonths: row.due_every_months,
+      firstDueKm: row.first_due_km,
+      confidence: row.confidence,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async createMaintenanceRule(
+    rule: Omit<MaintenanceRuleRow, 'id' | 'isActive' | 'serviceNameAr' | 'createdAt'>,
+  ): Promise<void> {
+    const { error } = await this.client.from('maintenance_rules').insert({
+      service_id: rule.serviceId,
+      make_id: rule.makeId,
+      model_id: rule.modelId,
+      name_ar: rule.nameAr,
+      name_en: rule.nameEn,
+      due_every_km: rule.dueEveryKm,
+      due_every_months: rule.dueEveryMonths,
+      first_due_km: rule.firstDueKm,
+      confidence: rule.confidence,
+    });
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async setMaintenanceRuleActive(ruleId: string, isActive: boolean): Promise<void> {
+    // Not a delete, and there must not be one: `maintenance_alerts.rule_id` is
+    // `on delete cascade` (0028), so removing a rule would erase every alert it
+    // ever raised — including the ones a customer acted on, which §1 counts as
+    // part of the logbook.
+    const { error } = await this.client
+      .from('maintenance_rules')
+      .update({ is_active: isActive })
+      .eq('id', ruleId);
+    if (error !== null) throw new Error(error.message);
+  }
+
   async setModelActive(modelId: string, isActive: boolean): Promise<void> {
     const { error } = await this.client
       .from('vehicle_models')
@@ -842,6 +920,31 @@ class InMemoryOpsRepository implements OpsRepository {
       supportedModes: ['mobile_scheduled'],
       isActive: false,
     },
+    // Two periodic services, because the maintenance rules hang off these and
+    // because without one the fixture never exercised the `periodic` category
+    // label at all.
+    {
+      id: 'svc-dev-oil',
+      category: 'periodic',
+      nameAr: 'تغيير زيت وفلتر',
+      nameEn: 'Oil and filter change',
+      basePrice: '220.00',
+      estDurationMin: 40,
+      supportedModes: ['mobile_scheduled', 'workshop'],
+      isActive: true,
+    },
+    {
+      id: 'svc-dev-belt',
+      category: 'periodic',
+      nameAr: 'سير التوقيت',
+      nameEn: 'Timing belt',
+      // Quote-only, so the catalogue's «بحسب المعاينة» branch is reachable in
+      // development rather than only against a real project.
+      basePrice: null,
+      estDurationMin: 240,
+      supportedModes: ['workshop'],
+      isActive: true,
+    },
   ];
 
   async listServices(): Promise<readonly ServiceRow[]> {
@@ -1028,6 +1131,90 @@ class InMemoryOpsRepository implements OpsRepository {
     const index = this.models.findIndex((row) => row.id === modelId);
     if (index < 0) return;
     this.models[index] = { ...(this.models[index] as VehicleModelRow), isActive };
+  }
+
+  private readonly rules: MaintenanceRuleRow[] = [
+    {
+      id: 'rule-1',
+      serviceId: 'svc-dev-oil',
+      serviceNameAr: 'تغيير زيت وفلتر',
+      makeId: null,
+      modelId: null,
+      nameAr: 'تغيير الزيت',
+      nameEn: 'Oil change',
+      dueEveryKm: 10_000,
+      dueEveryMonths: 6,
+      firstDueKm: null,
+      confidence: 'generic',
+      isActive: true,
+      createdAt: '2026-01-05T00:00:00.000Z',
+    },
+    {
+      id: 'rule-2',
+      serviceId: 'svc-dev-belt',
+      serviceNameAr: 'سير التوقيت',
+      makeId: 'make-1',
+      modelId: null,
+      nameAr: 'سير التوقيت — تويوتا',
+      nameEn: 'Timing belt — Toyota',
+      dueEveryKm: 90_000,
+      dueEveryMonths: null,
+      firstDueKm: 90_000,
+      confidence: 'oem',
+      isActive: true,
+      createdAt: '2026-01-06T00:00:00.000Z',
+    },
+    {
+      // ⚠️ Deliberately shadowed, so the warning this screen exists to show is
+      // visible in development rather than only on the day it matters: a second
+      // generic rule for the same service that `applicable_rules` will never
+      // reach, because rule-1 is older and equally specific.
+      id: 'rule-3',
+      serviceId: 'svc-dev-oil',
+      serviceNameAr: 'تغيير زيت وفلتر',
+      makeId: null,
+      modelId: null,
+      nameAr: 'تغيير الزيت — مراجَع',
+      nameEn: 'Oil change — revised',
+      dueEveryKm: 8_000,
+      dueEveryMonths: null,
+      firstDueKm: null,
+      confidence: 'generic',
+      isActive: true,
+      createdAt: '2026-02-01T00:00:00.000Z',
+    },
+  ];
+
+  async listMaintenanceRules(): Promise<readonly MaintenanceRuleRow[]> {
+    return [...this.rules].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async createMaintenanceRule(
+    rule: Omit<MaintenanceRuleRow, 'id' | 'isActive' | 'serviceNameAr' | 'createdAt'>,
+  ): Promise<void> {
+    // The fixture refuses exactly what the table refuses, so a form that would
+    // fail against a real project fails here too.
+    if (rule.dueEveryKm === null && rule.dueEveryMonths === null) {
+      throw new Error('A rule with no interval can never fire');
+    }
+    if (rule.modelId !== null && rule.makeId === null) {
+      throw new Error('A model rule must name its make');
+    }
+
+    this.rules.push({
+      ...rule,
+      id: `rule-${this.rules.length + 1}`,
+      serviceNameAr:
+        this.services.find((service) => service.id === rule.serviceId)?.nameAr ?? rule.serviceId,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  async setMaintenanceRuleActive(ruleId: string, isActive: boolean): Promise<void> {
+    const index = this.rules.findIndex((row) => row.id === ruleId);
+    if (index < 0) return;
+    this.rules[index] = { ...(this.rules[index] as MaintenanceRuleRow), isActive };
   }
 }
 
