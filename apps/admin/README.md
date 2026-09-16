@@ -153,11 +153,20 @@ repeat if it is ever recreated.
    arrives afterwards and names the wrong thing, which makes it an expensive
    half hour. Stating the framework in the repo removes the race and the
    dashboard from the question.
+
 3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
    Vercel project's environment variables. Nothing else.
 4. Restrict access at the edge if you can — a Vercel deployment protection rule
    or an IP allowlist. The database refuses a non-operator regardless, but there
    is no reason for the sign-in page to be reachable from the open internet.
+
+   **On `habba-admin` this is already on**: Vercel Authentication, scoped to
+   `all_except_custom_domains`. So `habba-admin.vercel.app` asks for a Vercel
+   login before it shows anything, and only members of the team get past it.
+   That is deliberate — it is step 4, not an obstacle to work around — and it
+   is the reason the URL looks unreachable to anyone you send it to. Attach a
+   custom domain and the exemption applies there; restrict that domain
+   separately before you do.
 
 ### ⚠️ What a deployment without step 3 actually is
 
