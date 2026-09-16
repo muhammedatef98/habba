@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { TriageClip } from '@/features/provider/components/TriageClip';
 
 export default function JobScreen() {
   const { t } = useTranslation();
@@ -138,6 +139,12 @@ export default function JobScreen() {
           ) : null}
         </View>
       </Card>
+
+      {/* ⚠️ Above everything else, and shown while the job is still an OFFER.
+          That is the whole feature: watch, then decide whether to drive out.
+          Below the accept button it would be a record of a decision already
+          made. */}
+      <TriageClip orderId={data.orderId} />
 
       {/* الفحص, on an inspection job and nowhere else. Decided from the
           service CATEGORY rather than its name: a string match against copy

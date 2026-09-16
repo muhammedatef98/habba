@@ -585,6 +585,13 @@
     "noTemplate": "The inspection template is unavailable.",
     "openInspection": "Open the inspection form"
   },
+  "triage": {
+    "title": "Video from the customer",
+    "why": "Twenty seconds the customer recorded of the problem. Watch it before you set off — the sound is a large part of the diagnosis.",
+    "watch": "Watch the video",
+    "unavailable": "No video is available for this job.",
+    "privacy": "This video belongs to this job and cannot be shared. The link expires in minutes."
+  },
   "provider": {
     "shiftTitle": "Your shift",
     "goOnline": "Go online",

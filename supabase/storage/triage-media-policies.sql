@@ -21,6 +21,14 @@
 -- The local harness applies this file as the storage owner (local-db.sh), so
 -- supabase/tests/24_triage_media_storage.sql exercises the real policies.
 
+-- Drops before creating, so re-running it on a project that already has an
+-- earlier version is safe. That is not hypothetical: 0071 corrected the
+-- provider read, and a project set up before it needs this file applied again.
+drop policy if exists triage_media_insert_customer on storage.objects;
+drop policy if exists triage_media_read_customer on storage.objects;
+drop policy if exists triage_media_read_assigned_provider on storage.objects;
+drop policy if exists triage_media_read_provider on storage.objects;
+
 -- Objects are keyed `<order_id>/<filename>`, so the first path segment is the
 -- authorisation subject. Anything else is rejected by the policies below
 -- simply by not matching an order.
@@ -53,21 +61,25 @@ create policy triage_media_read_customer on storage.objects
     )
   );
 
--- The assigned provider reads it — that is the entire point of the feature.
--- Scoped to the assignment, so a provider who lost the job or was never on it
--- sees nothing. Deliberately NOT limited to in-transit statuses: the clip is
--- most useful while they are still deciding what to bring.
-create policy triage_media_read_assigned_provider on storage.objects
+-- ⚠️ The provider reads it while DECIDING, not once committed.
+--
+-- This used to join `providers` on `orders.provider_id`, which is NULL until
+-- someone accepts — so at the one moment §1's third differentiator exists for,
+-- a technician looking at an offer could read nothing. The comment above it
+-- even said "the clip is most useful while they are still deciding what to
+-- bring", which the predicate made impossible. See 0071.
+--
+-- Now: assigned, OR holding a live offer. A declined or superseded offer loses
+-- it again — a technician who said no has no further business watching video of
+-- a stranger's driveway.
+--
+-- Definer, because an offered provider cannot read the `orders` row at all
+-- (ADR-0013) and an inline subquery here would be filtered by their own RLS.
+create policy triage_media_read_provider on storage.objects
   for select to authenticated
   using (
     bucket_id = 'triage-media'
-    and exists (
-      select 1
-        from public.orders o
-        join public.providers pr on pr.id = o.provider_id
-       where o.id::text = (storage.foldername(name))[1]
-         and pr.owner_profile_id = (select auth.uid())
-    )
+    and public.may_watch_triage_clip((storage.foldername(name))[1])
   );
 
 -- ⚠️ No update and no delete policy, for anyone. RLS denies by default, so

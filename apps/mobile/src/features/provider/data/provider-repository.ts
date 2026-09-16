@@ -22,6 +22,15 @@ import {
   type SarAmount,
 } from '@habba/core';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
+
+/**
+ * How long a signed triage URL lives.
+ *
+ * Long enough to watch a 20-second clip twice on a bad connection; short enough
+ * that a link to private video of a stranger's car is not still working an hour
+ * after the technician declined the job.
+ */
+const TRIAGE_CLIP_URL_SECONDS = 300;
 import type { OrderPart } from '@/features/shared/data/types.js';
 import { locationProvider } from '@/features/shared/lib/location.js';
 import type { LocationProvider } from '@/features/shared/lib/location-provider.js';
@@ -37,6 +46,19 @@ export interface OpenJob {
   readonly problemSummary: string;
   readonly hasTriageVideo: boolean;
   readonly estimatedPayout: string | null;
+}
+
+/**
+ * A short-lived URL for one triage clip.
+ *
+ * ⚠️ Signed, never public. `triage-media` is a private bucket (0048) because a
+ * clip is video of someone's car, often their driveway, sometimes them, taken
+ * at a moment of stress by a person not thinking about who else can watch it.
+ * A public URL is guessable and permanent; this one expires.
+ */
+export interface TriageClip {
+  readonly url: string;
+  readonly expiresInSeconds: number;
 }
 
 export type ServiceCategory = 'emergency' | 'periodic' | 'inspection' | 'wash' | 'bodywork';
@@ -208,6 +230,15 @@ export interface ProviderRepository {
    */
   getInspectionTemplate(key: string): Promise<InspectionTemplateRow | null>;
   submitInspection(input: InspectionSubmission): Promise<string>;
+
+  /**
+   * فيديو الفرز — the clip the customer recorded, if there is one.
+   *
+   * Null covers every reason there is nothing to play: no clip, an expired
+   * offer, a declined one. The screen says the same thing for all of them
+   * because the technician can act on none of them differently.
+   */
+  getTriageClip(orderId: string): Promise<TriageClip | null>;
 }
 
 export interface InspectionTemplateRow {
@@ -607,6 +638,35 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`setLabour: ${error.message}`);
   }
 
+  /**
+   * Signs a URL for the clip on this order.
+   *
+   * ⚠️ Storage is listed rather than guessed at a filename. `attachTriageClip`
+   * keys the object `<order_id>/<timestamp>.mp4`, so the name is not derivable
+   * — and an order can only ever carry one clip, so the first is the one.
+   *
+   * A short life on purpose: the URL is a bearer capability for private video
+   * of a stranger's car, and a technician who declines the job five minutes
+   * later should not be holding a working link to it for the rest of the day.
+   */
+  async getTriageClip(orderId: string): Promise<TriageClip | null> {
+    const listed = await this.client.storage.from('triage-media').list(orderId, { limit: 1 });
+    // ⚠️ Not an error to the caller. A provider whose offer expired, or who
+    // never had one, is refused by the storage policy (0071) and that is the
+    // system working — surfacing it as a failure would read as a broken app.
+    if (listed.error !== null) return null;
+
+    const name = listed.data?.[0]?.name;
+    if (name === undefined) return null;
+
+    const signed = await this.client.storage
+      .from('triage-media')
+      .createSignedUrl(`${orderId}/${name}`, TRIAGE_CLIP_URL_SECONDS);
+
+    if (signed.error !== null || signed.data === null) return null;
+    return { url: signed.data.signedUrl, expiresInSeconds: TRIAGE_CLIP_URL_SECONDS };
+  }
+
   async getInspectionTemplate(key: string): Promise<InspectionTemplateRow | null> {
     const { data, error } = await this.client
       .from('inspection_templates')
@@ -949,6 +1009,12 @@ export class InMemoryProviderRepository implements ProviderRepository {
         },
       ],
     };
+  }
+
+  async getTriageClip(): Promise<TriageClip | null> {
+    // No storage behind the dev build, and no clip to invent. Returning a fake
+    // URL would render a broken player and teach nothing.
+    return null;
   }
 
   async submitInspection(): Promise<string> {

@@ -88,6 +88,7 @@ insert into expected_exposed (name) values
   ('mark_offer_viewed'),               -- 25
   ('match_providers'),                 -- 06/26
   ('may_read_completion_media'),       -- 37: boolean about the CALLER
+  ('may_watch_triage_clip'),           -- 24: boolean about the CALLER
   ('may_write_completion_media'),      -- 37: boolean about the CALLER
   ('my_payout_lines'),                 -- 39: current_provider_id, empty for others
   ('order_dispatch_telemetry'),        -- 25: aggregates, never identities

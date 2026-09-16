@@ -137,9 +137,17 @@ never been done.
   **Still missing: the pre-dispatch quote** (differentiator 3) — a price offered
   from the triage clip before driving out. That one moves `searching → quoted`
   and belongs with the dispatch state machine rather than with parts.
-- **The triage clip cannot be watched.** `OpenJobCard` shows a "has video"
-  badge with no player, which is the feature's entire point.
-- **No rating, verification-status, workshop-schedule or inspection screens.**
+- ~~The triage clip cannot be watched. `OpenJobCard` shows a "has video" badge
+  with no player.~~ **Built, and it was worse than a missing player.** The
+  storage policy authorised on `orders.provider_id`, which is NULL until
+  acceptance — so §1's third differentiator (quote BEFORE driving out) was
+  structurally impossible: the clip only became readable after the technician
+  had committed to the journey it was meant to inform. Proved with a probe
+  before fixing. 0071 authorises on a live OFFER instead, and suite 24 —
+  which previously asserted the broken behaviour was correct — now covers
+  watching before accepting and losing it on decline.
+- ~~No inspection screens.~~ **Provider capture built** (see Phase 5).
+- **No rating, verification-status or workshop-schedule screens.**
 
 ---
 
