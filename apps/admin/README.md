@@ -144,6 +144,15 @@ repeat if it is ever recreated.
 1. Import the repo into Vercel and set the root directory to `apps/admin`.
 2. Build command `pnpm build`, install command `pnpm install --frozen-lockfile`
    (run from the repo root; the monorepo is pnpm workspaces).
+
+   ⚠️ `apps/admin/vercel.json` pins `"framework": "nextjs"` and it is not
+   decoration. Vercel auto-detects the framework on the FIRST build and saves
+   it to the project — so a second deployment pushed before that write lands
+   is built as a static site, and then fails looking for a `public/` directory
+   it was never going to have. The Next.js build itself succeeds; the error
+   arrives afterwards and names the wrong thing, which makes it an expensive
+   half hour. Stating the framework in the repo removes the race and the
+   dashboard from the question.
 3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
    Vercel project's environment variables. Nothing else.
 4. Restrict access at the edge if you can — a Vercel deployment protection rule
