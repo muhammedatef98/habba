@@ -48,6 +48,7 @@ supabase/.tmp/
 # 6 MB of it — the script is the source of truth, not the bundle it makes.
 .web-build/
 .web-publish/
+.web-check/
 
 # Design-canvas build output. `docs/design/ownership-transfer/build.py` emits the
 # artboards, and the seeded canvas is ~2.5 MB of editor payload — regenerate it
