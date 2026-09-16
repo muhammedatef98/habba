@@ -96,7 +96,7 @@ export default function BecomeProviderScreen() {
         <Button
           testID="upgrade-done"
           label={t('common.done')}
-          onPress={() => router.replace('/profile')}
+          onPress={() => router.replace('/account')}
         />
       </Screen>
     );

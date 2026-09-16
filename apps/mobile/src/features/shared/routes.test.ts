@@ -143,6 +143,120 @@ const ENTRY_POINTS = new Set<string>([
   '/schedule',
 ]);
 
+/**
+ * ⚠️ Reachable FROM AN ENTRY POINT, not merely mentioned somewhere.
+ *
+ * The first version of this file asked "does any file navigate to this route",
+ * and that is not the question. `/profile` held the «اشتغل معنا كفنّي» card and
+ * the mode switcher; the account tab replaced it and did not carry them across;
+ * nothing navigated to it any more — except `become-provider`, which returned
+ * to it on success, and `become-provider` was only reachable FROM it. Two
+ * screens pointing at each other and at nothing else, so both looked linked
+ * and neither could be opened. A technician could not sign up at all.
+ *
+ * So the check walks the graph instead: from the tabs and the launch screen,
+ * through every navigation each screen can make — including the ones made by
+ * the components it imports, because a row's `onPress` is navigation too.
+ */
+function moduleOf(routeFile: string): string | null {
+  const source = readFileSync(routeFile, 'utf8');
+  const match = /from\s+'(@\/[^']+)'/.exec(source);
+  return match?.[1] === undefined ? null : resolveImport(match[1], routeFile);
+}
+
+/** `@/x` → `src/x`, `./x` → sibling. Returns the file on disk, or null. */
+function resolveImport(specifier: string, fromFile: string): string | null {
+  const base = specifier.startsWith('@/')
+    ? join(SRC_DIR, specifier.slice(2))
+    : specifier.startsWith('.')
+      ? join(dirname(fromFile), specifier)
+      : null;
+  if (base === null) return null;
+
+  for (const candidate of [
+    base,
+    `${base}.tsx`,
+    `${base}.ts`,
+    join(base, 'index.tsx'),
+    join(base, 'index.ts'),
+  ]) {
+    try {
+      if (statSync(candidate).isFile()) return candidate;
+    } catch {
+      /* not this one */
+    }
+  }
+  return null;
+}
+
+/** Every module a screen pulls in, so a component's `router.push` counts. */
+function importClosure(entry: string): Set<string> {
+  const seen = new Set<string>();
+  const queue = [entry];
+
+  while (queue.length > 0) {
+    const file = queue.pop() as string;
+    if (seen.has(file)) continue;
+    seen.add(file);
+
+    const source = readFileSync(file, 'utf8');
+    for (const match of source.matchAll(/from\s+'((?:@\/|\.)[^']+)'/g)) {
+      const specifier = match[1];
+      if (specifier === undefined) continue;
+      const resolved = resolveImport(specifier, file);
+      if (resolved !== null && !seen.has(resolved)) queue.push(resolved);
+    }
+  }
+  return seen;
+}
+
+function navigationTargetsIn(files: Iterable<string>): Set<string> {
+  const targets = new Set<string>();
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    for (const pattern of NAVIGATION) {
+      for (const match of source.matchAll(new RegExp(pattern.source, 'g'))) {
+        const target = match[1];
+        if (target !== undefined) targets.add(withoutGroups(target));
+      }
+    }
+  }
+  return targets;
+}
+
+/** Routes reachable by walking outward from the entry points. */
+const reachableFromEntry = (() => {
+  const byRoute = new Map<string, string>();
+  for (const file of routeFiles) {
+    const screen = moduleOf(file);
+    if (screen !== null) byRoute.set(routePathOf(file), screen);
+  }
+
+  // Layouts navigate too — a group's `<Redirect>` is how a customer-only user
+  // leaves `(provider)` — and they are mounted for every route beneath them.
+  const layouts = walk(APP_DIR, (path) => path.endsWith(`${sep}_layout.tsx`));
+
+  const reached = new Set<string>(ENTRY_POINTS);
+  const queue = [...ENTRY_POINTS];
+
+  while (queue.length > 0) {
+    const route = queue.pop() as string;
+    const screen = byRoute.get(route);
+    if (screen === undefined) continue;
+
+    const closure = importClosure(screen);
+    for (const layout of layouts) for (const file of importClosure(layout)) closure.add(file);
+
+    for (const target of navigationTargetsIn(closure)) {
+      if (!reached.has(target)) {
+        reached.add(target);
+        queue.push(target);
+      }
+    }
+  }
+  return reached;
+})();
+
 describe('every screen has a way in', () => {
   test.each(routeFiles.map((file) => [routePathOf(file), file] as const))(
     '%s is reachable',
@@ -153,6 +267,12 @@ describe('every screen has a way in', () => {
         reachedRoutes.has(route),
         `${route} is a route nothing navigates to. Either link it or delete it — ` +
           'a screen with no way in is a feature that does not exist.',
+      ).toBe(true);
+
+      expect(
+        reachableFromEntry.has(route),
+        `${route} is navigated to, but only from screens that cannot themselves ` +
+          'be opened. Something reachable from a tab has to lead there.',
       ).toBe(true);
     },
   );

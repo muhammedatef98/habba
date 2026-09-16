@@ -19,10 +19,10 @@
  * half mirrored.
  */
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Constants from 'expo-constants';
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
@@ -33,6 +33,30 @@ import { formatCount } from '@/features/shared/lib/format-number';
 import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
+import {
+  useCanApplyAsProvider,
+  useIsApprovedProvider,
+  useProviderApplication,
+  useRoles,
+} from '@/features/shared/hooks/use-roles';
+import { useMode } from '@/features/shared/state/mode';
+import type { ProviderApplicationStatus } from '@/features/shared/data/types';
+
+/**
+ * What the application card says while ops has not answered yet.
+ *
+ * Every state named, including the two nobody enjoys. A rejected or suspended
+ * application that rendered as silence would leave somebody refreshing a screen
+ * that had already decided about them.
+ */
+const STATUS_KEY: Readonly<Record<ProviderApplicationStatus, string>> = {
+  none: 'provider.upgrade.statusNone',
+  pending: 'provider.upgrade.statusPending',
+  in_review: 'provider.upgrade.statusInReview',
+  approved: 'provider.upgrade.statusApproved',
+  rejected: 'provider.upgrade.statusRejected',
+  suspended: 'provider.upgrade.statusSuspended',
+};
 
 export default function AccountScreen() {
   const { t, i18n } = useTranslation();
@@ -46,7 +70,48 @@ export default function AccountScreen() {
   const signOut = useSession((state) => state.signOut);
   const isGuest = useSession((state) => state.isGuest);
 
+  /**
+   * ⚠️ The way into the provider side.
+   *
+   * Both of these lived on `/profile`, a screen the app stopped navigating to
+   * when this tab replaced it — so «اشتغل معنا كفنّي» and the mode switcher
+   * were written, translated, tested and unreachable. A technician could not
+   * sign up, and an approved provider could not get to their own shift screen;
+   * the only way out of provider mode (shift.tsx) still worked, which is what
+   * made it look like a working feature from the inside.
+   *
+   * They belong here rather than behind another tap: this tab is already the
+   * "who you are" surface, and which side of Habba you are on is that question.
+   */
+  const isProvider = useIsApprovedProvider();
+  const canApply = useCanApplyAsProvider();
+  const application = useProviderApplication();
+  const roles = useRoles();
+  const setMode = useMode((state) => state.setMode);
+
+  /**
+   * Both re-read on focus, because both change while this screen is mounted
+   * and a tab screen is never unmounted.
+   *
+   * An application is approved by somebody else, elsewhere, minutes or days
+   * after it was submitted — so the first time this tab is opened afterwards
+   * is exactly when the switcher should appear. `useRoles` caches for a minute
+   * and would otherwise answer from that cache. The same refetch covers the
+   * unhappy direction: a suspended provider loses the surface on their next
+   * visit rather than keeping it until they sign out (§5.1.3).
+   */
+  const refetchRoles = roles.refetch;
+  const refetchApplication = application.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      void refetchRoles();
+      void refetchApplication();
+    }, [refetchRoles, refetchApplication]),
+  );
+
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+
+  const applicationStatus = application.data?.status ?? 'none';
 
   /**
    * The language the customer has chosen but not yet restarted into.
@@ -191,6 +256,52 @@ export default function AccountScreen() {
           </Text>
           <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
         </Card>
+
+        {/* The mode switcher (§5.1.4). Gated on the SERVER's answer about this
+            user's roles, never on a local flag — and absent entirely for a
+            customer-only account, who must never see a provider surface. */}
+        {isProvider ? (
+          <Card testID="mode-switcher" style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('profile.modeTitle')}</Text>
+            <Text variant="caption" tone="muted">
+              {t('profile.modeBody')}
+            </Text>
+            <Button
+              testID="switch-to-provider"
+              label={t('profile.switchToProvider')}
+              size="medium"
+              onPress={() => {
+                setMode('provider');
+                router.replace('/shift');
+              }}
+            />
+          </Card>
+        ) : null}
+
+        {/* «اشتغل معنا كفنّي». Hidden once the role is held — there is nothing
+            left to apply for — replaced by status while an application is in
+            flight, and absent entirely while ENABLE_PROVIDER_MODE is off: the
+            launch collects no ID and no IBAN it cannot yet protect
+            (ADR-0017). */}
+        {canApply ? (
+          <Card testID="provider-upgrade" style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('provider.upgrade.cardTitle')}</Text>
+            <Text variant="caption" tone="muted">
+              {applicationStatus === 'none' || applicationStatus === 'rejected'
+                ? t('provider.upgrade.cardBody')
+                : t(STATUS_KEY[applicationStatus])}
+            </Text>
+            {applicationStatus === 'none' || applicationStatus === 'rejected' ? (
+              <Button
+                testID="become-provider"
+                label={t('provider.upgrade.cta')}
+                variant="accent"
+                size="medium"
+                onPress={() => router.push('/become-provider')}
+              />
+            ) : null}
+          </Card>
+        ) : null}
       </View>
 
       <View style={{ gap: theme.spacing.md }}>

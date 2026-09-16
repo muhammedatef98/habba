@@ -526,6 +526,16 @@ const MODELS: readonly VehicleModel[] = [
 
 // Mirrors seed/02_services.sql: same names and prices, so the dev flow
 // teaches the UI the real catalogue rather than a fictional one.
+/**
+ * How long the dev build's stand-in ops console takes to answer a provider
+ * application. See `currentApplication`.
+ *
+ * Twenty seconds: long enough that «قيد المراجعة» is a screen somebody reads
+ * rather than a frame they miss, short enough that nobody concludes the flow
+ * is broken and gives up on it.
+ */
+const DEV_REVIEW_MS = 20_000;
+
 const EMERGENCY_SERVICES: readonly Service[] = [
   {
     id: 'svc-towing',
@@ -1963,14 +1973,49 @@ export class InMemoryRepository implements Repository {
     if (this.profile === null) return [];
 
     const roles: UserRole[] = ['customer'];
-    if (this.application?.status === 'approved') {
+    if (this.currentApplication().status === 'approved') {
       roles.push(this.applicationType === 'workshop' ? 'workshop_admin' : 'technician');
     }
     return roles;
   }
 
   async getProviderApplication(): Promise<ProviderApplication> {
-    return this.application ?? { status: 'none', businessNameAr: null, submittedAt: null };
+    return this.currentApplication();
+  }
+
+  /**
+   * Stands in for the ops console that approves an application (Amendment B).
+   *
+   * ⚠️ The application used to sit at `pending` forever, and the reasoning for
+   * that was half right. "A stub that approved instantly would hide every
+   * screen that has to handle waiting" is true; a stub that NEVER approves
+   * hides every screen on the other side of it, which is the larger half of
+   * the app — a shift, a job, evidence, a quote, an inspection, earnings, a
+   * payout, a workshop's calendar. None of it could be opened in a dev build,
+   * which is the only build that exists until a Supabase project does.
+   *
+   * So it waits, and then it decides. Long enough that «قيد المراجعة» is a
+   * state you actually see; short enough that it is not a dead end.
+   *
+   * None of this is reachable in production. The in-memory repository is
+   * constructed only when no Supabase client can be (`createRepository`), and
+   * against a real project the role comes from `user_roles` under RLS, where
+   * this class does not run and could not grant anything if it did (§5.1.3).
+   */
+  private currentApplication(): ProviderApplication {
+    const application = this.application;
+    if (application === null) {
+      return { status: 'none', businessNameAr: null, submittedAt: null };
+    }
+    if (application.status !== 'pending' || application.submittedAt === null) {
+      return application;
+    }
+
+    const waited = Date.now() - new Date(application.submittedAt).getTime();
+    if (waited < DEV_REVIEW_MS) return application;
+
+    this.application = { ...application, status: 'approved' };
+    return this.application;
   }
 
   async applyAsProvider(input: ProviderApplicationInput): Promise<ProviderApplication> {

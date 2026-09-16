@@ -113,7 +113,17 @@ describe('the schedule belongs to workshops', () => {
 
 describe('the screens are wired to the gate', () => {
   const becomeProvider = readFileSync(join(SRC, 'screens/become-provider.tsx'), 'utf8');
-  const profile = readFileSync(join(SRC, 'screens/profile.tsx'), 'utf8');
+  // ⚠️ The ACCOUNT TAB, not `screens/profile.tsx`.
+  //
+  // This test used to read that file, and it passed for months against a
+  // screen nothing in the app navigated to. The tab replaced it, the upgrade
+  // card was not carried across, and the assertion below went on confirming
+  // that an unreachable screen consulted the gate correctly — which is the
+  // most expensive kind of green test: it describes a real rule, on dead code.
+  const account = readFileSync(
+    join(SRC, '..', 'customer', 'screens', 'tabs', 'account.tsx'),
+    'utf8',
+  );
 
   test('the KYC screen redirects before it renders a single field', () => {
     expect(becomeProvider).toContain('useCanApplyAsProvider');
@@ -127,9 +137,16 @@ describe('the screens are wired to the gate', () => {
     expect(guardAt).toBeLessThan(firstFieldAt);
   });
 
-  test('the profile screen gates the upgrade card on the same decision', () => {
-    expect(profile).toContain('useCanApplyAsProvider');
-    expect(profile).toContain('{canApply ? (');
+  test('the account tab gates the upgrade card on the same decision', () => {
+    expect(account).toContain('useCanApplyAsProvider');
+    expect(account).toContain('{canApply ? (');
+  });
+
+  test('and the mode switcher on the role the server granted', () => {
+    // §5.1.4: a customer-only user must never see the switcher. Reading the
+    // hook is what makes that a server decision rather than a local guess.
+    expect(account).toContain('useIsApprovedProvider');
+    expect(account).toContain('{isProvider ? (');
   });
 
   test('the KYC screen asks for an ID and an IBAN — so the guard matters', () => {
