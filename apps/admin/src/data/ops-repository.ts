@@ -10,11 +10,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type {
   AuditEntry,
   BoardOrder,
+  CityRow,
   OpsRepository,
   PayoutRow,
   PayoutStatus,
   ProviderReview,
   ServiceRow,
+  VehicleMakeRow,
+  VehicleModelRow,
   VerificationEvent,
   VerificationStatus,
 } from './types';
@@ -66,6 +69,70 @@ interface AuditDbRow {
  */
 function money(value: number | string): string {
   return typeof value === 'string' ? value : value.toFixed(2);
+}
+
+interface CityDbRow {
+  readonly id: string;
+  readonly name_ar: string;
+  readonly name_en: string;
+  readonly region_ar: string;
+  readonly region_en: string;
+  readonly centroid: string;
+  readonly is_active: boolean;
+}
+
+interface MakeDbRow {
+  readonly id: string;
+  readonly name_ar: string;
+  readonly name_en: string;
+  readonly sort_order: number;
+  readonly is_active: boolean;
+}
+
+interface ModelDbRow {
+  readonly id: string;
+  readonly make_id: string;
+  readonly name_ar: string;
+  readonly name_en: string;
+  readonly year_from: number;
+  readonly year_to: number | null;
+  readonly body_type: string | null;
+  readonly is_active: boolean;
+}
+
+/**
+ * A PostGIS point, out of the hex EWKB PostgREST serves it as.
+ *
+ * ⚠️ There is no lighter way to read one. `geography` comes over the wire as
+ * `0101000020E6100000917EFB3A70564740F46C567DAEB63840` — endianness byte, type
+ * word with the SRID flag, SRID, then X and Y as little-endian float64. It is
+ * NOT GeoJSON and not WKT, so `JSON.parse` and a regex both fail on it, and a
+ * console that could not read the column would have to omit the one field an
+ * operator needs to check they typed the coordinate correctly.
+ *
+ * X is longitude. PostGIS orders a point x,y, which reads backwards next to
+ * every map UI in the world — hence this being in one place rather than at
+ * each call site (see `createCity`).
+ */
+function parsePoint(hex: string): { readonly lat: number; readonly lng: number } {
+  if (hex.length < 50) return { lat: 0, lng: 0 };
+
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+
+  const view = new DataView(bytes.buffer);
+  // Byte 0 says how the rest is encoded: 1 = little-endian (NDR). PostGIS
+  // emits NDR on every platform Habba runs on, but reading the flag costs one
+  // line and being wrong costs a coordinate silently transposed into garbage.
+  const little = bytes[0] === 1;
+  // 1 endian + 4 type + 4 SRID = 9. The SRID is present because the type word
+  // carries 0x20000000; the column is `geography(point, 4326)` so it always is.
+  return {
+    lng: view.getFloat64(9, little),
+    lat: view.getFloat64(17, little),
+  };
 }
 
 interface ProviderRow {
@@ -336,6 +403,144 @@ class SupabaseOpsRepository implements OpsRepository {
       .from('orders')
       .update({ status: 'cancelled', cancellation_reason: reason })
       .eq('id', orderId);
+    if (error !== null) throw new Error(error.message);
+  }
+
+  // البيانات المرجعية ---------------------------------------------------------
+  // Every list here includes inactive rows. That is the whole reason ops can
+  // read them: `cities_read`, `vehicle_makes_read` and `vehicle_models_read`
+  // (0013) admit inactive rows for ops and hide them from everyone else, so a
+  // row taken off the picker can still be found and put back.
+
+  async listCities(): Promise<readonly CityRow[]> {
+    const { data, error } = await this.client
+      .from('cities')
+      .select('id, name_ar, name_en, region_ar, region_en, centroid, is_active')
+      .order('region_ar')
+      .order('name_ar');
+
+    if (error !== null) throw new Error(`listCities: ${error.message}`);
+    return (data as unknown as CityDbRow[]).map((row) => {
+      const point = parsePoint(row.centroid);
+      return {
+        id: row.id,
+        nameAr: row.name_ar,
+        nameEn: row.name_en,
+        regionAr: row.region_ar,
+        regionEn: row.region_en,
+        lat: point.lat,
+        lng: point.lng,
+        isActive: row.is_active,
+      };
+    });
+  }
+
+  async createCity(city: Omit<CityRow, 'id' | 'isActive'>): Promise<void> {
+    // ⚠️ WKT, not GeoJSON, and lng before lat. `extensions.geography(point)`
+    // takes x,y — x is longitude. Swapping them puts Riyadh in Somalia, which
+    // is the kind of mistake a form cannot catch because both numbers are
+    // valid coordinates. The order is fixed here, once, rather than at each
+    // call site.
+    const { error } = await this.client.from('cities').insert({
+      name_ar: city.nameAr,
+      name_en: city.nameEn,
+      region_ar: city.regionAr,
+      region_en: city.regionEn,
+      centroid: `SRID=4326;POINT(${city.lng} ${city.lat})`,
+    });
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async setCityActive(cityId: string, isActive: boolean): Promise<void> {
+    const { error } = await this.client
+      .from('cities')
+      .update({ is_active: isActive })
+      .eq('id', cityId);
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async listMakes(): Promise<readonly VehicleMakeRow[]> {
+    const [makes, models] = await Promise.all([
+      this.client
+        .from('vehicle_makes')
+        .select('id, name_ar, name_en, sort_order, is_active')
+        .order('sort_order')
+        .order('name_ar'),
+      this.client.from('vehicle_models').select('make_id'),
+    ]);
+
+    if (makes.error !== null) throw new Error(`listMakes: ${makes.error.message}`);
+    if (models.error !== null) throw new Error(`listMakes: ${models.error.message}`);
+
+    // The count is shown because "deactivate this make" is a decision about
+    // every model under it, and an operator should see how many before they
+    // make it.
+    const counts = new Map<string, number>();
+    for (const row of models.data as unknown as { make_id: string }[]) {
+      counts.set(row.make_id, (counts.get(row.make_id) ?? 0) + 1);
+    }
+
+    return (makes.data as unknown as MakeDbRow[]).map((row) => ({
+      id: row.id,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      sortOrder: row.sort_order,
+      isActive: row.is_active,
+      modelCount: counts.get(row.id) ?? 0,
+    }));
+  }
+
+  async createMake(nameAr: string, nameEn: string, sortOrder: number): Promise<void> {
+    const { error } = await this.client
+      .from('vehicle_makes')
+      .insert({ name_ar: nameAr, name_en: nameEn, sort_order: sortOrder });
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async setMakeActive(makeId: string, isActive: boolean): Promise<void> {
+    const { error } = await this.client
+      .from('vehicle_makes')
+      .update({ is_active: isActive })
+      .eq('id', makeId);
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async listModels(): Promise<readonly VehicleModelRow[]> {
+    const { data: rows, error } = await this.client
+      .from('vehicle_models')
+      .select('id, make_id, name_ar, name_en, year_from, year_to, body_type, is_active')
+      .order('name_ar');
+
+    if (error !== null) throw new Error(`listModels: ${error.message}`);
+    return (rows as unknown as ModelDbRow[]).map((row) => ({
+      id: row.id,
+      makeId: row.make_id,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      yearFrom: row.year_from,
+      yearTo: row.year_to,
+      bodyType: row.body_type,
+      isActive: row.is_active,
+    }));
+  }
+
+  async createModel(model: Omit<VehicleModelRow, 'id' | 'isActive'>): Promise<void> {
+    const { error } = await this.client.from('vehicle_models').insert({
+      make_id: model.makeId,
+      name_ar: model.nameAr,
+      name_en: model.nameEn,
+      year_from: model.yearFrom,
+      year_to: model.yearTo,
+      body_type: model.bodyType,
+    });
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async setModelActive(modelId: string, isActive: boolean): Promise<void> {
+    const { error } = await this.client
+      .from('vehicle_models')
+      .update({ is_active: isActive })
+      .eq('id', modelId);
     if (error !== null) throw new Error(error.message);
   }
 }
@@ -676,6 +881,153 @@ class InMemoryOpsRepository implements OpsRepository {
       at: new Date().toISOString(),
       ip: '127.0.0.1',
     });
+  }
+
+  // البيانات المرجعية ---------------------------------------------------------
+
+  private readonly cities: CityRow[] = [
+    {
+      id: 'city-1',
+      nameAr: 'الرياض',
+      nameEn: 'Riyadh',
+      regionAr: 'الرياض',
+      regionEn: 'Riyadh',
+      lat: 24.7136,
+      lng: 46.6753,
+      isActive: true,
+    },
+    {
+      id: 'city-2',
+      nameAr: 'الدمام',
+      nameEn: 'Dammam',
+      regionAr: 'الشرقية',
+      regionEn: 'Eastern',
+      lat: 26.4207,
+      lng: 50.1033,
+      isActive: true,
+    },
+    {
+      id: 'city-3',
+      nameAr: 'الخبر',
+      nameEn: 'Khobar',
+      regionAr: 'الشرقية',
+      regionEn: 'Eastern',
+      lat: 26.2794,
+      lng: 50.208,
+      isActive: true,
+    },
+  ];
+
+  private readonly makes: VehicleMakeRow[] = [
+    {
+      id: 'make-1',
+      nameAr: 'تويوتا',
+      nameEn: 'Toyota',
+      sortOrder: 1,
+      isActive: true,
+      modelCount: 2,
+    },
+    {
+      id: 'make-2',
+      nameAr: 'هيونداي',
+      nameEn: 'Hyundai',
+      sortOrder: 2,
+      isActive: true,
+      modelCount: 1,
+    },
+    { id: 'make-3', nameAr: 'لكزس', nameEn: 'Lexus', sortOrder: 3, isActive: true, modelCount: 0 },
+  ];
+
+  private readonly models: VehicleModelRow[] = [
+    {
+      id: 'model-1',
+      makeId: 'make-1',
+      nameAr: 'كامري',
+      nameEn: 'Camry',
+      yearFrom: 2012,
+      yearTo: null,
+      bodyType: 'sedan',
+      isActive: true,
+    },
+    {
+      id: 'model-2',
+      makeId: 'make-1',
+      nameAr: 'هايلكس',
+      nameEn: 'Hilux',
+      yearFrom: 2005,
+      yearTo: null,
+      bodyType: 'pickup',
+      isActive: true,
+    },
+    {
+      id: 'model-3',
+      makeId: 'make-2',
+      nameAr: 'إلنترا',
+      nameEn: 'Elantra',
+      yearFrom: 2010,
+      yearTo: 2020,
+      bodyType: 'sedan',
+      isActive: true,
+    },
+  ];
+
+  async listCities(): Promise<readonly CityRow[]> {
+    return [...this.cities];
+  }
+
+  async createCity(city: Omit<CityRow, 'id' | 'isActive'>): Promise<void> {
+    this.cities.push({ ...city, id: `city-${this.cities.length + 1}`, isActive: true });
+  }
+
+  async setCityActive(cityId: string, isActive: boolean): Promise<void> {
+    const index = this.cities.findIndex((row) => row.id === cityId);
+    if (index < 0) return;
+    this.cities[index] = { ...(this.cities[index] as CityRow), isActive };
+  }
+
+  async listMakes(): Promise<readonly VehicleMakeRow[]> {
+    return [...this.makes]
+      .map((make) => ({
+        ...make,
+        modelCount: this.models.filter((model) => model.makeId === make.id).length,
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async createMake(nameAr: string, nameEn: string, sortOrder: number): Promise<void> {
+    this.makes.push({
+      id: `make-${this.makes.length + 1}`,
+      nameAr,
+      nameEn,
+      sortOrder,
+      isActive: true,
+      modelCount: 0,
+    });
+  }
+
+  async setMakeActive(makeId: string, isActive: boolean): Promise<void> {
+    const index = this.makes.findIndex((row) => row.id === makeId);
+    if (index < 0) return;
+    this.makes[index] = { ...(this.makes[index] as VehicleMakeRow), isActive };
+  }
+
+  async listModels(): Promise<readonly VehicleModelRow[]> {
+    return [...this.models];
+  }
+
+  async createModel(model: Omit<VehicleModelRow, 'id' | 'isActive'>): Promise<void> {
+    // Mirrors `vehicle_models_year_range` (0006), so the fixture refuses what
+    // the database would refuse rather than accepting a row no project accepts.
+    if (model.yearTo !== null && model.yearTo < model.yearFrom) {
+      throw new Error('year_to must not be before year_from');
+    }
+    this.models.push({ ...model, id: `model-${this.models.length + 1}`, isActive: true });
+  }
+
+  async setModelActive(modelId: string, isActive: boolean): Promise<void> {
+    const index = this.models.findIndex((row) => row.id === modelId);
+    if (index < 0) return;
+    this.models[index] = { ...(this.models[index] as VehicleModelRow), isActive };
   }
 }
 

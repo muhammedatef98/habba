@@ -96,6 +96,49 @@ export interface ServiceRow {
   readonly isActive: boolean;
 }
 
+/**
+ * A city Habba operates in.
+ *
+ * ⚠️ `centroid` is `not null` in 0004 and read by nothing in the product. It is
+ * not what matching uses — `match_providers` measures from the provider's own
+ * location to the order's, never from a city's centre — so a wrong coordinate
+ * here misroutes nobody. It is carried because the column demands a value and
+ * because a city with no point on the map is a city no future feature can
+ * place. The form says so rather than implying it steers dispatch.
+ */
+export interface CityRow {
+  readonly id: string;
+  readonly nameAr: string;
+  readonly nameEn: string;
+  readonly regionAr: string;
+  readonly regionEn: string;
+  readonly lat: number;
+  readonly lng: number;
+  readonly isActive: boolean;
+}
+
+export interface VehicleMakeRow {
+  readonly id: string;
+  readonly nameAr: string;
+  readonly nameEn: string;
+  /** What decides the order a customer sees. Toyota before Bentley. */
+  readonly sortOrder: number;
+  readonly isActive: boolean;
+  readonly modelCount: number;
+}
+
+export interface VehicleModelRow {
+  readonly id: string;
+  readonly makeId: string;
+  readonly nameAr: string;
+  readonly nameEn: string;
+  readonly yearFrom: number;
+  /** null = still made. 0006 checks `year_to >= year_from` when it is set. */
+  readonly yearTo: number | null;
+  readonly bodyType: string | null;
+  readonly isActive: boolean;
+}
+
 export interface OpsRepository {
   /** Live orders, ordered by trouble rather than by time (0046). */
   listBoard(): Promise<readonly BoardOrder[]>;
@@ -167,6 +210,40 @@ export interface OpsRepository {
    * them.
    */
   cancelOrder(orderId: string, reason: string): Promise<void>;
+
+  /**
+   * البيانات المرجعية — the lookup tables a customer meets before they can use
+   * anything else.
+   *
+   * ⚠️ These are the only tables in the product whose absence is silent. A
+   * missing service shows an operator a short menu; a missing MAKE shows a
+   * customer a picker their car is not in, and they cannot add the vehicle at
+   * all — so they get no logbook, and the logbook is the product (§1). Until
+   * now the only way to add one was psql against production, which means the
+   * answer to "my car isn't listed" was a deployment.
+   *
+   * Cities gate the same thing one level up: a provider's `city_id` is not
+   * nullable, so a city that does not exist is a region Habba cannot onboard
+   * anybody in.
+   *
+   * **Nothing here deletes, for the same reason as the catalogue.**
+   * `vehicles.model_id` and `providers.city_id` are foreign keys, and 0006
+   * declares `on delete restrict` explicitly. Deactivating takes a row off the
+   * customer's picker (every mobile read filters `is_active`) and leaves every
+   * vehicle that already names it standing.
+   */
+  listCities(): Promise<readonly CityRow[]>;
+  createCity(city: Omit<CityRow, 'id' | 'isActive'>): Promise<void>;
+  setCityActive(cityId: string, isActive: boolean): Promise<void>;
+
+  listMakes(): Promise<readonly VehicleMakeRow[]>;
+  createMake(nameAr: string, nameEn: string, sortOrder: number): Promise<void>;
+  setMakeActive(makeId: string, isActive: boolean): Promise<void>;
+
+  /** Every model, of every make — the catalogue is small and bounded. */
+  listModels(): Promise<readonly VehicleModelRow[]>;
+  createModel(model: Omit<VehicleModelRow, 'id' | 'isActive'>): Promise<void>;
+  setModelActive(modelId: string, isActive: boolean): Promise<void>;
 }
 
 /** What the board is telling the operator to look at (0046). */
