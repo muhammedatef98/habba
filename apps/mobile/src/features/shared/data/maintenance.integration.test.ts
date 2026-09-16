@@ -254,7 +254,8 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
       p_order_id: priorId,
       p_payment_intent_id: 'intel_prior',
     });
-    await owner.from('orders').update({ status: 'accepted' }).eq('id', priorId);
+    // 0074: the provider confirms the booking, never the customer.
+    await shop.from('orders').update({ status: 'accepted' }).eq('id', priorId);
     await shop.rpc('check_in_vehicle', { p_order_id: priorId });
     await shop.from('orders').update({ status: 'in_progress' }).eq('id', priorId);
     await shop.rpc('record_completion_evidence', {
@@ -338,7 +339,8 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
       p_order_id: orderId,
       p_payment_intent_id: 'intel_http_1',
     });
-    await owner.from('orders').update({ status: 'accepted' }).eq('id', orderId);
+    // 0074: the provider confirms the booking, never the customer.
+    await shop.from('orders').update({ status: 'accepted' }).eq('id', orderId);
     await shop.rpc('check_in_vehicle', { p_order_id: orderId });
     await shop.from('orders').update({ status: 'in_progress' }).eq('id', orderId);
     await shop.rpc('record_completion_evidence', {

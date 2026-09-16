@@ -20,6 +20,7 @@ function order(fields: Partial<Order>): Order {
     totalAmount: null,
     escrowStatus: 'authorised',
     completionMedia: [],
+    scheduledFor: null,
     ...fields,
   };
 }

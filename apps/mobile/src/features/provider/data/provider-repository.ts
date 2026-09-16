@@ -84,6 +84,15 @@ export interface AssignedJob {
   readonly completionMedia: readonly CompletionMediaItem[];
   readonly requiresCompletionPhotos: boolean;
   readonly requiresCompletionMileage: boolean;
+  /**
+   * The odometer on file for this car, or null when there is none.
+   *
+   * ⚠️ Read through `last_known_mileage_for_order` (0073), never through a
+   * join. `vehicles` is owner-only (0013), so `vehicles(current_mileage)`
+   * embedded in a provider's query comes back null on every row, always — and
+   * it did, which made the evidence screen's «آخر قراءة مسجّلة» and its
+   * below-the-recorded-reading warning unreachable code in a shipped screen.
+   */
   readonly vehicleCurrentMileage: number | null;
 }
 
@@ -259,6 +268,52 @@ export interface ProviderRepository {
    * week's calendar cannot delete the appointment somebody is driving to.
    */
   deleteSlot(slotId: string): Promise<void>;
+
+  /**
+   * حجوزات بانتظار التأكيد — bookings the provider has not answered yet.
+   *
+   * ⚠️ These were invisible. `book_appointment` opens an order at `draft`
+   * (0024), the workshop transition table has `draft → accepted`, and
+   * `listMyJobs` filters to `accepted` and beyond — so a customer could claim
+   * a slot, be charged nothing, watch a dispatch search spin, and never appear
+   * on any screen the workshop could open. Every appointment ever booked would
+   * have sat in `draft` until it was cancelled.
+   *
+   * `accept_order` is not the path here: it claims an UNASSIGNED order
+   * (`provider_id is null`, 0033) for the broadcast flow. A booking already
+   * names its provider, because the customer chose them.
+   */
+  listMyBookings(): Promise<readonly ProviderBooking[]>;
+  /** `draft`/`quoted` → `accepted`. The customer is now expected. */
+  confirmBooking(orderId: string): Promise<void>;
+  /**
+   * Turns a booking down, which releases the slot.
+   *
+   * ⚠️ Not a soft no. `release_slot_on_cancel` (0036) gives the place back to
+   * the calendar, so a workshop that declines has genuinely freed the time —
+   * and the customer's order is `cancelled`, not left hanging in a state
+   * nobody advances.
+   */
+  declineBooking(orderId: string, reason: string | null): Promise<void>;
+}
+
+/**
+ * One appointment somebody has booked, as the workshop reads it.
+ *
+ * `scheduledFor` rather than the slot id, because what a workshop needs is
+ * when the car is coming — and `quotedAmount` because a booking it is about to
+ * commit a bay to is also a price it has agreed to honour.
+ */
+export interface ProviderBooking {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly status: OrderStatus;
+  readonly serviceNameAr: string;
+  readonly scheduledFor: string | null;
+  readonly problemDescription: string | null;
+  readonly quotedAmount: SarAmount | null;
+  /** Null when the booking carries no vehicle — a wash, say. */
+  readonly vehicleLabel: string | null;
 }
 
 export interface ScheduleSlot {
@@ -438,8 +493,7 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
           'completion_mileage, completion_media, vehicle_id, ' +
-          'services(name_ar, requires_completion_photos, requires_completion_mileage), ' +
-          'vehicles(current_mileage)',
+          'services(name_ar, requires_completion_photos, requires_completion_mileage)',
       )
       .in('status', [
         'accepted',
@@ -461,14 +515,26 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
           'completion_mileage, completion_media, vehicle_id, ' +
-          'services(name_ar, requires_completion_photos, requires_completion_mileage), ' +
-          'vehicles(current_mileage)',
+          'services(name_ar, requires_completion_photos, requires_completion_mileage)',
       )
       .eq('id', orderId)
       .maybeSingle();
 
     if (error !== null) throw new Error(`getJob: ${error.message}`);
-    return data === null ? null : toAssignedJob(data);
+    if (data === null) return null;
+
+    // A second call rather than a join, for the reason on `vehicleCurrentMileage`
+    // above. Only here and not in `listMyJobs`: the list shows no odometer, and
+    // one round trip per row to populate a field nothing renders would be a
+    // cost paid for nothing.
+    const { data: mileage } = await this.client.rpc('last_known_mileage_for_order', {
+      p_order_id: orderId,
+    });
+
+    return {
+      ...toAssignedJob(data),
+      vehicleCurrentMileage: (mileage as number | null) ?? null,
+    };
   }
 
   async markOfferViewed(orderId: string): Promise<void> {
@@ -770,6 +836,58 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(error.message);
   }
 
+  async listMyBookings(): Promise<readonly ProviderBooking[]> {
+    // No provider filter: `orders_read_assigned_provider` (0022) already scopes
+    // this to orders whose `provider_id` is this provider, and a client-side
+    // `.eq()` here would look like the control while being none.
+    const { data, error } = await this.client
+      .from('orders')
+      .select(
+        'id, order_number, status, scheduled_for, problem_description, quoted_amount, ' +
+          'services(name_ar)',
+      )
+      .in('status', ['draft', 'quoted'])
+      .order('scheduled_for', { ascending: true });
+
+    if (error !== null) throw new Error(`listMyBookings: ${error.message}`);
+
+    return (data as unknown as BookingRow[]).map((row) => ({
+      orderId: row.id,
+      orderNumber: row.order_number,
+      status: row.status,
+      serviceNameAr: row.services?.name_ar ?? '',
+      scheduledFor: row.scheduled_for,
+      problemDescription: row.problem_description,
+      quotedAmount: row.quoted_amount === null ? null : toSar(row.quoted_amount),
+      // ⚠️ Always null, and deliberately so. `vehicles` has exactly four
+      // policies (0013) and every one of them is `owner_id = auth.uid()`: a
+      // provider cannot read the car they are about to work on. Embedding
+      // `vehicles(...)` here would return null on every row and read as
+      // missing data rather than as an absent permission.
+      vehicleLabel: null,
+    }));
+  }
+
+  async confirmBooking(orderId: string): Promise<void> {
+    // A direct update, not `accept_order`: that function claims an order with
+    // NO provider (0033). This one already names its provider — the customer
+    // chose them — so the move is `draft → accepted` under
+    // `orders_update_assigned_provider`, checked by the state machine (0020).
+    const { error } = await this.client
+      .from('orders')
+      .update({ status: 'accepted' })
+      .eq('id', orderId);
+    if (error !== null) throw new Error(error.message);
+  }
+
+  async declineBooking(orderId: string, reason: string | null): Promise<void> {
+    const { error } = await this.client
+      .from('orders')
+      .update({ status: 'cancelled', cancellation_reason: reason })
+      .eq('id', orderId);
+    if (error !== null) throw new Error(error.message);
+  }
+
   async deleteSlot(slotId: string): Promise<void> {
     const { error } = await this.client.from('appointment_slots').delete().eq('id', slotId);
     if (error === null) return;
@@ -829,6 +947,16 @@ export class SupabaseProviderRepository implements ProviderRepository {
   }
 }
 
+interface BookingRow {
+  id: string;
+  order_number: string;
+  status: OrderStatus;
+  scheduled_for: string | null;
+  problem_description: string | null;
+  quoted_amount: number | null;
+  services: { name_ar: string } | null;
+}
+
 interface SlotRow {
   id: string;
   starts_at: string;
@@ -878,7 +1006,6 @@ interface OrderRow {
     requires_completion_photos: boolean;
     requires_completion_mileage: boolean;
   } | null;
-  vehicles: { current_mileage: number } | null;
 }
 
 function toAssignedJob(row: unknown): AssignedJob {
@@ -896,7 +1023,10 @@ function toAssignedJob(row: unknown): AssignedJob {
     completionMedia: order.completion_media ?? [],
     requiresCompletionPhotos: order.services?.requires_completion_photos ?? true,
     requiresCompletionMileage: order.services?.requires_completion_mileage ?? true,
-    vehicleCurrentMileage: order.vehicles?.current_mileage ?? null,
+    // ⚠️ Always null here, and honestly so. The embed cannot see `vehicles`;
+    // `getJob` fills this in from `last_known_mileage_for_order` (0073), which
+    // is the only path that can.
+    vehicleCurrentMileage: null,
   };
 }
 
@@ -1138,6 +1268,50 @@ export class InMemoryProviderRepository implements ProviderRepository {
         },
       ],
     };
+  }
+
+  private devBookings: ProviderBooking[] | null = null;
+
+  /**
+   * Two appointments waiting on an answer.
+   *
+   * The interesting state is a booking the workshop has NOT dealt with, so the
+   * fixture starts there rather than with a tidy confirmed calendar — the
+   * whole reason this surface exists is that unanswered bookings were
+   * invisible.
+   */
+  async listMyBookings(): Promise<readonly ProviderBooking[]> {
+    this.devBookings ??= [
+      {
+        orderId: 'dev-booking-1',
+        orderNumber: 'HB-24081',
+        status: 'draft',
+        serviceNameAr: 'تغيير زيت وفلتر',
+        scheduledFor: new Date(Date.now() + 86_400_000).toISOString(),
+        problemDescription: 'صوت خفيف من المحرك عند التشغيل البارد',
+        quotedAmount: sarOrThrow('230.00'),
+        vehicleLabel: null,
+      },
+      {
+        orderId: 'dev-booking-2',
+        orderNumber: 'HB-24082',
+        status: 'draft',
+        serviceNameAr: 'فحص شامل',
+        scheduledFor: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+        problemDescription: null,
+        quotedAmount: sarOrThrow('450.00'),
+        vehicleLabel: null,
+      },
+    ];
+    return this.devBookings;
+  }
+
+  async confirmBooking(orderId: string): Promise<void> {
+    this.devBookings = this.devBookings?.filter((booking) => booking.orderId !== orderId) ?? null;
+  }
+
+  async declineBooking(orderId: string): Promise<void> {
+    this.devBookings = this.devBookings?.filter((booking) => booking.orderId !== orderId) ?? null;
   }
 
   private devSlots: ScheduleSlot[] | null = null;

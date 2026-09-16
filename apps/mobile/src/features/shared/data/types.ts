@@ -294,6 +294,16 @@ export interface Order {
   readonly totalAmount: SarAmount | null;
   readonly escrowStatus: EscrowStatus;
   readonly completionMedia: readonly CompletionMedia[];
+  /**
+   * When the appointment is, for the two modes that have one.
+   *
+   * Null on an on-demand emergency, which happens now. Carried because a
+   * scheduled order sits in `draft` until the workshop confirms it, and "your
+   * booking on Tuesday at 09:00 is with the workshop" is a different sentence
+   * from the dispatch search a `draft` on-demand order gets — the customer was
+   * shown the search for both.
+   */
+  readonly scheduledFor: string | null;
 }
 
 export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'refunded';

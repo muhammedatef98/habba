@@ -332,8 +332,12 @@ update public.orders set status = 'searching'
 update public.orders set status = 'quoted'
  where id = 'f0000000-0000-4000-f000-000000000001';
 select public.authorise_order_payment('f0000000-0000-4000-f000-000000000001', 'push_1');
+-- 0074: the provider accepts, not the customer. Before it, this fixture
+-- was modelling a transition a real workshop could not have produced.
+select test.become('22222222-0000-4000-f000-000000000002');
 update public.orders set status = 'accepted'
  where id = 'f0000000-0000-4000-f000-000000000001';
+select test.become('11111111-0000-4000-f000-000000000001');
 
 reset role;
 

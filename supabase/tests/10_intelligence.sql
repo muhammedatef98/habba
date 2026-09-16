@@ -119,7 +119,11 @@ values
 
 update public.orders set status = 'quoted' where id = 'f0000000-0000-4000-c000-000000000001';
 select public.authorise_order_payment('f0000000-0000-4000-c000-000000000001', 'intel_1');
+-- 0074: the provider accepts, not the customer. Before it, this fixture
+-- was modelling a transition a real workshop could not have produced.
+select test.become('22222222-0000-4000-c000-000000000002');
 update public.orders set status = 'accepted' where id = 'f0000000-0000-4000-c000-000000000001';
+select test.become('11111111-0000-4000-c000-000000000001');
 update public.orders set status = 'checked_in' where id = 'f0000000-0000-4000-c000-000000000001';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-c000-000000000001';
 -- Recorded through the provider RPC; a customer cannot write evidence (0033).

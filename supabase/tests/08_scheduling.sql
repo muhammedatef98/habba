@@ -148,7 +148,11 @@ select test.assert_eq(
 -- Workshop flow: check-in replaces en_route/arrived ---------------------------------
 update public.orders set status = 'quoted', quoted_amount = 180 where id = :'order3';
 select public.authorise_order_payment(:'order3', 'test_sched_001');
+-- 0074: the provider accepts, not the customer. Before it, this fixture
+-- was modelling a transition a real workshop could not have produced.
+select test.become('22222222-0000-4000-a000-000000000002');
 update public.orders set status = 'accepted' where id = :'order3';
+select test.become('11111111-0000-4000-a000-000000000001');
 
 select test.assert_raises(
   format($$update public.orders set status = 'en_route' where id = '%s'$$, :'order3'),
@@ -225,7 +229,10 @@ select test.assert_eq(
 -- A free order must be acceptable without an authorisation, or the whole
 -- feature is unusable.
 update public.orders set status = 'quoted' where id = :'claim';
+-- 0074: the provider accepts, not the customer.
+select test.become('22222222-0000-4000-a000-000000000002');
 update public.orders set status = 'accepted' where id = :'claim';
+select test.become('11111111-0000-4000-a000-000000000001');
 
 select test.assert_eq(
   (select status from public.orders where id = :'claim'),

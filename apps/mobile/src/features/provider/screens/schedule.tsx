@@ -36,6 +36,7 @@ import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  BottomSheet,
   Button,
   Card,
   EmptyState,
@@ -51,6 +52,7 @@ import {
 } from '@habba/ui';
 import {
   providerRepository,
+  type ProviderBooking,
   type ScheduleSlot,
 } from '@/features/provider/data/provider-repository';
 import {
@@ -60,6 +62,7 @@ import {
 } from '@/features/provider/lib/schedule-form';
 import { useSession } from '@/features/shared/state/session';
 import { daysFromToday, groupSlotsByDay } from '@/features/shared/lib/slot-days';
+import { formatGregorianDate } from '@/features/shared/lib/dates';
 import { formatCount } from '@/features/shared/lib/format-number';
 
 /**
@@ -91,6 +94,22 @@ export default function ProviderScheduleScreen() {
     queryFn: () => providerRepository.listMySlots(fromIso, HORIZON_DAYS),
   });
 
+  /**
+   * حجوزات بانتظار التأكيد, above the calendar.
+   *
+   * ⚠️ These are the bookings the workshop could not see. `book_appointment`
+   * opens an order at `draft` (0024) and `listMyJobs` filters to `accepted`
+   * and beyond, so a customer claimed a slot and then appeared on no provider
+   * screen at all — the appointment sat in `draft` until it was cancelled.
+   *
+   * First on the page, above the workshop's own calendar, because somebody is
+   * waiting on the answer.
+   */
+  const bookings = useQuery({
+    queryKey: ['my-bookings'],
+    queryFn: () => providerRepository.listMyBookings(),
+  });
+
   const [dayKey, setDayKey] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [days, setDays] = useState<string>(SLOT_FORM_DEFAULTS.days);
@@ -100,8 +119,47 @@ export default function ProviderScheduleScreen() {
   const [capacity, setCapacity] = useState<string>(SLOT_FORM_DEFAULTS.capacity);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // ⚠️ Declining is asked about first. It cancels the customer's order and
+  // releases the slot, and the customer has already arranged their Tuesday
+  // around it — an accidental tap here is a phone call, not an undo.
+  const [declining, setDeclining] = useState<string | null>(null);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['my-slots'] });
+
+  /**
+   * Both, always. Confirming a booking does not change the slot, but declining
+   * one gives the place back (`release_slot_on_cancel`, 0036) — and a calendar
+   * still showing that slot as taken is the screen disagreeing with the server
+   * about how many cars fit on Tuesday.
+   */
+  const refreshBookings = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['my-bookings'] }),
+      queryClient.invalidateQueries({ queryKey: ['my-slots'] }),
+    ]);
+  };
+
+  const confirm = useMutation({
+    mutationFn: (orderId: string) => providerRepository.confirmBooking(orderId),
+    onSuccess: async () => {
+      setError(null);
+      await refreshBookings();
+    },
+    onError: () => setError(t('schedule.confirmFailed')),
+  });
+
+  const decline = useMutation({
+    mutationFn: (orderId: string) => providerRepository.declineBooking(orderId, null),
+    onSuccess: async () => {
+      setError(null);
+      setDeclining(null);
+      await refreshBookings();
+    },
+    onError: () => {
+      setDeclining(null);
+      setError(t('schedule.declineFailed'));
+    },
+  });
 
   const publish = useMutation({
     mutationFn: async () => {
@@ -218,6 +276,34 @@ export default function ProviderScheduleScreen() {
             {notice}
           </Text>
         </Card>
+      ) : null}
+
+      {/* حجوزات بانتظار التأكيد — somebody is waiting on an answer, so it is
+          the first thing on the page. */}
+      {(bookings.data ?? []).length > 0 ? (
+        <View style={{ gap: theme.spacing.md }}>
+          <Text variant="subheading">{t('schedule.bookingsTitle')}</Text>
+          <Text variant="caption" tone="muted">
+            {t('schedule.bookingsBody')}
+          </Text>
+          {(bookings.data ?? []).map((booking) => (
+            <BookingRow
+              key={booking.orderId}
+              booking={booking}
+              when={
+                booking.scheduledFor === null
+                  ? null
+                  : `${formatGregorianDate(booking.scheduledFor, locale)} · ${clock(
+                      booking.scheduledFor,
+                      i18n.language,
+                    )}`
+              }
+              busy={confirm.isPending || decline.isPending}
+              onConfirm={() => confirm.mutate(booking.orderId)}
+              onDecline={() => setDeclining(booking.orderId)}
+            />
+          ))}
+        </View>
       ) : null}
 
       {/* Publishing. Collapsed by default: a workshop opens this screen far
@@ -434,8 +520,124 @@ export default function ProviderScheduleScreen() {
         </View>
       )}
 
+      {/* «اعتذر عن الحجز» asks first. It cancels the customer's order and hands
+          the place back to the calendar; they have arranged a Tuesday around
+          it, and an accidental tap is a phone call rather than an undo. */}
+      <BottomSheet
+        visible={declining !== null}
+        onClose={() => setDeclining(null)}
+        title={t('schedule.declineConfirmTitle')}
+        closeLabel={t('common.close')}
+        testID="schedule-decline-sheet"
+      >
+        <View style={{ gap: theme.spacing.md }}>
+          <Text variant="body" tone="muted">
+            {t('schedule.declineConfirmBody')}
+          </Text>
+          <Button
+            testID="schedule-decline-confirm"
+            label={t('schedule.declineConfirmAction')}
+            variant="emergencyOutline"
+            loading={decline.isPending}
+            onPress={() => {
+              if (declining !== null) decline.mutate(declining);
+            }}
+          />
+          <Button
+            label={t('schedule.declineKeep')}
+            variant="ghost"
+            onPress={() => setDeclining(null)}
+          />
+        </View>
+      </BottomSheet>
+
       <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
+  );
+}
+
+interface BookingRowProps {
+  readonly booking: ProviderBooking;
+  readonly when: string | null;
+  readonly busy: boolean;
+  readonly onConfirm: () => void;
+  readonly onDecline: () => void;
+}
+
+function BookingRow({ booking, when, busy, onConfirm, onDecline }: BookingRowProps) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+
+  return (
+    <Card
+      testID={`schedule-booking-${booking.orderId}`}
+      elevation="sm"
+      style={{
+        gap: theme.spacing.sm,
+        borderStartWidth: 3,
+        borderStartColor: theme.colors.accent,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          alignItems: 'center',
+          gap: theme.spacing.sm,
+        }}
+      >
+        <Text variant="bodyStrong" style={{ flex: 1 }}>
+          {booking.serviceNameAr}
+        </Text>
+        <Text variant="caption" tone="subtle" numeric>
+          {booking.orderNumber}
+        </Text>
+      </View>
+
+      {when !== null ? (
+        <Text variant="bodySmall" numeric>
+          {when}
+        </Text>
+      ) : null}
+
+      {booking.problemDescription !== null ? (
+        <Text variant="caption" tone="muted">
+          {booking.problemDescription}
+        </Text>
+      ) : null}
+
+      {booking.quotedAmount !== null ? (
+        <Text variant="caption" tone="muted" numeric>
+          {t('schedule.bookingAmount', { amount: booking.quotedAmount })}
+        </Text>
+      ) : null}
+
+      <View
+        style={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          gap: theme.spacing.sm,
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          <Button
+            testID={`schedule-confirm-${booking.orderId}`}
+            label={t('schedule.confirmBooking')}
+            size="medium"
+            disabled={busy}
+            onPress={onConfirm}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button
+            testID={`schedule-decline-${booking.orderId}`}
+            label={t('schedule.declineBooking')}
+            variant="ghost"
+            size="medium"
+            disabled={busy}
+            onPress={onDecline}
+          />
+        </View>
+      </View>
+    </Card>
   );
 }
 

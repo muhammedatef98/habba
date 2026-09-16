@@ -266,6 +266,7 @@ interface OrderRow {
   total_amount: number | null;
   escrow_status: EscrowStatus;
   readonly completion_media: readonly CompletionMedia[] | null;
+  scheduled_for: string | null;
 }
 
 interface OrderPartRow {
@@ -328,6 +329,7 @@ function toOrder(row: OrderRow): Order {
     // column list would see undefined — normalise rather than let a screen
     // map over nothing.
     completionMedia: row.completion_media ?? [],
+    scheduledFor: row.scheduled_for,
   };
 }
 
@@ -1002,7 +1004,7 @@ export class SupabaseRepository implements Repository {
     const { data, error } = await this.client
       .from('orders')
       .select(
-        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media',
+        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media, scheduled_for',
       )
       .eq('id', orderId)
       .maybeSingle();

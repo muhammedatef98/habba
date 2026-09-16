@@ -83,6 +83,10 @@ insert into expected_exposed (name) values
   ('is_assigned_provider_on_order'),   -- 37: boolean about the CALLER
   ('is_provider'),                     -- boolean about a user
   ('issue_zatca_invoice'),             -- 18
+  -- 44: ONE integer, for ONE order the caller is assigned to. A definer read
+  -- because `vehicles` is owner-only (0013) and a technician recording an
+  -- odometer has to be able to see what the last reading was.
+  ('last_known_mileage_for_order'),
   ('last_service_for_rule'),           -- 10
   ('mark_maintenance_item_done'),      -- 36
   ('mark_offer_viewed'),               -- 25

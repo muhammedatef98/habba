@@ -206,7 +206,8 @@ describe.skipIf(!harnessUp)('Phase 5 acceptance — pre-purchase inspection', ()
       p_order_id: orderId,
       p_payment_intent_id: 'insp_intent_int',
     });
-    await buyer.from('orders').update({ status: 'accepted' }).eq('id', orderId);
+    // 0074: the provider confirms the booking, never the customer.
+    await inspector.from('orders').update({ status: 'accepted' }).eq('id', orderId);
 
     for (const status of ['en_route', 'arrived', 'in_progress']) {
       const step = await inspector.from('orders').update({ status }).eq('id', orderId);

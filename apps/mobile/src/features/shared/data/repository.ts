@@ -908,6 +908,8 @@ class DevOrderSimulator {
       escrowStatus: 'authorised',
       // The dev simulator has no technician taking photographs.
       completionMedia: [],
+      // An emergency happens now. There is nothing scheduled about it.
+      scheduledFor: null,
     };
     this.orders.set(id, order);
 
@@ -945,12 +947,25 @@ class DevOrderSimulator {
   /**
    * A booked appointment, which is a different animal from an emergency: the
    * provider is known at creation because the customer chose them, so the
-   * order opens at `accepted` and never passes through `searching`. Nothing
-   * advances on a timer either — the job is days away, and a dev simulator
-   * that marched a Tuesday appointment to `completed` in ten seconds would
-   * teach the UI a lie.
+   * order never passes through `searching`. Nothing advances on a timer
+   * either — the job is days away, and a dev simulator that marched a Tuesday
+   * appointment to `completed` in ten seconds would teach the UI a lie.
+   *
+   * ⚠️ It opens at `draft`, because `book_appointment` opens it at `draft`
+   * (0024) and the workshop has to confirm it.
+   *
+   * This used to open at `accepted`, and that one word hid the whole gap: a
+   * booking was confirmed the instant it was made, so no screen ever needed to
+   * show a workshop its incoming appointments, and none did. Against the real
+   * server every booking in the product's history would have sat in `draft`
+   * until it was cancelled.
    */
-  book(input: NewBookingInput, mode: BookingMode, providerId: string): string {
+  book(
+    input: NewBookingInput,
+    mode: BookingMode,
+    providerId: string,
+    scheduledFor: string | null,
+  ): string {
     this.counter += 1;
     const id = `order-${this.counter}`;
     this.createdAt.set(id, new Date().toISOString());
@@ -958,7 +973,7 @@ class DevOrderSimulator {
 
     this.orders.set(id, {
       id,
-      status: 'accepted',
+      status: 'draft',
       fulfilmentMode: mode,
       vehicleId: input.vehicleId ?? null,
       serviceId: input.serviceId,
@@ -972,6 +987,7 @@ class DevOrderSimulator {
       totalAmount: null,
       escrowStatus: 'authorised',
       completionMedia: [],
+      scheduledFor,
     });
 
     return id;
@@ -1389,7 +1405,12 @@ export class InMemoryRepository implements Repository {
     const mode: BookingMode =
       provider.providerType === 'workshop' ? 'workshop' : 'mobile_scheduled';
 
-    return this.orders.book(input, mode, provider.id);
+    // The slot's own start, not a guess: the awaiting-confirmation screen
+    // shows the customer when their appointment is, and a fixture that made
+    // that time up would be the one field on the screen nobody could trust.
+    const slotRow = devSlotsFor(provider.id, new Date()).find((candidate) => candidate.id === slot);
+
+    return this.orders.book(input, mode, provider.id, slotRow?.startsAt ?? null);
   }
 
   async getOrder(orderId: string) {

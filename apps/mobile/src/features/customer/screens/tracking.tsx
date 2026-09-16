@@ -39,10 +39,28 @@ import { InProgress } from '@/features/customer/components/tracking/InProgress';
 import { LiveTracking } from '@/features/customer/components/tracking/LiveTracking';
 import { Matched } from '@/features/customer/components/tracking/Matched';
 import { Searching } from '@/features/customer/components/tracking/Searching';
-import type { OrderStatus } from '@/features/shared/data/types';
+import { AwaitingConfirmation } from '@/features/customer/components/tracking/AwaitingConfirmation';
+import type { FulfilmentMode, OrderStatus } from '@/features/shared/data/types';
 
 const TERMINAL: readonly OrderStatus[] = ['completed', 'cancelled', 'disputed'];
-const SEARCHING: readonly OrderStatus[] = ['draft', 'searching'];
+
+/**
+ * ⚠️ `draft` is not always a dispatch search, and it used to be treated as one.
+ *
+ * An on-demand emergency opens at `draft` and moves to `searching` within a
+ * breath, so showing the search for both is right. A BOOKED appointment also
+ * opens at `draft` (`book_appointment`, 0024) — and stays there until the
+ * workshop confirms it. Every customer who booked a Tuesday morning was shown
+ * «نبحث عن فنّي قريب منك» with a live count of technicians being contacted,
+ * about an appointment at a workshop they had chosen themselves, at a time
+ * they had chosen themselves, where nobody was being dispatched at all.
+ *
+ * So the mode decides, not the status alone.
+ */
+function isDispatchSearch(status: OrderStatus, mode: FulfilmentMode): boolean {
+  if (status === 'searching') return true;
+  return status === 'draft' && mode === 'mobile_ondemand';
+}
 
 function TrackingBody() {
   const { t } = useTranslation();
@@ -87,7 +105,13 @@ function TrackingBody() {
   const dispatch = useQuery({
     queryKey: ['order-dispatch', id],
     queryFn: () => repository.getDispatchTelemetry(id ?? ''),
-    enabled: SEARCHING.includes(order.data?.status ?? 'draft'),
+    // Only while something really is being dispatched. Polling every three
+    // seconds on a booking three days out is a request that can never return
+    // anything, on a screen that would not show it.
+    enabled: isDispatchSearch(
+      order.data?.status ?? 'draft',
+      order.data?.fulfilmentMode ?? 'mobile_ondemand',
+    ),
     refetchInterval: 3000,
   });
 
@@ -152,11 +176,28 @@ function TrackingBody() {
   const telemetry = dispatch.data ?? undefined;
   const progress = liveProgress.data ?? undefined;
 
-  if (SEARCHING.includes(status)) {
+  if (isDispatchSearch(status, current.fulfilmentMode)) {
     return (
       <Screen scrollable>
         <Searching
           telemetry={telemetry}
+          onCancel={() => cancel.mutate()}
+          cancelPending={cancel.isPending}
+          cancelFailed={cancel.isError}
+        />
+      </Screen>
+    );
+  }
+
+  // A booking waiting on the workshop. Not a search, and not a spinner: the
+  // appointment is real, the time is known, and the only thing outstanding is
+  // the workshop saying yes.
+  if (status === 'draft') {
+    return (
+      <Screen scrollable>
+        <AwaitingConfirmation
+          order={current}
+          provider={providerData}
           onCancel={() => cancel.mutate()}
           cancelPending={cancel.isPending}
           cancelFailed={cancel.isError}

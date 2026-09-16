@@ -451,7 +451,12 @@
       "explained": "Explained the issue"
     },
     "evidenceTitle": "Photos from the job",
-    "contactUnavailable": "Calling the technician isn't available yet — we're setting up a relay number that protects both sides' privacy."
+    "contactUnavailable": "Calling the technician isn't available yet — we're setting up a relay number that protects both sides' privacy.",
+    "awaitingTitle": "Waiting on the workshop",
+    "awaitingBody": "Your booking is recorded and the time is held for you. The workshop still has to confirm it, and we'll tell you as soon as they do.",
+    "awaitingWhen": "Your appointment",
+    "awaitingProvider": "Workshop",
+    "awaitingCancel": "Cancel this booking"
   },
   "quote": {
     "title": "Parts quote",
@@ -899,7 +904,18 @@
       "tooShort": "The appointment is longer than the working day. Shorten it or extend the day.",
       "slotMinutes": "Between 15 minutes and 8 hours.",
       "capacity": "Between 1 and 20 cars."
-    }
+    },
+    "bookingsTitle": "Bookings awaiting confirmation",
+    "bookingsBody": "The customer has booked and is waiting for your answer. Confirming fixes the appointment; declining cancels it and returns the place to your calendar.",
+    "bookingAmount": "Agreed amount: {{amount}} SAR",
+    "confirmBooking": "Confirm",
+    "declineBooking": "Decline",
+    "confirmFailed": "Could not confirm the booking. Try again.",
+    "declineFailed": "Could not decline the booking. Try again.",
+    "declineConfirmTitle": "Decline this booking?",
+    "declineConfirmBody": "The customer's order is cancelled and the place returns to your calendar. They have arranged their day around this time.",
+    "declineConfirmAction": "Yes, decline it",
+    "declineKeep": "Go back"
   },
   "inspections": {
     "sectionTitle": "My inspections",
