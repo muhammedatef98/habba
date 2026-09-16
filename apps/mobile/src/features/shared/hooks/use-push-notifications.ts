@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { router, useRootNavigationState } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { repository } from '@/features/shared/data/repository';
@@ -124,9 +125,18 @@ export function usePushNotifications(): void {
 
     // The cold-start case. Checked once on mount, after the listener is
     // installed so a tap arriving in between is not lost either way.
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response !== null) open(response.notification.request.content.data);
-    });
+    //
+    // ⚠️ Not on web. `getLastNotificationResponseAsync` throws outright there
+    // ("not available on web, are you sure you've linked all the native
+    // dependencies") rather than resolving to null, and an unhandled rejection
+    // on the first frame is how a preview build looks broken for a reason that
+    // has nothing to do with the screen anybody is looking at. There is no
+    // cold-start notification tap in a browser tab to miss.
+    if (Platform.OS !== 'web') {
+      void Notifications.getLastNotificationResponseAsync().then((response) => {
+        if (response !== null) open(response.notification.request.content.data);
+      });
+    }
 
     return () => subscription.remove();
   }, [navigationReady, isProvider, setMode]);

@@ -12,6 +12,12 @@ export default tseslint.config(
       '**/.next/**',
       '**/build/**',
       '**/.expo/**',
+      // Metro's web export and the repackaged preview (scripts/package-web.sh).
+      // Same argument as `.next` above: a 3 MB emitted bundle is not source,
+      // and linting it reports on Metro's own `__d()` module registrations.
+      '**/.expo-bundle-check/**',
+      '**/.web-build/**',
+      '**/.web-publish/**',
       '**/coverage/**',
       '**/*.d.ts',
     ],
