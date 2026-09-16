@@ -19,6 +19,8 @@ import { isLive, opsRepository } from '@/data/ops-repository';
 import { opsAuth, type Operator } from '@/lib/ops-session';
 import { SignIn } from './sign-in';
 import { Board } from './board';
+import { Payouts } from './payouts';
+import { AuditLog } from './audit';
 import type { ProviderReview, VerificationStatus } from '@/data/types';
 
 const QUEUES: readonly { readonly status: VerificationStatus; readonly label: string }[] = [
@@ -56,13 +58,18 @@ export default function AdminEntry() {
   return <Console operator={operator} onSignedOut={() => setOperator(null)} />;
 }
 
-type Section = 'board' | 'verification';
+type Section = 'board' | 'verification' | 'payouts' | 'audit';
 
 const SECTIONS: readonly { readonly id: Section; readonly label: string }[] = [
   // The board first: it is what an operator opens a shift on, and what they
   // return to between everything else.
   { id: 'board', label: 'اللوحة' },
   { id: 'verification', label: 'مراجعة مقدّمي الخدمة' },
+  // Then the money, then the record of who touched it. That order is the
+  // console's whole shape: what is happening, who may work, who gets paid,
+  // and what was done — each one the thing you reach for after the one before.
+  { id: 'payouts', label: 'الدفعات' },
+  { id: 'audit', label: 'سجلّ التدقيق' },
 ];
 
 function Console({
@@ -135,7 +142,15 @@ function Console({
         </div>
       </div>
 
-      {section === 'board' ? <Board /> : <VerificationQueue />}
+      {section === 'board' ? (
+        <Board />
+      ) : section === 'verification' ? (
+        <VerificationQueue />
+      ) : section === 'payouts' ? (
+        <Payouts />
+      ) : (
+        <AuditLog />
+      )}
     </main>
   );
 }
