@@ -45,10 +45,24 @@ const RECORDED_LATER_MS = 60 * 60 * 1000;
 
 export interface LogbookTimelineProps {
   readonly events: readonly TimelineEvent[];
+  /**
+   * Opens one entry in full.
+   *
+   * ⚠️ Without this the entry screen has no way in, and the logbook stops at
+   * the summary line. Everything that makes an entry evidence rather than a
+   * sentence — the part numbers, the oil grade, the before-and-after
+   * photographs, the provenance of each — lives on `/event` and was
+   * unreachable: `screens/event.tsx` existed, was complete, and nothing in the
+   * app navigated to it.
+   *
+   * That is the moat with its contents hidden. A buyer being shown a car's
+   * history needs to open the entry, not read that something happened in March.
+   */
+  readonly onSelect?: ((eventId: string) => void) | undefined;
   readonly testID?: string | undefined;
 }
 
-export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
+export function LogbookTimeline({ events, onSelect, testID }: LogbookTimelineProps) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isArabic = i18n.language.startsWith('ar');
@@ -171,6 +185,12 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
               <Card
                 testID={`event-${event.id}`}
                 elevation="none"
+                {...(onSelect === undefined
+                  ? {}
+                  : {
+                      onPress: () => onSelect(event.id),
+                      accessibilityLabel: isArabic ? event.summaryAr : event.summaryEn,
+                    })}
                 style={{
                   flex: 1,
                   marginBottom: isLast ? 0 : theme.spacing.md,

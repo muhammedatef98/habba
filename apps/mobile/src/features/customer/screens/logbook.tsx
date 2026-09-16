@@ -436,7 +436,11 @@ export default function LogbookScreen() {
                 {t('logbook.filterEmpty')}
               </Text>
             ) : (
-              <LogbookTimeline testID="logbook-timeline" events={shown} />
+              <LogbookTimeline
+                testID="logbook-timeline"
+                events={shown}
+                onSelect={(eventId) => router.push({ pathname: '/event', params: { id, eventId } })}
+              />
             )}
           </View>
 

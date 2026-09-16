@@ -69,6 +69,27 @@ export default function InspectionReportScreen() {
     enabled: id !== undefined,
   });
 
+  /**
+   * Whether this report has already become a car.
+   *
+   * The report document itself does not say — `InspectionReport` is the shape
+   * @habba/core renders into a PDF, and a PDF has no opinion about anybody's
+   * logbook. The summary list does, and it is the same query the orders tab
+   * has already run, so this is a cache read rather than a second round trip
+   * in the common path.
+   *
+   * ⚠️ It decides what to OFFER, never what is allowed. `convert_inspection_
+   * to_vehicle` refuses a second conversion itself (0027), which is what makes
+   * it safe to treat an unanswered query as "not yet converted" and show the
+   * card: the worst case is a refusal the buyer can read, not a forked
+   * history.
+   */
+  const mine = useQuery({
+    queryKey: ['inspections'],
+    queryFn: () => repository.listMyInspections(),
+  });
+  const converted = mine.data?.find((entry) => entry.id === id)?.vehicleId ?? null;
+
   if (report.isPending) {
     return (
       <Screen scrollable style={{ gap: theme.spacing.lg }}>
@@ -261,20 +282,33 @@ export default function InspectionReportScreen() {
         >
           <Icon name="gauge" size={theme.iconSize.md} color={theme.colors.primary} />
           <Text variant="bodyStrong" style={{ flex: 1 }}>
-            {t('inspectionReport.convertTitle')}
+            {converted === null
+              ? t('inspectionReport.convertTitle')
+              : t('inspectionReport.convertedTitle')}
           </Text>
         </View>
         <Text variant="caption" tone="muted">
-          {t('inspectionReport.convertBody')}
+          {converted === null
+            ? t('inspectionReport.convertBody')
+            : t('inspectionReport.convertedBody')}
         </Text>
-        <Button
-          testID="convert-inspection"
-          label={t('inspectionReport.convert')}
-          variant="secondary"
-          onPress={() =>
-            router.push({ pathname: '/add-vehicle', params: { fromInspection: id ?? '' } })
-          }
-        />
+        {converted === null ? (
+          <Button
+            testID="convert-inspection"
+            label={t('inspectionReport.convert')}
+            variant="secondary"
+            onPress={() =>
+              router.push({ pathname: '/add-vehicle', params: { fromInspection: id ?? '' } })
+            }
+          />
+        ) : (
+          <Button
+            testID="open-converted-vehicle"
+            label={t('inspectionReport.openLogbook')}
+            variant="secondary"
+            onPress={() => router.push({ pathname: '/logbook', params: { id: converted } })}
+          />
+        )}
       </Card>
 
       <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />

@@ -182,7 +182,14 @@ export default function JobScreen() {
               testID="open-quote"
               label={t('quoteBuild.openQuote')}
               variant="secondary"
-              onPress={() => router.push({ pathname: '/quote', params: { id: data.orderId } })}
+              // ⚠️ The group is named, not implied. `(customer)/quote.tsx` and
+              // `(provider)/quote.tsx` both claim `/quote` — one is where the
+              // customer approves a price, the other is where the technician
+              // builds it — and a bare `/quote` asks the router to guess which
+              // screen a provider meant. It must never guess this one wrong.
+              onPress={() =>
+                router.push({ pathname: '/(provider)/quote', params: { id: data.orderId } })
+              }
             />
           </View>
         </Card>

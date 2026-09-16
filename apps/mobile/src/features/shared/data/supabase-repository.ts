@@ -1301,11 +1301,22 @@ export class SupabaseRepository implements Repository {
       p_nickname: nickname,
     });
 
-    // Surfaced verbatim: the server distinguishes an unfinished inspection from
-    // one already attached to a vehicle, and those are different things for the
-    // buyer to do next.
-    if (error !== null) throw new Error(error.message);
-    return data as string;
+    if (error === null) return data as string;
+
+    // ⚠️ Named by SQLSTATE, not by the sentence Postgres wrote.
+    //
+    // 0027 raises `unique_violation` for the one refusal the buyer can act on:
+    // this car already sits in a logbook — either theirs, from an earlier
+    // conversion, or somebody else's, in which case the route is ownership
+    // transfer rather than a second vehicle row. Both readings are true of the
+    // same Arabic sentence, and both are the opposite of "try again", which is
+    // what a generic failure would tell them.
+    //
+    // Matching on `error.message` would tie that copy to the wording of a
+    // migration, in English, in a file nobody editing the copy would think to
+    // look at.
+    if (error.code === '23505') throw new Error('vehicle_exists');
+    throw new Error(error.message);
   }
 
   async listOrderParts(orderId: string): Promise<readonly OrderPart[]> {

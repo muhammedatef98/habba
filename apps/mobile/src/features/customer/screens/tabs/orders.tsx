@@ -23,6 +23,7 @@ import { Button, Card, ErrorState, Icon, Screen, SkeletonCard, Text, useTheme } 
 import { ActiveOrderCard } from '@/features/customer/components/home/ActiveOrderCard';
 import { RecentOrderRow } from '@/features/customer/components/home/RecentOrderRow';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
+import { InspectionRow } from '@/features/customer/components/orders/InspectionRow';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
@@ -38,11 +39,31 @@ export default function OrdersScreen() {
     queryFn: () => repository.listRecentOrders(HISTORY_LIMIT),
   });
 
+  /**
+   * فحوصاتي — the reports, which are not orders.
+   *
+   * A pre-purchase inspection is the one order that runs against a car nobody
+   * owns, so its result does not live on a vehicle and cannot be found through
+   * the logbook. Until this section existed, `listMyInspections` was called by
+   * nothing and `/inspection-report` was a screen with no link into it: a
+   * buyer paid for an inspection and had no way to read it.
+   *
+   * It lives here rather than behind its own tab because a buyer opens it once
+   * or twice in their life — and "what did I order and what came of it" is the
+   * question this tab already answers.
+   */
+  const inspections = useQuery({
+    queryKey: ['inspections'],
+    queryFn: () => repository.listMyInspections(),
+  });
+
   const refetch = orders.refetch;
+  const refetchInspections = inspections.refetch;
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch]),
+      void refetchInspections();
+    }, [refetch, refetchInspections]),
   );
 
   if (!isAuthenticated) return <Redirect href="/" />;
@@ -50,6 +71,7 @@ export default function OrdersScreen() {
   const rows = orders.data ?? [];
   const live = rows.filter((order) => isActiveJob(order.status));
   const past = rows.filter((order) => !isActiveJob(order.status));
+  const reports = inspections.data ?? [];
 
   const openOrder = (id: string) => router.push({ pathname: '/tracking', params: { id } });
 
@@ -91,7 +113,11 @@ export default function OrdersScreen() {
     );
   }
 
-  if (rows.length === 0) {
+  // Both empty, not just the orders. An inspection always has an order behind
+  // it, so this is belt and braces — but `listRecentOrders` is capped at 50 and
+  // an invitation to book a first service, shown above a list of the customer's
+  // own inspection reports, would be the screen contradicting itself.
+  if (rows.length === 0 && reports.length === 0) {
     return (
       <Screen>
         <Text variant="title">{t('nav.orders')}</Text>
@@ -185,6 +211,39 @@ export default function OrdersScreen() {
                     testID="orders-past"
                     order={order}
                     onPress={() => openOrder(order.id)}
+                  />
+                </View>
+              ))}
+            </Card>
+          </View>
+        ) : null}
+
+        {/* فحوصاتي. Below the order history, because a report is something the
+            customer comes back for rather than something they are waiting on —
+            and because the one that matters most, a car they have just bought,
+            is the one they will have opened from the notification anyway. */}
+        {reports.length > 0 ? (
+          <View style={{ gap: theme.spacing.xs }}>
+            <SectionHeader title={t('inspections.sectionTitle')} />
+            <Card elevation="none" style={{ paddingVertical: theme.spacing.xs }}>
+              {reports.map((inspection, index) => (
+                <View
+                  key={inspection.id}
+                  style={
+                    index === 0
+                      ? undefined
+                      : { borderTopWidth: 1, borderTopColor: theme.colors.border }
+                  }
+                >
+                  <InspectionRow
+                    testID="orders-inspection"
+                    inspection={inspection}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/inspection-report',
+                        params: { id: inspection.id },
+                      })
+                    }
                   />
                 </View>
               ))}

@@ -90,7 +90,9 @@
       "vinInvalid": "A VIN is 17 characters and never contains I, O or Q.",
       "required": "This field is required.",
       "mileageImplausible": "Check that reading — the number doesn't look right.",
-      "saveFailed": "We couldn't save this vehicle. Check your connection and try again."
+      "saveFailed": "We couldn't save this vehicle. Check your connection and try again.",
+      "alreadyInLogbook": "This car already has a Habba logbook. If it is yours now, ask the previous owner to transfer ownership to you in the app.",
+      "conversionOffline": "This step needs a connection to Habba's servers."
     },
     "mileageHint": "Helps us predict when the next service is due",
     "lastOilLabel": "Last oil change",
@@ -98,7 +100,13 @@
     "lastOilKmLabel": "At what mileage?",
     "lastOilMonthsLabel": "Or how many months ago?",
     "lastOilMonths": "{{count}} months ago",
-    "lastOilUnknown": "I do not remember"
+    "lastOilUnknown": "I do not remember",
+    "convertTitle": "Add the inspected car",
+    "convertSubtitle": "The car's details come from the inspection report. We only need the make and model.",
+    "fromReport": "From the inspection report",
+    "fromReportNote": "Year, plate, VIN and odometer are carried over from the report exactly as the inspector recorded them.",
+    "mileageValue": "{{km}} km",
+    "convertAction": "Add this car to my logbook"
   },
   "logbook": {
     "title": "Vehicle logbook",
@@ -607,7 +615,10 @@
     "convertTitle": "Did you buy the car?",
     "convertBody": "Add it to your account and this inspection becomes the first entry in its logbook — your ownership starts with a documented history instead of a blank page.",
     "convert": "Add this car to my account",
-    "myInspections": "Inspections"
+    "myInspections": "Inspections",
+    "convertedTitle": "The car is in your logbook",
+    "convertedBody": "This inspection is the first entry in its logbook, and it travels with the car in its Habba Report when you sell.",
+    "openLogbook": "Open the logbook"
   },
   "provider": {
     "shiftTitle": "Your shift",
@@ -889,5 +900,11 @@
       "slotMinutes": "Between 15 minutes and 8 hours.",
       "capacity": "Between 1 and 20 cars."
     }
+  },
+  "inspections": {
+    "sectionTitle": "My inspections",
+    "unknownSubject": "Unidentified car",
+    "inYourLogbook": "In your logbook",
+    "scoreShort": "{{score}}/100"
   }
 }

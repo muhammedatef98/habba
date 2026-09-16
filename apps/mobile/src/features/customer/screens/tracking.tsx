@@ -209,7 +209,9 @@ function TrackingBody() {
           provider={providerData}
           progress={progress}
           hasUnapprovedParts={hasUnapprovedParts}
-          onReviewQuote={() => router.push({ pathname: '/quote', params: { id } })}
+          // Named group, for the same reason the provider's job screen names
+          // its own: `/quote` exists in both route groups.
+          onReviewQuote={() => router.push({ pathname: '/(customer)/quote', params: { id } })}
         />
       </Screen>
     );
