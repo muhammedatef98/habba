@@ -142,6 +142,44 @@ export default tseslint.config(
       ],
     },
   },
+  // -------------------------------------------------------------------------
+  // RTL: rows are resolved against two directions, never one (CLAUDE.md §6)
+  // -------------------------------------------------------------------------
+  // `flexDirection: 'row'` is laid out by Yoga against `I18nManager.isRTL`,
+  // which `forceRTL` only changes on the NEXT process start. So on a first
+  // Arabic launch, and for one session after any language switch, every
+  // hand-written row runs the wrong way — and this is not a theoretical state,
+  // it is the state after install. `<Row>` and `rowDirectionFor` resolve
+  // against the locale and the platform together (packages/ui/src/direction.ts).
+  //
+  // The rule was written down in CLAUDE.md and enforced by nobody, so three
+  // violations accumulated — one of them in `ListRow`, which put the leading
+  // icon on the wrong side of every list in the app. A convention that only
+  // lives in a document is a convention that is already being broken; this
+  // makes it fail CI like the boundaries rule above.
+  {
+    files: ['apps/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+    ignores: ['packages/ui/src/Row.tsx', 'packages/ui/src/direction.ts', '**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          // Two selectors, because `{ flexDirection: 'row' }` and
+          // `{ flexDirection: 'row' as const }` are different trees — the
+          // second wraps the literal in a TSAsExpression, and a rule that only
+          // matched the first would be bypassed by the annotation people reach
+          // for precisely when they are writing a typed ViewStyle.
+          selector: [
+            "Property[key.name='flexDirection'] > Literal[value=/^row(-reverse)?$/]",
+            "Property[key.name='flexDirection'] > TSAsExpression > Literal[value=/^row(-reverse)?$/]",
+          ].join(', '),
+          message:
+            'Use <Row> (or rowDirectionFor) instead of a literal flexDirection. Yoga resolves `row` against I18nManager.isRTL, which lags the locale by one process start — so a hand-written row is mirrored for the whole of a first Arabic launch (CLAUDE.md §6).',
+        },
+      ],
+    },
+  },
+
   {
     // Metro reads its config with `require`, so these files are CommonJS and
     // run in Node — not app code. `require`, `module` and `__dirname` are

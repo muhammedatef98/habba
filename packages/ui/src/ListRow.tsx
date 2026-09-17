@@ -9,11 +9,23 @@
  *     Arabic and right in English. It is drawn as a character chosen by
  *     direction rather than a mirrored image, because a flipped glyph and a
  *     correct glyph look identical only until someone looks closely.
+ *
+ * ⚠️ …and then the row itself was laid out with a hand-written
+ * `flexDirection: 'row'`, which is the one thing `direction.ts` exists to stop.
+ * Yoga resolves that against `I18nManager.isRTL`, which `forceRTL` only changes
+ * on the NEXT process start — so on a first Arabic launch, and for one session
+ * after any language switch, every list row in the app ran left-to-right while
+ * the chevron inside it was picked from the *locale* and pointed the other way.
+ * A row with its leading icon on the wrong side and a `‹` at the far right is
+ * the most visible RTL bug the app had, and it was in the primitive rather than
+ * in any one screen. Resolved against both directions now, like everything else.
  */
 
 import type { ReactNode } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { rowDirectionFor } from './direction.js';
+import { haptic } from './haptics.js';
 import { useTheme } from './theme.js';
 
 export interface ListRowProps {
@@ -48,7 +60,7 @@ export function ListRow({
 
   const base: ViewStyle = {
     minHeight: theme.minTouchTarget,
-    flexDirection: 'row',
+    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
     alignItems: 'center',
     gap: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
@@ -101,6 +113,9 @@ export function ListRow({
     <Pressable
       testID={testID}
       onPress={onPress}
+      // Same signal `Card` fires: a row is a way into something, and choosing
+      // one should feel like a selection rather than a commitment.
+      onPressIn={() => haptic('selection')}
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
       accessibilityLabel={accessibilityLabel ?? title}

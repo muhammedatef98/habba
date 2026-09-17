@@ -26,6 +26,7 @@ import {
   Card,
   EmptyState,
   Field,
+  Row,
   Screen,
   ScreenHeader,
   Text,
@@ -192,18 +193,15 @@ export default function MileageScreen() {
         <View style={{ gap: theme.spacing.md }}>
           {readings.map((reading, index) => (
             <View key={`${reading.at.toISOString()}-${index}`} style={{ gap: theme.spacing.xs }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  gap: theme.spacing.sm,
-                }}
-              >
+              {/* `<Row>`, not a hand-written `flexDirection` — this put the
+                  reading on the left and the date on the right for the whole
+                  of a first Arabic launch (CLAUDE.md §6). */}
+              <Row gap="sm" justify="space-between">
                 <Text variant="body">{reading.mileage.toLocaleString(locale)}</Text>
                 <Text variant="caption" tone="muted">
                   {reading.at.toLocaleDateString(locale)}
                 </Text>
-              </View>
+              </Row>
 
               {/* The bar is the distance covered since the previous reading, so
                   a long gap with little driving reads as a short bar — which is
