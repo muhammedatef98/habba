@@ -42,7 +42,11 @@ export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
   return (
     <View testID={testID} style={{ gap: theme.spacing.sm }}>
       {order.labourAmount !== null ? row(t('tracking.labourLine'), order.labourAmount) : null}
-      {order.partsAmount !== null ? row(t('quote.partsTotal'), order.partsAmount) : null}
+      {/* `quote.partsLabel`. It said `quote.partsTotal`, a key that has never
+          existed in either locale — so i18next fell back to echoing the key
+          and this line of the price a customer reads before paying rendered as
+          the literal string "quote.partsTotal". */}
+      {order.partsAmount !== null ? row(t('quote.partsLabel'), order.partsAmount) : null}
       {order.vatAmount !== null ? row(t('tracking.vatLine'), order.vatAmount) : null}
 
       <View

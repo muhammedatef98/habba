@@ -17,12 +17,14 @@
  * stubbed with invented numbers.
  */
 
+import { useState } from 'react';
 import { Share, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   BackButton,
+  BottomSheet,
   Button,
   Card,
   Row,
@@ -84,6 +86,8 @@ function TrackingBody() {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   const order = useQuery({
     queryKey: ['order', id],
@@ -192,10 +196,51 @@ function TrackingBody() {
       <TrackingFrame backLabel={t('common.back')}>
         <Searching
           telemetry={telemetry}
-          onCancel={() => cancel.mutate()}
+          onCancel={() => setConfirmingCancel(true)}
           cancelPending={cancel.isPending}
           cancelFailed={cancel.isError}
         />
+
+        {/* «إلغاء الطلب» asks first. The copy for this — `cancelConfirmTitle`,
+            «إلغاء الطلب؟» — has been sitting in both locale files unused since
+            it was written, while the button killed a live dispatch on one tap.
+            That tap happens at a roadside, one-handed, next to traffic, on a
+            screen whose other controls are large and close together; and what
+            it discards is not the request but the matcher's work on it — every
+            provider already contacted, the radius already grown. Restarting
+            means starting that from zero. Same sheet the transfer flow uses to
+            ask the same kind of question. */}
+        <BottomSheet
+          visible={confirmingCancel}
+          onClose={() => setConfirmingCancel(false)}
+          title={t('tracking.cancelConfirmTitle')}
+          closeLabel={t('common.close')}
+          testID="tracking-cancel-sheet"
+        >
+          <View style={{ gap: theme.spacing.md }}>
+            <Text variant="body" tone="muted">
+              {t('tracking.cancelConfirmBody')}
+            </Text>
+            <Button
+              testID="tracking-cancel-confirm"
+              label={t('tracking.cancelConfirmAction')}
+              variant="emergencyOutline"
+              loading={cancel.isPending}
+              onPress={() => {
+                setConfirmingCancel(false);
+                cancel.mutate();
+              }}
+            />
+            {/* The way out of the way out, and the one the thumb lands on by
+                default — the sheet exists because leaving should be the easy
+                outcome of an accidental tap. */}
+            <Button
+              label={t('tracking.cancelKeep')}
+              variant="ghost"
+              onPress={() => setConfirmingCancel(false)}
+            />
+          </View>
+        </BottomSheet>
       </TrackingFrame>
     );
   }
