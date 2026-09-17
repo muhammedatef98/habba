@@ -26,7 +26,18 @@ import {
   type CompletionMediaItem,
   type EvidenceGap,
 } from '@habba/core';
-import { Button, Card, Field, Screen, Text, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Field,
+  Screen,
+  Skeleton,
+  SkeletonCard,
+  Text,
+  useTheme,
+} from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 
 const GAP_LABEL_KEY: Record<EvidenceGap, string> = {
@@ -59,12 +70,47 @@ export default function EvidenceScreen() {
   });
 
   const data = job.data;
+
+  // Same three outcomes as the job screen, and the same reason: this is the
+  // screen a technician fills in at the end of a job, often in a basement or a
+  // workshop with no signal (§2.7). "Not found" over a dropped request would
+  // read as the job having been taken away from them.
+  if (job.isPending) {
+    return (
+      <Screen>
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.md }}
+        >
+          <Skeleton height={28} width="65%" />
+          <SkeletonCard testID="evidence-skeleton" lines={2} />
+          <SkeletonCard lines={3} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (job.isError) {
+    return (
+      <Screen>
+        <ErrorState
+          testID="evidence-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={job.isFetching}
+          onRetry={() => void job.refetch()}
+        />
+        <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
+      </Screen>
+    );
+  }
+
   if (data === null || data === undefined) {
     return (
       <Screen>
-        <Text variant="body" tone="muted">
-          {job.isLoading ? t('common.loading') : t('errors.notFound')}
-        </Text>
+        <EmptyState testID="evidence-missing" title={t('errors.notFound')} />
+        <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
       </Screen>
     );
   }

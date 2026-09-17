@@ -16,7 +16,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
-import { Button, Card, Screen, ScreenHeader, Text, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Screen,
+  ScreenHeader,
+  Skeleton,
+  SkeletonCard,
+  Text,
+  useTheme,
+} from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 
 export default function JobScreen() {
@@ -75,12 +86,50 @@ export default function JobScreen() {
 
   const data = job.data;
 
+  /*
+   * Three outcomes, not two.
+   *
+   * This was one ternary — loading, else "not found" — which folded a dropped
+   * request into a statement about the job. A technician whose connection went
+   * while the screen opened was told the job does not exist, on the screen they
+   * use to accept work, with a back button as the only offer. A retry is what
+   * that moment needs; a mid-shift technician on a bad signal is the normal
+   * case, not the edge one.
+   */
+  if (job.isPending) {
+    return (
+      <Screen>
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.md }}
+        >
+          <Skeleton height={28} width="65%" />
+          <SkeletonCard testID="job-skeleton" lines={3} />
+          <SkeletonCard lines={2} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (job.isError) {
+    return (
+      <Screen>
+        <ErrorState
+          testID="job-error"
+          message={t('errors.offline')}
+          retryLabel={t('common.retry')}
+          retrying={job.isFetching}
+          onRetry={() => void job.refetch()}
+        />
+      </Screen>
+    );
+  }
+
   if (data === null || data === undefined) {
     return (
       <Screen>
-        <Text variant="body" tone="muted">
-          {job.isLoading ? t('common.loading') : t('errors.notFound')}
-        </Text>
+        <EmptyState testID="job-missing" title={t('errors.notFound')} />
         <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
       </Screen>
     );

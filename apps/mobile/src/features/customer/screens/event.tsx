@@ -25,6 +25,8 @@ import {
   ProvenanceBadge,
   Screen,
   ScreenHeader,
+  Skeleton,
+  SkeletonCard,
   Text,
   useTheme,
 } from '@habba/ui';
@@ -93,9 +95,20 @@ export default function EventScreen() {
   if (timeline.isPending) {
     return (
       <Screen>
-        <Text variant="body" tone="muted">
-          {t('common.loading')}
-        </Text>
+        {/* The shape that is about to arrive, not the word «جارٍ التحميل».
+            Skeleton.tsx says why: a line of text tells the reader nothing
+            about what is coming, and the layout shifts under a thumb already
+            moving toward where something is about to be. This screen was
+            simply missed when the rest of the app moved over. */}
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+          style={{ gap: theme.spacing.md }}
+        >
+          <Skeleton height={28} width="70%" />
+          <SkeletonCard testID="event-skeleton" lines={3} />
+          <SkeletonCard lines={2} />
+        </View>
       </Screen>
     );
   }
