@@ -23,6 +23,18 @@ module.exports = {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     // The app's own alias, as configured in tsconfig and babel.
     '^@/(.*)$': '<rootDir>/src/$1',
+    // One copy of safe-area-context, not two.
+    //
+    // pnpm gives `apps/mobile` and `packages/ui` each their own resolution of
+    // it, so a `jest.mock('react-native-safe-area-context')` in a test here
+    // patched the app's instance while a design-system component went on
+    // importing the other one — and reported "No safe area value available"
+    // from a hook the test had just mocked. Metro dedupes this through the
+    // monorepo resolver in metro.config.js; Jest needs telling separately.
+    //
+    // It matters beyond the mock: `Screen` reads insets on every screen in the
+    // app, so any render test that mounts one lands here.
+    '^react-native-safe-area-context$': require.resolve('react-native-safe-area-context'),
   },
   transformIgnorePatterns: [
     // The RN ecosystem ships untranspiled source; the preset's own list plus
