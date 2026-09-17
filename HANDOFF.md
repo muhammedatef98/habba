@@ -52,7 +52,7 @@ both the spec and the code. Repo is private at **github.com/muhammedatef98/habba
 
 ```
 41 migrations · 20 SQL suites · 2 concurrency tests · tests/rls.spec.ts (17)
-apps/mobile 52 · core 99 · ui 21 · i18n 9 · typecheck + lint + boundaries green
+apps/mobile 145 (+15 render) · core 162 · ui 69 · i18n 10 · typecheck + lint green
 ```
 
 **There is now ONE mobile app.** `apps/customer` and `apps/provider` are gone;
@@ -80,7 +80,8 @@ habba/
 │  ├─ core/                  saudi validators, SarAmount money, report render,
 │  │                         inspection scoring, job-flow state mirror
 │  ├─ ui/                    design system (tokens, Text, Button, Card, Field,
-│  │                         Screen, ProvenanceBadge, theme)
+│  │                         Screen, ScreenHeader/BackButton, ProvenanceBadge,
+│  │                         Toast + toast-queue, haptics, reduced-motion, theme)
 │  └─ i18n/                  ar.json + en.json, typed keys
 ├─ tests/rls.spec.ts        RLS + Amendment A6, over real HTTP with a real JWT
 ├─ supabase/
@@ -306,7 +307,29 @@ token pair with the contrast test extended to all three provenance levels.
 - **Never `select()` on `providers`.** Always an explicit column list — 0037
   revoked the KYC columns, and a bare `select()` requests every column and fails
   the whole query. This broke three integration tests when introduced.
-- **No hardcoded strings.** All copy in `packages/i18n`, typed keys.
+- **No hardcoded strings.** All copy in `packages/i18n`, typed keys. `t()` is
+  not typed against them, so `translation-keys.test.ts` scans the app and fails
+  on a key that resolves to nothing — two had already shipped, one of them
+  rendering as a visible price label.
+- **Arabic copy is MSA, not dialect.** `dialect.test.ts` holds the word list and
+  will catch «تقدر» or «وش» on the way in.
+- **A horizontal stack is `<Row>`, never `flexDirection: 'row'`.** Yoga resolves
+  `row` against `I18nManager.isRTL`, which lags the locale by one process start,
+  so a literal is mirrored for the whole of a first Arabic launch. Lint enforces
+  it (`no-restricted-syntax`), including the `as const` form.
+- **A committed write says so.** `useToast()` from `@habba/ui` — a mutation whose
+  only sign of success is a screen dismissing or a field clearing is
+  indistinguishable from one that failed.
+- **A press is felt.** `haptic()` from `@habba/ui`, already inside `Button`,
+  `Card`, `ListRow` and the tab bar; weight follows consequence. The waveform
+  mapping lives in `features/shared/lib/haptics-driver.ts` and is the only file
+  importing `expo-haptics` — the design system stays free of Expo.
+- **A screen has a way out at the top.** `ScreenHeader` (or `BackButton` where
+  the screen draws its own headline), never a ghost «رجوع» at the end of a
+  scroll.
+- **Three outcomes, not two.** Pending gets a skeleton, error gets a retry, and
+  "not found" is only what the server actually said. Folding a dropped request
+  into "غير موجود" tells someone their car or their job is gone.
 - **Errors surface in Arabic, plainly, with a next action** (§12). Never a raw
   Postgres or provider code.
 - **Any status change goes through the state machine**, never a direct UPDATE.
