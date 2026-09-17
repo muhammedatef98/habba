@@ -42,6 +42,7 @@ import {
   ErrorState,
   Icon,
   Screen,
+  ScreenHeader,
   SkeletonCard,
   Text,
   rowDirectionFor,
@@ -226,11 +227,17 @@ export default function LogbookScreen() {
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="label" tone="muted">
-          {t('logbook.title')}
-        </Text>
-        <Text variant="title">{heading}</Text>
+      {/* The way out used to be at the *bottom* of this screen — under every
+          service the car has ever had. A logbook that grows is the whole
+          product promise, so the one control whose cost grew with it was the
+          one for leaving. */}
+      <ScreenHeader
+        testID="logbook-header"
+        eyebrow={t('logbook.title')}
+        title={heading}
+        backLabel={t('common.back')}
+        {...(router.canGoBack() ? { onBack: () => router.back() } : {})}
+      >
         <View
           style={{
             flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
@@ -249,7 +256,7 @@ export default function LogbookScreen() {
             </Text>
           ) : null}
         </View>
-      </View>
+      </ScreenHeader>
 
       {/* القادم, above حصل and OUTSIDE the timeline's loading branches: what
           the car needs next does not depend on the logbook having loaded, and
@@ -496,8 +503,6 @@ export default function LogbookScreen() {
           </View>
         </>
       )}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

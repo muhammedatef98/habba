@@ -24,8 +24,8 @@ import {
   ListRow,
   ProvenanceBadge,
   Screen,
+  ScreenHeader,
   Text,
-  Button,
   useTheme,
 } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
@@ -121,12 +121,21 @@ export default function EventScreen() {
 
   return (
     <Screen scrollable>
-      <ProvenanceBadge
-        provenance={event.provenance}
-        label={t(PROVENANCE_LABEL_KEY[event.provenance])}
+      <ScreenHeader
+        testID="event-header"
+        title={isArabic ? event.summaryAr : event.summaryEn}
+        backLabel={t('common.back')}
+        {...(router.canGoBack() ? { onBack: () => router.back() } : {})}
+        // Where this entry came from is the first thing a reader needs — it is
+        // the difference between a verified record and a recollection (ADR-0005)
+        // — so it stays above the title rather than becoming a detail row.
+        action={
+          <ProvenanceBadge
+            provenance={event.provenance}
+            label={t(PROVENANCE_LABEL_KEY[event.provenance])}
+          />
+        }
       />
-
-      <Text variant="title">{isArabic ? event.summaryAr : event.summaryEn}</Text>
 
       <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
         <View style={{ gap: theme.spacing.sm }}>
@@ -192,8 +201,6 @@ export default function EventScreen() {
           </Text>
         </View>
       </Card>
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

@@ -16,7 +16,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Screen, ScreenHeader, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 
 export default function JobScreen() {
@@ -104,12 +104,19 @@ export default function JobScreen() {
 
   return (
     <Screen scrollable>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="title">{data.serviceNameAr}</Text>
+      {/* A technician on a job reaches for "back" far more often than a
+          customer does — they are stepping between the list and the job all
+          shift. It belongs under the thumb, not under the decline button. */}
+      <ScreenHeader
+        testID="job-header"
+        title={data.serviceNameAr}
+        backLabel={t('common.back')}
+        {...(router.canGoBack() ? { onBack: () => router.back() } : {})}
+      >
         <Text variant="caption" tone="muted">
           {data.orderNumber} · {t(`job.status.${data.status}`)}
         </Text>
-      </View>
+      </ScreenHeader>
 
       <Card>
         <View style={{ gap: theme.spacing.sm }}>
@@ -192,8 +199,6 @@ export default function JobScreen() {
           loading={decline.isPending}
         />
       ) : null}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

@@ -8,6 +8,7 @@ export * from './Text.js';
 export * from './Row.js';
 export * from './Button.js';
 export * from './Screen.js';
+export * from './ScreenHeader.js';
 export * from './Card.js';
 export * from './ErrorState.js';
 export * from './Field.js';

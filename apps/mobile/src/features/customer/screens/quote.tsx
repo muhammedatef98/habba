@@ -18,7 +18,17 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  Icon,
+  Screen,
+  ScreenHeader,
+  StatusPill,
+  Text,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
 import {
   addSar,
   applyRate,
@@ -76,38 +86,35 @@ export default function QuoteScreen() {
 
   return (
     <Screen scrollable>
-      <View style={{ gap: theme.spacing.sm }}>
-        <View
-          style={{
-            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-            alignItems: 'center',
-            gap: theme.spacing.sm,
-          }}
-        >
-          <Text variant="title" style={{ flex: 1 }}>
-            {t('quote.title')}
-          </Text>
-          {/* The count is the point of the screen: the technician is standing
-              still until these are answered, and a customer who cannot see how
-              many are left cannot tell whether they are done. */}
-          {lines.length > 0 ? (
-            <StatusPill
-              tone={pendingCount === 0 ? 'success' : 'active'}
-              showDot={pendingCount > 0}
-              label={
-                pendingCount === 0
-                  ? t('quote.allApprovedBadge')
-                  : t('quote.pendingBadge', {
-                      count: formatCount(pendingCount, i18n.language),
-                    })
-              }
-            />
-          ) : null}
-        </View>
-        <Text variant="body" tone="muted">
-          {t('quote.subtitle')}
-        </Text>
-      </View>
+      <ScreenHeader
+        testID="quote-header"
+        title={t('quote.title')}
+        subtitle={t('quote.subtitle')}
+        backLabel={t('common.back')}
+        {...(router.canGoBack() ? { onBack: () => router.back() } : {})}
+        // The count is the point of the screen: the technician is standing
+        // still until these are answered, and a customer who cannot see how
+        // many are left cannot tell whether they are done. It rides in the
+        // header's trailing slot, which puts it at the reading end of the top
+        // row in either language.
+        {...(lines.length > 0
+          ? {
+              action: (
+                <StatusPill
+                  tone={pendingCount === 0 ? 'success' : 'active'}
+                  showDot={pendingCount > 0}
+                  label={
+                    pendingCount === 0
+                      ? t('quote.allApprovedBadge')
+                      : t('quote.pendingBadge', {
+                          count: formatCount(pendingCount, i18n.language),
+                        })
+                  }
+                />
+              ),
+            }
+          : {})}
+      />
 
       <View style={{ gap: theme.spacing.md }}>
         {lines.map((line) => (
@@ -223,8 +230,6 @@ export default function QuoteScreen() {
       <Text variant="caption" tone="muted">
         {allApproved ? t('quote.allApprovedHint') : t('quote.pendingHint')}
       </Text>
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

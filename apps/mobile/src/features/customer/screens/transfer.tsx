@@ -52,6 +52,7 @@ import {
   Icon,
   Row,
   Screen,
+  ScreenHeader,
   SkeletonCard,
   Text,
   useTheme,
@@ -222,17 +223,19 @@ export default function TransferScreen() {
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="label" tone="muted">
-          {t('transfer.entry')}
-        </Text>
-        <Text variant="title">{carLabel}</Text>
+      <ScreenHeader
+        testID="transfer-header"
+        eyebrow={t('transfer.entry')}
+        title={carLabel}
+        backLabel={t('common.back')}
+        {...(router.canGoBack() ? { onBack: () => router.back() } : {})}
+      >
         {car?.plateNormalised != null ? (
           <Text variant="bodySmall" tone="muted" numeric>
             {car.plateNormalised}
           </Text>
         ) : null}
-      </View>
+      </ScreenHeader>
 
       {outgoing.isError ? (
         <ErrorState
@@ -486,8 +489,6 @@ export default function TransferScreen() {
           />
         </View>
       </BottomSheet>
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

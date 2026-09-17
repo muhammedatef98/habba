@@ -22,8 +22,10 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  BackButton,
   Button,
   Card,
+  Row,
   Screen,
   Skeleton,
   SkeletonCard,
@@ -40,6 +42,39 @@ import { LiveTracking } from '@/features/customer/components/tracking/LiveTracki
 import { Matched } from '@/features/customer/components/tracking/Matched';
 import { Searching } from '@/features/customer/components/tracking/Searching';
 import type { OrderStatus } from '@/features/shared/data/types';
+
+/**
+ * Every live state, wrapped so it has a way out.
+ *
+ * None of them had one. The dispatcher's six branches each rendered their
+ * component straight into a bare `<Screen>`, so a customer watching a
+ * technician drive toward them could not leave the tracking screen to look at
+ * anything else in the app — `fade_from_bottom` leaves no edge-swipe to fall
+ * back on, and force-quitting was the only exit. This is the screen people sit
+ * on longest in the whole product.
+ *
+ * Going back does NOT cancel anything: the order is live on the server either
+ * way, and the home screen's `ActiveOrderCard` leads straight back here. That
+ * is the point — leaving has to be cheap, or watching stops being a choice.
+ */
+function TrackingFrame({
+  backLabel,
+  children,
+}: {
+  readonly backLabel: string;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <Screen scrollable>
+      <Row gap="sm" align="center">
+        {router.canGoBack() ? (
+          <BackButton testID="tracking-back" onPress={() => router.back()} label={backLabel} />
+        ) : null}
+      </Row>
+      {children}
+    </Screen>
+  );
+}
 
 const TERMINAL: readonly OrderStatus[] = ['completed', 'cancelled', 'disputed'];
 const SEARCHING: readonly OrderStatus[] = ['draft', 'searching'];
@@ -154,33 +189,33 @@ function TrackingBody() {
 
   if (SEARCHING.includes(status)) {
     return (
-      <Screen scrollable>
+      <TrackingFrame backLabel={t('common.back')}>
         <Searching
           telemetry={telemetry}
           onCancel={() => cancel.mutate()}
           cancelPending={cancel.isPending}
           cancelFailed={cancel.isError}
         />
-      </Screen>
+      </TrackingFrame>
     );
   }
 
   if (status === 'quoted') {
     return (
-      <Screen scrollable>
+      <TrackingFrame backLabel={t('common.back')}>
         <Matched
           order={current}
           provider={providerData}
           progress={progress}
           onFindAnother={() => cancel.mutate()}
         />
-      </Screen>
+      </TrackingFrame>
     );
   }
 
   if (status === 'accepted' || status === 'en_route' || status === 'checked_in') {
     return (
-      <Screen scrollable>
+      <TrackingFrame backLabel={t('common.back')}>
         <LiveTracking
           order={current}
           provider={providerData}
@@ -189,21 +224,21 @@ function TrackingBody() {
             void Share.share({ message: t('tracking.shareTrip') });
           }}
         />
-      </Screen>
+      </TrackingFrame>
     );
   }
 
   if (status === 'arrived') {
     return (
-      <Screen scrollable>
+      <TrackingFrame backLabel={t('common.back')}>
         <Arrived order={current} provider={providerData} progress={progress} />
-      </Screen>
+      </TrackingFrame>
     );
   }
 
   if (status === 'in_progress') {
     return (
-      <Screen scrollable>
+      <TrackingFrame backLabel={t('common.back')}>
         <InProgress
           order={current}
           provider={providerData}
@@ -211,7 +246,7 @@ function TrackingBody() {
           hasUnapprovedParts={hasUnapprovedParts}
           onReviewQuote={() => router.push({ pathname: '/quote', params: { id } })}
         />
-      </Screen>
+      </TrackingFrame>
     );
   }
 
@@ -219,7 +254,7 @@ function TrackingBody() {
   // needs its own explicit confirmation rather than folding into `completed`.
   if (status === 'awaiting_approval') {
     return (
-      <Screen scrollable>
+      <TrackingFrame backLabel={t('common.back')}>
         <Card testID="tracking-confirm-completion">
           <View style={{ gap: theme.spacing.sm }}>
             <Text variant="heading">{t('tracking.confirmCompletionTitle')}</Text>
@@ -239,13 +274,13 @@ function TrackingBody() {
             ) : null}
           </View>
         </Card>
-      </Screen>
+      </TrackingFrame>
     );
   }
 
   if (status === 'completed') {
     return (
-      <Screen scrollable>
+      <TrackingFrame backLabel={t('common.back')}>
         <Completed
           order={current}
           provider={providerData}
@@ -258,7 +293,7 @@ function TrackingBody() {
           }
           onDismiss={() => router.replace('/')}
         />
-      </Screen>
+      </TrackingFrame>
     );
   }
 

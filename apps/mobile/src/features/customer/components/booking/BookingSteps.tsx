@@ -11,8 +11,7 @@
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Icon, ProgressStages, Text, rowDirectionFor, useTheme } from '@habba/ui';
-import { Pressable } from 'react-native';
+import { BackButton, ProgressStages, Row, Text, useTheme } from '@habba/ui';
 
 export type BookingStep = 0 | 1 | 2;
 
@@ -29,42 +28,23 @@ export function BookingSteps({ current, title, subtitle, testID }: BookingStepsP
 
   return (
     <View testID={testID} style={{ gap: theme.spacing.base }}>
-      <View
-        style={{
-          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-          alignItems: 'center',
-          gap: theme.spacing.sm,
-        }}
-      >
+      {/* This was the app's only correct back button, implemented here where
+          only the booking flow could reach it. It is now `BackButton` in the
+          design system, and this is a consumer of it rather than the one place
+          that got it right. */}
+      <Row gap="sm" align="center">
         {router.canGoBack() ? (
-          <Pressable
+          <BackButton
             testID="booking-back"
             onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.back')}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={({ pressed }) => [
-              {
-                width: 36,
-                height: 36,
-                borderRadius: theme.radius.full,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: theme.colors.surfaceSunken,
-              },
-              pressed ? { opacity: 0.6 } : null,
-            ]}
-          >
-            {/* `chevronBack` means "go back", and Icon mirrors it, so it
-                points right in Arabic and left in English. */}
-            <Icon name="chevronBack" size={theme.iconSize.sm} color={theme.colors.text} />
-          </Pressable>
+            label={t('common.back')}
+          />
         ) : null}
 
         <Text variant="label" tone="muted" style={{ flex: 1 }}>
           {t('booking.title')}
         </Text>
-      </View>
+      </Row>
 
       <ProgressStages
         testID="booking-progress"

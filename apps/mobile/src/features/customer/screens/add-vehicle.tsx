@@ -20,7 +20,7 @@ import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { normalisePlate } from '@habba/core';
-import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Field, Screen, ScreenHeader, Text, useTheme } from '@habba/ui';
 import { ChipRow } from '@/features/customer/components/form/ChipRow';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -138,12 +138,16 @@ export default function AddVehicleScreen() {
 
   return (
     <Screen scrollable>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="title">{t('vehicle.addTitle')}</Text>
-        <Text variant="body" tone="muted">
-          {t('vehicle.addSubtitle')}
-        </Text>
-      </View>
+      {/* This screen had no way out at all. `fade_from_bottom` leaves no
+          edge-swipe to fall back on, so someone who tapped «أضف سيارة» by
+          mistake could complete the form or force-quit the app. */}
+      <ScreenHeader
+        testID="add-vehicle-header"
+        title={t('vehicle.addTitle')}
+        subtitle={t('vehicle.addSubtitle')}
+        backLabel={t('common.back')}
+        {...(router.canGoBack() ? { onBack: () => router.back() } : {})}
+      />
 
       <ChipRow
         testIdPrefix="chip"

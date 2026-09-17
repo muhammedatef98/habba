@@ -21,7 +21,17 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, EmptyState, Field, Screen, Text, useTheme, useToast } from '@habba/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Screen,
+  ScreenHeader,
+  Text,
+  useTheme,
+  useToast,
+} from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import type { TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -128,12 +138,13 @@ export default function MileageScreen() {
 
   return (
     <Screen scrollable>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="title">{t('logbook.mileageTitle')}</Text>
-        <Text variant="body" tone="muted">
-          {t('logbook.mileageSubtitle')}
-        </Text>
-      </View>
+      <ScreenHeader
+        testID="mileage-header"
+        title={t('logbook.mileageTitle')}
+        subtitle={t('logbook.mileageSubtitle')}
+        backLabel={t('common.back')}
+        {...(router.canGoBack() ? { onBack: () => router.back() } : {})}
+      />
 
       <Card>
         <View style={{ gap: theme.spacing.sm }}>
@@ -236,8 +247,6 @@ export default function MileageScreen() {
           ))}
         </View>
       )}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }
