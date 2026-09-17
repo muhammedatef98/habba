@@ -22,7 +22,17 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { sar } from '@habba/core';
-import { BottomSheet, Button, Card, Field, ListRow, Screen, Text, useTheme } from '@habba/ui';
+import {
+  BottomSheet,
+  Button,
+  Card,
+  Field,
+  ListRow,
+  Screen,
+  Text,
+  useTheme,
+  useToast,
+} from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import type { PastServicePart, TimelineAttachment } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -63,6 +73,7 @@ export default function RecordServiceScreen() {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
+  const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [serviceType, setServiceType] = useState<ServiceType>('oil_change');
@@ -108,6 +119,12 @@ export default function RecordServiceScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['timeline', id] });
       await queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      // The screen dismisses itself, so the confirmation cannot live on it.
+      // Something permanent was just appended to the logbook — the one artefact
+      // this product exists to build — and until now the only sign of it was
+      // the screen going away, which is also what cancelling looks like. The
+      // toast is mounted above the navigator for exactly this (app/_layout).
+      toast.show({ message: t('logbook.recordSaved') });
       router.back();
     },
     onError: (error: Error) => {

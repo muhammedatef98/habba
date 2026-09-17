@@ -40,6 +40,11 @@ export type IconName =
   | 'share'
   | 'bell'
   | 'alert'
+  // The counterpart to `alert`, and drawn as its inverse on purpose: the same
+  // ring, the same two marks, swapped. A neutral notice and a warning that look
+  // unrelated make the reader work out which one they are holding; a notice
+  // that is a warning upside-down is read at a glance.
+  | 'info'
   | 'gauge'
   // Bookable catalogue. The emergency set above was drawn first and these were
   // being borrowed from it — every periodic service rendered as `gauge`, which

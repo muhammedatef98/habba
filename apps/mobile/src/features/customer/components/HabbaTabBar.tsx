@@ -20,7 +20,7 @@
 
 import { Pressable, View } from 'react-native';
 import type { BottomTabBarProps } from 'expo-router/tabs';
-import { Row, Text, useTheme } from '@habba/ui';
+import { haptic, Row, Text, useTheme } from '@habba/ui';
 
 export function HabbaTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const theme = useTheme();
@@ -55,6 +55,12 @@ export function HabbaTabBar({ state, descriptors, navigation, insets }: BottomTa
               : route.name;
 
           const onPress = () => {
+            // Only when the tab actually changes. A tick for re-tapping the tab
+            // you are already on is feedback for nothing happening, and the
+            // bottom bar is the most-tapped surface in the app — the one place
+            // where a gratuitous buzz becomes a habit worth turning off.
+            if (!isFocused) haptic('selection');
+
             // The navigator's own event, so `unmountOnBlur`, scroll-to-top and
             // anything else listening still behave as they would with the
             // default bar. Skipping it would make this look right and act
@@ -81,15 +87,36 @@ export function HabbaTabBar({ state, descriptors, navigation, insets }: BottomTa
               onLongPress={() => {
                 navigation.emit({ type: 'tabLongPress', target: route.key });
               }}
-              style={{
-                flex: 1,
-                minHeight: theme.minTouchTarget,
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 2,
-                paddingVertical: theme.spacing.xs,
-              }}
+              style={({ pressed }) => [
+                {
+                  flex: 1,
+                  minHeight: theme.minTouchTarget,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  paddingVertical: theme.spacing.xs,
+                },
+                // The bar had no press state at all: a tap on a slow navigation
+                // left the finger with nothing to show for it, which is how
+                // someone ends up tapping a second time.
+                pressed ? { opacity: 0.6 } : null,
+              ]}
             >
+              {/* Colour was the only thing marking the current tab, and colour
+                  alone is not a distinction for the ~8% of men with a red-green
+                  deficiency — teal against grey is exactly the pair that goes.
+                  The rule restates it as position, which everyone can see. */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -theme.spacing.sm,
+                  height: 3,
+                  width: 28,
+                  borderRadius: theme.radius.full,
+                  backgroundColor: isFocused ? theme.colors.primary : 'transparent',
+                }}
+              />
+
               {options?.tabBarIcon?.({ focused: isFocused, color, size: theme.iconSize.md })}
               <Text variant="caption" align="center" style={{ color }}>
                 {label}

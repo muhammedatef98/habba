@@ -21,7 +21,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, EmptyState, Field, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, EmptyState, Field, Screen, Text, useTheme, useToast } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import type { TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -62,6 +62,7 @@ export default function MileageScreen() {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
+  const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const locale = i18n.language === 'ar' ? 'ar-SA' : 'en-GB';
 
@@ -87,6 +88,11 @@ export default function MileageScreen() {
     onSuccess: async () => {
       setValue('');
       setError(undefined);
+      // The field emptying is the only thing that used to change, and an empty
+      // field is also what a rejected entry leaves behind. The new reading does
+      // appear in the history below — eventually, once the refetch lands, at
+      // the far end of a list the customer may not be looking at.
+      toast.show({ message: t('logbook.mileageSaved') });
       await queryClient.invalidateQueries({ queryKey: ['timeline', id] });
       await queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
       await queryClient.invalidateQueries({ queryKey: ['vehicles'] });

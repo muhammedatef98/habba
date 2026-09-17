@@ -217,7 +217,9 @@
     "recordMonth": "الشهر",
     "recordDay": "اليوم",
     "recordYear": "السنة",
-    "yearHeading": "سجلات {{year}}"
+    "yearHeading": "سجلات {{year}}",
+    "mileageSaved": "تم تسجيل قراءة العدّاد في دفتر السيارة",
+    "recordSaved": "أُضيف السجل إلى دفتر السيارة"
   },
   "settings": {
     "title": "الإعدادات",

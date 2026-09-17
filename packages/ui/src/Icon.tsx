@@ -74,6 +74,8 @@ const ICONS: Record<IconName, readonly Shape[]> = {
   share: [p('M12 3v12M8 11l4 4 4-4M5 20h14')],
   bell: [p('M12 3a6 6 0 0 0-6 6c0 5-2 6-2 6h16s-2-1-2-6a6 6 0 0 0-6-6zM10 20a2 2 0 0 0 4 0')],
   alert: [c(12, 12, 9), p('M12 8v5M12 16.5v.5')],
+  // `alert`, inverted: the stem below the dot rather than above it.
+  info: [c(12, 12, 9), p('M12 16v-5M12 7.5v.5')],
   // ⚠️ `gauge` was `M12 3v10M8 9l4 4 4-4M5 19h14` — a download arrow. It is
   // used for odometer readings, where a downward arrow says nothing at all.
   // Now a dial: an arc, a needle, and the two end ticks.

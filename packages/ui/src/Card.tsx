@@ -8,6 +8,7 @@
 
 import type { ReactNode } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
+import { haptic } from './haptics.js';
 import { useTheme } from './theme.js';
 
 export interface CardProps {
@@ -55,6 +56,10 @@ export function Card({
   return (
     <Pressable
       testID={testID}
+      // The lightest signal there is. A card is nearly always a way *into*
+      // something — an order, a vehicle, a timeline entry — and navigation
+      // should feel like a choice registering, not like a commitment.
+      onPressIn={() => haptic('selection')}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}

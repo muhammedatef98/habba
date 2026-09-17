@@ -217,7 +217,9 @@
     "recordMonth": "Month",
     "recordDay": "Day",
     "recordYear": "Year",
-    "yearHeading": "{{year}} records"
+    "yearHeading": "{{year}} records",
+    "mileageSaved": "Odometer reading saved to the logbook",
+    "recordSaved": "Record added to the logbook"
   },
   "settings": {
     "title": "Settings",

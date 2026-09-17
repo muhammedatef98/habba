@@ -13,8 +13,16 @@
  */
 
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View, type ViewStyle } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { haptic } from './haptics.js';
 import { useTheme } from './theme.js';
 
 /**
@@ -35,6 +43,22 @@ export interface ScreenProps {
   readonly children: ReactNode;
   readonly scrollable?: boolean;
   readonly padded?: boolean;
+  /**
+   * Pull down to refetch. Requires `scrollable`.
+   *
+   * Here rather than on each screen because the alternative was each screen:
+   * the order history had a `RefreshControl` and nothing else in the app did,
+   * so the same downward pull refreshed one tab and did nothing on the next
+   * one. A gesture that works in one place and is inert in another is worse
+   * than one that exists nowhere — it teaches people the data is live when it
+   * is not.
+   *
+   * Everything else already refetches on focus, which covers coming back to a
+   * tab and not the case this is for: standing beside the car, watching a
+   * status that has not moved, wanting to ask again *now*.
+   */
+  readonly onRefresh?: (() => void) | undefined;
+  readonly refreshing?: boolean | undefined;
   readonly style?: ViewStyle;
   readonly testID?: string;
 }
@@ -43,6 +67,8 @@ export function Screen({
   children,
   scrollable = false,
   padded = true,
+  onRefresh,
+  refreshing = false,
   style,
   testID,
 }: ScreenProps) {
@@ -68,6 +94,29 @@ export function Screen({
       contentContainerStyle={[content, { flexGrow: 1 }, style]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      {...(onRefresh === undefined
+        ? {}
+        : {
+            refreshControl: (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  // The moment the pull commits, not when the data lands. This
+                  // is the one gesture in the app with no button under it — the
+                  // tick is what tells the thumb it pulled far enough, and
+                  // waiting for the network would make it arrive as a surprise.
+                  haptic('light');
+                  onRefresh();
+                }}
+                // Left to the platform otherwise, which on iOS means a grey
+                // spinner on a sand-coloured page and in dark mode a dark
+                // spinner on a dark one.
+                tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
+                progressBackgroundColor={theme.colors.surface}
+              />
+            ),
+          })}
     >
       {children}
     </ScrollView>

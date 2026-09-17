@@ -31,7 +31,8 @@ import {
   Outfit_700Bold,
   useFonts,
 } from '@expo-google-fonts/outfit';
-import { ThemeProvider, lightColors } from '@habba/ui';
+import { ThemeProvider, ToastProvider, lightColors, setHapticDriver } from '@habba/ui';
+import { createHapticDriver } from '@/features/shared/lib/haptics-driver';
 import { detectDeviceLocale, initI18n } from '@/features/shared/lib/i18n';
 import { readStoredLocale, readStoredTheme } from '@/features/shared/lib/preferences';
 import { syncLayoutDirection } from '@/features/shared/lib/rtl';
@@ -81,6 +82,19 @@ export default function RootLayout() {
     Outfit_600SemiBold,
     Outfit_700Bold,
   });
+
+  /**
+   * Give the design system a taptic engine to talk to.
+   *
+   * Module-level state rather than context, so a primitive can fire a signal
+   * without every call site threading a prop down to it — and set once, before
+   * anything can be pressed. `@habba/ui` stays free of Expo either way; see
+   * `packages/ui/src/haptics.ts` for why that matters.
+   */
+  useEffect(() => {
+    setHapticDriver(createHapticDriver());
+    return () => setHapticDriver(null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,12 +163,20 @@ export default function RootLayout() {
           {/* One flex parent for the two of them. Left as bare siblings, the
               navigator had no `flex: 1` of its own to fall back on and the
               screen below it stopped filling the window. */}
-          <View style={{ flex: 1 }}>
-            <OfflineNotice testID="offline-notice" />
+          {/* Above the navigator for the same reason the offline notice is: a
+              confirmation that a service was written to the logbook has to
+              outlive the screen that wrote it, and several of these fire from a
+              mutation whose last act is `router.back()`. Mounted inside the
+              theme so the toast is themed, and outside the Stack so it is not
+              unmounted by the navigation that triggered it. */}
+          <ToastProvider>
             <View style={{ flex: 1 }}>
-              <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+              <OfflineNotice testID="offline-notice" />
+              <View style={{ flex: 1 }}>
+                <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+              </View>
             </View>
-          </View>
+          </ToastProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </QueryClientProvider>

@@ -14,10 +14,11 @@
  * boundaries, and they turn one accessible field into N unlabelled ones.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
 import { rowDirectionFor } from './direction.js';
+import { haptic } from './haptics.js';
 import { useTheme } from './theme.js';
 import { lineHeightFor } from './tokens.js';
 
@@ -49,6 +50,25 @@ export function CodeInput({
   const hasError = error !== undefined && error.length > 0;
   const digits = [...value].slice(0, length);
   const activeIndex = Math.min(digits.length, length - 1);
+
+  /**
+   * The code is full, or the code was rejected — said in the hand.
+   *
+   * This is the one screen in the app where someone is looking at a *different*
+   * screen: the SMS, or the person reading a transfer code out to them. The
+   * boxes filling up is the thing they will not be watching, and an autofilled
+   * code arrives without a single keystroke to feel. Both facts point the same
+   * way — the field has to report its own state through a sense that is not
+   * being used elsewhere.
+   */
+  const isComplete = digits.length === length;
+  useEffect(() => {
+    if (isComplete) haptic('success');
+  }, [isComplete]);
+
+  useEffect(() => {
+    if (hasError) haptic('error');
+  }, [hasError]);
 
   const boxSize = 60;
 

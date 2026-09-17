@@ -31,7 +31,16 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, ErrorState, Screen, Text, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Screen,
+  Skeleton,
+  SkeletonCard,
+  Text,
+  useTheme,
+} from '@habba/ui';
 import { ActiveOrderCard } from '@/features/customer/components/home/ActiveOrderCard';
 import { EmergencyHero } from '@/features/customer/components/home/EmergencyHero';
 import { HomeHeader } from '@/features/customer/components/home/HomeHeader';
@@ -177,6 +186,26 @@ export default function HomeScreen() {
    * without it when the service needs one — skipping the service screen skips
    * where that was being set.
    */
+  /**
+   * One pull, everything this screen shows.
+   *
+   * The focus effect above covers arriving at the tab; it does not cover
+   * standing next to the car with the screen already open, which is when
+   * someone actually wants to ask again. Refetching rather than invalidating:
+   * an invalidation on a screen that is already mounted is a no-op until
+   * something re-reads the query, and the point of the gesture is that the
+   * network moves *now*.
+   */
+  function refreshAll() {
+    void vehicles.refetch();
+    void recentOrders.refetch();
+    void incomingTransfer.refetch();
+    if (primaryVehicleId !== undefined) {
+      void alerts.refetch();
+      void timeline.refetch();
+    }
+  }
+
   function startQuickService(service: Service) {
     if (service.requiresVehicle && primaryVehicleId === undefined) {
       router.push('/add-vehicle');
@@ -189,7 +218,15 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen scrollable style={{ gap: 0 }}>
+    <Screen
+      scrollable
+      style={{ gap: 0 }}
+      onRefresh={refreshAll}
+      // The *vehicles* query, not every query on the screen: the spinner should
+      // describe the thing being waited for, and a background refetch of the
+      // service catalogue is not something anyone pulled for.
+      refreshing={vehicles.isFetching && !vehicles.isPending}
+    >
       <HomeHeader
         testID="home-header"
         {...(!isGuest && fullName !== null ? { name: fullName } : {})}
@@ -287,6 +324,21 @@ export default function HomeScreen() {
             retrying={vehicles.isFetching}
             onRetry={() => void vehicles.refetch()}
           />
+        ) : vehicles.isPending ? (
+          /* The same lie as the error case above, in a quieter voice: with no
+             data yet, `selectedVehicle` is undefined and the branch below
+             invites someone who owns three cars to add their first one. It
+             showed for as long as the request took, which on a roadside
+             connection is not a flicker — and "Habba has forgotten my cars" is
+             the worst sentence this product can put in front of anyone. */
+          <View
+            accessibilityRole="progressbar"
+            accessibilityLabel={t('common.loading')}
+            style={{ gap: theme.spacing.md }}
+          >
+            <SkeletonCard testID="home-vehicle-skeleton" lines={1} />
+            <Skeleton height={44} radius="lg" />
+          </View>
         ) : selectedVehicle !== undefined ? (
           <VehicleHeroCard
             testID="home-vehicle"

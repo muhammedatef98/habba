@@ -10,11 +10,33 @@
 import { ActivityIndicator, PixelRatio, Pressable, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
 import { scaledHeight } from './font-scale.js';
+import { haptic, type HapticSignal } from './haptics.js';
 import { useTheme } from './theme.js';
 
 export type ButtonVariant =
   'primary' | 'accent' | 'secondary' | 'ghost' | 'emergency' | 'emergencyOutline';
 export type ButtonSize = 'medium' | 'large';
+
+/**
+ * How hard each variant lands in the hand.
+ *
+ * Weight follows consequence, not prominence. `emergency` is the only heavy
+ * one in the app — it is the press that sends a technician to a roadside, and
+ * it should not feel like dismissing a sheet. `ghost` is the lightest because
+ * it is nearly always a "not now".
+ *
+ * Read this table next to the colour table below: the two say the same thing
+ * in two senses, which is the point. Someone whose eyes are on the traffic
+ * still knows which button they just hit.
+ */
+const VARIANT_HAPTIC: Readonly<Record<ButtonVariant, HapticSignal>> = {
+  emergency: 'heavy',
+  emergencyOutline: 'medium',
+  primary: 'medium',
+  accent: 'medium',
+  secondary: 'light',
+  ghost: 'selection',
+};
 
 export interface ButtonProps {
   readonly label: string;
@@ -98,6 +120,11 @@ export function Button({
   return (
     <Pressable
       testID={testID}
+      // Fired here rather than in `onPress` so the tick lands with the finger
+      // going down, not with whatever the handler does afterwards. A press that
+      // opens a screen would otherwise buzz a frame *after* the screen appears,
+      // which reads as a stray vibration rather than as feedback.
+      onPressIn={() => haptic(VARIANT_HAPTIC[variant])}
       onPress={onPress}
       disabled={isDisabled}
       accessibilityRole="button"

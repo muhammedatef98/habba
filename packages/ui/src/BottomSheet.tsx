@@ -19,6 +19,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, Modal, Pressable, View, useWindowDimensions } from 'react-native';
 import { Text } from './Text.js';
+import { useReducedMotion } from './reduced-motion.js';
 import { useTheme } from './theme.js';
 
 export interface BottomSheetProps {
@@ -41,9 +42,19 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const theme = useTheme();
   const { height } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const translate = useRef(new Animated.Value(height)).current;
 
   useEffect(() => {
+    // A full-screen-height slide is the largest movement in the app, and it is
+    // exactly the kind that makes someone with a vestibular disorder unwell.
+    // Asked to reduce motion, the sheet is simply *there* — same start, same
+    // end, no journey (reduced-motion.ts).
+    if (reducedMotion) {
+      translate.setValue(visible ? 0 : height);
+      return;
+    }
+
     Animated.timing(translate, {
       toValue: visible ? 0 : height,
       duration: visible ? theme.duration.normal : theme.duration.fast,
@@ -52,7 +63,7 @@ export function BottomSheet({
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [visible, height, translate, theme.duration.normal, theme.duration.fast]);
+  }, [visible, height, translate, reducedMotion, theme.duration.normal, theme.duration.fast]);
 
   return (
     <Modal
