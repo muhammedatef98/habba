@@ -56,5 +56,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // against 'true' so a typo, `1`, or `yes` leaves the flow off rather than
     // opening a KYC form we cannot yet protect.
     enableProviderMode: env('EXPO_PUBLIC_ENABLE_PROVIDER_MODE') === 'true',
+
+    // Dev only, and only against the in-memory repository — see
+    // `lib/flags.ts`. It shortens the one flow that needs two actors on one
+    // record down to something a laptop can run; it cannot grant anything
+    // against a real project, where roles come from the server.
+    devApproveProvider: env('EXPO_PUBLIC_DEV_APPROVE_PROVIDER') === 'true',
   },
 });

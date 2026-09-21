@@ -26,6 +26,7 @@ import {
 } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-language.js';
+import { isDevProviderApprovalEnabled } from '@/features/shared/lib/flags.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
@@ -943,6 +944,18 @@ class DevOrderSimulator {
     return id;
   }
 
+  /**
+   * Sets a status without running the timers.
+   *
+   * For the dev inspection bridge only: the provider side moved the order, and
+   * in production that was an UPDATE on the one row both sides read.
+   */
+  setStatus(id: string, status: Order['status']): void {
+    const order = this.orders.get(id);
+    if (order === undefined || order.status === status) return;
+    this.orders.set(id, { ...order, status });
+  }
+
   private advanceAfter(id: string, delayMs: number, update: (order: Order) => Order) {
     setTimeout(() => {
       const current = this.orders.get(id);
@@ -1364,11 +1377,43 @@ export class InMemoryRepository implements Repository {
     const mode: BookingMode =
       provider.providerType === 'workshop' ? 'workshop' : 'mobile_scheduled';
 
-    return this.orders.book(input, mode, provider.id);
+    const orderId = this.orders.book(input, mode, provider.id);
+
+    // An inspection's deliverable is a document, so the order has to reach the
+    // other side of the dev build for the loop to be walkable at all — see
+    // `dev-inspection-store.ts`. Every other service is finished by the order
+    // simulator on a timer and needs no second actor.
+    const service = BOOKABLE_SERVICES.find((candidate) => candidate.id === input.serviceId);
+    if (service?.category === 'inspection') {
+      this.inspections.offerJob({
+        orderId,
+        serviceNameAr: service.nameAr,
+        addressAr: input.addressAr ?? null,
+        problem: input.problem ?? null,
+        vehicleId: input.vehicleId ?? null,
+      });
+    }
+
+    return orderId;
   }
 
   async getOrder(orderId: string) {
+    this.syncBridgedStatus(orderId);
     return this.orders.get(orderId);
+  }
+
+  /**
+   * Applies a status the inspector moved the order to.
+   *
+   * Written through rather than overlaid on read: everything downstream reads
+   * the stored row, so an overlay would show the customer `awaiting_approval`
+   * while `confirmCompletion` — which checks the row — still refused them,
+   * saying the job was not ready to confirm. In production there is one row
+   * and no such gap.
+   */
+  private syncBridgedStatus(orderId: string): void {
+    const bridged = this.inspections.jobStatus(orderId);
+    if (bridged !== null) this.orders.setStatus(orderId, bridged);
   }
 
   async getOrderProvider(providerId: string) {
@@ -1433,7 +1478,13 @@ export class InMemoryRepository implements Repository {
   }
 
   async confirmOrderCompletion(orderId: string): Promise<void> {
+    this.syncBridgedStatus(orderId);
     this.orders.confirmCompletion(orderId);
+    // Back across the bridge, so the provider's job list agrees. Completion is
+    // the CUSTOMER's to declare (ADR-0006) — the inspector hands the work back
+    // at `awaiting_approval` and stops there — so this direction exists for
+    // the same reason the other one does.
+    this.inspections.setJobStatus(orderId, 'completed');
 
     // Phase 3's acceptance criterion (build prompt §10): a completed job
     // appears in the logbook automatically. The real write goes through
@@ -1935,7 +1986,13 @@ export class InMemoryRepository implements Repository {
     this.application = {
       // `pending`, never `approved`. Approval is an ops action; a stub that
       // approved instantly would hide every screen that has to handle waiting.
-      status: 'pending',
+      //
+      // The one exception is explicit, opt-in and dev-only: الفحص needs an
+      // inspector and a buyer on one record, and without it that half of the
+      // flow cannot be reached on a laptop at all. See
+      // `isDevProviderApprovalEnabled()` for why this cannot matter against a
+      // real project.
+      status: isDevProviderApprovalEnabled() ? 'approved' : 'pending',
       businessNameAr: input.businessNameAr,
       submittedAt: new Date().toISOString(),
     };

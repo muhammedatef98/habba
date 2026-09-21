@@ -13,8 +13,10 @@ app/                      Expo Router routes — thin files, one export each
   profile.tsx             account, «اشتغل معنا كفنّي», mode switcher
   become-provider.tsx     KYC application
   (customer)/             vehicles, logbook, event, mileage, record-service,
-                          emergency, tracking, quote, booking
-  (provider)/             shift, my-jobs, job, evidence
+                          emergency, tracking, quote, booking, transfer,
+                          accept-transfer, inspection (the report)
+  (provider)/             shift, my-jobs, job, evidence,
+                          inspection (the form)
 src/features/
   customer/               customer-only screens and components
   provider/               provider-only screens and state
@@ -52,12 +54,13 @@ in-memory repository:
 | Email auth    | in-memory stub — any address, password ≥ 8 characters             |
 | Location      | a fixed Dammam coordinate                                         |
 | Camera        | stubbed; "add a photo" records an attachment without a real image |
-| Provider role | granted only by approval, which needs the ops console (not built) |
+| Provider role | granted only by approval — `apps/admin`, or the SQL below         |
 | Provider mode | **off** — see Feature flags below                                 |
 
 That last row is deliberate: applying through «اشتغل معنا كفنّي» creates a
 `pending` record and grants nothing. To exercise provider mode against the local
-harness, approve the record the way ops would:
+harness, approve the record the way ops would — through the console
+(`pnpm --filter @habba/admin dev`), or directly:
 
 ```bash
 pnpm db:reset && pnpm api:start
@@ -76,11 +79,12 @@ scheme, bundle ids).
 cp .env.example .env.local   # git-ignored
 ```
 
-| Variable                           | Default | Notes                                         |
-| ---------------------------------- | ------- | --------------------------------------------- |
-| `EXPO_PUBLIC_SUPABASE_URL`         | unset   | Unset → in-memory repository and the dev OTP  |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | unset   | Public by design; useless unless RLS is wrong |
-| `EXPO_PUBLIC_ENABLE_PROVIDER_MODE` | `false` | See below                                     |
+| Variable                           | Default | Notes                                              |
+| ---------------------------------- | ------- | -------------------------------------------------- |
+| `EXPO_PUBLIC_SUPABASE_URL`         | unset   | Unset → in-memory repository and the dev OTP       |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | unset   | Public by design; useless unless RLS is wrong      |
+| `EXPO_PUBLIC_ENABLE_PROVIDER_MODE` | `false` | See below                                          |
+| `EXPO_PUBLIC_DEV_APPROVE_PROVIDER` | `false` | Dev only, in-memory only — see the inspection loop |
 
 `EXPO_PUBLIC_*` values are **inlined into the bundle** and readable by anyone
 with the app. That is correct for these three and for nothing else: the
@@ -94,15 +98,53 @@ the full runbook.
 | ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `EXPO_PUBLIC_ENABLE_PROVIDER_MODE` | `false` | «اشتغل معنا كفنّي» is not offered, the KYC screen redirects before rendering a field, the mode switcher is hidden even from an approved provider, the `(provider)` group is unreachable, and `applyAsProvider()` throws. |
 
-Off by default for the logbook launch: the KYC vault is a placeholder
-(ADR-0017) and there is no ops console to approve an application (Amendment B,
-Phase 6). Collecting a national ID and an IBAN we cannot yet protect, from
-applicants nobody can approve, is the thing the flag prevents.
+Off by default for the logbook launch: the KYC vault is still a placeholder
+(ADR-0017). Collecting a national ID and an IBAN we cannot yet protect is the
+thing the flag prevents. The ops console that approves an application does now
+exist — that half of the reason has gone.
 
 To work on the provider side, set it to exactly `true` in `.env.local` and restart Metro. The flag
 decides only what renders and what the client will send — a user still holds no
 provider role until approval, and RLS refuses every provider read regardless
 (§5.1.3).
+
+## Walking the inspection loop (no database needed)
+
+الفحص is the one flow with two actors on the same record: an inspector files a
+document and a buyer reads it. Both halves run on the in-memory build.
+
+```bash
+# .env.local
+EXPO_PUBLIC_ENABLE_PROVIDER_MODE=true
+EXPO_PUBLIC_DEV_APPROVE_PROVIDER=true
+```
+
+The second flag exists because approval is an ops action and the dev build is
+one process with one account, so without it the inspector's half is
+unreachable on a laptop. It is read by the in-memory repository and nowhere
+else; against a real project roles come from the server and RLS refuses a
+client that lies about its own (§5.1.3). Restart Metro after changing either.
+
+1. Sign in (OTP `123456`), then **حسابي → اشتغل معنا كفنّي** and submit the
+   KYC form. With the dev flag on it comes back approved and the mode switcher
+   appears; with it off you get the `pending` screen, which is what a real
+   applicant sees.
+2. As a customer: **احجز موعد → فحص ما قبل الشراء**. It asks for no car —
+   §7.3, the one service where demanding a vehicle would block the exact
+   customer it exists to win. Pick a workshop and a slot.
+3. Switch to provider mode → **ورديتك → ابدأ الاستقبال**. The booking you just
+   made is at the top of the feed.
+4. Accept it, advance to «جارٍ العمل», then **تعبئة تقرير الفحص**: 43 items in
+   11 sections, a provisional score that moves as you answer, and the missing
+   required items named when you try to file. Answer the VIN — anything with
+   17 characters and no I, O or Q, e.g. `5HGBH41JXMN109186`.
+5. Back on the customer side, open that order from **طلباتي**. The report is
+   findings-first, and ends on «هذه سيارتي الآن» — which opens a logbook that
+   starts with the inspection instead of empty.
+
+The provisional score is computed by the same mirror the server scores with,
+and the parity test asserts the two agree; the number you watch while filling
+the form is the number the report carries.
 
 ## Pointing it at Supabase
 

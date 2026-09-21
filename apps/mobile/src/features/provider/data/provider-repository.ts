@@ -454,7 +454,23 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async listOpenJobs(): Promise<readonly OpenJob[]> {
     if (!this.online) return [];
-    return DEV_OPEN_JOBS;
+
+    // Inspections the customer booked in this session come first: they are the
+    // ones somebody is actually waiting on, and the static offers below exist
+    // only so the feed is not empty on a fresh start.
+    const booked: readonly OpenJob[] = this.inspections.openJobs().map((job) => ({
+      orderId: job.orderId,
+      serviceId: 'svc-inspection',
+      serviceNameAr: job.serviceNameAr,
+      fulfilmentMode: 'mobile_scheduled',
+      distanceBucket: 'أقل من ٥ كم',
+      districtNameAr: 'الرياض',
+      problemSummary: job.problem ?? 'فحص قبل الشراء',
+      hasTriageVideo: false,
+      estimatedPayout: '350.00',
+    }));
+
+    return [...booked, ...DEV_OPEN_JOBS];
   }
 
   async listMyJobs(): Promise<readonly AssignedJob[]> {
@@ -477,32 +493,44 @@ export class InMemoryProviderRepository implements ProviderRepository {
   }
 
   async acceptJob(orderId: string): Promise<void> {
+    // A job the customer booked in this session, if there is one; otherwise
+    // one of the static offers.
+    const booked = this.inspections.job(orderId);
     const offer = DEV_OPEN_JOBS.find((job) => job.orderId === orderId);
-    const isInspection = offer?.serviceId === 'svc-inspection';
+    const isInspection = booked !== null || offer?.serviceId === 'svc-inspection';
 
     this.jobs.set(orderId, {
       orderId,
       orderNumber: 'HB-DEV-000001',
       status: 'accepted',
-      fulfilmentMode: offer?.fulfilmentMode ?? 'mobile_ondemand',
-      serviceNameAr: offer?.serviceNameAr ?? 'بطارية — شحن أو تبديل',
+      fulfilmentMode:
+        booked !== null ? 'mobile_scheduled' : (offer?.fulfilmentMode ?? 'mobile_ondemand'),
+      serviceNameAr: booked?.serviceNameAr ?? offer?.serviceNameAr ?? 'بطارية — شحن أو تبديل',
       serviceCategory: isInspection ? 'inspection' : 'emergency',
-      addressAr: isInspection ? 'معرض السيارات، طريق الملك عبدالله' : 'حي الفيصلية، شارع ١٢',
-      problemDescription: offer?.problemSummary ?? 'السيارة ما تشتغل',
+      addressAr:
+        booked?.addressAr ??
+        (isInspection ? 'معرض السيارات، طريق الملك عبدالله' : 'حي الفيصلية، شارع ١٢'),
+      problemDescription: booked?.problem ?? offer?.problemSummary ?? 'السيارة ما تشتغل',
       completionMileage: null,
       completionMedia: [],
       requiresCompletionPhotos: true,
       requiresCompletionMileage: true,
-      // An inspection is against a car Habba has never seen: no vehicle row,
-      // and therefore no odometer to read back.
+      // A pre-purchase inspection is against a car Habba has never seen: no
+      // vehicle row, and therefore no odometer to read back.
       vehicleCurrentMileage: isInspection ? null : 45000,
-      vehicleId: isInspection ? null : 'veh-1',
+      vehicleId: booked?.vehicleId ?? (isInspection ? null : 'veh-1'),
     });
   }
 
   async advanceJob(orderId: string, toStatus: OrderStatus): Promise<void> {
     const job = this.jobs.get(orderId);
     if (job !== undefined) this.jobs.set(orderId, { ...job, status: toStatus });
+
+    // In production this IS the customer's order moving — one row, one UPDATE
+    // (`advanceJob` above does exactly that). The dev build keeps the two
+    // sides in separate stores, so the transition crosses the bridge or the
+    // customer's screen never leaves `accepted`.
+    this.inspections.setJobStatus(orderId, toStatus);
   }
 
   async checkInVehicle(orderId: string): Promise<void> {

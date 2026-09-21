@@ -262,6 +262,67 @@ describe('inspection, end to end in the dev build', () => {
     ).rejects.toThrow(/already/i);
   });
 
+  test('an inspection the customer booked reaches the inspector, and the report comes back on it', async () => {
+    // The claim `dev-inspection-store.ts` makes: the loop can be WALKED in the
+    // dev build. It could not be, until the booked order reached the
+    // provider's feed — the customer's orders and the provider's jobs are two
+    // stores, so the report was only ever readable on an order that was not
+    // theirs.
+    // Through the picker, as the booking flow does: the slot id encodes the
+    // provider, and `bookAppointment` re-derives the fulfilment mode from it
+    // rather than trusting the client — the same way 0024 does server-side.
+    const providers = await customer.listBookingProviders('svc-inspection', 'workshop');
+    const providerId = providers[0]?.id;
+    expect(providerId).toBeDefined();
+
+    const slots = await customer.listSlots(providerId as string);
+    const slotId = slots[0]?.id;
+    expect(slotId).toBeDefined();
+
+    const bookedOrderId = await customer.bookAppointment({
+      slotId: slotId as string,
+      serviceId: 'svc-inspection',
+      // No vehicle: the car belongs to nobody in Habba, which is the whole
+      // point of a pre-purchase inspection.
+      problem: 'فحص قبل الشراء — معرض سيارات',
+    });
+
+    const feed = await inspector.listOpenJobs();
+    expect(feed.map((job) => job.orderId)).toContain(bookedOrderId);
+
+    await inspector.acceptJob(bookedOrderId);
+    const form = await inspector.getInspectionForm(bookedOrderId);
+    expect(form?.subjectRequired).toBe(true);
+
+    await inspector.submitInspection({
+      orderId: bookedOrderId,
+      templateKey: 'pre_purchase_v1',
+      results: allPass(),
+      subject: { vin: SUBJECT_VIN, year: 2019, mileage: 88000 },
+    });
+
+    // The customer reads it back on the order they booked — which is what the
+    // tracking screen passes to the report screen.
+    const outcome = await customer.getInspectionForOrder(bookedOrderId);
+    expect(outcome).not.toBeNull();
+    expect(outcome?.report.subject.vin).toBe(SUBJECT_VIN);
+
+    // And the status crosses: the inspector hands the work back, the customer
+    // sees that, and only the CUSTOMER'S confirmation completes it (ADR-0006).
+    // Without this the booked order sits at `accepted` forever and the
+    // tracking screen never offers the report at all.
+    await inspector.advanceJob(bookedOrderId, 'awaiting_approval');
+    expect((await customer.getOrder(bookedOrderId))?.status).toBe('awaiting_approval');
+
+    await customer.confirmOrderCompletion(bookedOrderId);
+    expect((await customer.getOrder(bookedOrderId))?.status).toBe('completed');
+
+    // And the offer is gone: `order_id` is unique on `inspection_reports`, so
+    // a filed job is not still on the board waiting to be taken again.
+    const after = await inspector.listOpenJobs();
+    expect(after.map((job) => job.orderId)).not.toContain(bookedOrderId);
+  });
+
   test('a VIN that already has a logbook is refused, not forked', async () => {
     // The one thing the whole product exists to prevent: two records for one
     // car, each holding half its history. The remedy is ownership transfer,
