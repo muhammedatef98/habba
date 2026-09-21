@@ -22,7 +22,7 @@ From the repository root:
 
 ```bash
 pnpm install
-pnpm --filter @habba/admin dev     # http://localhost:3100
+pnpm demo:ops      # http://localhost:3100
 ```
 
 With no project configured it runs on an in-memory repository, the same way

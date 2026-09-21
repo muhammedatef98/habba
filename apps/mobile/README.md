@@ -113,17 +113,25 @@ provider role until approval, and RLS refuses every provider read regardless
 الفحص is the one flow with two actors on the same record: an inspector files a
 document and a buyer reads it. Both halves run on the in-memory build.
 
+From the repository root:
+
 ```bash
-# .env.local
-EXPO_PUBLIC_ENABLE_PROVIDER_MODE=true
-EXPO_PUBLIC_DEV_APPROVE_PROVIDER=true
+pnpm demo        # Metro, with both dev flags on — no .env.local needed
 ```
 
-The second flag exists because approval is an ops action and the dev build is
-one process with one account, so without it the inspector's half is
-unreachable on a laptop. It is read by the in-memory repository and nowhere
-else; against a real project roles come from the server and RLS refuses a
-client that lies about its own (§5.1.3). Restart Metro after changing either.
+That is the two flags below set inline, and nothing else:
+
+```bash
+EXPO_PUBLIC_ENABLE_PROVIDER_MODE=true    # renders the provider surface at all
+EXPO_PUBLIC_DEV_APPROVE_PROVIDER=true    # approves your own application
+```
+
+The second exists because approval is an ops action and the dev build is one
+process with one account, so without it the inspector's half is unreachable on
+a laptop. It is read by the in-memory repository and nowhere else; against a
+real project roles come from the server and RLS refuses a client that lies
+about its own (§5.1.3). Put them in `.env.local` instead if you would rather
+they stuck — restart Metro after changing either.
 
 1. Sign in (OTP `123456`), then **حسابي → اشتغل معنا كفنّي** and submit the
    KYC form. With the dev flag on it comes back approved and the mode switcher
