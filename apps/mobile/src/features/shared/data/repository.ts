@@ -29,13 +29,16 @@ import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-languag
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
+import { devInspections, type InspectionStore } from './dev-inspection-store.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import type {
   AppointmentSlot,
   BookingMode,
   BookingProvider,
   City,
+  ConvertInspectionInput,
   DispatchTelemetry,
+  InspectionOutcome,
   JobProgress,
   MaintenanceAlert,
   MaintenanceItem,
@@ -288,6 +291,30 @@ export interface Repository {
   markMaintenanceItemDone(itemId: string): Promise<void>;
   /** «ذكّرني لاحقًا» — silences the notification, not the row. */
   snoozeMaintenanceItem(itemId: string, days: number): Promise<void>;
+
+  // الفحص — Phase 5 (0026, 0027).
+  //
+  // Note again what is absent: nothing here writes a score, a recommendation
+  // or a share token. All three are derived by `submit_inspection_report`,
+  // `inspection_reports` has no INSERT policy at all, and a client that could
+  // name its own score could sell a car with it.
+  /**
+   * The inspection this customer paid for, once it is filed.
+   *
+   * Null while the job is still running, which the screen renders as "your
+   * inspector is at the car" rather than as an error — the order exists, the
+   * report does not yet.
+   */
+  getInspectionForOrder(orderId: string): Promise<InspectionOutcome | null>;
+  /**
+   * «هذه سيارتي الآن» — the buyer purchased, so the report becomes a logbook
+   * (0027). Returns the new vehicle id.
+   *
+   * Throws when the VIN already belongs to a live vehicle: that car has a
+   * logbook and forking its history is the one thing the product exists to
+   * prevent. The remedy is a transfer, and the screen says so.
+   */
+  convertInspectionToVehicle(input: ConvertInspectionInput): Promise<string>;
 }
 
 /** Exactly one of `phone` or `email` — the server refuses both and neither. */
@@ -1046,6 +1073,15 @@ export class InMemoryRepository implements Repository {
   private readonly careItems = new Map<string, CareItemRow[]>();
   private readonly careDocuments = new Map<string, VehicleDocument[]>();
 
+  /**
+   * Filed inspections live outside this class, because in production they are
+   * one row two accounts reach: the inspector files it, the buyer reads it.
+   * Injectable so a test can give both in-memory repositories the same fresh
+   * store instead of sharing the app's — there is no reset, deliberately, and
+   * a hidden one would be a test-only door into production code.
+   */
+  constructor(private readonly inspections: InspectionStore = devInspections) {}
+
   async listMakes() {
     return MAKES;
   }
@@ -1731,6 +1767,85 @@ export class InMemoryRepository implements Repository {
   async snoozeMaintenanceItem(itemId: string, days: number): Promise<void> {
     const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
     this.updateCareItem(itemId, (row) => ({ ...row, snoozedUntil: until }));
+  }
+
+  // الفحص --------------------------------------------------------------------
+
+  async getInspectionForOrder(orderId: string): Promise<InspectionOutcome | null> {
+    return this.inspections.forOrder(orderId);
+  }
+
+  async convertInspectionToVehicle(input: ConvertInspectionInput): Promise<string> {
+    const outcome = this.inspections.forReport(input.reportId);
+    if (outcome === null) throw new Error(`Inspection report ${input.reportId} not found`);
+
+    // A VIN already on a live vehicle means that car has a logbook, and a
+    // second record would fork its history — the one thing the product exists
+    // to prevent (0027). The remedy is a transfer, and the message says which
+    // refusal this is so the screen can offer it.
+    const vin = outcome.report.subject.vin;
+    if (vin !== undefined) {
+      for (const vehicle of this.vehicles.values()) {
+        if (vehicle.vin === vin) {
+          throw new Error('This car already has a Habba logbook');
+        }
+      }
+    }
+
+    // A report converts exactly once (0027). Checked before the vehicle is
+    // created, so a refused conversion leaves no orphan car behind.
+    if (outcome.vehicleId !== null) {
+      throw new Error('That inspection is already attached to a vehicle');
+    }
+
+    const { subject } = outcome.report;
+    const vehicle = await this.addVehicle({
+      makeId: input.makeId,
+      modelId: input.modelId,
+      year: subject.year ?? new Date().getFullYear(),
+      ...(subject.plate === undefined ? {} : { plate: subject.plate }),
+      ...(input.nickname === undefined ? {} : { nickname: input.nickname }),
+      ...(subject.mileage === undefined ? {} : { currentMileage: subject.mileage }),
+    });
+
+    // `addVehicle` has no VIN parameter — a car added by hand has no verified
+    // one. This car does: the inspector read it off the chassis.
+    this.vehicles.set(vehicle.id, {
+      ...vehicle,
+      ...(subject.vin === undefined ? {} : { vin: subject.vin }),
+    });
+
+    this.inspections.attachVehicle(input.reportId, vehicle.id);
+
+    // The new logbook opens with the inspection, not empty (0027). This is the
+    // moat's whole claim about acquisition: a logbook that starts with a
+    // Habba-verified assessment has already shown the owner what it is for.
+    const events = this.timeline.get(vehicle.id) ?? [];
+    const score = outcome.report.overall_score;
+    this.timeline.set(vehicle.id, [
+      {
+        id: `evt-${vehicle.id}-inspection`,
+        vehicleId: vehicle.id,
+        eventType: 'inspection_completed',
+        occurredAt: outcome.report.completed_at,
+        recordedAt: new Date().toISOString(),
+        mileage: subject.mileage ?? null,
+        // Habba dispatched the inspector and holds the report, so this is a
+        // system fact rather than an owner's claim (ADR-0005).
+        provenance: 'habba_verified',
+        summaryAr: `فحص ما قبل الشراء — النتيجة ${score ?? '—'}%`,
+        summaryEn: `Pre-purchase inspection — score ${score ?? '—'}%`,
+        details: {
+          inspection_score: score,
+          service_kind: 'pre_purchase_inspection',
+          notes_public: outcome.report.recommendation,
+        },
+        attachments: [],
+      },
+      ...events,
+    ]);
+
+    return vehicle.id;
   }
 
   private updateCareItem(

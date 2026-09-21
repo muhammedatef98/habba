@@ -13,7 +13,14 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
+import {
+  sarOrThrow,
+  type HabbaReport,
+  type InspectionResults,
+  type InspectionTemplateSection,
+  type Recommendation,
+  type SarAmount,
+} from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import type {
@@ -22,8 +29,10 @@ import type {
   BookingMode,
   BookingProvider,
   City,
+  ConvertInspectionInput,
   DispatchTelemetry,
   FulfilmentMode,
+  InspectionOutcome,
   OrderStatus,
   CompletionMedia,
   EscrowStatus,
@@ -411,6 +420,28 @@ interface VehicleDocumentRow {
   readonly days_remaining: number;
   readonly is_expired: boolean;
   readonly is_expiring: boolean;
+}
+
+interface InspectionReportRow {
+  readonly id: string;
+  readonly order_id: string;
+  readonly public_token: string | null;
+  readonly vehicle_id: string | null;
+  readonly completed_at: string | null;
+  readonly overall_score: number | null;
+  readonly recommendation: Recommendation | null;
+  readonly results: InspectionResults;
+  readonly subject_vin: string | null;
+  readonly subject_plate: string | null;
+  readonly subject_make_ar: string | null;
+  readonly subject_model_ar: string | null;
+  readonly subject_year: number | null;
+  readonly subject_mileage: number | null;
+  readonly inspection_templates: {
+    readonly key: string;
+    readonly name_ar: string;
+    readonly sections: readonly InspectionTemplateSection[];
+  } | null;
 }
 
 function unwrap<T>(
@@ -1466,5 +1497,79 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`snoozeMaintenanceItem: ${error.message}`);
+  }
+
+  // الفحص --------------------------------------------------------------------
+
+  async getInspectionForOrder(orderId: string): Promise<InspectionOutcome | null> {
+    // A table read rather than `get_inspection_report(token)`: the customer is
+    // reading their OWN inspection, which the RLS policy already permits
+    // (0026), and the row carries the ids the public payload deliberately
+    // leaves out. The payload itself is then rebuilt to the same shape the
+    // public link serves, so the app is not a privileged view of the document.
+    const { data, error } = await this.client
+      .from('inspection_reports')
+      .select(
+        'id, order_id, public_token, vehicle_id, completed_at, overall_score, recommendation, ' +
+          'results, subject_vin, subject_plate, subject_make_ar, subject_model_ar, ' +
+          'subject_year, subject_mileage, ' +
+          'inspection_templates(key, name_ar, sections)',
+      )
+      .eq('order_id', orderId)
+      .maybeSingle();
+
+    if (error !== null) throw new Error(`getInspectionForOrder: ${error.message}`);
+    if (data === null) return null;
+
+    const row = data as unknown as InspectionReportRow;
+
+    // An unfiled report has no completed_at and therefore no document. The
+    // row can only exist filed today, but reading it as one would put a score
+    // of `null` in front of a buyer as if it were the car's.
+    if (row.completed_at === null) return null;
+
+    return {
+      reportId: row.id,
+      orderId: row.order_id,
+      publicToken: row.public_token,
+      vehicleId: row.vehicle_id,
+      report: {
+        report_version: 1,
+        completed_at: row.completed_at,
+        subject: {
+          ...(row.subject_vin === null ? {} : { vin: row.subject_vin }),
+          ...(row.subject_plate === null ? {} : { plate: row.subject_plate }),
+          ...(row.subject_make_ar === null ? {} : { make_ar: row.subject_make_ar }),
+          ...(row.subject_model_ar === null ? {} : { model_ar: row.subject_model_ar }),
+          ...(row.subject_year === null ? {} : { year: row.subject_year }),
+          ...(row.subject_mileage === null ? {} : { mileage: row.subject_mileage }),
+        },
+        overall_score: row.overall_score,
+        recommendation: row.recommendation,
+        template: {
+          key: row.inspection_templates?.key ?? '',
+          name_ar: row.inspection_templates?.name_ar ?? '',
+          sections: row.inspection_templates?.sections ?? [],
+        },
+        results: row.results,
+      },
+    };
+  }
+
+  async convertInspectionToVehicle(input: ConvertInspectionInput): Promise<string> {
+    const { data, error } = await this.client.rpc('convert_inspection_to_vehicle', {
+      p_report_id: input.reportId,
+      p_make_id: input.makeId,
+      p_model_id: input.modelId,
+      p_nickname: input.nickname ?? null,
+    });
+
+    // Passed through as the server wrote it. Two of its refusals are ones the
+    // buyer can act on — the car already has a logbook (ask for a transfer),
+    // and this report has already been converted — and the screen tells them
+    // apart by the message text, which is why it is not flattened here.
+    if (error !== null) throw new Error(error.message);
+
+    return data as string;
   }
 }

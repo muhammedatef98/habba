@@ -20,8 +20,31 @@ export interface InspectionTemplateItem {
   readonly key: string;
   readonly label_ar: string;
   readonly label_en?: string;
+  /**
+   * How the item is answered. Every item in `pre_purchase_v1` is `'rating'`,
+   * and `rating_to_score` scores nothing else (0026), so that is the only
+   * control the capture screen draws.
+   *
+   * It is on the template rather than assumed because the seed puts it there,
+   * and a client type that dropped it would make a template comparison
+   * disagree with the database over a field neither of them had lost. If a
+   * measurement type is ever seeded, the capture screen will need to learn it
+   * BEFORE the template ships: a required item with no control is an
+   * inspection that can never be filed.
+   */
+  readonly type?: string;
   readonly required?: boolean;
   readonly weight?: number;
+  /**
+   * A finding that settles the decision rather than adding to it (0026).
+   *
+   * Chassis damage, a previous airbag deployment, flood damage and an
+   * inconsistent odometer are all marked this way in `pre_purchase_v1`: a
+   * `fail` on one of them CAPS the score instead of being averaged into it.
+   * It is part of the template, not of the renderer, so the cap travels with
+   * the data — a template seeded tomorrow carries its own critical items.
+   */
+  readonly critical?: boolean;
 }
 
 export interface InspectionTemplateSection {

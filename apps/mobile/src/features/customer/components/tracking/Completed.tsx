@@ -23,6 +23,15 @@ export interface CompletedProps {
   readonly rateSucceeded: boolean;
   readonly rateFailed?: boolean | undefined;
   readonly onViewLogbook: () => void;
+  /**
+   * Offered only when an inspection report exists for this order.
+   *
+   * Not derived from the service category: the report is the thing the
+   * customer came for, and its presence is the only honest signal that there
+   * is one to open. An inspection order whose report has not been filed yet
+   * shows nothing here rather than a link to a blank page.
+   */
+  readonly onViewInspection?: (() => void) | undefined;
   readonly onDismiss: () => void;
 }
 
@@ -34,6 +43,7 @@ export function Completed({
   rateSucceeded,
   rateFailed = false,
   onViewLogbook,
+  onViewInspection,
   onDismiss,
 }: CompletedProps) {
   const { t } = useTranslation();
@@ -78,6 +88,18 @@ export function Completed({
           ) : null}
         </View>
       </Card>
+
+      {/* Above the logbook link, and above the rating: on an inspection this
+          IS the delivered work, and a pre-purchase report has no logbook to
+          link to at all until the buyer claims the car. */}
+      {onViewInspection === undefined ? null : (
+        <Button
+          testID="view-inspection"
+          label={t('inspection.customerTitle')}
+          variant="accent"
+          onPress={onViewInspection}
+        />
+      )}
 
       {order.vehicleId !== null ? (
         <Button label={t('tracking.viewLogbook')} variant="secondary" onPress={onViewLogbook} />

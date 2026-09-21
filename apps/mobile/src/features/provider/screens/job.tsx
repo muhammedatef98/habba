@@ -139,6 +139,28 @@ export default function JobScreen() {
         </View>
       </Card>
 
+      {/* An inspection's deliverable is the report, not the photos. Offered
+          in the same window as evidence capture, because filing it is part of
+          doing the job rather than something that happens afterwards — and
+          `submit_inspection_report` refuses it from anyone but the assigned
+          provider, so there is nothing to offer once the job is handed on. */}
+      {data.serviceCategory === 'inspection' && canRecordEvidence(data.status) ? (
+        <Card>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('inspection.title')}</Text>
+            <Text variant="caption" tone="muted">
+              {t('inspection.formRequired')}
+            </Text>
+            <Button
+              testID="open-inspection-form"
+              label={t('inspection.openForm')}
+              variant="accent"
+              onPress={() => router.push({ pathname: '/inspection', params: { id: data.orderId } })}
+            />
+          </View>
+        </Card>
+      ) : null}
+
       {canRecordEvidence(data.status) ? (
         <Card elevation={evidenceReady ? 'sm' : 'none'}>
           <View style={{ gap: theme.spacing.sm }}>

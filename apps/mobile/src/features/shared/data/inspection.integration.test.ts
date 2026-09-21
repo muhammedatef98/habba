@@ -14,7 +14,15 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
-import { renderInspectionReport, type InspectionReport } from '@habba/core';
+import {
+  recommendationFor,
+  renderInspectionReport,
+  scoreInspection,
+  type InspectionReport,
+  type InspectionResults,
+  type InspectionTemplateSection,
+} from '@habba/core';
+import { DEV_INSPECTION_SECTIONS } from './dev-inspection-template.js';
 import { mintTestJwt } from './test-jwt.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
@@ -76,6 +84,8 @@ let reportId = '';
 let shareToken = '';
 let makeId = '';
 let modelId = '';
+let filedResults: InspectionResults = {};
+let templateSections: readonly InspectionTemplateSection[] = [];
 const subjectVin = uniqueVin();
 
 beforeAll(async () => {
@@ -242,6 +252,9 @@ describe.skipIf(!harnessUp)('Phase 5 acceptance — pre-purchase inspection', ()
     results['engine']!['oil_leaks'] = { rating: 'attention', note: 'ترشيح خفيف من غطاء البلوف' };
     results['tyres']!['tread'] = { rating: 'attention' };
 
+    filedResults = results as InspectionResults;
+    templateSections = sections as unknown as readonly InspectionTemplateSection[];
+
     const submitted = await inspector.rpc('submit_inspection_report', {
       p_order_id: orderId,
       p_template_key: 'pre_purchase_v1',
@@ -279,6 +292,35 @@ describe.skipIf(!harnessUp)('Phase 5 acceptance — pre-purchase inspection', ()
     expect(row.overall_score).toBeLessThanOrEqual(45);
     expect(row.recommendation).toBe('avoid');
     expect(row.vehicle_id).toBeNull();
+  });
+
+  test('the client mirror scores this report exactly as Postgres did', async () => {
+    // `scoreInspection` is what the inspector watches while they fill the
+    // form, and it duplicates `score_inspection` — the weights, the `na`
+    // exclusion, the critical cap and the half-up rounding. A mirror that
+    // drifts is worse than none: it shows the inspector one verdict and files
+    // another, and they only find out once the buyer has the report.
+    const mirrored = scoreInspection(templateSections, filedResults);
+
+    expect(mirrored).toBe(
+      (
+        await clientFor(INSPECTOR_ID)
+          .from('inspection_reports')
+          .select('overall_score')
+          .eq('id', reportId)
+          .single()
+      ).data?.overall_score,
+    );
+    expect(recommendationFor(mirrored)).toBe('avoid');
+  });
+
+  test('the dev template is the seeded template, item for item', () => {
+    // `dev-inspection-template.ts` copies `pre_purchase_v1` so the capture
+    // screen can be built and run without a database. This is the check that
+    // keeps the copy honest: a template revised in a migration fails here
+    // rather than quietly giving developers a different car to inspect than
+    // customers get.
+    expect(templateSections).toEqual(DEV_INSPECTION_SECTIONS);
   });
 
   test('anyone with the link can read and render it — no login', async () => {

@@ -6,7 +6,14 @@
  * from the migrations and removes the risk of drift.
  */
 
-import type { FulfilmentMode, OrderStatus, SarAmount } from '@habba/core';
+import type {
+  FulfilmentMode,
+  InspectionReport,
+  InspectionResults,
+  InspectionTemplateSection,
+  OrderStatus,
+  SarAmount,
+} from '@habba/core';
 
 export type Provenance = 'self_reported' | 'self_documented' | 'habba_verified' | 'third_party';
 
@@ -457,6 +464,84 @@ export interface VehicleWarranty {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 5 — الفحص (0026, 0027)
+// ---------------------------------------------------------------------------
+
+/**
+ * The car an inspection is about, as the report itself carries it.
+ *
+ * Deliberately not a `vehicleId`. A pre-purchase inspection runs against a car
+ * nobody in Habba owns — that is the whole point of it (§1.3) — so the report
+ * carries its own subject identity and only borrows a vehicle's once the buyer
+ * converts it. Every field is optional because the inspector types them at the
+ * kerb, except that the server refuses a report with neither VIN nor plate.
+ */
+export interface InspectionSubject {
+  readonly vin?: string | undefined;
+  readonly plate?: string | undefined;
+  readonly makeAr?: string | undefined;
+  readonly modelAr?: string | undefined;
+  readonly year?: number | undefined;
+  readonly mileage?: number | undefined;
+}
+
+/**
+ * A filed inspection, as the person who paid for it reads it back.
+ *
+ * `report` is byte-for-byte what the public link serves, so the buyer and
+ * whoever they forward the link to are reading the same document — the app is
+ * not a privileged view of it. The ids around it are what the app adds:
+ * `vehicleId` is the fact that decides whether «هذه سيارتي الآن» is still on
+ * offer, since a report converts exactly once (0027).
+ */
+export interface InspectionOutcome {
+  readonly reportId: string;
+  readonly orderId: string;
+  /** Null until the report is completed — an unfiled report has no link. */
+  readonly publicToken: string | null;
+  /** Set on conversion, or from the start for an inspection on an owned car. */
+  readonly vehicleId: string | null;
+  readonly report: InspectionReport;
+}
+
+/**
+ * The form the inspector fills, as the server defines it.
+ *
+ * `sections` is the template verbatim: the items, their weights, which are
+ * required and which are critical. It is data, not a client release — a
+ * template revised in the database changes the form on the next launch.
+ */
+export interface InspectionForm {
+  readonly orderId: string;
+  readonly templateKey: string;
+  readonly templateNameAr: string;
+  readonly sections: readonly InspectionTemplateSection[];
+  /**
+   * True when the order has no vehicle, so the inspector must identify the car
+   * themselves. `submit_inspection_report` refuses a subjectless report in
+   * that case, and a refusal after the car has been handed back means
+   * inspecting it again.
+   */
+  readonly subjectRequired: boolean;
+  /** A report already filed against this order. `order_id` is unique (0026). */
+  readonly filedReportId: string | null;
+}
+
+export interface SubmitInspectionInput {
+  readonly orderId: string;
+  readonly templateKey: string;
+  readonly results: InspectionResults;
+  readonly subject: InspectionSubject;
+}
+
+export interface ConvertInspectionInput {
+  readonly reportId: string;
+  readonly makeId: string;
+  readonly modelId: string;
+  readonly nickname?: string | undefined;
+}
+
+// ---------------------------------------------------------------------------
 // القادم — the care section (0058–0062, ADR-0022)
 // ---------------------------------------------------------------------------
 
@@ -534,4 +619,10 @@ export interface VehicleCareBaseline {
 
 // Re-exported here (not just from @habba/core) so every screen imports domain
 // types from one place — data/types.ts — rather than mixing import sources.
-export type { FulfilmentMode, OrderStatus };
+export type {
+  FulfilmentMode,
+  InspectionReport,
+  InspectionResults,
+  InspectionTemplateSection,
+  OrderStatus,
+};

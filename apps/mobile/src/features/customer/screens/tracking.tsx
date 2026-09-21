@@ -97,6 +97,15 @@ function TrackingBody() {
     enabled: order.data?.status === 'in_progress' || order.data?.status === 'awaiting_approval',
   });
 
+  // Asked only once the work is done, and only to decide whether there is a
+  // report to open. Most completed orders are not inspections, so this
+  // answers null and the button is simply absent.
+  const inspection = useQuery({
+    queryKey: ['inspection', id],
+    queryFn: () => repository.getInspectionForOrder(id ?? ''),
+    enabled: order.data?.status === 'completed',
+  });
+
   const cancel = useMutation({
     mutationFn: () => repository.cancelOrder(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
@@ -255,6 +264,11 @@ function TrackingBody() {
           rateFailed={rate.isError}
           onViewLogbook={() =>
             router.push({ pathname: '/logbook', params: { id: current.vehicleId ?? '' } })
+          }
+          onViewInspection={
+            inspection.data == null
+              ? undefined
+              : () => router.push({ pathname: '/inspection', params: { id: id ?? '' } })
           }
           onDismiss={() => router.replace('/')}
         />
