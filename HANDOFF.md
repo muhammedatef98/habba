@@ -46,18 +46,23 @@ enforced by triggers and revoked grants, never by convention.
 
 ## 2. Current state — one line
 
-All six backend phases pass their acceptance criteria, and Amendments A and B
-(one mobile app, roles as a join table, admin stays separate) are applied to
-both the spec and the code. Repo is private at **github.com/muhammedatef98/habba**.
+All six backend phases pass their acceptance criteria, Amendments A and B are
+applied to both the spec and the code, and every phase now has screens.
+Nothing has launched: see §9. Repo is private at
+**github.com/muhammedatef98/habba**.
 
 ```
-41 migrations · 20 SQL suites · 2 concurrency tests · tests/rls.spec.ts (17)
-apps/mobile 52 · core 99 · ui 21 · i18n 9 · typecheck + lint + boundaries green
+65 migrations · 38 SQL suites · 2 concurrency tests · tests/rls.spec.ts (17, local + hosted-shape)
+apps/mobile 194 · core 186 · ui 52 · i18n 10 · typecheck + lint + boundaries + bundle green
 ```
 
 **There is now ONE mobile app.** `apps/customer` and `apps/provider` are gone;
 `apps/mobile` serves both through `(customer)` and `(provider)` route groups.
 `profiles.role` is gone too — roles live in `user_roles` (ADR-0016).
+
+**`apps/admin` exists** — the verification queue that grants the provider
+role, the dispatch board, and the audit trail. It is a separate Next.js web
+app and stays one (Amendment B).
 
 ---
 
@@ -75,7 +80,9 @@ habba/
 │     ├─ src/features/shared/    data layer, lib, session/mode state, shared screens
 │     ├─ metro.config.js    monorepo resolution
 │     └─ vitest.config.ts   the `@/` alias, for tests
-│  (admin/ NOT BUILT — separate Next.js ops dashboard, §9.4 + Amendment B)
+│  └─ admin/                Next.js ops console — verification queue, dispatch
+│                           board, audit trail. Web only, never bundled into
+│                           mobile (Amendment B).
 ├─ packages/
 │  ├─ core/                  saudi validators, SarAmount money, report render,
 │  │                         inspection scoring, job-flow state mirror
@@ -84,12 +91,12 @@ habba/
 │  └─ i18n/                  ar.json + en.json, typed keys
 ├─ tests/rls.spec.ts        RLS + Amendment A6, over real HTTP with a real JWT
 ├─ supabase/
-│  ├─ migrations/            0001–0041, forward-only
-│  ├─ tests/                 00_helpers + 01–19 SQL suites
+│  ├─ migrations/            0001–0065, forward-only
+│  ├─ tests/                 00_helpers + 01–38 SQL suites
 │  ├─ seed/                  cities, services, maintenance rules
 │  └─ scripts/               local-db.sh, postgrest.sh, supabase_shim.sql,
 │                            concurrency-test.sh, slot-concurrency-test.sh
-└─ docs/adr/                 ADR-0001 … ADR-0015
+└─ docs/adr/                 ADR-0001 … ADR-0022
 ```
 
 ---
@@ -142,6 +149,10 @@ Location is a fixed Dammam coordinate.
 | 0015 | Local harness exists so migrations are _verified_, not merely written                                                                                 |
 | 0016 | Roles are `user_roles` rows, not a column; approval grants the provider role; one app with lint-enforced feature boundaries                           |
 | 0017 | The report QR is generated in-page (no external request); KYC sealing is a stub until ADR-0010 lands                                                  |
+| 0019 | تقرير هبّة is rendered and printed in-app; no server-side PDF service                                                                                 |
+| 0020 | Email is a second identity alongside phone; verification is a server fact, never a client claim                                                       |
+| 0021 | Warranty follows the CAR, not the order — so cover survives a handover                                                                                |
+| 0022 | The odometer is a series, and a distance-based due date may never be stated as a certainty                                                            |
 
 ---
 
@@ -167,6 +178,21 @@ found by the ~150 feature tests, because those all exercise the intended flow.
 - **Column read control** is a _grant-layer_ problem, not RLS. A column-level
   `REVOKE` is a **silent no-op** against an existing table-level grant. You must
   `REVOKE SELECT ON <table>` then `GRANT SELECT (explicit, column, list)`.
+- **`REVOKE EXECUTE ... FROM public` on a function is the same no-op**, and it
+  is the one that got missed for thirty migrations. 0001 ends with
+  `alter default privileges in schema public grant all on functions to anon,
+authenticated, service_role`, so every function created since arrives with a
+  **direct grant to all three roles**. Revoking `PUBLIC` removes a grant that
+  was never in force, and it looks exactly like success. **Name the roles.**
+
+  What this left open: `begin_privileged_write()` — the switch that exempts a
+  write from every column guard in 0033–0039 — was granted to `authenticated`
+  from 0033 until 0065. It was not reachable through PostgREST, which gives a
+  request one statement and one transaction while the flag is transaction-local;
+  that was the only thing in the way, and it is a property of the HTTP layer
+  rather than of the database. Found by writing 0064's suite, not by reading
+  the schema — which is now the third time that has been how one of these
+  surfaced.
 
 **Standing audits (these are build steps, not documentation):**
 
@@ -176,6 +202,11 @@ found by the ~150 feature tests, because those all exercise the intended flow.
 - `tests/17_read_surface_audit.sql` — uses `has_column_privilege()` (not
   `information_schema`, which reports the same false-safe answer a naive REVOKE
   would) to keep KYC columns off the client SELECT surface.
+- `tests/38_function_surface_audit.sql` — the same question for EXECUTE. Names
+  every internal-only function, asserts no client role can call one, and
+  asserts the default ACL that causes the trap directly from `pg_default_acl`.
+  A probe function created by the suite would get the ordinary `PUBLIC` grant
+  instead and "prove" that revoking `PUBLIC` works, which is the wrong lesson.
 
 **Vulnerabilities fixed (migrations 0033–0039):** forged escrow status, price
 rewriting, odometer rollback, VIN transplant, self-granted reputation/Nafath,
@@ -273,25 +304,30 @@ token pair with the contrast test extended to all three provenance levels.
 
 ## 10. Known incomplete
 
-- **Admin dashboard (§9.4, Next.js + Amendment B)** — not started. Provider
-  verification queue (which is what grants the provider role), live order map,
-  dispute resolution, pricing tuning, payout runs, `audit_log` (spec §6.10 —
-  the table is specified but not yet migrated), 2FA, 8-hour sessions, and the
-  CI check that fails on a client-reachable service-role key.
-- **Booking flow (§9.1)** — placeholder screen. Backend built and tested,
-  including the slot-concurrency guarantee. This is the obvious next increment.
-- **Inspection screens (Phase 5)** — backend done, no customer UI.
+- **Admin dashboard (§9.4, Next.js + Amendment B)** — partial. The verification
+  queue, the dispatch board and the audit trail exist. Still missing: dispute
+  resolution, pricing tuning, payout runs, 2FA, 8-hour sessions,
+  `apps/admin/README.md`, and the CI check that fails on a client-reachable
+  service-role key. `audit_log` (§6.10) IS migrated now — 0064 — and
+  `set_provider_verification` is so far the only action that writes to it,
+  because it is so far the only action the console takes.
 - **Camera and GPS are stubs** — both behind interfaces (`location-provider.ts`
   mirrors `otp-provider.ts`); swapping in real implementations is one file each.
 - **KYC sealing is a stub** (ADR-0017). Real encryption is Supabase Vault /
   pgsodium and waits on ADR-0010, so no real ID or IBAN may be accepted yet.
 - **Guest → account conversion** uses the dev stub. Real Supabase
   `signInAnonymously` + identity linking is not wired.
-- **Video triage (§9.1)** — the 20-second clip before dispatch is not built.
 - **PDF generation** — print-to-PDF only, no server-side render.
-- **Ownership transfer acceptance** — `accept_ownership_transfer()` exists
-  (0037) with OTP verification, atomic claim, privileged owner reassignment and
-  a timeline event. Wired in SQL and tested; no UI.
+- **The inspection form has no draft persistence** and captures no photo per
+  item. Forty-three items is a long time to hold in volatile state, and a
+  backgrounded app loses them; `results[].photos` is in the schema and not in
+  the screen, for the same reason the camera is a stub everywhere else.
+- **No component or E2E tests anywhere.** Every screen is covered by typecheck,
+  lint and the data layer beneath it, and by nothing that renders it.
+
+Built since this list was last written: the booking flow (Phase 4), the
+inspection form and report (Phase 5), the ownership-transfer UI both ends, and
+video triage.
 
 ---
 

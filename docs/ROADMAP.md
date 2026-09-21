@@ -189,12 +189,15 @@ the provider verification queue, which is what grants the provider role.
 transaction and refuses a rejection with no reason; the form asks for it
 before submitting. The live order board (0053) is there too.
 
+`audit_log` (§6.10) is migrated — 0064 — and the console has a tab that reads
+it. `set_provider_verification` is so far the only action that writes a row,
+because it is so far the only action the console takes; the table exists so
+that the next one has nowhere else to go.
+
 **What it needs:** dispute resolution, payout runs, pricing tuning, 2FA and
 8-hour sessions, `apps/admin/README.md`, and the CI check that fails on a
-client-reachable service-role key. The `audit_log` table is specified (build
-prompt §6.10) but still not migrated, so admin actions are not yet auditable —
-which Amendment B requires before any of this is operated for real. ZATCA
-delivery is blocked on open decision 2.
+client-reachable service-role key. ZATCA delivery is blocked on open
+decision 2.
 
 ---
 
@@ -228,13 +231,14 @@ In the order that buys the most, given the above:
 1. **Decisions 3 and 4** — a hosted project and an SMS provider. Phase 2 is
    finished code that cannot reach a user without them, and every phase below
    is waiting behind the same two.
-2. **`audit_log`** (build prompt §6.10). `apps/admin` now performs the action
-   that grants a role, and does so unaudited. Amendment B says every admin
-   action writes an immutable row; today none does.
-3. **Decision 1**, then the Phase 3 two-device run. Nothing has moved real
+2. **Decision 1**, then the Phase 3 two-device run. Nothing has moved real
    money, and no order has been run end to end on two devices.
-4. **Component and E2E coverage.** Every screen is covered by typecheck, lint
+3. **Component and E2E coverage.** Every screen is covered by typecheck, lint
    and the data layer beneath it, and by nothing that renders it. The
    inspection capture form — forty-three items, a live score, a submit that
    must agree with a Postgres function — is the strongest argument yet for
    changing that.
+4. **2FA and 8-hour sessions on `apps/admin`**, and the CI check for a
+   client-reachable service-role key. The console now performs an audited
+   action, which makes who is signed in to it a question worth answering
+   properly.
