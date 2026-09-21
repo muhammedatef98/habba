@@ -42,9 +42,9 @@ describe('with ENABLE_PROVIDER_MODE off (the default)', () => {
   });
 
   test('the mode switcher is hidden even from an approved provider', () => {
-    // The role is real and the server would honour it. The surface behind the
-    // switcher still depends on an ops console that does not exist, so the flag
-    // wins.
+    // The role is real and the server would honour it. The flag still wins,
+    // because the application that earned the role would have been sealed with
+    // the placeholder vault (ADR-0017).
     expect(holdsProviderRole(TECHNICIAN)).toBe(true);
     expect(canEnterProviderMode({ roles: TECHNICIAN, ...off })).toBe(false);
     expect(canEnterProviderMode({ roles: WORKSHOP, ...off })).toBe(false);

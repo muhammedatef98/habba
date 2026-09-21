@@ -53,8 +53,8 @@ export function canApplyAsProvider(input: ProviderAccessInput): boolean {
  *
  * Requires the flag AND an approved provider role. A customer-only user must
  * never see the switcher even with the flag on; a real provider must not see
- * it while the flow is off, because the surface behind it depends on an ops
- * console that does not exist yet.
+ * it while the flow is off, because the application that earned them the role
+ * would have sealed their هوية and IBAN with a placeholder vault (ADR-0017).
  */
 export function canEnterProviderMode(input: ProviderAccessInput): boolean {
   return flagOf(input) && holdsProviderRole(input.roles);

@@ -7,17 +7,17 @@ The phase definitions come from `docs/HABBA_BUILD_PROMPT.md` §10; this file is
 the status view over them. Where the two disagree, the build prompt is the
 specification and this is the mistake.
 
-**Last updated:** 2026-09-04 · **Amendments applied:** A (one mobile app,
+**Last updated:** 2026-09-21 · **Amendments applied:** A (one mobile app,
 `user_roles`) and B (admin stays a separate web app) — see CLAUDE.md §5.1.
 
-| Phase                         | Status                        |
-| ----------------------------- | ----------------------------- |
-| 1 — Foundation                | ✅ **Done**                   |
-| 2 — The logbook (the moat)    | ✅ **Done**                   |
-| 3 — On-demand emergency       | 🟡 Backend done, not launched |
-| 4 — Scheduled & workshop      | 🟡 Backend done, no screens   |
-| 5 — Inspections               | 🟡 Backend done, no screens   |
-| 6 — Intelligence & compliance | 🟡 Backend partial, no admin  |
+| Phase                         | Status                               |
+| ----------------------------- | ------------------------------------ |
+| 1 — Foundation                | ✅ **Done**                          |
+| 2 — The logbook (the moat)    | ✅ **Done**                          |
+| 3 — On-demand emergency       | 🟡 Built, not launched               |
+| 4 — Scheduled & workshop      | 🟡 Built, not launched               |
+| 5 — Inspections               | 🟡 Built, not launched               |
+| 6 — Intelligence & compliance | 🟡 Backend partial, admin is partial |
 
 "Backend done" means the migrations exist, run, and pass their own SQL suites.
 It does **not** mean the phase is shippable — see each phase below, and §Open
@@ -119,9 +119,14 @@ clients against a capacity-3 slot: exactly 3 succeed, 13 are refused cleanly
 rather than by a constraint error. Warranty claim and routing pass
 `08_scheduling.sql`.
 
-**What it needs:** the customer booking screen — today `booking.tsx` is an
-honest "coming soon" rather than a flow. This is the smallest remaining gap
-between a built backend and a usable feature.
+**Where the screens stand.** The booking flow is three steps — what and for
+which car, which provider, which window — and `book_appointment` is called
+from the third. A service that supports one fulfilment mode has it selected
+rather than offered, because a step whose only content is a disabled option is
+not a step.
+
+**What it needs:** the same two things Phase 3 needs — a payment provider
+(open decision 1) and the two-device run, which has never been done.
 
 ---
 
@@ -135,8 +140,32 @@ buyer purchases, the report converts into a new `vehicles` row with the
 inspection as its first timeline event.
 
 **Where it stands.** Migrations 0026–0027, covered by `09_inspections.sql`
-including the conversion. No customer or provider screens at all — this phase
-is backend-only.
+and by `inspection.integration.test.ts`, which executes the acceptance above
+over real HTTP as three identities: the buyer, the inspector, and an anonymous
+reader holding nothing but the link.
+
+**The screens exist.** The inspector fills `pre_purchase_v1` — forty-three
+items across eleven collapsed sections — with a provisional score that moves
+as they answer and the missing required items named before the button is
+reachable. The buyer reads findings first and the score second, in the order
+`renderInspectionReport` puts them on the public page, and ends on
+«هذه سيارتي الآن», which is `convert_inspection_to_vehicle` and the whole
+zero-CAC loop.
+
+Two client mirrors of server logic, each checked against the database rather
+than trusted, in the manner of `orders/job-flow.ts`:
+
+- `scoreInspection` / `recommendationFor` / `missingRequiredItems` duplicate
+  `score_inspection`, `score_to_recommendation` and the completeness check.
+  The parity test scores the filed report both ways and asserts one number.
+- `dev-inspection-template.ts` copies the seeded template so the form can be
+  built without a database. The parity test compares them item for item — and
+  caught a real difference the first time it ran.
+
+**What it needs:** draft persistence on the capture form. Forty-three items is
+a long time to hold in volatile state, and a backgrounded app today loses
+them. Photographs per item are captured by the schema (`results[].photos`) and
+not yet by the screen, for the same reason evidence capture stubs the camera.
 
 ---
 
@@ -154,11 +183,18 @@ client-reachable service-role key.)_
 **Where it stands.** Migrations 0028–0031: the maintenance scan, alert
 conversion, ZATCA TLV/QR and payout building all pass `10_intelligence.sql`.
 
-**What it needs:** most of the phase. `apps/admin` **does not exist** — no
-provider verification queue (which is what grants the provider role), no live
-order map, no dispute resolution, no payout runs. The `audit_log` table is
-specified (build prompt §6.10) but not migrated. ZATCA delivery is blocked on
-open decision 2.
+**`apps/admin` exists**, and covers the screen that unblocks everything else:
+the provider verification queue, which is what grants the provider role.
+`set_provider_verification` (0052) writes the status and the reason in one
+transaction and refuses a rejection with no reason; the form asks for it
+before submitting. The live order board (0053) is there too.
+
+**What it needs:** dispute resolution, payout runs, pricing tuning, 2FA and
+8-hour sessions, `apps/admin/README.md`, and the CI check that fails on a
+client-reachable service-role key. The `audit_log` table is specified (build
+prompt §6.10) but still not migrated, so admin actions are not yet auditable —
+which Amendment B requires before any of this is operated for real. ZATCA
+delivery is blocked on open decision 2.
 
 ---
 
@@ -190,9 +226,15 @@ they gate visible behaviour:
 In the order that buys the most, given the above:
 
 1. **Decisions 3 and 4** — a hosted project and an SMS provider. Phase 2 is
-   finished code that cannot reach a user without them.
-2. **The booking screen** (Phase 4). The backend, including the concurrency
-   guarantee, is already there.
-3. **`apps/admin`** (Amendment B). Everything provider-side is gated behind an
-   approval nobody can currently give.
-4. **Decision 1**, then the Phase 3 two-device run.
+   finished code that cannot reach a user without them, and every phase below
+   is waiting behind the same two.
+2. **`audit_log`** (build prompt §6.10). `apps/admin` now performs the action
+   that grants a role, and does so unaudited. Amendment B says every admin
+   action writes an immutable row; today none does.
+3. **Decision 1**, then the Phase 3 two-device run. Nothing has moved real
+   money, and no order has been run end to end on two devices.
+4. **Component and E2E coverage.** Every screen is covered by typecheck, lint
+   and the data layer beneath it, and by nothing that renders it. The
+   inspection capture form — forty-three items, a live score, a submit that
+   must agree with a Postgres function — is the strongest argument yet for
+   changing that.

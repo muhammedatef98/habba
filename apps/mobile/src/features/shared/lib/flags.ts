@@ -3,12 +3,12 @@
  *
  * One flag today: `ENABLE_PROVIDER_MODE`, default **false**.
  *
- * The provider side is built and tested, but the KYC vault is a placeholder
- * (ADR-0017) and the ops console that approves an application does not exist
- * (Amendment B, Phase 6). Shipping the logbook launch with the upgrade flow
+ * The provider side is built and tested, and `apps/admin` now carries the
+ * verification queue that grants the role. What is still a placeholder is the
+ * KYC vault (ADR-0017): shipping the logbook launch with the upgrade flow
  * visible would collect national IDs and IBANs into a column sealed by a dev
- * digest, from applicants nobody can approve. So the flow is off until both
- * are real — the flag is the switch, not a rewrite.
+ * digest. So the flow stays off until the vault is real — which waits on
+ * ADR-0010 — and the flag is the switch, not a rewrite.
  *
  * Read from Expo config (`expo.extra.enableProviderMode`) so a build turns it
  * on without a code change, matching how the Supabase credentials work.
