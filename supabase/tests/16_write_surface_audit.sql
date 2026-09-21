@@ -187,8 +187,10 @@ select test.assert(
 -- vehicle_timeline is the moat; zatca_invoices and inspection_reports are
 -- records of fact; vehicle_odometer_readings (0058) is the series every
 -- prediction is computed from, and a client that could write one could choose
--- its own series and its own lifetime distance. All are written only by
--- SECURITY DEFINER functions.
+-- its own series and its own lifetime distance; audit_log (0064) is the record
+-- of what operators did, and a client that could insert there could manufacture
+-- a record of an action nobody took. All are written only by SECURITY DEFINER
+-- functions.
 select test.assert_eq(
   (select coalesce(string_agg(c.relname, ', '), '(none)')
    from pg_class c
@@ -196,7 +198,8 @@ select test.assert_eq(
    join pg_policy p on p.polrelid = c.oid
    where n.nspname = 'public'
      and c.relname in ('vehicle_timeline', 'zatca_invoices', 'inspection_reports',
-                       'order_events', 'payout_orders', 'vehicle_odometer_readings')
+                       'order_events', 'payout_orders', 'vehicle_odometer_readings',
+                       'audit_log')
      and p.polcmd in ('*', 'w', 'a')),
   '(none)',
   'append-only and system-written tables expose no client INSERT or UPDATE policy');

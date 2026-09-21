@@ -103,10 +103,17 @@ select test.assert_raises(
 
 -- Same revocation rule as phone (0036): a verified flag cannot ride along to a
 -- different address.
+--
+-- Set as the OWNER, standing in for the definer function that sets it in
+-- production — see the same note in suite 15. `test.become()` sets a
+-- transaction-local GUC, so the impersonated subject survives the role change
+-- and only the role has to be put back.
+reset role;
 select public.begin_privileged_write();
 update public.profiles set email_verified = true
 where id = '33333333-0000-4000-9999-000000000003';
 select public.end_privileged_write();
+set role authenticated;
 
 update public.profiles set email = 'someone.else@example.com'
 where id = '33333333-0000-4000-9999-000000000003';
