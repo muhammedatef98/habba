@@ -8,12 +8,34 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type {
+  AuditEntry,
   BoardOrder,
   OpsRepository,
   ProviderReview,
   VerificationEvent,
   VerificationStatus,
 } from './types';
+
+/**
+ * How many audit rows one screenful is.
+ *
+ * A page rather than everything: this table only grows, and an operator
+ * opening the tab six months in should not wait for a year of it.
+ */
+const AUDIT_PAGE = 100;
+
+interface AuditRow {
+  readonly id: string;
+  readonly at: string;
+  readonly actor_id: string;
+  readonly action: string;
+  readonly target_table: string;
+  readonly target_id: string | null;
+  readonly before: Readonly<Record<string, unknown>> | null;
+  readonly after: Readonly<Record<string, unknown>> | null;
+  readonly ip: string | null;
+  readonly profiles: { readonly full_name: string } | null;
+}
 
 interface ProviderRow {
   readonly id: string;
@@ -60,6 +82,37 @@ class SupabaseOpsRepository implements OpsRepository {
       offersTotal: row.offers_total,
       offersOpen: row.offers_open,
       attention: row.attention,
+    }));
+  }
+
+  async listAuditLog(limit = AUDIT_PAGE): Promise<readonly AuditEntry[]> {
+    // Explicit columns on the embed too. `profiles` is not a KYC table, but
+    // the habit is the point: a bare `profiles(*)` here would put an
+    // operator's phone number on a screen that exists to show what they did.
+    const { data, error } = await this.client
+      .from('audit_log')
+      .select(
+        'id, at, actor_id, action, target_table, target_id, before, after, ip, ' +
+          'profiles(full_name)',
+      )
+      .order('at', { ascending: false })
+      .limit(limit);
+
+    if (error !== null) throw new Error(`listAuditLog: ${error.message}`);
+
+    return (data as unknown as readonly AuditRow[]).map((row) => ({
+      id: row.id,
+      at: row.at,
+      actorId: row.actor_id,
+      // Null rather than a fallback name: an audit row whose actor cannot be
+      // resolved is a thing to notice, not to paper over with "غير معروف".
+      actorName: row.profiles?.full_name ?? null,
+      action: row.action,
+      targetTable: row.target_table,
+      targetId: row.target_id,
+      before: row.before,
+      after: row.after,
+      ip: row.ip,
     }));
   }
 
@@ -229,12 +282,26 @@ class InMemoryOpsRepository implements OpsRepository {
 
   private readonly history = new Map<string, VerificationEvent[]>();
 
+  /**
+   * The dev console's audit rows.
+   *
+   * Written by `setVerification` below rather than seeded, so the tab shows
+   * the same thing it will show in production: nothing until somebody does
+   * something, and then exactly what they did. A seeded log would let the
+   * screen be built against rows no action produced.
+   */
+  private readonly audit: AuditEntry[] = [];
+
   async listProvidersForReview(status: VerificationStatus): Promise<readonly ProviderReview[]> {
     return this.providers.filter((provider) => provider.verificationStatus === status);
   }
 
   async listVerificationHistory(providerId: string): Promise<readonly VerificationEvent[]> {
     return this.history.get(providerId) ?? [];
+  }
+
+  async listAuditLog(limit = AUDIT_PAGE): Promise<readonly AuditEntry[]> {
+    return this.audit.slice(0, limit);
   }
 
   async setVerification(
@@ -263,6 +330,30 @@ class InMemoryOpsRepository implements OpsRepository {
 
     const index = this.providers.indexOf(provider);
     this.providers[index] = { ...provider, verificationStatus: status };
+
+    // 0064 writes this row inside `set_provider_verification`, in the same
+    // transaction as the decision. Mirrored here, curated the same way — no
+    // whole-row snapshot — so the screen is built against the shape the
+    // server actually produces.
+    this.audit.unshift({
+      id: `audit-${this.audit.length + 1}`,
+      at: new Date().toISOString(),
+      actorId: 'dev-operator',
+      actorName: 'مشغّل التطوير',
+      action: `provider.${status}`,
+      targetTable: 'providers',
+      targetId: providerId,
+      before: { verification_status: provider.verificationStatus, is_online: false },
+      after: {
+        verification_status: status,
+        is_online: false,
+        ...((note ?? '').trim() === '' ? {} : { note: (note ?? '').trim() }),
+      },
+      // No edge in front of the dev console, so no forwarded address. Null is
+      // what the server records in the same situation, and a fabricated
+      // address here would be the one field on this screen that lies.
+      ip: null,
+    });
   }
 }
 

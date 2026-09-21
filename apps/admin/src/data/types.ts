@@ -30,9 +30,41 @@ export interface VerificationEvent {
   readonly createdAt: string;
 }
 
+/**
+ * One row of `audit_log` (0064) — what an operator did, and what the record
+ * used to say.
+ *
+ * `actorName` is resolved from `profiles`, because an id answers nobody's
+ * question at 2am. `ip` is carried through exactly as the schema labels it:
+ * reported by the edge, never proof of anything, and nothing here decides
+ * anything from it.
+ */
+export interface AuditEntry {
+  readonly id: string;
+  readonly at: string;
+  readonly actorId: string;
+  readonly actorName: string | null;
+  readonly action: string;
+  readonly targetTable: string;
+  readonly targetId: string | null;
+  readonly before: Readonly<Record<string, unknown>> | null;
+  readonly after: Readonly<Record<string, unknown>> | null;
+  readonly ip: string | null;
+}
+
 export interface OpsRepository {
   /** Live orders, ordered by trouble rather than by time (0046). */
   listBoard(): Promise<readonly BoardOrder[]>;
+  /**
+   * The audit trail, newest first.
+   *
+   * Amendment B's point is accountability, and a log only a DBA can read is
+   * not that: the operator who has to notice a colleague's mistake is another
+   * operator, in this console. Read-only by construction — `audit_log` has no
+   * write policy and no write grant, so there is no method here that could
+   * edit or remove a row, and there never will be.
+   */
+  listAuditLog(limit?: number): Promise<readonly AuditEntry[]>;
   listProvidersForReview(status: VerificationStatus): Promise<readonly ProviderReview[]>;
   listVerificationHistory(providerId: string): Promise<readonly VerificationEvent[]>;
   /**

@@ -223,6 +223,24 @@ select test.assert_raises(
 reset role;
 
 
+-- What the console's query depends on --------------------------------------------
+-- The ops console reads `audit_log` with `profiles(full_name)` embedded, and
+-- PostgREST derives an embed from the FOREIGN KEY. Drop or rename this
+-- constraint and the console's query stops being a join and starts being a
+-- 400 — the whole screen, not the name column, because PostgREST rejects the
+-- request rather than degrading it. Same failure mode as the bare `select()`
+-- on `providers` in HANDOFF §11, reached from the other direction.
+select test.assert(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'audit_log' and c.contype = 'f'
+      and (select relname from pg_class where oid = c.confrelid) = 'profiles'
+  ),
+  'actor_id is a real FK to profiles — the console embeds the actor''s name through it');
+
+
 -- The address is context, never a claim -----------------------------------------
 -- Null here rather than an exception: there is no `request.headers` GUC in a
 -- psql session, and an audit row that failed to write because a header was
