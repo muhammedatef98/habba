@@ -25,6 +25,10 @@ pnpm install
 pnpm demo:ops      # http://localhost:3100
 ```
 
+Or `pnpm go` from the root, which starts this and the mobile app together —
+the two meet on every provider approval, so trying either usually means
+running both.
+
 With no project configured it runs on an in-memory repository, the same way
 the mobile app does and for the same reason (ADR-0010). Sign in with:
 

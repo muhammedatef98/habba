@@ -8,6 +8,7 @@
     "node": ">=22.18.0"
   },
   "scripts": {
+    "go": "./scripts/demo.sh",
     "demo": "EXPO_PUBLIC_ENABLE_PROVIDER_MODE=true EXPO_PUBLIC_DEV_APPROVE_PROVIDER=true pnpm --filter @habba/mobile start",
     "demo:ops": "pnpm --filter @habba/admin dev",
     "typecheck": "pnpm -r --parallel typecheck",

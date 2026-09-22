@@ -116,10 +116,16 @@ document and a buyer reads it. Both halves run on the in-memory build.
 From the repository root:
 
 ```bash
-pnpm demo        # Metro, with both dev flags on — no .env.local needed
+pnpm go          # installs, starts the ops console, then Metro — one command
+pnpm demo        # just Metro, with both dev flags on
 ```
 
-That is the two flags below set inline, and nothing else:
+`pnpm go` is the whole thing: the console on 3100 in the background and Metro
+in front, with Ctrl-C stopping both. Use `pnpm demo` when the console is
+already running or you do not need it.
+
+Either way the flags below are set inline, so there is no `.env.local` to
+write:
 
 ```bash
 EXPO_PUBLIC_ENABLE_PROVIDER_MODE=true    # renders the provider surface at all
