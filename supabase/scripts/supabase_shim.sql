@@ -63,6 +63,19 @@ as $$
   );
 $$;
 
+-- The whole verified token, as Supabase's own auth.jwt() returns it. 0068
+-- reads `aal` and `amr` from it to require a second factor for ops.
+create or replace function auth.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')
+  )::jsonb;
+$$;
+
 do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then

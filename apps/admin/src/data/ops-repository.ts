@@ -6,8 +6,10 @@
  * the whole screen can be built and reviewed before a project exists (ADR-0010).
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { opsClient } from '@/lib/ops-session';
 import type {
+  AuditEntry,
   BoardOrder,
   OpsRepository,
   ProviderReview,
@@ -60,6 +62,39 @@ class SupabaseOpsRepository implements OpsRepository {
       offersTotal: row.offers_total,
       offersOpen: row.offers_open,
       attention: row.attention,
+    }));
+  }
+
+  async listAuditLog(limit: number): Promise<readonly AuditEntry[]> {
+    const { data, error } = await this.client
+      .from('audit_log')
+      .select('id, actor_id, action, target_table, target_id, before, after, ip, at')
+      .order('at', { ascending: false })
+      .limit(limit);
+    if (error !== null) throw new Error(`listAuditLog: ${error.message}`);
+
+    const rows = data as readonly AuditRow[];
+    const actorIds = [...new Set(rows.map((row) => row.actor_id))];
+    const names = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const profiles = await this.client
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', actorIds);
+      for (const profile of (profiles.data ?? []) as { id: string; full_name: string }[]) {
+        names.set(profile.id, profile.full_name);
+      }
+    }
+
+    return rows.map((row) => ({
+      id: String(row.id),
+      actorName: names.get(row.actor_id) ?? row.actor_id,
+      action: row.action,
+      targetTable: row.target_table,
+      targetId: row.target_id,
+      changes: changedFields(row.before, row.after),
+      ip: row.ip,
+      at: row.at,
     }));
   }
 
@@ -155,7 +190,54 @@ function intervalToSeconds(value: string): number {
   return fromDays + Number(clock[1]) * 3600 + Number(clock[2]) * 60 + Math.floor(Number(clock[3]));
 }
 
+interface AuditRow {
+  readonly id: number;
+  readonly actor_id: string;
+  readonly action: AuditEntry['action'];
+  readonly target_table: string;
+  readonly target_id: string;
+  readonly before: Record<string, unknown> | null;
+  readonly after: Record<string, unknown> | null;
+  readonly ip: string | null;
+  readonly at: string;
+}
+
+/**
+ * What an entry changed, field by field. The log keeps whole rows; an
+ * operator scanning it wants "verification_status: pending → approved", not
+ * two thirty-column objects to compare by eye. Housekeeping columns that
+ * change on every write are left out.
+ */
+export function changedFields(
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
+): AuditEntry['changes'] {
+  const ignored = new Set(['updated_at', 'created_at']);
+  const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
+  const changes: { field: string; from: string | null; to: string | null }[] = [];
+
+  for (const field of keys) {
+    if (ignored.has(field)) continue;
+    const from = before?.[field];
+    const to = after?.[field];
+    if (JSON.stringify(from) === JSON.stringify(to)) continue;
+    changes.push({ field, from: show(from), to: show(to) });
+  }
+  return changes;
+}
+
+function show(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
 class InMemoryOpsRepository implements OpsRepository {
+  private readonly audit: AuditEntry[] = [];
+
+  async listAuditLog(limit: number): Promise<readonly AuditEntry[]> {
+    return this.audit.slice(0, limit);
+  }
+
   private readonly board: BoardOrder[] = [
     {
       orderId: 'ord-1',
@@ -263,17 +345,26 @@ class InMemoryOpsRepository implements OpsRepository {
 
     const index = this.providers.indexOf(provider);
     this.providers[index] = { ...provider, verificationStatus: status };
+
+    // Mirrors the server's audit trigger (0068), so the log screen shows
+    // decisions made in the dev console too.
+    this.audit.unshift({
+      id: `audit-${this.audit.length + 1}`,
+      actorName: 'مشغّل التطوير',
+      action: 'update',
+      targetTable: 'providers',
+      targetId: providerId,
+      changes: [{ field: 'verification_status', from: provider.verificationStatus, to: status }],
+      ip: null,
+      at: new Date().toISOString(),
+    });
   }
 }
 
-// Bracket access: `noPropertyAccessFromIndexSignature` is on (ADR-0014), and
-// env vars are an index signature — the rule exists so a typo reads as one.
-const url = process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? '';
-const key = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] ?? '';
-
 /** True when the console is talking to a real project rather than fixtures. */
-export const isLive = url !== '' && key !== '';
+export const isLive = opsClient !== null;
 
-export const opsRepository: OpsRepository = isLive
-  ? new SupabaseOpsRepository(createClient(url, key))
-  : new InMemoryOpsRepository();
+// The session's own client, never a second one: a second client keeps its own
+// session store, and its requests would reach the database as nobody.
+export const opsRepository: OpsRepository =
+  opsClient !== null ? new SupabaseOpsRepository(opsClient) : new InMemoryOpsRepository();

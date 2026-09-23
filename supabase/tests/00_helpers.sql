@@ -56,16 +56,53 @@ end $$;
 
 -- Impersonate a user the way Supabase does: set the JWT subject GUC, then
 -- switch to the `authenticated` role so real RLS applies.
+--
+-- The session looks like a real one that finished two-factor sign-in a moment
+-- ago (aal2, a fresh `totp` in amr). Only is_ops() reads those (0068), so for
+-- everyone else this is the same as before; suites that need an operator keep
+-- working, and the ones about 2FA say explicitly what they are testing with
+-- the two helpers below.
 create or replace function test.become(p_user_id uuid)
 returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claim.sub', p_user_id::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object(
+    'sub', p_user_id, 'role', 'authenticated', 'aal', 'aal2',
+    'amr', jsonb_build_array(
+      jsonb_build_object('method', 'password', 'timestamp', extract(epoch from now())::bigint),
+      jsonb_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint))
+  )::text, true);
+end $$;
+
+-- Signed in with a password only: no second factor yet.
+create or replace function test.become_password_only(p_user_id uuid)
+returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_user_id::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object(
+    'sub', p_user_id, 'role', 'authenticated', 'aal', 'aal1',
+    'amr', jsonb_build_array(
+      jsonb_build_object('method', 'password', 'timestamp', extract(epoch from now())::bigint))
+  )::text, true);
+end $$;
+
+-- Two factors, but verified longer ago than the session is allowed to last.
+create or replace function test.become_verified_ago(p_user_id uuid, p_ago interval)
+returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_user_id::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object(
+    'sub', p_user_id, 'role', 'authenticated', 'aal', 'aal2',
+    'amr', jsonb_build_array(
+      jsonb_build_object('method', 'totp', 'timestamp', extract(epoch from now() - p_ago)::bigint))
+  )::text, true);
 end $$;
 
 create or replace function test.become_anon()
 returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claims', '', true);
 end $$;
 
 -- Grants a role the way the server does (0040): through grant_user_role(),

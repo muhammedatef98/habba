@@ -16,8 +16,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { isLive, opsRepository } from '@/data/ops-repository';
-import { opsAuth, type Operator } from '@/lib/ops-session';
+import { opsAuth, type Operator, type OpsState } from '@/lib/ops-session';
 import { SignIn } from './sign-in';
+import { TwoFactor } from './two-factor';
+import { AuditLog } from './audit';
 import { Board } from './board';
 import type { ProviderReview, VerificationStatus } from '@/data/types';
 
@@ -30,18 +32,16 @@ const QUEUES: readonly { readonly status: VerificationStatus; readonly label: st
 ];
 
 export default function AdminEntry() {
-  const [operator, setOperator] = useState<Operator | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [state, setState] = useState<OpsState | null>(null);
 
-  // Re-checked on load rather than trusted from storage: the role is read from
-  // `profiles` each time, so an operator whose access was revoked loses the
-  // console on the next visit instead of at token expiry.
+  // Re-checked on load rather than trusted from storage: the role and the
+  // session's standing are read from the server each time (ops_whoami, 0068),
+  // so revoked access or a lapsed eight hours is noticed on the next visit.
   useEffect(() => {
-    void (async () => {
-      setOperator(await opsAuth.currentOperator());
-      setChecking(false);
-    })();
+    void opsAuth.current().then(setState);
   }, []);
+
+  const checking = state === null;
 
   if (checking) {
     return (
@@ -51,28 +51,57 @@ export default function AdminEntry() {
     );
   }
 
-  if (operator === null) return <SignIn onSignedIn={setOperator} />;
+  if (state.stage === 'signed_out') return <SignIn onProgress={setState} />;
 
-  return <Console operator={operator} onSignedOut={() => setOperator(null)} />;
+  if (state.stage === 'enrol' || state.stage === 'verify') {
+    return (
+      <TwoFactor
+        state={state}
+        onProgress={setState}
+        onCancel={() => void opsAuth.signOut().then(() => setState({ stage: 'signed_out' }))}
+      />
+    );
+  }
+
+  return (
+    <Console
+      operator={state.operator}
+      onSignedOut={() => setState({ stage: 'signed_out' })}
+      onExpired={() => void opsAuth.current().then(setState)}
+    />
+  );
 }
 
-type Section = 'board' | 'verification';
+type Section = 'board' | 'verification' | 'audit';
 
 const SECTIONS: readonly { readonly id: Section; readonly label: string }[] = [
   // The board first: it is what an operator opens a shift on, and what they
   // return to between everything else.
   { id: 'board', label: 'اللوحة' },
   { id: 'verification', label: 'مراجعة مقدّمي الخدمة' },
+  { id: 'audit', label: 'سجلّ التدقيق' },
 ];
 
 function Console({
   operator,
   onSignedOut,
+  onExpired,
 }: {
   readonly operator: Operator;
   readonly onSignedOut: () => void;
+  /** The eight hours are up: the server has stopped treating this as ops. */
+  readonly onExpired: () => void;
 }) {
   const [section, setSection] = useState<Section>('board');
+
+  // §5.1.6: eight hours from the second factor. The server enforces it on
+  // every request regardless; this just stops showing controls that would
+  // now fail, and sends the operator to verify again.
+  useEffect(() => {
+    const remaining = operator.expiresAt.getTime() - Date.now();
+    const timer = setTimeout(onExpired, Math.max(0, remaining));
+    return () => clearTimeout(timer);
+  }, [operator.expiresAt, onExpired]);
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--space-xl)' }}>
@@ -116,6 +145,13 @@ function Console({
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
             {operator.fullName}
             {operator.role === 'super_admin' ? ' · مشرف عام' : ''}
+            {' · تنتهي الجلسة '}
+            <span dir="ltr">
+              {operator.expiresAt.toLocaleTimeString('ar-u-nu-latn', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
           </span>
           <button
             onClick={() => {
@@ -135,7 +171,7 @@ function Console({
         </div>
       </div>
 
-      {section === 'board' ? <Board /> : <VerificationQueue />}
+      {section === 'board' ? <Board /> : section === 'audit' ? <AuditLog /> : <VerificationQueue />}
     </main>
   );
 }

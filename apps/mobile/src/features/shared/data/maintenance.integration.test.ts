@@ -47,7 +47,13 @@ function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
 }
 
 function clientFor(userId: string): SupabaseClient {
-  const token = mintTestJwt(JWT_SECRET, { sub: userId, role: 'authenticated' });
+  // The operator has passed their second factor, as the console requires
+  // (0068); for everyone else the claim is inert.
+  const token = mintTestJwt(JWT_SECRET, {
+    sub: userId,
+    role: 'authenticated',
+    ...(userId === OPS_ID ? { secondFactorAt: new Date() } : {}),
+  });
   return createClient(POSTGREST_URL, token, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },

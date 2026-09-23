@@ -30,7 +30,25 @@ export interface VerificationEvent {
   readonly createdAt: string;
 }
 
+/** One change an operator made (0068). */
+export interface AuditEntry {
+  readonly id: string;
+  readonly actorName: string;
+  readonly action: 'insert' | 'update' | 'delete';
+  readonly targetTable: string;
+  readonly targetId: string;
+  readonly changes: readonly {
+    readonly field: string;
+    readonly from: string | null;
+    readonly to: string | null;
+  }[];
+  readonly ip: string | null;
+  readonly at: string;
+}
+
 export interface OpsRepository {
+  /** Newest first. Readable only by an operator in a verified session. */
+  listAuditLog(limit: number): Promise<readonly AuditEntry[]>;
   /** Live orders, ordered by trouble rather than by time (0046). */
   listBoard(): Promise<readonly BoardOrder[]>;
   listProvidersForReview(status: VerificationStatus): Promise<readonly ProviderReview[]>;
