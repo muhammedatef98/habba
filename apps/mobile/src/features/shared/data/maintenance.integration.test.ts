@@ -260,10 +260,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     await shop.rpc('record_completion_evidence', {
       p_order_id: priorId,
       p_mileage: 62000,
-      p_media: [
-        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
-        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
-      ],
+      p_media: (await shop.rpc('test_upload_completion_photos', { p_order_id: priorId })).data,
     });
     await shop
       .from('orders')
@@ -344,10 +341,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     await shop.rpc('record_completion_evidence', {
       p_order_id: orderId,
       p_mileage: 86000,
-      p_media: [
-        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
-        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
-      ],
+      p_media: (await shop.rpc('test_upload_completion_photos', { p_order_id: orderId })).data,
     });
     await shop
       .from('orders')

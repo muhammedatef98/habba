@@ -12,7 +12,10 @@
  */
 
 import type { CompletionMediaItem, FulfilmentMode, OrderStatus } from '@habba/core';
+import { storageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
+
+const COMPLETION_MEDIA_BUCKET = 'completion-media';
 
 export interface OpenJob {
   readonly orderId: string;
@@ -69,6 +72,18 @@ export interface ProviderRepository {
   acceptJob(orderId: string): Promise<void>;
   advanceJob(orderId: string, toStatus: OrderStatus): Promise<void>;
   checkInVehicle(orderId: string): Promise<void>;
+  /**
+   * Uploads a photo taken on the job and returns the item to record for it.
+   *
+   * Throws on failure rather than returning a placeholder: a photo that did
+   * not upload is a photo that was not taken, and the server refuses to
+   * record one anyway (0064).
+   */
+  uploadEvidencePhoto(
+    orderId: string,
+    kind: CompletionMediaItem['kind'],
+    localUri: string,
+  ): Promise<CompletionMediaItem>;
   recordEvidence(
     orderId: string,
     mileage: number,
@@ -203,6 +218,24 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`checkInVehicle: ${error.message}`);
   }
 
+  async uploadEvidencePhoto(
+    orderId: string,
+    kind: CompletionMediaItem['kind'],
+    localUri: string,
+  ): Promise<CompletionMediaItem> {
+    const body = await (await fetch(localUri)).arrayBuffer();
+    // `<order_id>/…` because the bucket's policies authorise on the first path
+    // segment, and record_completion_evidence() only accepts this order's.
+    const path = `${orderId}/${kind}-${Date.now()}.jpg`;
+
+    const { error } = await this.client.storage
+      .from(COMPLETION_MEDIA_BUCKET)
+      .upload(path, body, { contentType: 'image/jpeg', upsert: false });
+    if (error !== null) throw new Error(`uploadEvidencePhoto: ${error.message}`);
+
+    return { url: storageRef(COMPLETION_MEDIA_BUCKET, path), kind };
+  }
+
   async recordEvidence(
     orderId: string,
     mileage: number,
@@ -330,6 +363,16 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async checkInVehicle(orderId: string): Promise<void> {
     await this.advanceJob(orderId, 'checked_in');
+  }
+
+  // No storage in the in-memory build. The photo is still a real one — the
+  // camera took it — so its local file is recorded, which displays as it is.
+  async uploadEvidencePhoto(
+    _orderId: string,
+    kind: CompletionMediaItem['kind'],
+    localUri: string,
+  ): Promise<CompletionMediaItem> {
+    return { url: localUri, kind };
   }
 
   async recordEvidence(

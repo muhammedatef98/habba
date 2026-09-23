@@ -38,7 +38,29 @@
         }
       ],
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "تستخدم هبّة الكاميرا لتصوير العطل قبل إرسال الفنّي، ولتوثيق العمل بصور قبل وبعد في دفتر السيارة.",
+          "microphonePermission": "تستخدم هبّة الميكروفون لتسجيل صوت العطل في مقطع الفحص، ليعرف الفنّي المشكلة قبل أن يتحرّك.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "تستخدم هبّة الكاميرا لتصوير العطل قبل إرسال الفنّي، ولتوثيق العمل بصور قبل وبعد في دفتر السيارة.",
+          "photosPermission": false,
+          "microphonePermission": "تستخدم هبّة الميكروفون لتسجيل صوت العطل في مقطع الفحص، ليعرف الفنّي المشكلة قبل أن يتحرّك."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "تستخدم هبّة الموقع لإرسال أقرب فنّي إلى سيارتك، ولمشاركة موقع الفنّي مع العميل أثناء توجّهه إليه."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

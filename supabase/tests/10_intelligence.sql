@@ -124,7 +124,7 @@ update public.orders set status = 'checked_in' where id = 'f0000000-0000-4000-c0
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-c000-000000000001';
 -- Recorded through the provider RPC; a customer cannot write evidence (0033).
 select test.become('22222222-0000-4000-c000-000000000002');
-select public.record_completion_evidence('f0000000-0000-4000-c000-000000000001', 62000, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence('f0000000-0000-4000-c000-000000000001', 62000, test.completion_photos('f0000000-0000-4000-c000-000000000001'));
 select test.become('11111111-0000-4000-c000-000000000001');
 select test.become('22222222-0000-4000-c000-000000000002');
 update public.orders
@@ -369,8 +369,7 @@ set completion_mileage = 62500,
     completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
 where id = 'f0000000-0000-4000-c000-000000000002';
 select test.become('22222222-0000-4000-c000-000000000002');
-select public.record_completion_evidence('f0000000-0000-4000-c000-000000000002', 62500,
-  '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence('f0000000-0000-4000-c000-000000000002', 62500, test.completion_photos('f0000000-0000-4000-c000-000000000002'));
 select test.become('11111111-0000-4000-c000-000000000001');
 update public.orders set status = 'awaiting_approval' where id = 'f0000000-0000-4000-c000-000000000002';
 select test.become('11111111-0000-4000-c000-000000000001');

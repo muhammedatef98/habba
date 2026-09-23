@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
+import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import type {
   AlertConfidence,
   AppointmentSlot,
@@ -1129,6 +1130,20 @@ export class SupabaseRepository implements Repository {
     } catch {
       return false;
     }
+  }
+
+  async resolveMediaUrl(ref: string): Promise<string | null> {
+    const stored = parseStorageRef(ref);
+    if (stored === null) return ref;
+
+    // Long enough to look at a job's photos, short enough that a URL copied
+    // out of the app stops working the same day. The bucket's read policy
+    // decides who gets one at all.
+    const { data, error } = await this.client.storage
+      .from(stored.bucket)
+      .createSignedUrl(stored.path, 60 * 60);
+
+    return error !== null ? null : data.signedUrl;
   }
 
   /**

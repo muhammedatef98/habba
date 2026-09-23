@@ -46,14 +46,14 @@ npx expo start --ios          # boot the iOS simulator directly
 **Dev credentials.** With no Supabase project configured the app runs on the
 in-memory repository:
 
-| Thing         | Value                                                             |
-| ------------- | ----------------------------------------------------------------- |
-| OTP code      | `123456`                                                          |
-| Email auth    | in-memory stub — any address, password ≥ 8 characters             |
-| Location      | a fixed Dammam coordinate                                         |
-| Camera        | stubbed; "add a photo" records an attachment without a real image |
-| Provider role | granted only by approval, which needs the ops console (not built) |
-| Provider mode | **off** — see Feature flags below                                 |
+| Thing         | Value                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| OTP code      | `123456`                                                                                                             |
+| Email auth    | in-memory stub — any address, password ≥ 8 characters                                                                |
+| Location      | a fixed Dammam coordinate in Expo Go; real GPS in a dev build                                                        |
+| Camera        | real for triage video and completion photos; the owner's own logbook entry still records an attachment with no image |
+| Provider role | granted only by approval, which needs the ops console (not built)                                                    |
+| Provider mode | **off** — see Feature flags below                                                                                    |
 
 That last row is deliberate: applying through «اشتغل معنا كفنّي» creates a
 `pending` record and grants nothing. To exercise provider mode against the local

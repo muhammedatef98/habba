@@ -120,10 +120,7 @@ update public.order_parts set approved_by_customer = true, approved_at = now()
 where id = '10000000-0000-4000-2222-000000000001';
 
 select test.become('22222222-0000-4000-2222-000000000002');
-select public.record_completion_evidence(
-  'f0000000-0000-4000-2222-000000000001', 51000,
-  '[{"url":"https://example.test/b.jpg","kind":"before"},
-    {"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence('f0000000-0000-4000-2222-000000000001', 51000, test.completion_photos('f0000000-0000-4000-2222-000000000001'));
 update public.orders set parts_amount = 1200, labour_amount = 0, vat_amount = 180,
   total_amount = 1380
 where id = 'f0000000-0000-4000-2222-000000000001';

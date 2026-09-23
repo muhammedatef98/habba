@@ -27,6 +27,7 @@ import {
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-language.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
+import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
@@ -170,6 +171,15 @@ export interface Repository {
    * A clip is an aid to the technician, never a precondition for rescue.
    */
   attachTriageClip(orderId: string, clip: { uri: string; seconds: number }): Promise<boolean>;
+  /**
+   * Something an <Image> can load for a stored media reference.
+   *
+   * A `storage://` reference (0064) becomes a short-lived signed URL; anything
+   * else is already displayable and is returned as it is. Null when the
+   * reference cannot be read by this user — the caller shows a placeholder,
+   * never the raw reference.
+   */
+  resolveMediaUrl(ref: string): Promise<string | null>;
   listEmergencyServices(): Promise<readonly Service[]>;
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
 
@@ -1367,6 +1377,12 @@ export class InMemoryRepository implements Repository {
   // success here would hide that the clip went nowhere.
   async attachTriageClip(): Promise<boolean> {
     return false;
+  }
+
+  // Nothing here is ever a storage reference: the in-memory provider keeps
+  // the photo's local file, which is displayable as it is.
+  async resolveMediaUrl(ref: string): Promise<string | null> {
+    return parseStorageRef(ref) === null ? ref : null;
   }
 
   // The dev build has no matcher and no providers to offer anything to, so

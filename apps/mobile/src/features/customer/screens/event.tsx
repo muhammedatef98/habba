@@ -28,6 +28,7 @@ import {
   Button,
   useTheme,
 } from '@habba/ui';
+import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { repository } from '@/features/shared/data/repository';
 import type { Provenance } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -170,10 +171,19 @@ export default function EventScreen() {
             <ListRow
               key={attachment.url}
               testID={`attachment-${attachment.kind}`}
+              leading={
+                <EvidencePhoto
+                  reference={attachment.url}
+                  size={48}
+                  accessibilityLabel={
+                    attachment.caption ??
+                    t('logbook.detail.attachmentKind', { kind: attachment.kind })
+                  }
+                />
+              }
               title={
                 attachment.caption ?? t('logbook.detail.attachmentKind', { kind: attachment.kind })
               }
-              subtitle={attachment.url}
             />
           ))}
         </View>

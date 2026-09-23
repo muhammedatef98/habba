@@ -80,6 +80,25 @@ begin
   perform public.grant_user_role(p_user_id, p_role, null);
 end $$;
 
+-- Uploads a before and an after photo for an order and returns the media list
+-- record_completion_evidence() accepts (0064), which refuses anything that was
+-- not actually uploaded to that order's folder. Stands in for the storage API,
+-- which the harness does not run; definer so it works from any test role.
+create or replace function test.completion_photos(p_order_id uuid)
+returns jsonb language plpgsql security definer as $$
+begin
+  insert into storage.objects (bucket_id, name)
+  values ('completion-media', p_order_id::text || '/before.jpg'),
+         ('completion-media', p_order_id::text || '/after.jpg')
+  on conflict (bucket_id, name) do nothing;
+
+  return jsonb_build_array(
+    jsonb_build_object('url', 'storage://completion-media/' || p_order_id::text || '/before.jpg',
+                       'kind', 'before'),
+    jsonb_build_object('url', 'storage://completion-media/' || p_order_id::text || '/after.jpg',
+                       'kind', 'after'));
+end $$;
+
 -- The RLS suite runs as the `authenticated` role so that real policies apply
 -- (the table owner and any superuser bypass RLS, which would make the whole
 -- suite vacuous). That role therefore needs to reach these helpers.

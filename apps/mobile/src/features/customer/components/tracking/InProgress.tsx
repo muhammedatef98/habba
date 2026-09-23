@@ -12,7 +12,7 @@
  * skipped a step the database in fact requires.
  */
 
-import { Image, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -24,6 +24,7 @@ import {
   type TimelineItem,
   useTheme,
 } from '@habba/ui';
+import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { agreedTotal } from '@/features/shared/lib/order-price';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/features/shared/data/types';
@@ -67,16 +68,11 @@ export function InProgress({
                 }}
               >
                 {photos.slice(0, 3).map((photo) => (
-                  <Image
+                  <EvidencePhoto
                     key={photo.url}
-                    source={{ uri: photo.url }}
+                    reference={photo.url}
+                    size={64}
                     accessibilityLabel={photo.caption ?? t('tracking.evidenceTitle')}
-                    style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: theme.radius.md,
-                      backgroundColor: theme.colors.surfaceSunken,
-                    }}
                   />
                 ))}
                 {photos.length > 3 ? (

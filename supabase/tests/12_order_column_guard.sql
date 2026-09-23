@@ -224,10 +224,7 @@ update public.orders set status = 'en_route' where id = 'f0000000-0000-4000-f000
 update public.orders set status = 'arrived' where id = 'f0000000-0000-4000-f000-000000000001';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-f000-000000000001';
 
-select public.record_completion_evidence(
-  'f0000000-0000-4000-f000-000000000001', 45500,
-  '[{"url":"https://example.test/b.jpg","kind":"before"},
-    {"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence('f0000000-0000-4000-f000-000000000001', 45500, test.completion_photos('f0000000-0000-4000-f000-000000000001'));
 
 update public.orders set status = 'awaiting_approval'
 where id = 'f0000000-0000-4000-f000-000000000001';

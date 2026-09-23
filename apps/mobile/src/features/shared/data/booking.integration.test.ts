@@ -168,9 +168,7 @@ describe.skipIf(!harnessUp)('Phase 4 acceptance — workshop booking', () => {
 
       expect(created.error).toBeNull();
       providerId = (created.data as { id: string }).id;
-      expect((created.data as { verification_status: string }).verification_status).toBe(
-        'pending',
-      );
+      expect((created.data as { verification_status: string }).verification_status).toBe('pending');
     }
 
     // Ops approval, applied directly — the admin console is Phase 6, same as
@@ -192,7 +190,9 @@ describe.skipIf(!harnessUp)('Phase 4 acceptance — workshop booking', () => {
       .select();
     expect(workshopRow.error).toBeNull();
 
-    await workshop.from('provider_services').upsert({ provider_id: providerId, service_id: serviceId });
+    await workshop
+      .from('provider_services')
+      .upsert({ provider_id: providerId, service_id: serviceId });
 
     // A wide range of slots, not one: `generate_slots` is `on conflict do
     // nothing`, so a rerun against a database that was not freshly reset (a
@@ -322,17 +322,21 @@ describe.skipIf(!harnessUp)('Phase 4 acceptance — workshop booking', () => {
     const evidence = await workshop.rpc('record_completion_evidence', {
       p_order_id: orderId,
       p_mileage: 32090,
-      p_media: [
-        { url: 'https://example.test/workshop-before.jpg', kind: 'before', caption: 'قبل' },
-        { url: 'https://example.test/workshop-after.jpg', kind: 'after', caption: 'بعد' },
-      ],
+      p_media: (await workshop.rpc('test_upload_completion_photos', { p_order_id: orderId })).data,
     });
     expect(evidence.error).toBeNull();
+
+    // The customer can neither upload into the job's evidence folder (the
+    // storage insert policy) nor record evidence against it.
+    const customerUpload = await customer.rpc('test_upload_completion_photos', {
+      p_order_id: orderId,
+    });
+    expect(customerUpload.error).not.toBeNull();
 
     const customerCannotRecord = await customer.rpc('record_completion_evidence', {
       p_order_id: orderId,
       p_mileage: 32090,
-      p_media: [{ url: 'https://example.test/forged.jpg', kind: 'before' }],
+      p_media: [],
     });
     expect(customerCannotRecord.error).not.toBeNull();
 
@@ -465,10 +469,7 @@ describe.skipIf(!harnessUp)('Phase 4 acceptance — workshop booking', () => {
     const evidence = await workshop.rpc('record_completion_evidence', {
       p_order_id: claimId,
       p_mileage: 32200,
-      p_media: [
-        { url: 'https://example.test/warranty-before.jpg', kind: 'before' },
-        { url: 'https://example.test/warranty-after.jpg', kind: 'after' },
-      ],
+      p_media: (await workshop.rpc('test_upload_completion_photos', { p_order_id: claimId })).data,
     });
     expect(evidence.error).toBeNull();
 

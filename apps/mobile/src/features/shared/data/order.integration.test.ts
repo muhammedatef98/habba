@@ -365,10 +365,7 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     const evidence = await tech.rpc('record_completion_evidence', {
       p_order_id: orderId,
       p_mileage: 45120,
-      p_media: [
-        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
-        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
-      ],
+      p_media: (await tech.rpc('test_upload_completion_photos', { p_order_id: orderId })).data,
     });
     expect(evidence.error).toBeNull();
 

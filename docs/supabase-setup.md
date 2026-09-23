@@ -305,16 +305,21 @@ ownership of the table it is on, and the project's `postgres` role — the one
 the owning role. This is the same shape as PostGIS in §2: a privileged one-off
 that a migration cannot perform.
 
-**Dashboard → SQL Editor**, paste and run once, after the migrations:
+Migration `0064` does the same for the private `completion-media` bucket,
+where technicians upload before/after photos. **Dashboard → SQL Editor**,
+paste and run each once, after the migrations:
 
 ```
 supabase/storage/triage-media-policies.sql
+supabase/storage/completion-media-policies.sql
 ```
 
 **How to tell it worked:** §6's run prints `storage policies for triage-media
-are in place`. Until then it prints a warning naming this step — and video
-triage uploads are refused, because RLS denies by default. The failure mode of
-forgetting is a closed bucket, never an open one.
+are in place` and `storage policies for completion-media are in place`. Until
+then it prints a warning naming this step. The failure mode of forgetting is a
+closed bucket, never an open one — but for completion-media a closed bucket
+means no technician can hand a job back, because `record_completion_evidence()`
+refuses any photo that was not uploaded there.
 
 > The local harness applies the same file as the storage owner
 > (`local-db.sh`), so `supabase/tests/24_triage_media_storage.sql` exercises

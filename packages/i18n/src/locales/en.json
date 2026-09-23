@@ -526,6 +526,9 @@
     "gapMileage": "Odometer reading",
     "gapBefore": "Photo before the work",
     "gapAfter": "Photo after the work",
+    "cameraDenied": "Habba needs the camera to document the work. Allow it in Settings, then try again.",
+    "photoUploadFailed": "The photo did not upload. Check your connection and take it again.",
+    "evidenceSaveFailed": "The evidence was not saved. Check your connection and tap Save again.",
     "upgrade": {
       "cardTitle": "Work with us as a technician",
       "cardBody": "Experienced with cars? Submit your details and start taking jobs once verified.",
