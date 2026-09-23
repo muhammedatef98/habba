@@ -16,7 +16,7 @@ import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
+import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { formatAppointment } from '@/features/shared/lib/dates';
@@ -54,6 +54,15 @@ export default function JobScreen() {
   });
 
   const [notice, setNotice] = useState<string | undefined>(undefined);
+
+  const quotable = job.data !== null && job.data !== undefined && canQuoteParts(job.data.status);
+  const parts = useQuery({
+    queryKey: ['job-parts', id],
+    queryFn: () => providerRepository.listParts(id ?? ''),
+    enabled: quotable,
+    refetchInterval: quotable ? 5000 : false,
+  });
+  const waitingParts = (parts.data ?? []).filter((line) => line.answer === 'pending').length;
 
   const advance = useMutation({
     mutationFn: async (): Promise<'done' | 'taken'> => {
@@ -115,6 +124,10 @@ export default function JobScreen() {
   // technician is told what is missing instead of being handed a database
   // error after tapping.
   const blockedForEvidence = step.action === 'submit_for_approval' && !evidenceReady;
+
+  // Same rule as the server (0067): every quoted part answered first. Said
+  // here, with the way out, instead of a refusal after the tap.
+  const blockedForParts = step.action === 'submit_for_approval' && waitingParts > 0;
 
   return (
     <Screen scrollable>
@@ -189,6 +202,27 @@ export default function JobScreen() {
         </View>
       </Card>
 
+      {quotable ? (
+        <Card testID="job-parts" elevation="none">
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('provider.partsTitle')}</Text>
+            <Text variant="caption" tone="muted">
+              {(parts.data ?? []).length === 0
+                ? t('provider.noParts')
+                : waitingParts > 0
+                  ? t('provider.partsWaiting', { count: waitingParts })
+                  : t('provider.partsAllAnswered')}
+            </Text>
+            <Button
+              testID="open-parts"
+              label={t('provider.partsManage')}
+              variant="secondary"
+              onPress={() => router.push({ pathname: '/parts', params: { id: data.orderId } })}
+            />
+          </View>
+        </Card>
+      ) : null}
+
       {canRecordEvidence(data.status) ? (
         <Card elevation={evidenceReady ? 'sm' : 'none'}>
           <View style={{ gap: theme.spacing.sm }}>
@@ -220,13 +254,19 @@ export default function JobScreen() {
           label={t(step.labelKey)}
           onPress={() => advance.mutate()}
           loading={advance.isPending}
-          disabled={blockedForEvidence}
+          disabled={blockedForEvidence || blockedForParts}
         />
       )}
 
       {notice !== undefined ? (
         <Text testID="job-notice" variant="bodySmall" tone="warning">
           {notice}
+        </Text>
+      ) : null}
+
+      {blockedForParts ? (
+        <Text variant="caption" style={{ color: theme.colors.warning }}>
+          {t('provider.partsBlockHandBack')}
         </Text>
       ) : null}
 

@@ -158,7 +158,9 @@ function TrackingBody() {
   const current = order.data;
   const { status } = current;
   const providerData = provider.data ?? null;
-  const hasUnapprovedParts = (parts.data ?? []).some((line) => !line.approvedByCustomer);
+  const hasUnapprovedParts = (parts.data ?? []).some(
+    (line) => !line.approvedByCustomer && line.declinedAt === null,
+  );
 
   const telemetry = dispatch.data ?? undefined;
   const progress = liveProgress.data ?? undefined;

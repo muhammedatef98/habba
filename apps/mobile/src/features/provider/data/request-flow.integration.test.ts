@@ -18,7 +18,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
-import { nextJobStep, type CompletionMediaItem } from '@habba/core';
+import { addSar, nextJobStep, sarOrThrow, type CompletionMediaItem } from '@habba/core';
 import { SupabaseRepository } from '@/features/shared/data/supabase-repository.js';
 import { mintTestJwt } from '@/features/shared/data/test-jwt.js';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
@@ -410,12 +410,63 @@ describe.skipIf(!harnessUp)('a workshop booking, through the app', () => {
     expect(nextJobStep(job!.status, job!.fulfilmentMode).action).toBe('check_in_vehicle');
   });
 
-  test('the workshop works it through to hand-back, and the customer approves', async () => {
+  test("the workshop quotes two parts; hand-back waits for the customer's answers", async () => {
+    const workshop = technician(WORKSHOP_ID);
+    await workshop.checkInVehicle(orderId);
+    await workshop.advanceJob(orderId, 'in_progress');
+
+    // The parts screen.
+    await workshop.addPart(orderId, {
+      nameAr: 'فلتر زيت',
+      partNumber: '04152-YZZA1',
+      isOem: true,
+      quantity: 1,
+      unitPrice: sarOrThrow('45.00'),
+      warrantyDays: 90,
+    });
+    await workshop.addPart(orderId, {
+      nameAr: 'منظّف محرك',
+      isOem: false,
+      quantity: 1,
+      unitPrice: sarOrThrow('60.00'),
+    });
+
+    // The customer's quote screen sees both, waiting.
+    const quoted = await customer().listOrderParts(orderId);
+    expect(quoted).toHaveLength(2);
+    expect(quoted.every((line) => !line.approvedByCustomer && line.declinedAt === null)).toBe(true);
+
+    // With answers outstanding, hand-back is refused — the job screen holds
+    // the button for the same reason.
+    const photos = await clientFor(WORKSHOP_ID).rpc('test_upload_completion_photos', {
+      p_order_id: orderId,
+    });
+    await workshop.recordEvidence(orderId, 41500, photos.data as CompletionMediaItem[], 30);
+    await expect(workshop.advanceJob(orderId, 'awaiting_approval')).rejects.toThrow(
+      /still waiting for the customer/,
+    );
+
+    const filter = quoted.find((line) => line.nameAr === 'فلتر زيت')!;
+    const flush = quoted.find((line) => line.nameAr === 'منظّف محرك')!;
+    await customer().approveOrderPart(filter.id);
+    await customer().declineOrderPart(flush.id);
+
+    const answered = await workshop.listParts(orderId);
+    expect(answered.map((line) => line.answer).sort()).toEqual(['approved', 'declined']);
+
+    // A "no" stays on the record.
+    await expect(workshop.removePart(flush.id)).rejects.toThrow();
+  });
+
+  test('the workshop hands back; the bill carries the part the customer approved, not the one declined', async () => {
     const walked = await workTheJob(WORKSHOP_ID, orderId, 41500, 30);
-    expect(walked).toEqual(['checked_in', 'in_progress', 'awaiting_approval']);
+    expect(walked).toEqual(['awaiting_approval']);
 
     const before = await customer().getOrder(orderId);
-    expect(before?.totalAmount).toBe(priceWithVat(before!.quotedAmount!));
+    expect(before?.partsAmount).toBe('45.00');
+    expect(before?.totalAmount).toBe(
+      priceWithVat(addSar(before!.quotedAmount!, sarOrThrow('45.00'))),
+    );
 
     await customer().confirmOrderCompletion(orderId);
     const after = await customer().getOrder(orderId);

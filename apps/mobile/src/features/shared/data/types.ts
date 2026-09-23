@@ -316,6 +316,8 @@ export interface OrderPart {
   readonly unitPrice: SarAmount;
   readonly warrantyDays: number | null;
   readonly approvedByCustomer: boolean;
+  /** The customer said no (0067). Kept on the record, never billed. */
+  readonly declinedAt: string | null;
 }
 
 /**

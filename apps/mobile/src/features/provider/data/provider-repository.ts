@@ -11,7 +11,13 @@
  * permission model rather than working around it.
  */
 
-import type { CompletionMediaItem, FulfilmentMode, OrderStatus } from '@habba/core';
+import {
+  sarOrThrow,
+  type CompletionMediaItem,
+  type FulfilmentMode,
+  type OrderStatus,
+  type SarAmount,
+} from '@habba/core';
 import { storageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 
@@ -57,6 +63,28 @@ export interface AssignedJob {
   > | null;
 }
 
+/** A part the technician quoted, and where the customer's answer stands. */
+export interface QuotedPart {
+  readonly id: string;
+  readonly nameAr: string;
+  readonly partNumber: string | null;
+  readonly isOem: boolean;
+  readonly quantity: number;
+  /** Before VAT, per unit. */
+  readonly unitPrice: SarAmount;
+  readonly warrantyDays: number | null;
+  readonly answer: 'pending' | 'approved' | 'declined';
+}
+
+export interface NewPartInput {
+  readonly nameAr: string;
+  readonly partNumber?: string | undefined;
+  readonly isOem: boolean;
+  readonly quantity: number;
+  readonly unitPrice: SarAmount;
+  readonly warrantyDays?: number | undefined;
+}
+
 /**
  * How accepting went. Losing the race is a normal outcome — an emergency goes
  * to several technicians at once and one of them wins — not an error.
@@ -100,6 +128,13 @@ export interface ProviderRepository {
     kind: CompletionMediaItem['kind'],
     localUri: string,
   ): Promise<CompletionMediaItem>;
+  /**
+   * The parts quote (0067). A new line always reaches the customer as a
+   * question; the server refuses anything once the job is handed back.
+   */
+  listParts(orderId: string): Promise<readonly QuotedPart[]>;
+  addPart(orderId: string, input: NewPartInput): Promise<void>;
+  removePart(partId: string): Promise<void>;
   /** Mileage, photos and the warranty given — one call, never half-saved. */
   recordEvidence(
     orderId: string,
@@ -228,6 +263,37 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`checkInVehicle: ${error.message}`);
   }
 
+  async listParts(orderId: string): Promise<readonly QuotedPart[]> {
+    const { data, error } = await this.client
+      .from('order_parts')
+      .select(
+        'id, name_ar, part_number, is_oem, quantity, unit_price, warranty_days, approved_by_customer, declined_at',
+      )
+      .eq('order_id', orderId)
+      .order('created_at');
+    if (error !== null) throw new Error(`listParts: ${error.message}`);
+    return (data as PartRow[]).map(toQuotedPart);
+  }
+
+  async addPart(orderId: string, input: NewPartInput): Promise<void> {
+    const { error } = await this.client.from('order_parts').insert({
+      order_id: orderId,
+      name_ar: input.nameAr.trim(),
+      part_number: input.partNumber?.trim() || null,
+      is_oem: input.isOem,
+      quantity: input.quantity,
+      // The string, not a number: PostgREST passes it to numeric(12,2) intact.
+      unit_price: input.unitPrice,
+      warranty_days: input.warrantyDays ?? null,
+    });
+    if (error !== null) throw new Error(`addPart: ${error.message}`);
+  }
+
+  async removePart(partId: string): Promise<void> {
+    const { error } = await this.client.from('order_parts').delete().eq('id', partId);
+    if (error !== null) throw new Error(`removePart: ${error.message}`);
+  }
+
   async uploadEvidencePhoto(
     orderId: string,
     kind: CompletionMediaItem['kind'],
@@ -279,6 +345,36 @@ interface OrderRow {
   } | null;
   vehicles: { current_mileage: number } | null;
   scheduled_for: string | null;
+}
+
+interface PartRow {
+  id: string;
+  name_ar: string;
+  part_number: string | null;
+  is_oem: boolean;
+  quantity: number;
+  unit_price: number;
+  warranty_days: number | null;
+  approved_by_customer: boolean;
+  declined_at: string | null;
+}
+
+function toQuotedPart(row: PartRow): QuotedPart {
+  return {
+    id: row.id,
+    nameAr: row.name_ar,
+    partNumber: row.part_number,
+    isOem: row.is_oem,
+    quantity: row.quantity,
+    // PostgREST serialises numeric as a JSON number; back to exact SAR at once.
+    unitPrice: sarOrThrow(Number(row.unit_price).toFixed(2)),
+    warrantyDays: row.warranty_days,
+    answer: row.approved_by_customer
+      ? 'approved'
+      : row.declined_at !== null
+        ? 'declined'
+        : 'pending',
+  };
 }
 
 function toOpenJob(row: OpenJobRow): OpenJob {
@@ -418,6 +514,39 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async checkInVehicle(orderId: string): Promise<void> {
     await this.advanceJob(orderId, 'checked_in');
+  }
+
+  private readonly parts = new Map<string, QuotedPart[]>();
+  private partCounter = 0;
+
+  async listParts(orderId: string): Promise<readonly QuotedPart[]> {
+    return this.parts.get(orderId) ?? [];
+  }
+
+  // No customer on the other end in the dev build, so a quoted part stays
+  // pending — which is exactly the state the technician's screen has to show.
+  async addPart(orderId: string, input: NewPartInput): Promise<void> {
+    this.partCounter += 1;
+    const line: QuotedPart = {
+      id: `dev-part-${this.partCounter}`,
+      nameAr: input.nameAr.trim(),
+      partNumber: input.partNumber?.trim() || null,
+      isOem: input.isOem,
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      warrantyDays: input.warrantyDays ?? null,
+      answer: 'pending',
+    };
+    this.parts.set(orderId, [...(this.parts.get(orderId) ?? []), line]);
+  }
+
+  async removePart(partId: string): Promise<void> {
+    for (const [orderId, lines] of this.parts) {
+      this.parts.set(
+        orderId,
+        lines.filter((line) => line.id !== partId),
+      );
+    }
   }
 
   // No storage in the in-memory build. The photo is still a real one — the

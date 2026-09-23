@@ -164,8 +164,15 @@ update public.orders set status = 'en_route' where id = :'with_parts';
 update public.orders set status = 'arrived' where id = :'with_parts';
 update public.orders set status = 'in_progress' where id = :'with_parts';
 
-insert into public.order_parts (order_id, name_ar, quantity, unit_price, approved_by_customer, approved_at)
-values (:'with_parts', 'بطارية ٧٠ أمبير', 1, 350.00, true, now());
+insert into public.order_parts (order_id, name_ar, quantity, unit_price)
+values (:'with_parts', 'بطارية ٧٠ أمبير', 1, 350.00);
+
+-- The customer approves it, as they would from the quote screen (0067: a
+-- line cannot be inserted already approved).
+select test.become('11111111-0000-4000-e800-000000000001');
+update public.order_parts set approved_by_customer = true, approved_at = now()
+ where order_id = :'with_parts';
+select test.become('22222222-0000-4000-e800-000000000002');
 
 select test.assert_raises(
   format($$select public.record_completion_evidence('%s', 30210, '[]'::jsonb, 400)$$, :'with_parts'),

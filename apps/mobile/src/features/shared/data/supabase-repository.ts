@@ -252,6 +252,7 @@ interface OrderPartRow {
   unit_price: number;
   warranty_days: number | null;
   approved_by_customer: boolean;
+  declined_at: string | null;
 }
 
 // PostgREST serialises `numeric` as a JSON number, so it arrives here as a
@@ -318,6 +319,7 @@ function toOrderPart(row: OrderPartRow): OrderPart {
     unitPrice: toSar(row.unit_price),
     warrantyDays: row.warranty_days,
     approvedByCustomer: row.approved_by_customer,
+    declinedAt: row.declined_at ?? null,
   };
 }
 
@@ -1235,7 +1237,7 @@ export class SupabaseRepository implements Repository {
       await this.client
         .from('order_parts')
         .select(
-          'id, order_id, name_ar, part_number, is_oem, quantity, unit_price, warranty_days, approved_by_customer',
+          'id, order_id, name_ar, part_number, is_oem, quantity, unit_price, warranty_days, approved_by_customer, declined_at',
         )
         .eq('order_id', orderId)
         .order('created_at'),
@@ -1251,10 +1253,27 @@ export class SupabaseRepository implements Repository {
     // customer on the order this line belongs to.
     const { error } = await this.client
       .from('order_parts')
-      .update({ approved_by_customer: true, approved_at: new Date().toISOString() })
+      // Clearing a previous "no": a customer may change their mind, and a
+      // line cannot hold both answers (0067).
+      .update({
+        approved_by_customer: true,
+        approved_at: new Date().toISOString(),
+        declined_at: null,
+      })
       .eq('id', partId);
 
     if (error !== null) throw new Error(`approveOrderPart: ${error.message}`);
+  }
+
+  async declineOrderPart(partId: string): Promise<void> {
+    // Same authority as approving: guard_order_parts (0067) lets only the
+    // customer answer, and only while the job is open.
+    const { error } = await this.client
+      .from('order_parts')
+      .update({ declined_at: new Date().toISOString() })
+      .eq('id', partId);
+
+    if (error !== null) throw new Error(`declineOrderPart: ${error.message}`);
   }
 
   async cancelOrder(orderId: string, reason?: string): Promise<void> {

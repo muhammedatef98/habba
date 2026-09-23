@@ -233,6 +233,8 @@ export interface Repository {
   getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null>;
   listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
   approveOrderPart(partId: string): Promise<void>;
+  /** The customer's "no" to a quoted part. Recorded, never billed (0067). */
+  declineOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
@@ -926,6 +928,7 @@ class DevOrderSimulator {
           unitPrice: sarOrThrow('320.00'),
           warrantyDays: 180,
           approvedByCustomer: false,
+          declinedAt: null,
         },
       ]);
       return { ...current, status: 'in_progress' };
@@ -992,16 +995,32 @@ class DevOrderSimulator {
   }
 
   approvePart(partId: string): void {
+    this.answerPart(partId, (line) => ({ ...line, approvedByCustomer: true, declinedAt: null }));
+  }
+
+  declinePart(partId: string): void {
+    this.answerPart(partId, (line) => ({
+      ...line,
+      approvedByCustomer: false,
+      declinedAt: new Date().toISOString(),
+    }));
+  }
+
+  /**
+   * Once every line has an answer, the simulated technician hands back — the
+   * same rule the server holds hand-back to (0067), with only the approved
+   * lines on the bill.
+   */
+  private answerPart(partId: string, answer: (line: OrderPart) => OrderPart): void {
     for (const [orderId, lines] of this.parts) {
       const index = lines.findIndex((line) => line.id === partId);
       if (index === -1) continue;
 
-      const approved = lines.map((line, i) =>
-        i === index ? { ...line, approvedByCustomer: true } : line,
-      );
-      this.parts.set(orderId, approved);
+      const answered = lines.map((line, i) => (i === index ? answer(line) : line));
+      this.parts.set(orderId, answered);
 
-      if (approved.every((line) => line.approvedByCustomer)) {
+      if (answered.every((line) => line.approvedByCustomer || line.declinedAt !== null)) {
+        const approved = answered.filter((line) => line.approvedByCustomer);
         const order = this.orders.get(orderId);
         if (order !== undefined) {
           const partsAmount = approved.reduce(
@@ -1472,6 +1491,10 @@ export class InMemoryRepository implements Repository {
 
   async approveOrderPart(partId: string): Promise<void> {
     this.orders.approvePart(partId);
+  }
+
+  async declineOrderPart(partId: string): Promise<void> {
+    this.orders.declinePart(partId);
   }
 
   async cancelOrder(orderId: string): Promise<void> {

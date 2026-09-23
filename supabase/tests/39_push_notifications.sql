@@ -168,6 +168,12 @@ update public.orders set status = 'in_progress' where id = :'emergency';
 insert into public.order_parts (order_id, name_ar, quantity, unit_price)
 values (:'emergency', 'بطارية ٧٠ أمبير', 1, 350.00);
 
+-- The customer answers before hand-back (0067).
+select test.become('11111111-0000-4000-e900-000000000001');
+update public.order_parts set approved_by_customer = true, approved_at = now()
+ where order_id = :'emergency';
+select test.become('22222222-0000-4000-e900-000000000002');
+
 select public.record_completion_evidence(:'emergency', 30150, test.completion_photos(:'emergency'), 30);
 update public.orders set status = 'awaiting_approval' where id = :'emergency';
 

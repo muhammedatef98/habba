@@ -123,6 +123,14 @@ export function isActiveJob(status: OrderStatus): boolean {
   return !['completed', 'cancelled', 'disputed', 'draft'].includes(status);
 }
 
+/**
+ * Statuses where the provider may quote, change or remove parts — mirrors
+ * `order_is_open_for_parts()` (0067): the job is on, not yet handed back.
+ */
+export function canQuoteParts(status: OrderStatus): boolean {
+  return ['accepted', 'en_route', 'arrived', 'checked_in', 'in_progress'].includes(status);
+}
+
 /** Statuses where the provider may still record or change evidence. */
 export function canRecordEvidence(status: OrderStatus): boolean {
   return ['arrived', 'checked_in', 'in_progress'].includes(status);
