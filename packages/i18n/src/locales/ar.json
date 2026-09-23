@@ -121,7 +121,8 @@
       "warranty_claimed": "مطالبة ضمان",
       "ownership_transferred": "نقل ملكية",
       "alert_raised": "تنبيه صيانة",
-      "alert_dismissed": "تم تجاهل التنبيه"
+      "alert_dismissed": "تم تجاهل التنبيه",
+      "record_annotated": "ملاحظة تصحيح من هبّة"
     },
     "addRecord": "سجّل صيانة سابقة",
     "recordTitle": "سجّل صيانة سابقة",

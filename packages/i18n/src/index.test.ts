@@ -65,6 +65,7 @@ describe('locale parity', () => {
       'ownership_transferred',
       'alert_raised',
       'alert_dismissed',
+      'record_annotated',
     ];
 
     for (const eventType of eventTypes) {

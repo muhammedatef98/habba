@@ -19,7 +19,9 @@ export type TimelineEventType =
   | 'warranty_claimed'
   | 'ownership_transferred'
   | 'alert_raised'
-  | 'alert_dismissed';
+  | 'alert_dismissed'
+  /** An operator's correction: a new entry beside the one it corrects (0069). */
+  | 'record_annotated';
 
 export interface VehicleMake {
   readonly id: string;

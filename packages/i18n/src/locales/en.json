@@ -121,7 +121,8 @@
       "warranty_claimed": "Warranty claimed",
       "ownership_transferred": "Ownership transferred",
       "alert_raised": "Maintenance alert",
-      "alert_dismissed": "Alert dismissed"
+      "alert_dismissed": "Alert dismissed",
+      "record_annotated": "Correction note from Habba"
     },
     "addRecord": "Record a past service",
     "recordTitle": "Record a past service",
