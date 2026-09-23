@@ -32,6 +32,26 @@ export function formatGregorianDate(iso: string, locale: string): string {
   });
 }
 
+/**
+ * An appointment: weekday, date and time, in Riyadh time.
+ *
+ * Pinned to Asia/Riyadh rather than the device's zone: slots are published in
+ * Riyadh time (0024's generate_slots), and a technician whose phone is set
+ * elsewhere must read the same hour the customer booked.
+ */
+export function formatAppointment(iso: string, locale: string): string {
+  return toLatinDigits(
+    new Date(iso).toLocaleString(tagFor(locale), {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: 'Asia/Riyadh',
+    }),
+  );
+}
+
 /** `null` when the platform cannot format the Islamic calendar — never throws. */
 export function formatHijriDate(iso: string, locale: string): string | null {
   if (!locale.startsWith('ar')) return null;

@@ -323,25 +323,28 @@
     "errorGeneric": "We couldn't complete the booking. Please try again.",
     "noVehicle": "Add your vehicle first so the service is recorded in its logbook.",
     "workshopOnly": "Workshop only",
-    "mobileOnly": "Mobile only"
+    "mobileOnly": "Mobile only",
+    "errorPayment": "The slot is held, but the amount could not be held on your card. Tap Confirm again.",
+    "priceByProvider": "Priced by each provider"
   },
   "emergency": {
     "title": "Emergency request",
     "serviceTitle": "What's the problem?",
-    "priceFixed": "Fixed price — {{amount}} SAR",
+    "priceFixed": "Fixed price — {{amount}} SAR incl. VAT",
     "locationTitle": "Your location",
     "locationHint": "The technician will come to this location. You can edit the address.",
     "addressLabel": "Address",
     "addressPlaceholder": "Nearest landmark or neighbourhood",
     "locatingNow": "Finding your location…",
-    "locationDenied": "We couldn't determine your location. Enter the address manually.",
+    "locationDenied": "We couldn't find your location. Move the map to where your car is, and describe the spot in the address.",
     "problemLabel": "Additional details",
     "problemPlaceholderLabel": "Optional",
     "vehicleRequired": "This service requires choosing a vehicle.",
     "submit": "Request now",
     "errors": {
       "noLocation": "We couldn't determine your location yet.",
-      "createFailed": "The request could not be sent. Try again."
+      "createFailed": "The request could not be sent. Try again.",
+      "paymentFailed": "The amount could not be held on your card. Check the card and try again."
     },
     "serviceHeadline": "What happened?",
     "serviceSubhead": "Pick one and we'll find your nearest technician right away.",
@@ -363,7 +366,8 @@
     "triageRetake": "Record again",
     "triageUse": "Use this clip",
     "triageRecorded": "Clip recorded ({{seconds}}s)",
-    "triageFailed": "Recording failed. You can continue without video."
+    "triageFailed": "Recording failed. You can continue without video.",
+    "paymentHold": "{{amount}} SAR will be held on your card now, and charged only after you confirm the work is done."
   },
   "tracking": {
     "title": "Track request",
@@ -443,7 +447,16 @@
       "explained": "Explained the issue"
     },
     "evidenceTitle": "Photos from the job",
-    "contactUnavailable": "Calling the technician isn't available yet — we're setting up a relay number that protects both sides' privacy."
+    "contactUnavailable": "Calling the technician isn't available yet — we're setting up a relay number that protects both sides' privacy.",
+    "notSentTitle": "Your request hasn't been sent yet",
+    "notSentBody": "Your request is saved, but it hasn't reached a provider because the payment hold didn't complete. Send it now.",
+    "notSentAction": "Send request",
+    "notSentFailed": "Couldn't send. Check your connection and try again.",
+    "bookedTitle": "Your appointment is confirmed",
+    "bookedWorkshopBody": "Bring your car to the workshop at the appointed time. We'll let you know when it's checked in, and at every step after.",
+    "bookedMobileBody": "The technician will come to you at the appointed time. We'll let you know when they set off.",
+    "bookedCancel": "Cancel appointment",
+    "warrantyLine": "{{days}}-day warranty on this work"
   },
   "quote": {
     "title": "Parts quote",
@@ -489,7 +502,9 @@
       "disputed": "Disputed"
     },
     "decline": "Can't take this one",
-    "declined": "Offer declined"
+    "declined": "Offer declined",
+    "lostRace": "Another technician took this job first.",
+    "actionFailed": "That step didn't go through. Check your connection and try again."
   },
   "provider": {
     "shiftTitle": "Your shift",
@@ -575,7 +590,11 @@
     "activeJobsTitle": "In progress",
     "noMyJobs": "No jobs in progress. Nearby requests appear on the shift screen.",
     "goToShift": "Open shift",
-    "sarSuffix": "SAR"
+    "sarSuffix": "SAR",
+    "warrantyLabel": "The warranty you give on this work",
+    "warrantyHint": "If the work fails within this period, the job comes back to you to fix at no charge.",
+    "warrantyDays": "{{days}} days",
+    "scheduledFor": "Appointment: {{when}}"
   },
   "profile": {
     "title": "My account",

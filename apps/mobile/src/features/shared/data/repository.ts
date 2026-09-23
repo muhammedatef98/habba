@@ -47,6 +47,7 @@ import type {
   NewVehicleInput,
   Order,
   OrderPart,
+  OrderStatus,
   IncomingTransfer,
   MintedTransfer,
   OwnershipTransfer,
@@ -182,6 +183,15 @@ export interface Repository {
   resolveMediaUrl(ref: string): Promise<string | null>;
   listEmergencyServices(): Promise<readonly Service[]>;
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
+  /**
+   * Sends a created order: holds the payment, then broadcasts an emergency to
+   * nearby technicians or confirms a booking with the provider the customer
+   * chose (0065). Until this runs the order is a `draft` nobody can see.
+   *
+   * Safe to call again after a failure or a dropped response — a held
+   * payment is not held twice, and an order already sent stays sent.
+   */
+  submitOrder(orderId: string): Promise<OrderStatus>;
 
   // Phase 4 — booking ahead. The server side has existed since 0024; these are
   // the calls the customer app was missing, which is why حجز موعد led to a
@@ -842,7 +852,7 @@ class DevOrderSimulator {
 
     const order: Order = {
       id,
-      status: 'searching',
+      status: 'draft',
       fulfilmentMode: 'mobile_ondemand',
       vehicleId: input.vehicleId ?? null,
       serviceId: input.serviceId,
@@ -854,14 +864,41 @@ class DevOrderSimulator {
       labourAmount: null,
       vatAmount: null,
       totalAmount: null,
-      escrowStatus: 'authorised',
+      escrowStatus: 'none',
       // The dev simulator has no technician taking photographs.
       completionMedia: [],
+      warrantyDays: null,
+      scheduledFor: null,
     };
     this.orders.set(id, order);
 
-    // Advances through the same statuses a real dispatch would, so the
-    // tracking screen has something to show without a second device.
+    return id;
+  }
+
+  /**
+   * The same commit the server makes (0065): nothing moves until the customer
+   * sends the order. Mirrored rather than skipped, so the dev build walks the
+   * screens through the same states a real order passes — including `draft`,
+   * which the tracking screen now shows as "not sent yet".
+   */
+  submit(id: string): OrderStatus {
+    const current = this.orders.get(id);
+    if (current === undefined) throw new Error('submitOrder: order not found');
+    if (current.status !== 'draft') return current.status;
+
+    const next: OrderStatus =
+      current.fulfilmentMode === 'mobile_ondemand' ? 'searching' : 'accepted';
+    this.orders.set(id, { ...current, status: next, escrowStatus: 'authorised' });
+
+    if (next === 'searching') this.simulateDispatch(id);
+    return next;
+  }
+
+  /**
+   * Advances through the same statuses a real dispatch would, so the
+   * tracking screen has something to show without a second device.
+   */
+  private simulateDispatch(id: string) {
     this.advanceAfter(id, 2500, (current) => ({
       ...current,
       status: 'accepted',
@@ -887,19 +924,23 @@ class DevOrderSimulator {
       ]);
       return { ...current, status: 'in_progress' };
     });
-
-    return id;
   }
 
   /**
    * A booked appointment, which is a different animal from an emergency: the
-   * provider is known at creation because the customer chose them, so the
-   * order opens at `accepted` and never passes through `searching`. Nothing
+   * provider is known at creation because the customer chose them, so once
+   * submitted it goes straight to `accepted` and never passes through
+   * `searching`. Nothing
    * advances on a timer either — the job is days away, and a dev simulator
    * that marched a Tuesday appointment to `completed` in ten seconds would
    * teach the UI a lie.
    */
-  book(input: NewBookingInput, mode: BookingMode, providerId: string): string {
+  book(
+    input: NewBookingInput,
+    mode: BookingMode,
+    providerId: string,
+    scheduledFor: string | null,
+  ): string {
     this.counter += 1;
     const id = `order-${this.counter}`;
     this.createdAt.set(id, new Date().toISOString());
@@ -907,7 +948,7 @@ class DevOrderSimulator {
 
     this.orders.set(id, {
       id,
-      status: 'accepted',
+      status: 'draft',
       fulfilmentMode: mode,
       vehicleId: input.vehicleId ?? null,
       serviceId: input.serviceId,
@@ -919,8 +960,10 @@ class DevOrderSimulator {
       labourAmount: null,
       vatAmount: null,
       totalAmount: null,
-      escrowStatus: 'authorised',
+      escrowStatus: 'none',
       completionMedia: [],
+      warrantyDays: null,
+      scheduledFor,
     });
 
     return id;
@@ -1300,6 +1343,10 @@ export class InMemoryRepository implements Repository {
     return this.orders.create(input);
   }
 
+  async submitOrder(orderId: string): Promise<OrderStatus> {
+    return this.orders.submit(orderId);
+  }
+
   async listBookableServices(): Promise<readonly Service[]> {
     return BOOKABLE_SERVICES;
   }
@@ -1338,7 +1385,11 @@ export class InMemoryRepository implements Repository {
     const mode: BookingMode =
       provider.providerType === 'workshop' ? 'workshop' : 'mobile_scheduled';
 
-    return this.orders.book(input, mode, provider.id);
+    const slotStart =
+      devSlotsFor(provider.id, new Date()).find((candidate) => candidate.id === slot)?.startsAt ??
+      null;
+
+    return this.orders.book(input, mode, provider.id, slotStart);
   }
 
   async getOrder(orderId: string) {

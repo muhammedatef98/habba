@@ -151,8 +151,12 @@ export interface Service {
   readonly nameEn: string;
   readonly descriptionAr: string | null;
   readonly icon: string | null;
-  /** CLAUDE.md §2.5: never a float — see @habba/core's money module (ADR-0007). */
-  readonly basePrice: SarAmount;
+  /**
+   * The catalogue price, before VAT. Null for a service each provider prices
+   * themselves (brakes, bodywork, detailing) — there is no one number to show.
+   * CLAUDE.md §2.5: never a float — see @habba/core's money module (ADR-0007).
+   */
+  readonly basePrice: SarAmount | null;
   readonly requiresVehicle: boolean;
   /**
    * Which fulfilment modes the service can actually be delivered in
@@ -294,6 +298,10 @@ export interface Order {
   readonly totalAmount: SarAmount | null;
   readonly escrowStatus: EscrowStatus;
   readonly completionMedia: readonly CompletionMedia[];
+  /** What the provider committed to at hand-back (0065). Null until then. */
+  readonly warrantyDays: number | null;
+  /** The appointment time for a booked order; null for an emergency. */
+  readonly scheduledFor: string | null;
 }
 
 export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'refunded';

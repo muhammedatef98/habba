@@ -18,6 +18,7 @@ import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@ha
 import { OpenJobCard } from '@/features/provider/components/OpenJobCard';
 import { ShiftStatusCard } from '@/features/provider/components/ShiftStatusCard';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { locationProvider } from '@/features/shared/lib/location';
 import { isBroadcastStale, LOCATION_INTERVAL_MS, useShift } from '@/features/provider/state/shift';
 import { useMode } from '@/features/shared/state/mode';
 
@@ -70,8 +71,11 @@ export default function ShiftScreen() {
 
     const push = async () => {
       try {
-        const position = await providerRepository.currentPosition();
-        await providerRepository.broadcastLocation(position);
+        // The phone's real position: without one the matcher cannot place this
+        // technician, and no emergency is ever offered to them.
+        const fix = await locationProvider.getCurrentLocation();
+        if (!fix.ok) throw new Error(fix.reason);
+        await providerRepository.broadcastLocation(fix.location);
         if (!cancelled) markBroadcast(Date.now());
       } catch (error) {
         if (!cancelled) {

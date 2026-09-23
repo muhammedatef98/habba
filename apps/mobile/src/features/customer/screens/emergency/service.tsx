@@ -17,6 +17,8 @@ import { repository } from '@/features/shared/data/repository';
 import { useEmergencyDraft } from '@/features/shared/state/emergency-draft';
 import { useSession } from '@/features/shared/state/session';
 import { serviceIcon } from '@/features/shared/lib/service-icon';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { priceWithVat } from '@/features/shared/lib/order-price';
 import { vehicleLabel } from '@/features/shared/lib/vehicle-label';
 
 export default function ServiceSelectionScreen() {
@@ -177,7 +179,13 @@ export default function ServiceSelectionScreen() {
               {t('emergency.estimatedPrice', { service: service.nameAr })}
             </Text>
             <Text variant="bodyStrong" numeric>
-              {t('emergency.priceFixed', { amount: service.basePrice })}
+              {t('emergency.priceFixed', {
+                // Emergency prices are always fixed centrally (§11).
+                amount:
+                  service.basePrice === null
+                    ? '—'
+                    : formatSarDisplay(priceWithVat(service.basePrice)),
+              })}
             </Text>
           </View>
         </Card>

@@ -12,7 +12,7 @@
  * technician brings and whether a tow truck can physically reach the vehicle.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -20,6 +20,13 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card, Field, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { locationProvider } from '@/features/shared/lib/location';
+import {
+  MAP_FALLBACK_LOCATION,
+  movedFromFallback,
+  type DeviceLocation,
+} from '@/features/shared/lib/location-provider';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { priceWithVat } from '@/features/shared/lib/order-price';
 import { useEmergencyDraft, type PlaceKind } from '@/features/shared/state/emergency-draft';
 import { LocationPicker } from '@/features/customer/components/map/LocationPicker';
 
@@ -29,7 +36,15 @@ export default function LocationConfirmScreen() {
 
   const draft = useEmergencyDraft();
   const [locationDenied, setLocationDenied] = useState(false);
+  const [pinMoved, setPinMoved] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+
+  /**
+   * The order this screen already created, if sending it failed afterwards.
+   * A retry sends that one rather than creating a second: two taps on a slow
+   * roadside connection must not put two emergencies out.
+   */
+  const createdId = useRef<string | null>(null);
 
   // Located once rather than continuously: "location confirm" is a one-shot
   // fix. Live tracking follows the provider, not the customer.
@@ -40,12 +55,20 @@ export default function LocationConfirmScreen() {
       if (result.ok) {
         draft.setLocation(result.location);
       } else {
+        // No permission is a normal answer, not a dead end: the map opens on
+        // a fallback the customer moves to their car.
         setLocationDenied(true);
+        if (draft.location === null) draft.setLocation(MAP_FALLBACK_LOCATION);
       }
       return result;
     },
     staleTime: Infinity,
   });
+
+  const handleSettled = (location: DeviceLocation) => {
+    draft.setLocation(location);
+    if (movedFromFallback(location)) setPinMoved(true);
+  };
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -55,15 +78,24 @@ export default function LocationConfirmScreen() {
         throw new Error('no_vehicle');
       }
 
-      return repository.createEmergencyOrder({
-        serviceId: draft.service.id,
-        lon: draft.location.lon,
-        lat: draft.location.lat,
-        ...(draft.vehicleId !== null ? { vehicleId: draft.vehicleId } : {}),
-        ...(draft.addressAr.trim().length > 0 ? { addressAr: draft.addressAr.trim() } : {}),
-        ...(draft.problem.trim().length > 0 ? { problem: draft.problem.trim() } : {}),
-      });
+      const orderId =
+        createdId.current ??
+        (await repository.createEmergencyOrder({
+          serviceId: draft.service.id,
+          lon: draft.location.lon,
+          lat: draft.location.lat,
+          ...(draft.vehicleId !== null ? { vehicleId: draft.vehicleId } : {}),
+          ...(draft.addressAr.trim().length > 0 ? { addressAr: draft.addressAr.trim() } : {}),
+          ...(draft.problem.trim().length > 0 ? { problem: draft.problem.trim() } : {}),
+        }));
+      createdId.current = orderId;
+
+      // Created is not sent. This holds the payment and puts the request in
+      // front of nearby technicians — until it succeeds, nobody can see it.
+      await repository.submitOrder(orderId);
+      return orderId;
     },
+    onMutate: () => setError(undefined),
     onSuccess: (orderId) => {
       // The draft is finished the moment the server owns the order. Leaving it
       // populated would pre-fill the next emergency with this one's answers.
@@ -76,10 +108,17 @@ export default function LocationConfirmScreen() {
           ? t('emergency.errors.noLocation')
           : mutationError.message === 'no_vehicle'
             ? t('emergency.vehicleRequired')
-            : t('emergency.errors.createFailed'),
+            : mutationError.message.startsWith('submitOrder/payment')
+              ? t('emergency.errors.paymentFailed')
+              : t('emergency.errors.createFailed'),
       );
     },
   });
+
+  const held =
+    draft.service === null || draft.service.basePrice === null
+      ? null
+      : priceWithVat(draft.service.basePrice);
 
   const places: readonly { readonly kind: PlaceKind; readonly label: string }[] = [
     { kind: 'roadside', label: t('emergency.placeRoadside') },
@@ -96,11 +135,7 @@ export default function LocationConfirmScreen() {
       </View>
 
       {draft.location !== null ? (
-        <LocationPicker
-          testID="emergency-map"
-          initial={draft.location}
-          onSettled={draft.setLocation}
-        />
+        <LocationPicker testID="emergency-map" initial={draft.location} onSettled={handleSettled} />
       ) : !locationDenied ? (
         <Text variant="caption" tone="muted">
           {t('emergency.locatingNow')}
@@ -156,8 +191,16 @@ export default function LocationConfirmScreen() {
         multiline
       />
 
+      {/* The escrow promise (§1), said where the customer commits: what is
+          held, and that nothing is taken until they say the job is done. */}
+      {held !== null ? (
+        <Text testID="emergency-payment-hold" variant="caption" tone="muted">
+          {t('emergency.paymentHold', { amount: formatSarDisplay(held) })}
+        </Text>
+      ) : null}
+
       {error !== undefined ? (
-        <Text variant="caption" tone="emergency">
+        <Text testID="emergency-error" variant="caption" tone="emergency">
           {error}
         </Text>
       ) : null}
@@ -172,7 +215,9 @@ export default function LocationConfirmScreen() {
         label={t('emergency.confirmAndSubmit')}
         onPress={() => submit.mutate()}
         loading={submit.isPending}
-        disabled={draft.location === null || draft.service === null}
+        disabled={
+          draft.location === null || draft.service === null || (locationDenied && !pinMoved)
+        }
       />
     </Screen>
   );

@@ -23,7 +23,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { addSar, applyRate, SAUDI_VAT_RATE, type SarAmount } from '@habba/core';
+import { subtractSar, type SarAmount } from '@habba/core';
 import {
   Button,
   Card,
@@ -38,6 +38,7 @@ import { BookingSteps } from '@/features/customer/components/booking/BookingStep
 import { repository } from '@/features/shared/data/repository';
 import { daysFromToday, groupSlotsByDay } from '@/features/shared/lib/slot-days';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { priceWithVat } from '@/features/shared/lib/order-price';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import type { AppointmentSlot } from '@/features/shared/data/types';
 
@@ -71,16 +72,31 @@ export default function BookingSlotScreen() {
     enabled: provider !== null,
   });
 
+  /**
+   * The booking this screen already placed, if confirming it failed after.
+   * The slot is claimed at that point; a retry confirms the same booking
+   * rather than claiming a second slot.
+   */
+  const bookedId = useRef<string | null>(null);
+
   const book = useMutation({
     mutationFn: async () => {
       if (draft.slot === null || service === null) throw new Error('incomplete');
 
-      return repository.bookAppointment({
-        slotId: draft.slot.id,
-        serviceId: service.id,
-        ...(draft.vehicleId !== null ? { vehicleId: draft.vehicleId } : {}),
-        ...(draft.problem.trim().length > 0 ? { problem: draft.problem.trim() } : {}),
-      });
+      const orderId =
+        bookedId.current ??
+        (await repository.bookAppointment({
+          slotId: draft.slot.id,
+          serviceId: service.id,
+          ...(draft.vehicleId !== null ? { vehicleId: draft.vehicleId } : {}),
+          ...(draft.problem.trim().length > 0 ? { problem: draft.problem.trim() } : {}),
+        }));
+      bookedId.current = orderId;
+
+      // Holds the payment and confirms the appointment with the provider.
+      // Until this succeeds the provider has nothing on their schedule.
+      await repository.submitOrder(orderId);
+      return orderId;
     },
     onSuccess: async (orderId) => {
       placed.current = true;
@@ -93,6 +109,14 @@ export default function BookingSlotScreen() {
     },
     onError: (cause: unknown) => {
       const message = cause instanceof Error ? cause.message : '';
+
+      // The slot is ours; only the confirmation failed. Keep the selection so
+      // one more tap finishes it.
+      if (bookedId.current !== null) {
+        setError(t('booking.errorPayment'));
+        return;
+      }
+
       setError(
         message.includes('slot_unavailable') || message.includes('no longer available')
           ? t('booking.errorSlotTaken')
@@ -114,9 +138,11 @@ export default function BookingSlotScreen() {
   const activeKey = dayKey ?? days[0]?.key ?? null;
   const activeDay = days.find((day) => day.key === activeKey);
 
-  const subtotal = service.basePrice;
-  const vat = applyRate(subtotal, SAUDI_VAT_RATE);
-  const total = addSar(subtotal, vat);
+  // The provider's price, as shown on their card and as the server quotes it
+  // (0065) — not the catalogue's, which a provider may have priced under.
+  const subtotal = provider.price;
+  const total = priceWithVat(subtotal);
+  const vat = subtractSar(total, subtotal);
 
   const dayLabel = (date: Date) => {
     const offset = daysFromToday(date);

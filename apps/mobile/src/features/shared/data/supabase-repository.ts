@@ -13,10 +13,12 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
+import { isZeroSar, sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
+import { priceWithVat } from '@/features/shared/lib/order-price.js';
+import { paymentProvider } from '@/features/shared/lib/payments.js';
 import type {
   AlertConfidence,
   AppointmentSlot,
@@ -236,6 +238,8 @@ interface OrderRow {
   total_amount: number | null;
   escrow_status: EscrowStatus;
   readonly completion_media: readonly CompletionMedia[] | null;
+  warranty_days: number | null;
+  scheduled_for: string | null;
 }
 
 interface OrderPartRow {
@@ -270,7 +274,7 @@ function toService(row: ServiceRow): Service {
     nameEn: row.name_en,
     descriptionAr: row.description_ar,
     icon: row.icon,
-    basePrice: toSar(row.base_price),
+    basePrice: toSarOrNull(row.base_price),
     requiresVehicle: row.requires_vehicle,
     supportedModes: row.supported_modes,
     estDurationMin: row.est_duration_min,
@@ -298,6 +302,8 @@ function toOrder(row: OrderRow): Order {
     // column list would see undefined — normalise rather than let a screen
     // map over nothing.
     completionMedia: row.completion_media ?? [],
+    warrantyDays: row.warranty_days ?? null,
+    scheduledFor: row.scheduled_for ?? null,
   };
 }
 
@@ -836,6 +842,32 @@ export class SupabaseRepository implements Repository {
     return data as string;
   }
 
+  async submitOrder(orderId: string): Promise<OrderStatus> {
+    const order = await this.getOrder(orderId);
+    if (order === null) throw new Error('submitOrder: order not found');
+
+    // Held at the price the customer was shown — catalogue plus VAT — which is
+    // also what the server bills at hand-back when no parts are added.
+    const owed = order.quotedAmount !== null && !isZeroSar(order.quotedAmount);
+    if (owed && order.status === 'draft' && order.escrowStatus === 'none') {
+      const held = await paymentProvider.authorise(
+        orderId,
+        priceWithVat(order.quotedAmount as SarAmount),
+      );
+      if (!held.ok) throw new Error(`submitOrder/payment: ${held.reason}`);
+
+      const { error } = await this.client.rpc('authorise_order_payment', {
+        p_order_id: orderId,
+        p_payment_intent_id: held.paymentIntentId,
+      });
+      if (error !== null) throw new Error(`submitOrder/payment: ${error.message}`);
+    }
+
+    const { data, error } = await this.client.rpc('submit_order', { p_order_id: orderId });
+    if (error !== null) throw new Error(`submitOrder: ${error.message}`);
+    return data as OrderStatus;
+  }
+
   async listBookableServices(): Promise<readonly Service[]> {
     const rows = unwrap(
       await this.client
@@ -878,9 +910,15 @@ export class SupabaseRepository implements Repository {
     // fixed-price service (0018's price guard), which is most of them.
     const service = await this.serviceById(serviceId);
 
-    return (rows as BookingProviderRow[]).map((row) => {
+    return (rows as BookingProviderRow[]).flatMap((row) => {
       const workshop = Array.isArray(row.workshops) ? row.workshops[0] : row.workshops;
       const custom = row.provider_services?.[0]?.custom_price ?? null;
+      const price = custom === null ? (service?.basePrice ?? null) : toSar(custom);
+
+      // A provider who has not priced a service the catalogue does not price
+      // either has nothing to book at. Offering them showed "0.00", and the
+      // booking went through with nothing held and nothing billed.
+      if (price === null) return [];
 
       return {
         id: row.id,
@@ -891,7 +929,7 @@ export class SupabaseRepository implements Repository {
         ratingCount: row.rating_count,
         jobsCompleted: row.jobs_completed,
         addressAr: workshop?.address_ar ?? null,
-        price: custom === null ? (service?.basePrice ?? toSar(0)) : toSar(custom),
+        price,
       };
     });
   }
@@ -953,7 +991,7 @@ export class SupabaseRepository implements Repository {
     const { data, error } = await this.client
       .from('orders')
       .select(
-        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media',
+        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media, warranty_days, scheduled_for',
       )
       .eq('id', orderId)
       .maybeSingle();

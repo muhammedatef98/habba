@@ -26,6 +26,22 @@ export interface LocationProvider {
 const DEV_FIXED_LOCATION: DeviceLocation = { lon: 50.1033, lat: 26.4207 };
 
 /**
+ * Where the map opens when the phone cannot say where it is (Riyadh centre,
+ * the larger launch market). Only ever a starting view: the emergency screen
+ * will not send an order pinned here until the customer has moved the map,
+ * or a technician would drive to the middle of the city.
+ */
+export const MAP_FALLBACK_LOCATION: DeviceLocation = { lon: 46.6753, lat: 24.7136 };
+
+/** True once a settled map position is meaningfully away from the fallback. */
+export function movedFromFallback(location: DeviceLocation): boolean {
+  return (
+    Math.abs(location.lon - MAP_FALLBACK_LOCATION.lon) > 0.0005 ||
+    Math.abs(location.lat - MAP_FALLBACK_LOCATION.lat) > 0.0005
+  );
+}
+
+/**
  * Fixed Eastern Province coordinate (CLAUDE.md §0: launch markets are Eastern
  * Province + Riyadh), so `assert_plausible_coordinate` on the server always
  * accepts it.

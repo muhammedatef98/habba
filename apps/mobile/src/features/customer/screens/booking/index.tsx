@@ -180,7 +180,9 @@ export default function BookingServiceScreen() {
               </View>
 
               <Text variant="bodyStrong" tone="accent" numeric>
-                {t('common.sar', { amount: formatSarDisplay(option.basePrice) })}
+                {option.basePrice === null
+                  ? t('booking.priceByProvider')
+                  : t('common.sar', { amount: formatSarDisplay(option.basePrice) })}
               </Text>
             </Card>
           );

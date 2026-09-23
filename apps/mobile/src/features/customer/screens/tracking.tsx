@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
+  Row,
   Screen,
   Skeleton,
   SkeletonCard,
@@ -33,16 +34,19 @@ import {
 } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
+import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { Arrived } from '@/features/customer/components/tracking/Arrived';
+import { Booked } from '@/features/customer/components/tracking/Booked';
 import { Completed } from '@/features/customer/components/tracking/Completed';
 import { InProgress } from '@/features/customer/components/tracking/InProgress';
 import { LiveTracking } from '@/features/customer/components/tracking/LiveTracking';
 import { Matched } from '@/features/customer/components/tracking/Matched';
+import { PriceBreakdown } from '@/features/customer/components/tracking/PriceBreakdown';
 import { Searching } from '@/features/customer/components/tracking/Searching';
 import type { OrderStatus } from '@/features/shared/data/types';
 
 const TERMINAL: readonly OrderStatus[] = ['completed', 'cancelled', 'disputed'];
-const SEARCHING: readonly OrderStatus[] = ['draft', 'searching'];
+const SEARCHING: readonly OrderStatus[] = ['searching'];
 
 function TrackingBody() {
   const { t } = useTranslation();
@@ -102,6 +106,13 @@ function TrackingBody() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
 
+  // Sends an order that was created but never sent — the app closed, or the
+  // payment hold failed, between the two steps. Idempotent server-side.
+  const send = useMutation({
+    mutationFn: () => repository.submitOrder(id ?? ''),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  });
+
   const confirmCompletion = useMutation({
     mutationFn: () => repository.confirmOrderCompletion(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
@@ -152,6 +163,55 @@ function TrackingBody() {
   const telemetry = dispatch.data ?? undefined;
   const progress = liveProgress.data ?? undefined;
 
+  // Created but not sent. Nobody can see it yet, so this must not look like a
+  // search — it says so, and offers the one tap that finishes it.
+  if (status === 'draft') {
+    return (
+      <Screen scrollable>
+        <Card testID="tracking-not-sent">
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="heading">{t('tracking.notSentTitle')}</Text>
+            <Text variant="body" tone="muted">
+              {t('tracking.notSentBody')}
+            </Text>
+            <Button
+              testID="tracking-send"
+              label={t('tracking.notSentAction')}
+              onPress={() => send.mutate()}
+              loading={send.isPending}
+            />
+            {send.isError ? (
+              <Text variant="caption" tone="emergency">
+                {t('tracking.notSentFailed')}
+              </Text>
+            ) : null}
+          </View>
+        </Card>
+        <Button
+          label={t('tracking.cancelAction')}
+          variant="ghost"
+          onPress={() => cancel.mutate()}
+          loading={cancel.isPending}
+        />
+      </Screen>
+    );
+  }
+
+  const booked = current.fulfilmentMode !== 'mobile_ondemand';
+
+  if (booked && status === 'accepted') {
+    return (
+      <Screen scrollable>
+        <Booked
+          order={current}
+          provider={providerData}
+          onCancel={() => cancel.mutate()}
+          cancelPending={cancel.isPending}
+        />
+      </Screen>
+    );
+  }
+
   if (SEARCHING.includes(status)) {
     return (
       <Screen scrollable>
@@ -178,7 +238,7 @@ function TrackingBody() {
     );
   }
 
-  if (status === 'accepted' || status === 'en_route' || status === 'checked_in') {
+  if (status === 'accepted' || status === 'en_route') {
     return (
       <Screen scrollable>
         <LiveTracking
@@ -201,7 +261,9 @@ function TrackingBody() {
     );
   }
 
-  if (status === 'in_progress') {
+  // A car checked in at the workshop is with the provider now: the same
+  // "work underway" view, not a live map of a drive that is not happening.
+  if (status === 'in_progress' || status === 'checked_in') {
     return (
       <Screen scrollable>
         <InProgress
@@ -226,6 +288,30 @@ function TrackingBody() {
             <Text variant="body" tone="muted">
               {t('tracking.confirmCompletionBody')}
             </Text>
+
+            {/* What they are approving, before they approve it: the photos
+                of the work, what it costs, and what is guaranteed. */}
+            {current.completionMedia.length > 0 ? (
+              <Row gap="sm" wrap>
+                {current.completionMedia.map((photo) => (
+                  <EvidencePhoto
+                    key={photo.url}
+                    reference={photo.url}
+                    size={72}
+                    accessibilityLabel={photo.caption ?? t('tracking.evidenceTitle')}
+                  />
+                ))}
+              </Row>
+            ) : null}
+
+            <PriceBreakdown testID="approval-breakdown" order={current} />
+
+            {current.warrantyDays !== null && current.warrantyDays > 0 ? (
+              <Text testID="approval-warranty" variant="bodySmall" tone="success">
+                {t('tracking.warrantyLine', { days: current.warrantyDays })}
+              </Text>
+            ) : null}
+
             <Button
               testID="confirm-completion"
               label={t('tracking.confirmCompletionAction')}

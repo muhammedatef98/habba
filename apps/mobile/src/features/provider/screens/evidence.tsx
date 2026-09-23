@@ -47,6 +47,13 @@ const PHOTO_LABELS: Record<PhotoKind, { add: string; captured: string }> = {
 
 const CAMERA_DENIED = 'camera_denied';
 
+/**
+ * The warranty periods a technician can give. No "none": §1 promises every
+ * job carries a warranty, and a zero on the list would become the default
+ * the moment someone is in a hurry. How long is theirs to choose.
+ */
+const WARRANTY_OPTIONS: readonly number[] = [30, 90, 180];
+
 export default function EvidenceScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -63,6 +70,7 @@ export default function EvidenceScreen() {
   const [media, setMedia] = useState<readonly CompletionMediaItem[]>([]);
 
   const [previews, setPreviews] = useState<Partial<Record<PhotoKind, string>>>({});
+  const [warrantyDays, setWarrantyDays] = useState<number>(WARRANTY_OPTIONS[0] ?? 30);
   const [photoError, setPhotoError] = useState<string | undefined>(undefined);
 
   /**
@@ -106,7 +114,8 @@ export default function EvidenceScreen() {
   });
 
   const save = useMutation({
-    mutationFn: () => providerRepository.recordEvidence(id ?? '', Number(mileageText), media),
+    mutationFn: () =>
+      providerRepository.recordEvidence(id ?? '', Number(mileageText), media, warrantyDays),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['job', id] });
       router.back();
@@ -213,6 +222,44 @@ export default function EvidenceScreen() {
           ) : null}
         </View>
       ) : null}
+
+      <View style={{ gap: theme.spacing.sm }}>
+        <Text variant="label" tone="muted">
+          {t('provider.warrantyLabel')}
+        </Text>
+        <Row gap="sm">
+          {WARRANTY_OPTIONS.map((days) => {
+            const selected = warrantyDays === days;
+            return (
+              <Card
+                key={days}
+                testID={`warranty-${days}`}
+                elevation="none"
+                onPress={() => setWarrantyDays(days)}
+                accessibilityLabel={t('provider.warrantyDays', { days })}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  minHeight: theme.minTouchTarget,
+                  justifyContent: 'center',
+                  backgroundColor: selected
+                    ? theme.colors.primarySubtle
+                    : theme.colors.surfaceSunken,
+                  borderColor: selected ? theme.colors.primary : theme.colors.border,
+                  borderWidth: selected ? 1.5 : 1,
+                }}
+              >
+                <Text variant="bodySmall" tone={selected ? 'primary' : 'muted'} numeric>
+                  {t('provider.warrantyDays', { days })}
+                </Text>
+              </Card>
+            );
+          })}
+        </Row>
+        <Text variant="caption" tone="subtle">
+          {t('provider.warrantyHint')}
+        </Text>
+      </View>
 
       {gaps.length > 0 ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>

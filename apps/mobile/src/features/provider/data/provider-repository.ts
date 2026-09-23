@@ -44,7 +44,24 @@ export interface AssignedJob {
   readonly requiresCompletionPhotos: boolean;
   readonly requiresCompletionMileage: boolean;
   readonly vehicleCurrentMileage: number | null;
+  /** The appointment time for a booked job; null for an emergency. */
+  readonly scheduledFor: string | null;
+  /**
+   * Present while the job is still an offer to this technician, not yet
+   * theirs. What they need to decide — how far, how much — and nothing that
+   * identifies the customer or where they are (ADR-0013).
+   */
+  readonly offer: Pick<
+    OpenJob,
+    'distanceBucket' | 'districtNameAr' | 'estimatedPayout' | 'hasTriageVideo'
+  > | null;
 }
+
+/**
+ * How accepting went. Losing the race is a normal outcome — an emergency goes
+ * to several technicians at once and one of them wins — not an error.
+ */
+export type AcceptOutcome = 'accepted' | 'taken';
 
 export interface Position {
   readonly lon: number;
@@ -54,7 +71,6 @@ export interface Position {
 
 export interface ProviderRepository {
   setOnline(online: boolean): Promise<void>;
-  currentPosition(): Promise<Position>;
   broadcastLocation(position: Position): Promise<void>;
   listOpenJobs(): Promise<readonly OpenJob[]>;
   listMyJobs(): Promise<readonly AssignedJob[]>;
@@ -69,7 +85,7 @@ export interface ProviderRepository {
   markOfferViewed(orderId: string): Promise<void>;
   /** Declines an offer so the dispatcher can widen instead of waiting. */
   declineOffer(orderId: string): Promise<void>;
-  acceptJob(orderId: string): Promise<void>;
+  acceptJob(orderId: string): Promise<AcceptOutcome>;
   advanceJob(orderId: string, toStatus: OrderStatus): Promise<void>;
   checkInVehicle(orderId: string): Promise<void>;
   /**
@@ -84,10 +100,12 @@ export interface ProviderRepository {
     kind: CompletionMediaItem['kind'],
     localUri: string,
   ): Promise<CompletionMediaItem>;
+  /** Mileage, photos and the warranty given — one call, never half-saved. */
   recordEvidence(
     orderId: string,
     mileage: number,
     media: readonly CompletionMediaItem[],
+    warrantyDays: number,
   ): Promise<void>;
 }
 
@@ -113,12 +131,6 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`setOnline: ${error.message}`);
   }
 
-  async currentPosition(): Promise<Position> {
-    // expo-location is wired in the native build; this keeps the data layer
-    // free of a native dependency so it stays testable in Node.
-    throw new Error('currentPosition must be supplied by the platform layer');
-  }
-
   async broadcastLocation(position: Position): Promise<void> {
     const { error } = await this.client.rpc('update_provider_location', {
       p_lon: position.lon,
@@ -133,17 +145,7 @@ export class SupabaseProviderRepository implements ProviderRepository {
     const { data, error } = await this.client.rpc('list_open_orders_for_provider');
     if (error !== null) throw new Error(`listOpenJobs: ${error.message}`);
 
-    return (data as OpenJobRow[]).map((row) => ({
-      orderId: row.order_id,
-      serviceId: row.service_id,
-      serviceNameAr: row.service_name_ar,
-      fulfilmentMode: row.fulfilment_mode,
-      distanceBucket: row.distance_bucket,
-      districtNameAr: row.district_name_ar,
-      problemSummary: row.problem_summary,
-      hasTriageVideo: row.has_triage_video,
-      estimatedPayout: row.estimated_payout,
-    }));
+    return (data as OpenJobRow[]).map(toOpenJob);
   }
 
   async listMyJobs(): Promise<readonly AssignedJob[]> {
@@ -151,7 +153,7 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .from('orders')
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
-          'completion_mileage, completion_media, vehicle_id, ' +
+          'completion_mileage, completion_media, vehicle_id, scheduled_for, ' +
           'services(name_ar, requires_completion_photos, requires_completion_mileage), ' +
           'vehicles(current_mileage)',
       )
@@ -174,7 +176,7 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .from('orders')
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
-          'completion_mileage, completion_media, vehicle_id, ' +
+          'completion_mileage, completion_media, vehicle_id, scheduled_for, ' +
           'services(name_ar, requires_completion_photos, requires_completion_mileage), ' +
           'vehicles(current_mileage)',
       )
@@ -182,7 +184,13 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .maybeSingle();
 
     if (error !== null) throw new Error(`getJob: ${error.message}`);
-    return data === null ? null : toAssignedJob(data);
+    if (data !== null) return toAssignedJob(data);
+
+    // Not yours yet, so RLS hides the order row — which is right (ADR-0013).
+    // An offer is still something to open and decide on, so it is read
+    // through the same masked listing the shift screen shows.
+    const offer = (await this.listOpenJobs()).find((job) => job.orderId === orderId);
+    return offer === undefined ? null : offerAsJob(offer);
   }
 
   async markOfferViewed(orderId: string): Promise<void> {
@@ -197,12 +205,14 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`declineOffer: ${error.message}`);
   }
 
-  async acceptJob(orderId: string): Promise<void> {
-    const { error } = await this.client
-      .from('orders')
-      .update({ status: 'accepted' })
-      .eq('id', orderId);
+  async acceptJob(orderId: string): Promise<AcceptOutcome> {
+    // The RPC, never a table UPDATE: before acceptance this technician is not
+    // the assigned provider, so RLS matches no row and a plain UPDATE
+    // "succeeds" having changed nothing (0033). The RPC claims atomically —
+    // of several technicians offered the job, exactly one gets it.
+    const { data, error } = await this.client.rpc('accept_order', { p_order_id: orderId });
     if (error !== null) throw new Error(`acceptJob: ${error.message}`);
+    return data === true ? 'accepted' : 'taken';
   }
 
   async advanceJob(orderId: string, toStatus: OrderStatus): Promise<void> {
@@ -240,12 +250,14 @@ export class SupabaseProviderRepository implements ProviderRepository {
     orderId: string,
     mileage: number,
     media: readonly CompletionMediaItem[],
+    warrantyDays: number,
   ): Promise<void> {
-    // One call for both halves, so a half-saved completion cannot exist.
+    // One call for all of it, so a half-saved completion cannot exist.
     const { error } = await this.client.rpc('record_completion_evidence', {
       p_order_id: orderId,
       p_mileage: mileage,
       p_media: media,
+      p_warranty_days: warrantyDays,
     });
     if (error !== null) throw new Error(`recordEvidence: ${error.message}`);
   }
@@ -266,6 +278,45 @@ interface OrderRow {
     requires_completion_mileage: boolean;
   } | null;
   vehicles: { current_mileage: number } | null;
+  scheduled_for: string | null;
+}
+
+function toOpenJob(row: OpenJobRow): OpenJob {
+  return {
+    orderId: row.order_id,
+    serviceId: row.service_id,
+    serviceNameAr: row.service_name_ar,
+    fulfilmentMode: row.fulfilment_mode,
+    distanceBucket: row.distance_bucket,
+    districtNameAr: row.district_name_ar,
+    problemSummary: row.problem_summary,
+    hasTriageVideo: row.has_triage_video,
+    estimatedPayout: row.estimated_payout,
+  };
+}
+
+function offerAsJob(offer: OpenJob): AssignedJob {
+  return {
+    orderId: offer.orderId,
+    orderNumber: '',
+    status: 'searching',
+    fulfilmentMode: offer.fulfilmentMode,
+    serviceNameAr: offer.serviceNameAr,
+    addressAr: null,
+    problemDescription: offer.problemSummary,
+    completionMileage: null,
+    completionMedia: [],
+    requiresCompletionPhotos: true,
+    requiresCompletionMileage: true,
+    vehicleCurrentMileage: null,
+    scheduledFor: null,
+    offer: {
+      distanceBucket: offer.distanceBucket,
+      districtNameAr: offer.districtNameAr,
+      estimatedPayout: offer.estimatedPayout,
+      hasTriageVideo: offer.hasTriageVideo,
+    },
+  };
 }
 
 function toAssignedJob(row: unknown): AssignedJob {
@@ -283,8 +334,23 @@ function toAssignedJob(row: unknown): AssignedJob {
     requiresCompletionPhotos: order.services?.requires_completion_photos ?? true,
     requiresCompletionMileage: order.services?.requires_completion_mileage ?? true,
     vehicleCurrentMileage: order.vehicles?.current_mileage ?? null,
+    scheduledFor: order.scheduled_for ?? null,
+    offer: null,
   };
 }
+
+/** The one offer the dev build shows a technician who goes online. */
+const DEV_OPEN_JOB: OpenJob = {
+  orderId: 'dev-open-1',
+  serviceId: 'dev-service-1',
+  serviceNameAr: 'بطارية — شحن أو تبديل',
+  fulfilmentMode: 'mobile_ondemand',
+  distanceBucket: 'أقل من ٢ كم',
+  districtNameAr: 'الرياض',
+  problemSummary: 'السيارة ما تشتغل',
+  hasTriageVideo: false,
+  estimatedPayout: '120.00',
+};
 
 /** In-memory stand-in, used until a Supabase project exists (ADR-0010). */
 export class InMemoryProviderRepository implements ProviderRepository {
@@ -295,29 +361,13 @@ export class InMemoryProviderRepository implements ProviderRepository {
     this.online = online;
   }
 
-  async currentPosition(): Promise<Position> {
-    return { lon: 46.6753, lat: 24.7136 };
-  }
-
   async broadcastLocation(): Promise<void> {
     /* no-op */
   }
 
   async listOpenJobs(): Promise<readonly OpenJob[]> {
-    if (!this.online) return [];
-    return [
-      {
-        orderId: 'dev-open-1',
-        serviceId: 'dev-service-1',
-        serviceNameAr: 'بطارية — شحن أو تبديل',
-        fulfilmentMode: 'mobile_ondemand',
-        distanceBucket: 'أقل من ٢ كم',
-        districtNameAr: 'الرياض',
-        problemSummary: 'السيارة ما تشتغل',
-        hasTriageVideo: false,
-        estimatedPayout: '120.00',
-      },
-    ];
+    if (!this.online || this.jobs.has(DEV_OPEN_JOB.orderId)) return [];
+    return [DEV_OPEN_JOB];
   }
 
   async listMyJobs(): Promise<readonly AssignedJob[]> {
@@ -325,7 +375,9 @@ export class InMemoryProviderRepository implements ProviderRepository {
   }
 
   async getJob(orderId: string): Promise<AssignedJob | null> {
-    return this.jobs.get(orderId) ?? null;
+    const job = this.jobs.get(orderId);
+    if (job !== undefined) return job;
+    return this.online && orderId === DEV_OPEN_JOB.orderId ? offerAsJob(DEV_OPEN_JOB) : null;
   }
 
   // No offers table in the dev build, so there is nothing to record. Silent
@@ -339,7 +391,7 @@ export class InMemoryProviderRepository implements ProviderRepository {
     this.jobs.delete(orderId);
   }
 
-  async acceptJob(orderId: string): Promise<void> {
+  async acceptJob(orderId: string): Promise<AcceptOutcome> {
     this.jobs.set(orderId, {
       orderId,
       orderNumber: 'HB-DEV-000001',
@@ -353,7 +405,10 @@ export class InMemoryProviderRepository implements ProviderRepository {
       requiresCompletionPhotos: true,
       requiresCompletionMileage: true,
       vehicleCurrentMileage: 45000,
+      scheduledFor: null,
+      offer: null,
     });
+    return 'accepted';
   }
 
   async advanceJob(orderId: string, toStatus: OrderStatus): Promise<void> {
@@ -379,6 +434,7 @@ export class InMemoryProviderRepository implements ProviderRepository {
     orderId: string,
     mileage: number,
     media: readonly CompletionMediaItem[],
+    _warrantyDays: number,
   ): Promise<void> {
     const job = this.jobs.get(orderId);
     if (job !== undefined) {

@@ -11,6 +11,7 @@
  * refuses.
  */
 
+import { useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,9 +19,10 @@ import { useTranslation } from 'react-i18next';
 import { canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { formatAppointment } from '@/features/shared/lib/dates';
 
 export default function JobScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,26 +53,38 @@ export default function JobScreen() {
     },
   });
 
+  const [notice, setNotice] = useState<string | undefined>(undefined);
+
   const advance = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<'done' | 'taken'> => {
       const current = job.data;
-      if (current === null || current === undefined) return;
+      if (current === null || current === undefined) return 'done';
 
       const step = nextJobStep(current.status, current.fulfilmentMode);
-      if (step.toStatus === null) return;
+      if (step.toStatus === null) return 'done';
 
       if (step.action === 'accept') {
-        await providerRepository.acceptJob(current.orderId);
-      } else if (step.action === 'check_in_vehicle') {
+        return (await providerRepository.acceptJob(current.orderId)) === 'accepted'
+          ? 'done'
+          : 'taken';
+      }
+      if (step.action === 'check_in_vehicle') {
         await providerRepository.checkInVehicle(current.orderId);
       } else {
         await providerRepository.advanceJob(current.orderId, step.toStatus);
       }
+      return 'done';
     },
-    onSuccess: async () => {
+    onMutate: () => setNotice(undefined),
+    onSuccess: async (outcome) => {
       await queryClient.invalidateQueries({ queryKey: ['job', id] });
       await queryClient.invalidateQueries({ queryKey: ['open-jobs'] });
+      await queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
+      // Said plainly rather than as an error: several technicians are offered
+      // every emergency and one wins. The offer is gone from their list too.
+      if (outcome === 'taken') setNotice(t('job.lostRace'));
     },
+    onError: () => setNotice(t('job.actionFailed')),
   });
 
   const data = job.data;
@@ -107,9 +121,45 @@ export default function JobScreen() {
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{data.serviceNameAr}</Text>
         <Text variant="caption" tone="muted">
-          {data.orderNumber} · {t(`job.status.${data.status}`)}
+          {data.orderNumber.length > 0
+            ? `${data.orderNumber} · ${t(`job.status.${data.status}`)}`
+            : t(`job.status.${data.status}`)}
         </Text>
+        {data.scheduledFor !== null ? (
+          <Text testID="job-scheduled" variant="bodyStrong">
+            {t('provider.scheduledFor', {
+              when: formatAppointment(data.scheduledFor, i18n.language),
+            })}
+          </Text>
+        ) : null}
       </View>
+
+      {/* What a technician needs to decide on an offer: how far, and what it
+          pays. The address arrives once they accept (ADR-0013). */}
+      {data.offer !== null ? (
+        <Card
+          testID="job-offer"
+          elevation="none"
+          style={{ backgroundColor: theme.colors.surfaceSunken }}
+        >
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text variant="bodyStrong">
+              {t('provider.distanceLabel')}: {data.offer.distanceBucket}
+              {data.offer.districtNameAr !== null ? ` · ${data.offer.districtNameAr}` : ''}
+            </Text>
+            {data.offer.estimatedPayout !== null ? (
+              <Text variant="body" numeric>
+                {t('provider.payoutLabel')}: {data.offer.estimatedPayout} {t('provider.sarSuffix')}
+              </Text>
+            ) : null}
+            {data.offer.hasTriageVideo ? (
+              <Text variant="caption" tone="muted">
+                {t('provider.hasVideo')}
+              </Text>
+            ) : null}
+          </View>
+        </Card>
+      ) : null}
 
       <Card>
         <View style={{ gap: theme.spacing.sm }}>
@@ -173,6 +223,12 @@ export default function JobScreen() {
           disabled={blockedForEvidence}
         />
       )}
+
+      {notice !== undefined ? (
+        <Text testID="job-notice" variant="bodySmall" tone="warning">
+          {notice}
+        </Text>
+      ) : null}
 
       {blockedForEvidence ? (
         <Text variant="caption" style={{ color: theme.colors.warning }}>
