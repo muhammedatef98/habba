@@ -39,6 +39,7 @@ import { repository } from '@/features/shared/data/repository';
 import { daysFromToday, groupSlotsByDay } from '@/features/shared/lib/slot-days';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { priceWithVat } from '@/features/shared/lib/order-price';
+import { registerThisDevice } from '@/features/shared/lib/push';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import type { AppointmentSlot } from '@/features/shared/data/types';
 
@@ -100,6 +101,9 @@ export default function BookingSlotScreen() {
     },
     onSuccess: async (orderId) => {
       placed.current = true;
+      // Asked now, when it explains itself: they will want to hear when the
+      // workshop has the car and when the work is done.
+      void registerThisDevice({ prompt: true, locale: i18n.language });
       // The draft is finished the moment the server owns the order; leaving it
       // populated would pre-fill the next booking with this one's answers.
       draft.reset();

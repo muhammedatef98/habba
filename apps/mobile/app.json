@@ -60,6 +60,12 @@
         {
           "locationWhenInUsePermission": "تستخدم هبّة الموقع لإرسال أقرب فنّي إلى سيارتك، ولمشاركة موقع الفنّي مع العميل أثناء توجّهه إليه."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#12514F"
+        }
       ]
     ],
     "experiments": {

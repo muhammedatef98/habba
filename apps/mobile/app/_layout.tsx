@@ -36,8 +36,12 @@ import { detectDeviceLocale, initI18n } from '@/features/shared/lib/i18n';
 import { readStoredLocale, readStoredTheme } from '@/features/shared/lib/preferences';
 import { syncLayoutDirection } from '@/features/shared/lib/rtl';
 import { OfflineNotice } from '@/features/shared/components/OfflineNotice';
+import { PushBridge } from '@/features/shared/components/PushBridge';
+import { configureNotificationPresentation } from '@/features/shared/lib/push';
 import { useMode } from '@/features/shared/state/mode';
 import { useSession } from '@/features/shared/state/session';
+
+configureNotificationPresentation();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,6 +143,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider locale={locale} preference={themePreference}>
           <StatusBar style="auto" />
+          <PushBridge />
           {/* Above the navigator and outside it, so the notice survives every
               screen change instead of each screen having to remember it.
               Deliberately NOT wrapped in a SafeAreaView: <Screen> already

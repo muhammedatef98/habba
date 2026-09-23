@@ -9,8 +9,8 @@
  * the address before acceptance, so this screen renders everything there is.
  */
 
-import { useCallback, useEffect } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Linking, View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +19,12 @@ import { OpenJobCard } from '@/features/provider/components/OpenJobCard';
 import { ShiftStatusCard } from '@/features/provider/components/ShiftStatusCard';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { locationProvider } from '@/features/shared/lib/location';
+import { registerThisDevice, type PushRegistration } from '@/features/shared/lib/push';
 import { isBroadcastStale, LOCATION_INTERVAL_MS, useShift } from '@/features/provider/state/shift';
 import { useMode } from '@/features/shared/state/mode';
 
 export default function ShiftScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
 
@@ -55,11 +56,19 @@ export default function ShiftScreen() {
     refetchInterval: isOnline ? 10_000 : false,
   });
 
+  /**
+   * Whether this phone can be reached with the app closed. Null until the
+   * technician first goes online in this session — that is when it is asked.
+   */
+  const [push, setPush] = useState<PushRegistration | null>(null);
+
   const toggle = useMutation({
     mutationFn: (next: boolean) => providerRepository.setOnline(next),
     onSuccess: async (_data, next) => {
       setOnline(next);
       await queryClient.invalidateQueries({ queryKey: ['open-jobs'] });
+      // Going online is when it explains itself: "tell me about new jobs".
+      if (next) setPush(await registerThisDevice({ prompt: true, locale: i18n.language }));
     },
   });
 
@@ -120,6 +129,30 @@ export default function ShiftScreen() {
         busy={toggle.isPending}
         onToggle={() => toggle.mutate(!isOnline)}
       />
+
+      {/* Online but unreachable while closed is the case that quietly costs a
+          technician their jobs — so it is said, with the way out. A simulator
+          or a build without push configured is not the technician's to fix,
+          and is not nagged about. */}
+      {isOnline && push !== null && !push.ok && push.reason === 'denied' ? (
+        <Card
+          testID="shift-push-off"
+          elevation="none"
+          style={{ backgroundColor: theme.colors.surfaceSunken }}
+        >
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodySmall" tone="warning">
+              {t('provider.pushOff')}
+            </Text>
+            <Button
+              label={t('provider.pushOffSettings')}
+              variant="secondary"
+              size="medium"
+              onPress={() => void Linking.openSettings()}
+            />
+          </View>
+        </Card>
+      ) : null}
 
       {/* Online but invisible to dispatch is the state worth shouting about:
           the technician believes they are working and nothing is arriving,

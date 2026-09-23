@@ -594,7 +594,9 @@
     "warrantyLabel": "The warranty you give on this work",
     "warrantyHint": "If the work fails within this period, the job comes back to you to fix at no charge.",
     "warrantyDays": "{{days}} days",
-    "scheduledFor": "Appointment: {{when}}"
+    "scheduledFor": "Appointment: {{when}}",
+    "pushOff": "Notifications are off, so new jobs won't reach you while the app is closed. Turn them on in Settings.",
+    "pushOffSettings": "Open Settings"
   },
   "profile": {
     "title": "My account",

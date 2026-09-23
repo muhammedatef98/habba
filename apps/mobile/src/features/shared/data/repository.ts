@@ -181,6 +181,12 @@ export interface Repository {
    * never the raw reference.
    */
   resolveMediaUrl(ref: string): Promise<string | null>;
+  /**
+   * Where to reach this person when the app is closed (0066). The token moves
+   * to whoever is signed in on the phone; sign-out removes it.
+   */
+  registerPushDevice(token: string, platform: 'ios' | 'android', locale: string): Promise<void>;
+  unregisterPushDevice(token: string): Promise<void>;
   listEmergencyServices(): Promise<readonly Service[]>;
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
   /**
@@ -1428,6 +1434,15 @@ export class InMemoryRepository implements Repository {
   // success here would hide that the clip went nowhere.
   async attachTriageClip(): Promise<boolean> {
     return false;
+  }
+
+  // The dev build has no server to send from, so there is nothing to register.
+  async registerPushDevice(): Promise<void> {
+    return;
+  }
+
+  async unregisterPushDevice(): Promise<void> {
+    return;
   }
 
   // Nothing here is ever a storage reference: the in-memory provider keeps

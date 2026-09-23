@@ -22,7 +22,7 @@ function base64url(input: Buffer | string): string {
 
 export interface TestJwtClaims {
   readonly sub: string;
-  readonly role: 'authenticated' | 'anon';
+  readonly role: 'authenticated' | 'anon' | 'service_role';
   readonly expiresInSeconds?: number;
 }
 

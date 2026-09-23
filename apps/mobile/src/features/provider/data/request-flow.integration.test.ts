@@ -70,6 +70,18 @@ function clientFor(userId: string): SupabaseClient {
 }
 
 const customer = () => new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+
+/** What push-tick connects as: the service role, the only caller the queue answers. */
+function sender(): SupabaseClient {
+  const token = mintTestJwt(JWT_SECRET, { sub: CUSTOMER_ID, role: 'service_role' });
+  return createClient(POSTGREST_URL, token, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+  });
+}
+
+const CUSTOMER_PHONE = 'ExponentPushToken[flow-customer-phone]';
+const TECH_PHONE = 'ExponentPushToken[flow-technician-ph]';
 const technician = (id: string) => new SupabaseProviderRepository(clientFor(id));
 
 function uniqueVin(): string {
@@ -210,6 +222,16 @@ beforeAll(async () => {
 describe.skipIf(!harnessUp)('an emergency request, through the app', () => {
   let orderId = '';
 
+  test('both phones register for notifications, each in its own language', async () => {
+    // What registerThisDevice() sends once permission is given.
+    await customer().registerPushDevice(CUSTOMER_PHONE, 'ios', 'ar');
+    await new SupabaseRepository(clientFor(TECH_ID), () => TECH_ID).registerPushDevice(
+      TECH_PHONE,
+      'android',
+      'en',
+    );
+  });
+
   test('two technicians go online, and their phones report where they are', async () => {
     for (const id of [TECH_ID, RIVAL_ID]) {
       await approvedProvider(id, 'individual', 'فنّي بطاريات', batteryServiceId);
@@ -299,6 +321,36 @@ describe.skipIf(!harnessUp)('an emergency request, through the app', () => {
 
     const warranties = await customer().listVehicleWarranties(vehicleId);
     expect(warranties.some((warranty) => warranty.orderId === orderId)).toBe(true);
+  });
+
+  test('each phone was told what it needed to know, and nothing it did itself', async () => {
+    const claimed = await sender().rpc('claim_push_notifications', { p_limit: 500 });
+    expect(claimed.error).toBeNull();
+
+    const rows = (
+      claimed.data as { token: string; kind: string; title: string; data: { id?: string } }[]
+    ).filter((row) => row.data.id === orderId);
+    const kindsFor = (token: string) =>
+      rows
+        .filter((row) => row.token === token)
+        .map((row) => row.kind)
+        .sort();
+
+    expect(kindsFor(CUSTOMER_PHONE)).toEqual([
+      'order_accepted',
+      'order_arrived',
+      'order_awaiting_approval',
+      'order_en_route',
+    ]);
+    expect(kindsFor(TECH_PHONE)).toEqual(['job_offer', 'order_completed']);
+
+    // Arabic for the customer's phone, English for the technician's.
+    expect(rows.find((row) => row.kind === 'order_arrived')?.title).toBe('وصل الفنّي');
+    expect(rows.find((row) => row.kind === 'job_offer')?.title).toBe('New request near you');
+
+    // And a customer's client cannot ask for anyone's queue.
+    const denied = await clientFor(CUSTOMER_ID).rpc('claim_push_notifications', { p_limit: 5 });
+    expect(denied.error).not.toBeNull();
   });
 });
 

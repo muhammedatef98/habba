@@ -32,6 +32,7 @@ import { repository } from '@/features/shared/data/repository';
 import { formatCount } from '@/features/shared/lib/format-number';
 import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
+import { unregisterThisDevice } from '@/features/shared/lib/push';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
 export default function AccountScreen() {
@@ -322,7 +323,10 @@ export default function AccountScreen() {
                 label={t('settings.signOutConfirm')}
                 variant="emergency"
                 size="medium"
-                onPress={() => {
+                onPress={async () => {
+                  // Before the session ends: only a signed-in person can take
+                  // their own phone off the list.
+                  await unregisterThisDevice();
                   signOut();
                   router.replace('/');
                 }}

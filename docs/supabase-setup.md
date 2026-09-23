@@ -326,6 +326,70 @@ refuses any photo that was not uploaded there.
 > the real policies rather than a weaker stand-in. Suite `31` asserts the
 > harness has not quietly given itself ownership it would not have here.
 
+## 7a. Deploy and schedule the two ticking functions
+
+Two Edge Functions run on their own, and **neither does anything until it is
+scheduled**. Without `dispatch-tick` an emergency nobody accepts is never
+widened past the first radius; without `push-tick` nobody is ever notified —
+not the technician about a new job, not the customer that help has arrived.
+
+| Function        | What it does                                            | How often                                |
+| --------------- | ------------------------------------------------------- | ---------------------------------------- |
+| `dispatch-tick` | widens searches nobody has accepted (0051)              | every 15 seconds                         |
+| `push-tick`     | delivers `notification_outbox` through Expo Push (0066) | on every insert (webhook) + every minute |
+
+**Deploy and set their secrets** (each secret a long random string):
+
+```bash
+supabase functions deploy dispatch-tick --no-verify-jwt
+supabase functions deploy push-tick --no-verify-jwt
+supabase secrets set HABBA_DISPATCH_TICK_SECRET=… HABBA_PUSH_TICK_SECRET=…
+# Once "enhanced push security" is on for the Expo project (it should be before launch):
+supabase secrets set EXPO_ACCESS_TOKEN=…
+```
+
+`--no-verify-jwt` because the caller is the scheduler, not a user; the shared
+secret in the `x-habba-tick` header is the gate, and a missing or wrong one
+gets a 404.
+
+**Schedule them** from the SQL editor, with the secrets in Vault rather than
+in the job text (anyone who can read `cron.job` can read the command):
+
+```sql
+select vault.create_secret('<HABBA_DISPATCH_TICK_SECRET>', 'dispatch_tick_secret');
+select vault.create_secret('<HABBA_PUSH_TICK_SECRET>', 'push_tick_secret');
+
+select cron.schedule('habba-dispatch-tick', '15 seconds', $$
+  select net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/dispatch-tick',
+    headers := jsonb_build_object('x-habba-tick',
+                 (select decrypted_secret from vault.decrypted_secrets where name = 'dispatch_tick_secret')),
+    body    := '{}'::jsonb);
+$$);
+
+select cron.schedule('habba-push-tick', '1 minute', $$
+  select net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/push-tick',
+    headers := jsonb_build_object('x-habba-tick',
+                 (select decrypted_secret from vault.decrypted_secrets where name = 'push_tick_secret')),
+    body    := '{}'::jsonb);
+$$);
+```
+
+**Make push immediate.** A minute is fine for a retry and far too slow for a
+job offer, which is decided in seconds. Dashboard → Database → Webhooks → new
+webhook on `notification_outbox`, event **INSERT**, type **Supabase Edge
+Function** `push-tick`, with the header `x-habba-tick` set to the push secret.
+The schedule stays as the safety net: claims are leased (0066), so the webhook
+and the schedule never send the same notification twice.
+
+**How to tell it worked:** go online as a technician on a real phone, create
+an emergency near them from a second account, and the phone should buzz
+within a couple of seconds. If it does not,
+`select kind, attempts, last_error, abandoned_at from notification_outbox order by created_at desc limit 5`
+says why — `no_device` means the phone never registered (see §9, the EAS
+project id), `expired` means nothing called `push-tick` in time.
+
 ## 8. There is no report function to deploy
 
 تقرير هبّة used to be an Edge Function serving a public page at
@@ -348,7 +412,12 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false
+EAS_PROJECT_ID=<from `eas init`, or expo.dev → project → ID>
 ```
+
+`EAS_PROJECT_ID` is what a phone needs to get a push token at all. Without it
+the app still works, and registers for nothing — every notification then
+settles as `no_device` (§7a).
 
 Restart Metro. With those set, the app switches from the in-memory repository
 to Supabase and from the dev OTP to real SMS — the same switch, in one place

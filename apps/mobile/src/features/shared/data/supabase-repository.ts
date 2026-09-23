@@ -1170,6 +1170,24 @@ export class SupabaseRepository implements Repository {
     }
   }
 
+  async registerPushDevice(
+    token: string,
+    platform: 'ios' | 'android',
+    locale: string,
+  ): Promise<void> {
+    const { error } = await this.client.rpc('register_push_device', {
+      p_token: token,
+      p_platform: platform,
+      p_locale: locale.startsWith('en') ? 'en' : 'ar',
+    });
+    if (error !== null) throw new Error(`registerPushDevice: ${error.message}`);
+  }
+
+  async unregisterPushDevice(token: string): Promise<void> {
+    const { error } = await this.client.rpc('unregister_push_device', { p_token: token });
+    if (error !== null) throw new Error(`unregisterPushDevice: ${error.message}`);
+  }
+
   async resolveMediaUrl(ref: string): Promise<string | null> {
     const stored = parseStorageRef(ref);
     if (stored === null) return ref;

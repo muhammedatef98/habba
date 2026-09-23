@@ -27,11 +27,12 @@ import {
 } from '@/features/shared/lib/location-provider';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { priceWithVat } from '@/features/shared/lib/order-price';
+import { registerThisDevice } from '@/features/shared/lib/push';
 import { useEmergencyDraft, type PlaceKind } from '@/features/shared/state/emergency-draft';
 import { LocationPicker } from '@/features/customer/components/map/LocationPicker';
 
 export default function LocationConfirmScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
 
   const draft = useEmergencyDraft();
@@ -97,6 +98,10 @@ export default function LocationConfirmScreen() {
     },
     onMutate: () => setError(undefined),
     onSuccess: (orderId) => {
+      // The moment asking makes sense: they have just sent for help and want
+      // to hear when someone accepts. Not awaited — the answer changes nothing
+      // about the request, which is already out.
+      void registerThisDevice({ prompt: true, locale: i18n.language });
       // The draft is finished the moment the server owns the order. Leaving it
       // populated would pre-fill the next emergency with this one's answers.
       draft.reset();
