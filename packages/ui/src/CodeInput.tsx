@@ -17,7 +17,6 @@
 import { useRef, useState } from 'react';
 import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
-import { rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
 import { lineHeightFor } from './tokens.js';
 
@@ -50,6 +49,11 @@ export function CodeInput({
   const digits = [...value].slice(0, length);
   const activeIndex = Math.min(digits.length, length - 1);
 
+  /**
+   * The largest a box gets. Boxes share the row's width below that: six at
+   * 60px plus gaps is 400px, wider than a 390px phone once the screen's
+   * gutters are taken off, and the sixth box was cut off at the edge.
+   */
   const boxSize = 60;
 
   return (
@@ -68,8 +72,13 @@ export function CodeInput({
         // in every locale — but a left-aligned group on an otherwise
         // right-aligned screen reads as a layout mistake, and right-aligning
         // the group would put box one under the last digit of the heading.
+        //
+        // `direction: 'ltr'` pins the row's own layout direction, so `row` is
+        // left-to-right whatever the platform or the locale thinks. Resolving
+        // it against both as well (rowDirectionFor) reversed it a second time
+        // on the launch where they disagree, and the code filled from the right.
         style={{
-          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          flexDirection: 'row',
           justifyContent: 'center',
           gap: theme.spacing.sm,
           direction: 'ltr',
@@ -83,8 +92,9 @@ export function CodeInput({
             <View
               key={index}
               style={{
-                width: boxSize,
-                height: boxSize,
+                flex: 1,
+                maxWidth: boxSize,
+                aspectRatio: 1,
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: theme.radius.md,

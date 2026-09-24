@@ -29,14 +29,14 @@ import { Button, Card, Icon, ListRow, Screen, Text, rowDirectionFor, useTheme } 
 import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
-import { formatCount } from '@/features/shared/lib/format-number';
+import { formatPhone } from '@/features/shared/lib/format-phone';
 import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
 import { unregisterThisDevice } from '@/features/shared/lib/push';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
 export default function AccountScreen() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
 
@@ -104,7 +104,10 @@ export default function AccountScreen() {
   ];
 
   const person = profile.data ?? null;
-  const contact = person?.phone ?? person?.email ?? null;
+  const contact =
+    person?.phone !== null && person?.phone !== undefined
+      ? formatPhone(person.phone)
+      : (person?.email ?? null);
 
   /**
    * A guest's stored name is a placeholder, not a name.
@@ -198,7 +201,7 @@ export default function AccountScreen() {
           </Text>
           <Text variant="caption" tone="muted">
             {t('settings.vehiclesCount', {
-              count: formatCount(vehicles.data?.length ?? 0, i18n.language),
+              count: vehicles.data?.length ?? 0,
             })}
           </Text>
           <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />

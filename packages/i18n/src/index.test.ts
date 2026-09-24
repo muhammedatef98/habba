@@ -8,6 +8,8 @@ import {
   interpolate,
   isRtl,
   lookup,
+  PLURAL_FORMS,
+  pluralBase,
   resolveLocale,
 } from './index.js';
 
@@ -24,11 +26,26 @@ describe('locale parity', () => {
   test('en has every key ar has, and no extras', () => {
     // Arabic is the source of truth (CLAUDE.md §2.1). A key present in one
     // file and missing from the other ships as a raw key path in the UI.
-    const arKeys = leafKeys(ar).sort();
-    const enKeys = leafKeys(en).sort();
+    // Plural forms differ by language (six in Arabic, two in English), so
+    // they are compared by the key the code calls.
+    const arKeys = [...new Set(leafKeys(ar).map(pluralBase))].sort();
+    const enKeys = [...new Set(leafKeys(en).map(pluralBase))].sort();
 
     expect(enKeys.filter((k) => !arKeys.includes(k))).toEqual([]);
     expect(arKeys.filter((k) => !enKeys.includes(k))).toEqual([]);
+  });
+
+  test('a counted phrase has every plural form its language needs, and only those', () => {
+    for (const [locale, resource] of Object.entries({ ar, en }) as ['ar' | 'en', unknown][]) {
+      const keys = leafKeys(resource);
+      const bases = new Set(keys.filter((k) => pluralBase(k) !== k).map(pluralBase));
+      for (const base of bases) {
+        const forms = keys
+          .filter((k) => pluralBase(k) === base && k !== base)
+          .map((k) => k.slice(base.length + 1));
+        expect(forms.sort(), `${locale}:${base}`).toEqual([...PLURAL_FORMS[locale]].sort());
+      }
+    }
   });
 
   test('no locale value is empty', () => {
@@ -41,13 +58,24 @@ describe('locale parity', () => {
 
   test('interpolation placeholders match across locales', () => {
     // A placeholder present in one language and missing in the other renders a
-    // sentence with a hole in it.
-    const placeholders = (value: string) => (value.match(/\{\{(\w+)\}\}/g) ?? []).sort();
+    // sentence with a hole in it. `count` is exempt inside plural forms: «سيارتان»
+    // says the number without writing it.
+    const placeholders = (locale: 'ar' | 'en', resource: unknown) => {
+      const byBase = new Map<string, Set<string>>();
+      for (const key of leafKeys(resource)) {
+        const base = pluralBase(key);
+        const names = (lookup(locale, key) ?? '').match(/\{\{(\w+)\}\}/g) ?? [];
+        const set = byBase.get(base) ?? new Set<string>();
+        for (const name of names) if (base === key || name !== '{{count}}') set.add(name);
+        byBase.set(base, set);
+      }
+      return byBase;
+    };
+    const arNames = placeholders('ar', ar);
+    const enNames = placeholders('en', en);
 
-    for (const key of leafKeys(ar)) {
-      const arValue = lookup('ar', key);
-      const enValue = lookup('en', key);
-      expect(placeholders(arValue ?? ''), key).toEqual(placeholders(enValue ?? ''));
+    for (const [base, names] of arNames) {
+      expect([...names].sort(), base).toEqual([...(enNames.get(base) ?? [])].sort());
     }
   });
 
@@ -108,6 +136,23 @@ describe('translator', () => {
     expect(interpolate('كود إلى {{phone}}', { phone: '0501234567' })).toBe('كود إلى 0501234567');
     expect(interpolate('no params')).toBe('no params');
     expect(interpolate('{{missing}} stays', {})).toBe('{{missing}} stays');
+  });
+
+  test('counts in Arabic the way Arabic counts', () => {
+    const t = createTranslator('ar');
+    expect(t('settings.vehiclesCount', { count: 0 })).toBe('لا سيارات');
+    expect(t('settings.vehiclesCount', { count: 1 })).toBe('سيارة واحدة');
+    expect(t('settings.vehiclesCount', { count: 2 })).toBe('سيارتان');
+    expect(t('settings.vehiclesCount', { count: 3 })).toBe('3 سيارات');
+    expect(t('settings.vehiclesCount', { count: 11 })).toBe('11 سيارةً');
+    expect(t('settings.vehiclesCount', { count: 100 })).toBe('100 سيارة');
+    expect(t('vehicle.lastOilMonths', { count: 1 })).toBe('قبل شهر');
+    expect(t('vehicle.lastOilMonths', { count: 6 })).toBe('قبل 6 أشهر');
+    expect(t('vehicle.lastOilMonths', { count: 12 })).toBe('قبل 12 شهراً');
+
+    const en = createTranslator('en');
+    expect(en('settings.vehiclesCount', { count: 1 })).toBe('1 vehicle');
+    expect(en('settings.vehiclesCount', { count: 4 })).toBe('4 vehicles');
   });
 
   test('falls back to Arabic, then to the key itself', () => {

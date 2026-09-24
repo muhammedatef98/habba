@@ -25,7 +25,15 @@ import { View } from 'react-native';
 import { Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { HabbaMark, Icon, Text, palette, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  HabbaMark,
+  Icon,
+  Text,
+  alignStartFor,
+  palette,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
 import { LivePulseDot } from './LivePulseDot';
 
 const HERO_HEIGHT = 156;
@@ -127,7 +135,7 @@ export function EmergencyHero({ onPress, testID }: EmergencyHeroProps) {
           flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
           alignItems: 'center',
           gap: theme.spacing.sm,
-          alignSelf: 'flex-start',
+          alignSelf: alignStartFor(theme.direction, theme.nativeDirection),
         }}
       >
         <LivePulseDot color={BADGE_INK} size={7} />

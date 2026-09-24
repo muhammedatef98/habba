@@ -17,7 +17,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
-import { Button, Field, HabbaWordmark, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Field, HabbaWordmark, Row, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/features/shared/lib/otp';
 import { repository } from '@/features/shared/data/repository';
 import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
@@ -97,7 +97,12 @@ export default function PhoneScreen() {
           {/* The full lockup, not the mark alone: this is the one screen that
               introduces the brand, and the wordmark is where the name and the
               gust are shown together. */}
-          <HabbaWordmark size={56} />
+          {/* In a Row so it sits at the reading start (the right, in Arabic)
+              on every launch, including the first, when the platform still
+              lays columns out left-to-right. */}
+          <Row>
+            <HabbaWordmark size={56} />
+          </Row>
           <Text variant="display">{t('auth.welcomeTitle')}</Text>
           <Text variant="body" tone="muted">
             {t('auth.welcomeSubtitle')}

@@ -245,7 +245,7 @@ export default function LogbookScreen() {
           ) : null}
           {events.length > 0 ? (
             <Text variant="bodySmall" tone="subtle">
-              {t('logbook.recordsCount', { count: formatCount(events.length, i18n.language) })}
+              {t('logbook.recordsCount', { count: events.length })}
             </Text>
           ) : null}
         </View>
@@ -457,9 +457,7 @@ export default function LogbookScreen() {
                       {isArabic ? warranty.serviceAr : warranty.serviceEn}
                     </Text>
                     <Text variant="caption" tone="subtle">
-                      {t('transfer.warrantyRemaining', {
-                        days: formatCount(warranty.daysRemaining, i18n.language),
-                      })}
+                      {t('transfer.warrantyRemaining', { count: warranty.daysRemaining })}
                       {warranty.hasOpenClaim ? ` · ${t('transfer.warrantyOpenClaim')}` : ''}
                     </Text>
                   </View>

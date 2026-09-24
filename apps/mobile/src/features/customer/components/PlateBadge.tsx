@@ -20,7 +20,7 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { parsePlate, toArabicIndicDigits } from '@habba/core';
-import { Text, useTheme } from '@habba/ui';
+import { Text, alignStartFor, useTheme } from '@habba/ui';
 
 export interface PlateBadgeProps {
   /** Any stored form — Arabic, Latin, or the normalised key. */
@@ -91,7 +91,7 @@ function Badge({
       testID={testID}
       accessibilityRole="text"
       style={{
-        alignSelf: 'flex-start',
+        alignSelf: alignStartFor(theme.direction, theme.nativeDirection),
         paddingVertical: theme.spacing.xs,
         paddingHorizontal: theme.spacing.md,
         borderRadius: theme.radius.sm,

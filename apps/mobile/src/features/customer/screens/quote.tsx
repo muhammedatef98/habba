@@ -182,7 +182,7 @@ export default function QuoteScreen() {
               </Text>
               {line.warrantyDays !== null ? (
                 <Text variant="caption" tone="muted">
-                  {t('quote.warranty', { days: line.warrantyDays })}
+                  {t('quote.warranty', { count: line.warrantyDays })}
                 </Text>
               ) : null}
 

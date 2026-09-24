@@ -17,7 +17,7 @@ import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isValidNationalId, isValidSaudiIban, normaliseIban } from '@habba/core';
-import { Button, Card, Field, ListRow, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Field, ListRow, Row, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { useCanApplyAsProvider } from '@/features/shared/hooks/use-roles';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -109,7 +109,7 @@ export default function BecomeProviderScreen() {
         {t('provider.upgrade.subtitle')}
       </Text>
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+      <Row gap="sm">
         <View style={{ flex: 1 }}>
           <Button
             testID="type-individual"
@@ -128,7 +128,7 @@ export default function BecomeProviderScreen() {
             onPress={() => setProviderType('workshop')}
           />
         </View>
-      </View>
+      </Row>
 
       <Field
         testID="business-name"

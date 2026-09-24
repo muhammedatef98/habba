@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { rowDirectionFor } from './direction.js';
+import { alignStartFor, rowDirectionFor } from './direction.js';
 
 /**
  * The state these guard is the first launch after install: the app boots
@@ -23,5 +23,17 @@ describe('row direction', () => {
   test('an explicit reverse composes with that rather than overriding it', () => {
     expect(rowDirectionFor('rtl', 'rtl', true)).toBe('row-reverse');
     expect(rowDirectionFor('rtl', 'ltr', true)).toBe('row');
+  });
+});
+
+describe('reading start in a column', () => {
+  test('is the platform start once it agrees with the locale', () => {
+    expect(alignStartFor('rtl', 'rtl')).toBe('flex-start');
+    expect(alignStartFor('ltr', 'ltr')).toBe('flex-start');
+  });
+
+  test('is the far side while the platform is a restart behind', () => {
+    expect(alignStartFor('rtl', 'ltr')).toBe('flex-end');
+    expect(alignStartFor('ltr', 'rtl')).toBe('flex-end');
   });
 });

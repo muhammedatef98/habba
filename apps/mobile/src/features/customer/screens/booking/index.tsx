@@ -167,7 +167,7 @@ export default function BookingServiceScreen() {
                   }}
                 >
                   <Text variant="caption" tone="subtle" numeric>
-                    {t('booking.durationMinutes', { minutes: option.estDurationMin })}
+                    {t('booking.durationMinutes', { count: option.estDurationMin })}
                   </Text>
                   {onlyMode(option) !== null ? (
                     <Text variant="caption" tone="muted">

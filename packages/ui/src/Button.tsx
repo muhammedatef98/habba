@@ -9,6 +9,7 @@
 
 import { ActivityIndicator, PixelRatio, Pressable, View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
+import { alignStartFor } from './direction.js';
 import { scaledHeight } from './font-scale.js';
 import { useTheme } from './theme.js';
 
@@ -92,7 +93,10 @@ export function Button({
     justifyContent: 'center',
     // Logical padding — never paddingLeft/Right (§8).
     paddingHorizontal: theme.spacing.lg,
-    alignSelf: fullWidth ? 'stretch' : 'flex-start',
+    // A compact button sits at the reading start — the right, in Arabic —
+    // including on the first launch, when the platform's own start is still
+    // the left (direction.ts).
+    alignSelf: fullWidth ? 'stretch' : alignStartFor(theme.direction, theme.nativeDirection),
   };
 
   return (

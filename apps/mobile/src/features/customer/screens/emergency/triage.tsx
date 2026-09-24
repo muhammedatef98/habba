@@ -20,7 +20,7 @@ import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Row, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { useEmergencyDraft } from '@/features/shared/state/emergency-draft';
 
@@ -142,17 +142,21 @@ export default function VideoTriageScreen() {
             <Text variant="bodySmall" tone="muted" align="center">
               {t('emergency.triagePermission')}
             </Text>
-            <Button
-              testID="triage-allow"
-              label={t('emergency.triageAllow')}
-              variant="secondary"
-              size="medium"
-              fullWidth={false}
-              onPress={() => {
-                void requestCamera();
-                void requestMic();
-              }}
-            />
+            {/* A non-full-width Button pins itself to the reading start; the
+                Row puts it back under the centred line above it. */}
+            <Row justify="center">
+              <Button
+                testID="triage-allow"
+                label={t('emergency.triageAllow')}
+                variant="secondary"
+                size="medium"
+                fullWidth={false}
+                onPress={() => {
+                  void requestCamera();
+                  void requestMic();
+                }}
+              />
+            </Row>
           </View>
         )}
       </View>
@@ -183,7 +187,7 @@ export default function VideoTriageScreen() {
 
       {clip !== null && !recording ? (
         <Text variant="caption" tone="success" align="center">
-          {t('emergency.triageRecorded', { seconds: clip.seconds })}
+          {t('emergency.triageRecorded', { count: clip.seconds })}
         </Text>
       ) : null}
 

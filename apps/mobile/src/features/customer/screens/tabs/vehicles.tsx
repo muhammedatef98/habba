@@ -31,7 +31,7 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, ErrorState, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Icon, Row, Screen, Text, useTheme } from '@habba/ui';
 import { ActiveOrderCard } from '@/features/customer/components/home/ActiveOrderCard';
 import { EmergencyHero } from '@/features/customer/components/home/EmergencyHero';
 import { HomeHeader } from '@/features/customer/components/home/HomeHeader';
@@ -219,14 +219,38 @@ export default function HomeScreen() {
             hero and the tiles are one group (start an emergency now), and
             booking ahead is a different intent that should not read as a
             fifth tile. */}
-        <View style={{ marginTop: theme.spacing.sm }}>
-          <Button
-            testID="home-booking"
-            label={t('home.bookAppointment')}
-            variant="secondary"
-            onPress={() => router.push('/booking')}
-          />
-        </View>
+        {/* A card rather than a bare button: it is the app's second flow, and
+            a secondary button under the hero read as a footnote to it. It
+            says what can be booked, so nobody has to open it to find out. */}
+        <Card
+          testID="home-booking"
+          elevation="sm"
+          onPress={() => router.push('/booking')}
+          accessibilityLabel={t('home.bookAppointment')}
+          style={{ marginTop: theme.spacing.sm }}
+        >
+          <Row gap="md">
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: theme.radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.colors.primarySubtle,
+              }}
+            >
+              <Icon name="calendar" size={theme.iconSize.md} color={theme.colors.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="bodyStrong">{t('home.bookAppointment')}</Text>
+              <Text variant="caption" tone="muted">
+                {t('home.bookAppointmentHint')}
+              </Text>
+            </View>
+            <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
+          </Row>
+        </Card>
       </View>
 
       {/* Above the alerts and below the live job: someone is standing next to

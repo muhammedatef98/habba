@@ -204,6 +204,15 @@ export default function LocationConfirmScreen() {
         </Text>
       ) : null}
 
+      {/* A disabled button with no reason next to it reads as broken. The
+          reason is at the top of the screen, but that has scrolled away by
+          the time a thumb reaches the button. */}
+      {locationDenied && !pinMoved ? (
+        <Text testID="emergency-move-pin" variant="caption" tone="warning">
+          {t('emergency.movePinToSend')}
+        </Text>
+      ) : null}
+
       {error !== undefined ? (
         <Text testID="emergency-error" variant="caption" tone="emergency">
           {error}

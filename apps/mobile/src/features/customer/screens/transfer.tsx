@@ -58,7 +58,6 @@ import {
 } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { shareHabbaReportPdf } from '@/features/shared/lib/report-pdf';
-import { formatCount } from '@/features/shared/lib/format-number';
 import { daysUntil } from '@/features/shared/lib/transfer-window';
 import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -597,7 +596,7 @@ function PendingTransfer({
   readonly cancelling: boolean;
   readonly onCancel: () => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
@@ -610,7 +609,7 @@ function PendingTransfer({
         <Text variant="bodySmall" tone="subtle">
           {remainingDays === 1
             ? t('transfer.pendingExpiresToday')
-            : t('transfer.pendingExpires', { days: formatCount(remainingDays, i18n.language) })}
+            : t('transfer.pendingExpires', { count: remainingDays })}
         </Text>
         <Text variant="caption" tone="muted">
           {t('transfer.pendingStillYours')}

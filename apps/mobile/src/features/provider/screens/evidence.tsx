@@ -236,7 +236,7 @@ export default function EvidenceScreen() {
                 testID={`warranty-${days}`}
                 elevation="none"
                 onPress={() => setWarrantyDays(days)}
-                accessibilityLabel={t('provider.warrantyDays', { days })}
+                accessibilityLabel={t('provider.warrantyDays', { count: days })}
                 style={{
                   flex: 1,
                   alignItems: 'center',
@@ -250,7 +250,7 @@ export default function EvidenceScreen() {
                 }}
               >
                 <Text variant="bodySmall" tone={selected ? 'primary' : 'muted'} numeric>
-                  {t('provider.warrantyDays', { days })}
+                  {t('provider.warrantyDays', { count: days })}
                 </Text>
               </Card>
             );

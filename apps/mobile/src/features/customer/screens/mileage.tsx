@@ -21,7 +21,9 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, EmptyState, Field, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, EmptyState, Field, Row, Screen, Text, useTheme } from '@habba/ui';
+import { formatGregorianDate } from '@/features/shared/lib/dates';
+import { formatCount } from '@/features/shared/lib/format-number';
 import { repository } from '@/features/shared/data/repository';
 import type { TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -63,7 +65,6 @@ export default function MileageScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const locale = i18n.language === 'ar' ? 'ar-SA' : 'en-GB';
 
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
@@ -134,7 +135,7 @@ export default function MileageScreen() {
           <Text variant="caption" tone="muted">
             {t('logbook.mileageCurrent')}
           </Text>
-          <Text variant="display">{current.toLocaleString(locale)}</Text>
+          <Text variant="display">{formatCount(current, i18n.language)}</Text>
           <Text variant="caption" tone="subtle">
             {t('logbook.mileageUnit')}
           </Text>
@@ -175,18 +176,12 @@ export default function MileageScreen() {
         <View style={{ gap: theme.spacing.md }}>
           {readings.map((reading, index) => (
             <View key={`${reading.at.toISOString()}-${index}`} style={{ gap: theme.spacing.xs }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  gap: theme.spacing.sm,
-                }}
-              >
-                <Text variant="body">{reading.mileage.toLocaleString(locale)}</Text>
+              <Row justify="space-between" gap="sm">
+                <Text variant="body">{formatCount(reading.mileage, i18n.language)}</Text>
                 <Text variant="caption" tone="muted">
-                  {reading.at.toLocaleDateString(locale)}
+                  {formatGregorianDate(reading.at.toISOString(), i18n.language)}
                 </Text>
-              </View>
+              </Row>
 
               {/* The bar is the distance covered since the previous reading, so
                   a long gap with little driving reads as a short bar — which is

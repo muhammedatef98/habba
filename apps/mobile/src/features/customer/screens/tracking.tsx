@@ -334,13 +334,13 @@ function TrackingBody() {
 
             {current.warrantyDays !== null && current.warrantyDays > 0 ? (
               <Text testID="approval-warranty" variant="bodySmall" tone="success">
-                {t('tracking.warrantyLine', { days: current.warrantyDays })}
+                {t('tracking.warrantyLine', { count: current.warrantyDays })}
               </Text>
             ) : null}
 
             {platform.data !== undefined ? (
               <Text testID="auto-complete-note" variant="caption" tone="muted">
-                {t('tracking.autoCompleteNote', { hours: platform.data.autoCompleteHours })}
+                {t('tracking.autoCompleteNote', { count: platform.data.autoCompleteHours })}
               </Text>
             ) : null}
 

@@ -12,7 +12,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ltrIsolate, maskPhone } from '@habba/core';
-import { Button, CodeInput, Field, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
+import { Button, CodeInput, Field, HabbaMark, Row, Screen, Text, useTheme } from '@habba/ui';
 import { OTP_LENGTH, OTP_RESEND_COOLDOWN_SECONDS } from '@/features/shared/lib/otp-provider';
 import { otpProvider } from '@/features/shared/lib/otp';
 import { repository } from '@/features/shared/data/repository';
@@ -89,7 +89,12 @@ export default function VerifyScreen() {
     <Screen scrollable>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.sm }}>
-          <HabbaMark size={40} />
+          {/* In a Row so it sits at the reading start (the right, in Arabic)
+              on every launch, including the first, when the platform still
+              lays columns out left-to-right. */}
+          <Row>
+            <HabbaMark size={40} />
+          </Row>
           <Text variant="title">{t('auth.otpTitle')}</Text>
           <Text variant="body" tone="muted">
             {/* Masked: a full number should not sit on screen unnecessarily.
@@ -135,7 +140,7 @@ export default function VerifyScreen() {
         />
 
         <Button
-          label={cooldown > 0 ? t('auth.resendIn', { seconds: cooldown }) : t('auth.resend')}
+          label={cooldown > 0 ? t('auth.resendIn', { count: cooldown }) : t('auth.resend')}
           variant="ghost"
           onPress={() => void handleResend()}
           disabled={cooldown > 0}
