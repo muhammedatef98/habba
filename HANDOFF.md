@@ -38,16 +38,19 @@ identities, against a real database: an emergency request (search → a
 technician accepts → en route → arrived → work → parts approved → hand-back
 with photos and warranty → customer approves → payment captured → logbook);
 and a scheduled or workshop booking (slot → confirmed → check-in → work →
-hand-back). Each step pushes a notification. The **ops console**
+hand-back); and a pre-purchase inspection (the technician files the report
+in the app, the buyer reads and shares it, then adds the car they bought with
+the inspection as its first logbook entry). Each step pushes a notification. The **ops console**
 (`apps/admin`) reaches everything an operator is answerable for, behind
 mandatory 2FA and 8-hour sessions, with every change and every file opened
 recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-72 migrations · 45 SQL suites (all pass) · tests/rls.spec.ts
-mobile 221 unit + integration (Vitest) + 8 render (Jest) · core 174 · ui 52 · i18n 10
+73 migrations · 46 SQL suites (all pass) · tests/rls.spec.ts
+mobile 226 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 52 · i18n 10
 admin 16 unit + 8 against the real database · request-flow integration 17
+inspection-flow integration 5
 pnpm verify: typecheck, lint, format, edge-shared sync, unit, bundle,
              admin secret-key check, SQL suites, integration — twice green
 ```
@@ -71,8 +74,8 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0072, forward-only, each paired with a suite
-│  ├─ tests/      00_helpers + 01–45
+│  ├─ migrations/ 0001–0073, forward-only, each paired with a suite
+│  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
 │  ├─ storage/    storage policies (applied as the storage owner)
@@ -134,7 +137,7 @@ them no search widens, no order auto-closes and nobody is notified.
 
 ---
 
-## 6. What was built across the last sessions (0064–0072)
+## 6. What was built across the last sessions (0064–0073)
 
 | Area                                | Migrations | What it gave                                                                                                               |
 | ----------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -144,6 +147,7 @@ them no search widens, no order auto-closes and nobody is notified.
 | Parts                               | 0067       | Customer approves or declines each line; hand-back waits for every answer                                                  |
 | Ops console                         | 0068–0070  | 2FA + 8h, audit log, settings, suspension, disputes and refunds, every read and action (see `apps/admin/README.md`)        |
 | Orders that end                     | 0071       | Reminder half-way, then auto-close + capture when the customer never confirms                                              |
+| Inspections in the app              | 0073       | Technician's form, report on the order + PDF, bought car joins the account; hand-back waits for the report                 |
 
 Real bugs found and fixed along the way, all with tests: orders were never
 submitted or funded; accept was an RLS no-op; the technician's position was
@@ -169,8 +173,8 @@ column); the customer saw "cancelled" for an order under complaint.
 
 ## 8. Known incomplete (code)
 
-- **Inspection screens** (Phase 5) — backend and its integration test exist; no
-  customer or provider UI.
+- **Inspection photos per item** — the form rates and annotates; it does not
+  attach a photo to an item yet.
 - **Payment provider worker** — waits on decision 1.
 - **ZATCA credit notes** — waits on decision 2.
 - **Real two-phone run** — every flow is proven by integration tests through

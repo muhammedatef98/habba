@@ -6,7 +6,7 @@
  * from the migrations and removes the risk of drift.
  */
 
-import type { FulfilmentMode, OrderStatus, SarAmount } from '@habba/core';
+import type { FulfilmentMode, InspectionReport, OrderStatus, SarAmount } from '@habba/core';
 
 export type Provenance = 'self_reported' | 'self_documented' | 'habba_verified' | 'third_party';
 
@@ -307,6 +307,14 @@ export interface Order {
 }
 
 export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'released' | 'refunded' | 'failed';
+
+/** An inspection report on an order, as the customer who paid for it reads it (0026). */
+export interface OrderInspection {
+  readonly reportId: string;
+  /** Null for a pre-purchase inspection until the buyer adds the car (0027). */
+  readonly vehicleId: string | null;
+  readonly report: InspectionReport;
+}
 
 /**
  * What Habba's operators have set for the whole app (0069, 0070), and whether

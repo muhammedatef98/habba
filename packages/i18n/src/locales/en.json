@@ -786,5 +786,62 @@
     "pausedTitle": "New orders are paused for now",
     "announcementTitle": "From Habba",
     "contactSupport": "Contact support"
+  },
+  "inspection": {
+    "title": "Inspection report",
+    "progress": "{{answered}} of {{total}} items",
+    "requiredLeft": "{{count}} required items left",
+    "subjectTitle": "The car inspected",
+    "identifyCar": "The car is not in Habba yet: enter its VIN or plate so the report names it.",
+    "vin": "VIN",
+    "vinInvalid": "A VIN is 17 letters and digits.",
+    "plate": "Plate",
+    "make": "Make",
+    "model": "Model",
+    "year": "Year",
+    "mileage": "Odometer (km)",
+    "rating": {
+      "pass": "OK",
+      "attention": "Needs attention",
+      "fail": "Fault",
+      "na": "N/A"
+    },
+    "note": "What did you find?",
+    "notePlaceholder": "Describe it as the buyer will read it",
+    "submit": "Submit report",
+    "submitFailed": "The report could not be submitted. Check the connection and try again.",
+    "filedTitle": "Report submitted",
+    "filedBody": "Habba scored it and it cannot be edited now. Finish the hand-back from the job page.",
+    "score": "Score {{score}}%",
+    "recommendation": {
+      "buy": "Good to buy",
+      "negotiate": "Negotiate",
+      "avoid": "Best avoided"
+    },
+    "backToJob": "Back to the job",
+    "jobCardTitle": "Inspection report",
+    "jobCardTodo": "Fill in the report item by item before handing back.",
+    "jobCardFiled": "Report submitted.",
+    "jobCardAction": "Fill in the report",
+    "blocksHandBack": "The job cannot be handed back before the inspection report is submitted."
+  },
+  "inspectionReport": {
+    "title": "Inspection report",
+    "counts": "{{fail}} faults · {{attention}} need attention · {{pass}} OK",
+    "findingsTitle": "What the inspector found",
+    "noFindings": "The inspector found no faults.",
+    "moreInPdf": "{{count}} more findings in the full report",
+    "share": "Share report (PDF)",
+    "shareFailed": "The report could not be shared from this device.",
+    "boughtIt": "Bought this car?",
+    "boughtItHint": "Add it to your account and its logbook starts with this Habba-verified inspection.",
+    "addToLogbook": "Add to my cars",
+    "chooseMake": "Choose the make",
+    "chooseModel": "Choose the model",
+    "changeMake": "Change make",
+    "nickname": "A name for the car (optional)",
+    "nicknamePlaceholder": "For example: the family car",
+    "convert": "Add the car",
+    "convertFailed": "The car could not be added. It may be registered in Habba to another owner."
   }
 }

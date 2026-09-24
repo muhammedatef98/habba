@@ -16,7 +16,7 @@ specification and this is the mistake.
 | 2 — The logbook (the moat)    | ✅ **Done**                                            |
 | 3 — On-demand emergency       | ✅ Built end to end; launch waits on decisions 1 and 4 |
 | 4 — Scheduled & workshop      | ✅ Built end to end                                    |
-| 5 — Inspections               | 🟡 Backend done, no screens                            |
+| 5 — Inspections               | ✅ Built end to end                                    |
 | 6 — Intelligence & compliance | 🟡 Console done; ZATCA waits on decision 2             |
 
 "Backend done" means the migrations exist, run, and pass their own SQL suites.
@@ -132,7 +132,7 @@ workshop booking with a warranty claim through the app.
 
 ---
 
-## Phase 5 — Inspections 🟡
+## Phase 5 — Inspections ✅
 
 Templates, structured capture with photos, scoring, PDF, public share,
 pre-purchase flow with no owned vehicle, buyer → owner conversion.
@@ -141,9 +141,15 @@ pre-purchase flow with no owned vehicle, buyer → owner conversion.
 buyer purchases, the report converts into a new `vehicles` row with the
 inspection as its first timeline event.
 
-**Where it stands.** Migrations 0026–0027, covered by `09_inspections.sql`
-including the conversion. No customer or provider screens at all — this phase
-is backend-only.
+**Where it stands.** Migrations 0026–0027 and 0073, covered by
+`09_inspections.sql` and `46_inspections_in_the_app.sql`. Each service names
+the template it is performed against (set from the console's catalogue); the
+report must match it, and the job cannot be handed back until it is filed.
+The technician fills the template item by item in the app (the server scores
+it); the buyer reads it on the order, shares it as a PDF made on the phone
+(ADR-0019), and, having bought the car, adds it — its logbook opens with the
+inspection. Proven through the app's repositories in
+`inspection-flow.integration.test.ts`. Photos per item are not captured yet.
 
 ---
 
@@ -203,5 +209,4 @@ In the order that buys the most, given the above:
 1. **Decisions 3 and 4** — a hosted project and an SMS provider. Everything
    built is finished code that cannot reach a user without them.
 2. **Decision 1**, then a two-phone run by people, emergency and booking.
-3. **Phase 5 screens** — the inspection backend is waiting for them.
-4. **Decision 2** — ZATCA delivery and credit notes.
+3. **Decision 2** — ZATCA delivery and credit notes.

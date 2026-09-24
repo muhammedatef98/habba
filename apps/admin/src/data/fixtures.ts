@@ -736,6 +736,18 @@ function seed(): State {
           is_active: true,
           sort_order: 3,
         }),
+        catalogue('svc-inspection', {
+          supported_modes: ['mobile_scheduled', 'workshop'],
+          name_ar: 'فحص قبل الشراء (شامل)',
+          name_en: 'Pre-purchase inspection',
+          category: 'inspection',
+          base_price: 350,
+          est_duration_min: 90,
+          requires_vehicle: false,
+          inspection_template_key: 'pre_purchase_v1',
+          is_active: true,
+          sort_order: 4,
+        }),
       ],
       cities: [
         catalogue('city-dammam', {
@@ -797,7 +809,15 @@ function seed(): State {
         },
       ],
       maintenance_rules: [],
-      inspection_templates: [],
+      inspection_templates: [
+        catalogue('it-1', {
+          key: 'pre_purchase_v1',
+          name_ar: 'فحص ما قبل الشراء (شامل)',
+          name_en: 'Pre-purchase inspection (comprehensive)',
+          sections: [],
+          is_active: true,
+        }),
+      ],
       profiles: [
         ...users.map((user) => ({ id: user.profile.id, full_name: user.profile.full_name })),
         { id: OPERATOR, full_name: 'مشغّل التطوير' },

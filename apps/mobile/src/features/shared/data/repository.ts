@@ -34,6 +34,7 @@ import { SupabaseRepository } from './supabase-repository.js';
 import { DEFAULT_PLATFORM_STATUS } from './platform-status.js';
 import type {
   AppointmentSlot,
+  OrderInspection,
   PlatformStatus,
   BookingMode,
   BookingProvider,
@@ -243,6 +244,18 @@ export interface Repository {
    * provider's payout for this order until Habba resolves it.
    */
   openOrderDispute(orderId: string, reason: string): Promise<void>;
+  /** The inspection report filed on this order, if one was (0026). */
+  getOrderInspection(orderId: string): Promise<OrderInspection | null>;
+  /**
+   * The buyer bought the car: it joins their vehicles with the inspection as
+   * the first entry in its logbook (0027). Returns the new vehicle's id.
+   */
+  convertInspectionToVehicle(
+    reportId: string,
+    makeId: string,
+    modelId: string,
+    nickname: string | null,
+  ): Promise<string>;
   /** The operators' switches and this account's standing (0069, 0070). */
   getPlatformStatus(): Promise<PlatformStatus>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
@@ -1524,6 +1537,15 @@ export class InMemoryRepository implements Repository {
   async openOrderDispute(orderId: string, reason: string): Promise<void> {
     if (reason.trim().length < 3) throw new Error('reason_required');
     this.orders.dispute(orderId);
+  }
+
+  // The dev build files no inspections, so there is never a report to show.
+  async getOrderInspection(): Promise<OrderInspection | null> {
+    return null;
+  }
+
+  async convertInspectionToVehicle(): Promise<string> {
+    throw new Error('convertInspectionToVehicle: not available in the dev build');
   }
 
   // Development has no operators: nothing paused, nothing announced.

@@ -129,6 +129,11 @@ export default function JobScreen() {
   // here, with the way out, instead of a refusal after the tap.
   const blockedForParts = step.action === 'submit_for_approval' && waitingParts > 0;
 
+  // An inspection is handed back with its report, or not at all (0073).
+  const needsInspection = data.inspectionTemplateKey !== null;
+  const blockedForInspection =
+    step.action === 'submit_for_approval' && needsInspection && !data.inspectionFiled;
+
   return (
     <Screen scrollable>
       <View style={{ gap: theme.spacing.xs }}>
@@ -223,6 +228,27 @@ export default function JobScreen() {
         </Card>
       ) : null}
 
+      {needsInspection && (data.status === 'in_progress' || data.inspectionFiled) ? (
+        <Card testID="job-inspection" elevation={data.inspectionFiled ? 'none' : 'sm'}>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('inspection.jobCardTitle')}</Text>
+            <Text variant="caption" tone="muted">
+              {data.inspectionFiled ? t('inspection.jobCardFiled') : t('inspection.jobCardTodo')}
+            </Text>
+            {!data.inspectionFiled ? (
+              <Button
+                testID="open-inspection"
+                label={t('inspection.jobCardAction')}
+                variant="accent"
+                onPress={() =>
+                  router.push({ pathname: '/inspection', params: { id: data.orderId } })
+                }
+              />
+            ) : null}
+          </View>
+        </Card>
+      ) : null}
+
       {canRecordEvidence(data.status) ? (
         <Card elevation={evidenceReady ? 'sm' : 'none'}>
           <View style={{ gap: theme.spacing.sm }}>
@@ -254,7 +280,7 @@ export default function JobScreen() {
           label={t(step.labelKey)}
           onPress={() => advance.mutate()}
           loading={advance.isPending}
-          disabled={blockedForEvidence || blockedForParts}
+          disabled={blockedForEvidence || blockedForParts || blockedForInspection}
         />
       )}
 
@@ -267,6 +293,12 @@ export default function JobScreen() {
       {blockedForParts ? (
         <Text variant="caption" style={{ color: theme.colors.warning }}>
           {t('provider.partsBlockHandBack')}
+        </Text>
+      ) : null}
+
+      {blockedForInspection ? (
+        <Text variant="caption" style={{ color: theme.colors.warning }}>
+          {t('inspection.blocksHandBack')}
         </Text>
       ) : null}
 

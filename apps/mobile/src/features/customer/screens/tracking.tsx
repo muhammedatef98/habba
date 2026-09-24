@@ -43,6 +43,7 @@ import { LiveTracking } from '@/features/customer/components/tracking/LiveTracki
 import { Matched } from '@/features/customer/components/tracking/Matched';
 import { PriceBreakdown } from '@/features/customer/components/tracking/PriceBreakdown';
 import { ReportProblem } from '@/features/customer/components/tracking/ReportProblem';
+import { InspectionReportCard } from '@/features/customer/components/tracking/InspectionReportCard';
 import { Searching } from '@/features/customer/components/tracking/Searching';
 import type { OrderStatus } from '@/features/shared/data/types';
 
@@ -121,6 +122,16 @@ function TrackingBody() {
 
   // How long before an unconfirmed job closes by itself — the operators'
   // setting (0071), shown so the customer is not surprised by it.
+  // An inspection order's report, once filed (0026). Asked for only when the
+  // work is done; most orders have none, and the answer is then null.
+  const inspection = useQuery({
+    queryKey: ['order-inspection', id],
+    queryFn: () => repository.getOrderInspection(id ?? ''),
+    enabled:
+      id !== undefined &&
+      (order.data?.status === 'awaiting_approval' || order.data?.status === 'completed'),
+  });
+
   const platform = useQuery({
     queryKey: ['platform-status'],
     queryFn: () => repository.getPlatformStatus(),
@@ -315,6 +326,10 @@ function TrackingBody() {
               </Row>
             ) : null}
 
+            {inspection.data !== null && inspection.data !== undefined ? (
+              <InspectionReportCard inspection={inspection.data} orderCompleted={false} />
+            ) : null}
+
             <PriceBreakdown testID="approval-breakdown" order={current} />
 
             {current.warrantyDays !== null && current.warrantyDays > 0 ? (
@@ -361,6 +376,9 @@ function TrackingBody() {
           }
           onDismiss={() => router.replace('/')}
         />
+        {inspection.data !== null && inspection.data !== undefined ? (
+          <InspectionReportCard inspection={inspection.data} orderCompleted />
+        ) : null}
         <ReportProblem orderId={current.id} />
       </Screen>
     );

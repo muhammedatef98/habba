@@ -13,7 +13,13 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { isZeroSar, sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
+import {
+  isZeroSar,
+  sarOrThrow,
+  type HabbaReport,
+  type InspectionReport,
+  type SarAmount,
+} from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
@@ -38,6 +44,7 @@ import type {
   OrderSummary,
   OwnershipTransfer,
   OwnershipTransferStatus,
+  OrderInspection,
   PlatformStatus,
   NewBookingInput,
   NewEmergencyOrderInput,
@@ -1296,6 +1303,45 @@ export class SupabaseRepository implements Repository {
       p_reason: reason,
     });
     if (error !== null) throw new Error(`openOrderDispute: ${error.message}`);
+  }
+
+  async getOrderInspection(orderId: string): Promise<OrderInspection | null> {
+    const row = await this.client
+      .from('inspection_reports')
+      .select('id, vehicle_id, public_token')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (row.error !== null) throw new Error(`getOrderInspection: ${row.error.message}`);
+    if (row.data === null) return null;
+    const found = row.data as { id: string; vehicle_id: string | null; public_token: string };
+
+    // The same frozen document anyone with the token reads (0026): no
+    // customer identity in it, so the file the buyer shares is safe to share.
+    const report = await this.client.rpc('get_inspection_report', { p_token: found.public_token });
+    if (report.error !== null) throw new Error(`getOrderInspection: ${report.error.message}`);
+    if (report.data === null) return null;
+
+    return {
+      reportId: found.id,
+      vehicleId: found.vehicle_id,
+      report: report.data as InspectionReport,
+    };
+  }
+
+  async convertInspectionToVehicle(
+    reportId: string,
+    makeId: string,
+    modelId: string,
+    nickname: string | null,
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('convert_inspection_to_vehicle', {
+      p_report_id: reportId,
+      p_make_id: makeId,
+      p_model_id: modelId,
+      p_nickname: nickname,
+    });
+    if (error !== null) throw new Error(`convertInspectionToVehicle: ${error.message}`);
+    return data as string;
   }
 
   async getPlatformStatus(): Promise<PlatformStatus> {

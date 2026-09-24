@@ -50,8 +50,11 @@ interface ColumnSpec {
   readonly kind: Kind;
   readonly required?: boolean;
   readonly options?: readonly { readonly value: string; readonly text: string }[];
-  /** Options loaded from another catalogue table. */
-  readonly ref?: { readonly table: string; readonly label: string };
+  /**
+   * Options loaded from another catalogue table. `value` is the column the
+   * foreign key points at — `id` unless the key is a natural one.
+   */
+  readonly ref?: { readonly table: string; readonly label: string; readonly value?: string };
   readonly nullable?: boolean;
   /** Set on creation only (a key, a code). */
   readonly createOnly?: boolean;
@@ -116,6 +119,14 @@ const SPECS: readonly TableSpec[] = [
         label: 'قراءة العداد إلزامية',
         kind: 'boolean',
         formOnly: true,
+      },
+      {
+        key: 'inspection_template_key',
+        label: 'نموذج الفحص',
+        kind: 'select',
+        ref: { table: 'inspection_templates', label: 'name_ar', value: 'key' },
+        nullable: true,
+        hint: 'للخدمات التي تنتج تقرير فحص فقط. لا يُسلَّم الطلب قبل تعبئة التقرير.',
       },
       { key: 'sort_order', label: 'الترتيب', kind: 'number' },
       { key: 'is_active', label: 'مفعّلة', kind: 'boolean' },
@@ -456,10 +467,11 @@ function useRefs(spec: TableSpec): Refs {
         tables.map(async (table) => {
           const column = spec.columns.find((candidate) => candidate.ref?.table === table);
           const labelKey = column?.ref?.label ?? 'name_ar';
-          const rows = await api.table<Row>(table, { columns: `id, ${labelKey}` });
+          const valueKey = column?.ref?.value ?? 'id';
+          const rows = await api.table<Row>(table, { columns: `${valueKey}, ${labelKey}` });
           return [
             table,
-            rows.map((row) => ({ value: String(row['id']), text: String(row[labelKey]) })),
+            rows.map((row) => ({ value: String(row[valueKey]), text: String(row[labelKey]) })),
           ] as const;
         }),
       );

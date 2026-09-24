@@ -22,7 +22,13 @@
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { renderHabbaReportPdf, reportFileName, type HabbaReport } from '@habba/core';
+import {
+  renderHabbaReportPdf,
+  renderInspectionReport,
+  reportFileName,
+  type HabbaReport,
+  type InspectionReport,
+} from '@habba/core';
 
 export type ReportPdfResult =
   | { readonly ok: true; readonly uri: string; readonly fileName: string }
@@ -89,4 +95,51 @@ export async function shareHabbaReportPdf(report: HabbaReport): Promise<ReportPd
   });
 
   return created;
+}
+
+/**
+ * The inspection report as a PDF, shared the same way (ADR-0019): generated
+ * on the device from the frozen payload, with no link to a public page. The
+ * payload carries no customer identity, so a buyer forwarding it to the
+ * seller — or a seller to the next buyer — shares only the car's condition.
+ */
+export async function shareInspectionPdf(report: InspectionReport): Promise<ReportPdfResult> {
+  let printed: { uri: string };
+  try {
+    printed = await Print.printToFileAsync({
+      html: renderInspectionReport(report),
+      width: 595,
+      height: 842,
+      base64: false,
+    });
+  } catch {
+    return { ok: false, reason: 'render_failed' };
+  }
+
+  const car = [report.subject.make_ar, report.subject.model_ar, report.subject.year]
+    .filter((part) => part !== undefined && part !== '')
+    .join('-');
+  const fileName =
+    `فحص-${car === '' ? 'سيارة' : car}-${report.completed_at.slice(0, 10)}.pdf`.replace(
+      /\s+/g,
+      '-',
+    );
+
+  let uri = printed.uri;
+  try {
+    const target = new File(Paths.cache, fileName);
+    if (target.exists) target.delete();
+    await new File(printed.uri).move(target);
+    uri = target.uri;
+  } catch {
+    // Shared under Expo's name rather than not at all.
+  }
+
+  if (!(await Sharing.isAvailableAsync())) return { ok: false, reason: 'sharing_unavailable' };
+  await Sharing.shareAsync(uri, {
+    mimeType: 'application/pdf',
+    UTI: 'com.adobe.pdf',
+    dialogTitle: 'تقرير الفحص',
+  });
+  return { ok: true, uri, fileName };
 }

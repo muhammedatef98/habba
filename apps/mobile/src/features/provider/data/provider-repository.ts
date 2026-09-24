@@ -15,7 +15,10 @@ import {
   sarOrThrow,
   type CompletionMediaItem,
   type FulfilmentMode,
+  type InspectionResultEntry,
+  type InspectionTemplateSection,
   type OrderStatus,
+  type Recommendation,
   type SarAmount,
 } from '@habba/core';
 import { storageRef } from '@/features/shared/lib/media-ref.js';
@@ -52,6 +55,12 @@ export interface AssignedJob {
   readonly vehicleCurrentMileage: number | null;
   /** The appointment time for a booked job; null for an emergency. */
   readonly scheduledFor: string | null;
+  /** The inspection template this job is performed against, if any (0073). */
+  readonly inspectionTemplateKey: string | null;
+  /** The report is filed; required before hand-back when there is a template. */
+  readonly inspectionFiled: boolean;
+  /** A pre-purchase inspection has no vehicle: the car is not the customer's yet. */
+  readonly hasVehicle: boolean;
   /**
    * Present while the job is still an offer to this technician, not yet
    * theirs. What they need to decide — how far, how much — and nothing that
@@ -61,6 +70,28 @@ export interface AssignedJob {
     OpenJob,
     'distanceBucket' | 'districtNameAr' | 'estimatedPayout' | 'hasTriageVideo'
   > | null;
+}
+
+/** The form an inspector fills in (0026). */
+export interface InspectionTemplate {
+  readonly key: string;
+  readonly nameAr: string;
+  readonly sections: readonly InspectionTemplateSection[];
+}
+
+/** The car an inspection is about, when it is not in Habba yet. */
+export interface InspectionSubject {
+  readonly vin: string | null;
+  readonly plate: string | null;
+  readonly makeAr: string | null;
+  readonly modelAr: string | null;
+  readonly year: number | null;
+  readonly mileage: number | null;
+}
+
+export interface FiledInspection {
+  readonly score: number | null;
+  readonly recommendation: Recommendation | null;
 }
 
 /** A part the technician quoted, and where the customer's answer stands. */
@@ -135,6 +166,17 @@ export interface ProviderRepository {
   listParts(orderId: string): Promise<readonly QuotedPart[]>;
   addPart(orderId: string, input: NewPartInput): Promise<void>;
   removePart(partId: string): Promise<void>;
+  getInspectionTemplate(key: string): Promise<InspectionTemplate | null>;
+  /**
+   * Files the report (0026). Scored by the server, never here; once filed it
+   * is final — it is evidence, and the order holds exactly one.
+   */
+  submitInspection(
+    orderId: string,
+    templateKey: string,
+    results: Readonly<Record<string, Readonly<Record<string, InspectionResultEntry>>>>,
+    subject: InspectionSubject,
+  ): Promise<FiledInspection>;
   /** Mileage, photos and the warranty given — one call, never half-saved. */
   recordEvidence(
     orderId: string,
@@ -189,8 +231,8 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
           'completion_mileage, completion_media, vehicle_id, scheduled_for, ' +
-          'services(name_ar, requires_completion_photos, requires_completion_mileage), ' +
-          'vehicles(current_mileage)',
+          'services(name_ar, requires_completion_photos, requires_completion_mileage, inspection_template_key), ' +
+          'vehicles(current_mileage), inspection_reports(id)',
       )
       .in('status', [
         'accepted',
@@ -212,8 +254,8 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
           'completion_mileage, completion_media, vehicle_id, scheduled_for, ' +
-          'services(name_ar, requires_completion_photos, requires_completion_mileage), ' +
-          'vehicles(current_mileage)',
+          'services(name_ar, requires_completion_photos, requires_completion_mileage, inspection_template_key), ' +
+          'vehicles(current_mileage), inspection_reports(id)',
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -312,6 +354,51 @@ export class SupabaseProviderRepository implements ProviderRepository {
     return { url: storageRef(COMPLETION_MEDIA_BUCKET, path), kind };
   }
 
+  async getInspectionTemplate(key: string): Promise<InspectionTemplate | null> {
+    const { data, error } = await this.client
+      .from('inspection_templates')
+      .select('key, name_ar, sections')
+      .eq('key', key)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (error !== null) throw new Error(`getInspectionTemplate: ${error.message}`);
+    if (data === null) return null;
+    const row = data as { key: string; name_ar: string; sections: InspectionTemplateSection[] };
+    return { key: row.key, nameAr: row.name_ar, sections: row.sections };
+  }
+
+  async submitInspection(
+    orderId: string,
+    templateKey: string,
+    results: Readonly<Record<string, Readonly<Record<string, InspectionResultEntry>>>>,
+    subject: InspectionSubject,
+  ): Promise<FiledInspection> {
+    const { data, error } = await this.client.rpc('submit_inspection_report', {
+      p_order_id: orderId,
+      p_template_key: templateKey,
+      p_results: results,
+      p_subject_vin: subject.vin,
+      p_subject_plate: subject.plate,
+      p_subject_make_ar: subject.makeAr,
+      p_subject_model_ar: subject.modelAr,
+      p_subject_year: subject.year,
+      p_subject_mileage: subject.mileage,
+    });
+    if (error !== null) throw new Error(`submitInspection: ${error.message}`);
+
+    const filed = await this.client
+      .from('inspection_reports')
+      .select('overall_score, recommendation')
+      .eq('id', data as string)
+      .single();
+    if (filed.error !== null) throw new Error(`submitInspection: ${filed.error.message}`);
+    const row = filed.data as {
+      overall_score: number | null;
+      recommendation: Recommendation | null;
+    };
+    return { score: row.overall_score, recommendation: row.recommendation };
+  }
+
   async recordEvidence(
     orderId: string,
     mileage: number,
@@ -342,9 +429,14 @@ interface OrderRow {
     name_ar: string;
     requires_completion_photos: boolean;
     requires_completion_mileage: boolean;
+    inspection_template_key?: string | null;
   } | null;
   vehicles: { current_mileage: number } | null;
   scheduled_for: string | null;
+  vehicle_id?: string | null;
+  // One-to-one through the unique order_id, so PostgREST embeds an object —
+  // or an array on older versions; both are read.
+  inspection_reports?: { id: string } | { id: string }[] | null;
 }
 
 interface PartRow {
@@ -406,6 +498,9 @@ function offerAsJob(offer: OpenJob): AssignedJob {
     requiresCompletionMileage: true,
     vehicleCurrentMileage: null,
     scheduledFor: null,
+    inspectionTemplateKey: null,
+    inspectionFiled: false,
+    hasVehicle: false,
     offer: {
       distanceBucket: offer.distanceBucket,
       districtNameAr: offer.districtNameAr,
@@ -431,6 +526,11 @@ function toAssignedJob(row: unknown): AssignedJob {
     requiresCompletionMileage: order.services?.requires_completion_mileage ?? true,
     vehicleCurrentMileage: order.vehicles?.current_mileage ?? null,
     scheduledFor: order.scheduled_for ?? null,
+    inspectionTemplateKey: order.services?.inspection_template_key ?? null,
+    inspectionFiled: Array.isArray(order.inspection_reports)
+      ? order.inspection_reports.length > 0
+      : order.inspection_reports !== null && order.inspection_reports !== undefined,
+    hasVehicle: order.vehicle_id !== null && order.vehicle_id !== undefined,
     offer: null,
   };
 }
@@ -446,6 +546,30 @@ const DEV_OPEN_JOB: OpenJob = {
   problemSummary: 'السيارة ما تشتغل',
   hasTriageVideo: false,
   estimatedPayout: '120.00',
+};
+
+/** A short form for the dev build; the real one is seeded by 0027. */
+const DEV_INSPECTION_TEMPLATE: InspectionTemplate = {
+  key: 'pre_purchase_v1',
+  nameAr: 'فحص ما قبل الشراء',
+  sections: [
+    {
+      key: 'engine',
+      title_ar: 'المحرك',
+      weight: 3,
+      items: [
+        { key: 'oil_leaks', label_ar: 'تسريب زيت', required: true, weight: 2 },
+        { key: 'cold_start', label_ar: 'التشغيل البارد', required: true, weight: 2 },
+        { key: 'belts', label_ar: 'السيور', required: false },
+      ],
+    },
+    {
+      key: 'body',
+      title_ar: 'الهيكل',
+      weight: 2,
+      items: [{ key: 'accident_evidence', label_ar: 'آثار حوادث', required: true, weight: 3 }],
+    },
+  ],
 };
 
 /** In-memory stand-in, used until a Supabase project exists (ADR-0010). */
@@ -502,6 +626,9 @@ export class InMemoryProviderRepository implements ProviderRepository {
       requiresCompletionMileage: true,
       vehicleCurrentMileage: 45000,
       scheduledFor: null,
+      inspectionTemplateKey: null,
+      inspectionFiled: false,
+      hasVehicle: true,
       offer: null,
     });
     return 'accepted';
@@ -557,6 +684,16 @@ export class InMemoryProviderRepository implements ProviderRepository {
     localUri: string,
   ): Promise<CompletionMediaItem> {
     return { url: localUri, kind };
+  }
+
+  async getInspectionTemplate(key: string): Promise<InspectionTemplate | null> {
+    return key === DEV_INSPECTION_TEMPLATE.key ? DEV_INSPECTION_TEMPLATE : null;
+  }
+
+  async submitInspection(orderId: string): Promise<FiledInspection> {
+    const job = this.jobs.get(orderId);
+    if (job !== undefined) this.jobs.set(orderId, { ...job, inspectionFiled: true });
+    return { score: 88, recommendation: 'buy' };
   }
 
   async recordEvidence(
