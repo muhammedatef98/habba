@@ -36,6 +36,7 @@ import { detectDeviceLocale, initI18n } from '@/features/shared/lib/i18n';
 import { readStoredLocale, readStoredTheme } from '@/features/shared/lib/preferences';
 import { syncLayoutDirection } from '@/features/shared/lib/rtl';
 import { OfflineNotice } from '@/features/shared/components/OfflineNotice';
+import { PlatformNotice } from '@/features/shared/components/PlatformNotice';
 import { PushBridge } from '@/features/shared/components/PushBridge';
 import { configureNotificationPresentation } from '@/features/shared/lib/push';
 import { useMode } from '@/features/shared/state/mode';
@@ -156,6 +157,7 @@ export default function RootLayout() {
               screen below it stopped filling the window. */}
           <View style={{ flex: 1 }}>
             <OfflineNotice testID="offline-notice" />
+            <PlatformNotice />
             <View style={{ flex: 1 }}>
               <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
             </View>

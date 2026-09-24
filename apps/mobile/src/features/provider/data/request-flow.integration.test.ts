@@ -31,6 +31,7 @@ const CUSTOMER_ID = 'aaaaaaaa-6666-4666-8666-aaaaaaaaaaa1';
 const TECH_ID = 'bbbbbbbb-6666-4666-8666-bbbbbbbbbbb1';
 const RIVAL_ID = 'bbbbbbbb-6666-4666-8666-bbbbbbbbbbb2';
 const WORKSHOP_ID = 'cccccccc-6666-4666-8666-ccccccccccc1';
+const OPS_ID = 'dddddddd-6666-4666-8666-ddddddddddd1';
 
 /** Where the customer's car is, and where each technician's phone reports. */
 const CAR = { lon: 50.105, lat: 26.422 };
@@ -70,6 +71,29 @@ function clientFor(userId: string): SupabaseClient {
 }
 
 const customer = () => new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+
+/** An operator in the console: two factors, a moment ago (0068). */
+function operator(): SupabaseClient {
+  const token = mintTestJwt(JWT_SECRET, {
+    sub: OPS_ID,
+    role: 'authenticated',
+    secondFactorAt: new Date(),
+  });
+  return createClient(POSTGREST_URL, token, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+  });
+}
+
+async function seedOperator(): Promise<SupabaseClient> {
+  const ops = operator();
+  await ops.rpc('test_seed_auth_user', { p_id: OPS_ID, p_phone: '+966506669901' });
+  await ops
+    .from('profiles')
+    .upsert({ id: OPS_ID, full_name: 'مشغّل التدفّق', phone: '+966506669901' });
+  await ops.rpc('test_grant_role', { p_user_id: OPS_ID, p_role: 'ops' });
+  return ops;
+}
 
 /** What push-tick connects as: the service role, the only caller the queue answers. */
 function sender(): SupabaseClient {
@@ -351,6 +375,65 @@ describe.skipIf(!harnessUp)('an emergency request, through the app', () => {
     // And a customer's client cannot ask for anyone's queue.
     const denied = await clientFor(CUSTOMER_ID).rpc('claim_push_notifications', { p_limit: 5 });
     expect(denied.error).not.toBeNull();
+  });
+
+  test('the customer reports a problem; Habba refunds part of it, and the app shows each step', async () => {
+    await customer().openOrderDispute(orderId, 'البطارية فصلت مرة أخرى في اليوم التالي');
+    expect((await customer().getOrder(orderId))?.status).toBe('disputed');
+
+    const ops = await seedOperator();
+    const resolved = await ops.rpc('ops_resolve_dispute', {
+      p_order_id: orderId,
+      p_resolution: 'partial_refund',
+      p_refund_amount: 10,
+      p_note: 'تعويض جزئي بعد مراجعة الصور',
+    });
+    expect(resolved.error).toBeNull();
+
+    const order = await customer().getOrder(orderId);
+    expect(order?.status).toBe('completed');
+    expect(order?.escrowStatus).toBe('captured');
+
+    // The customer can see the refund is on its way (0069).
+    const refunds = await clientFor(CUSTOMER_ID)
+      .from('payment_operations')
+      .select('kind, amount, status')
+      .eq('order_id', orderId);
+    expect(refunds.data).toEqual([{ kind: 'refund', amount: 10, status: 'pending' }]);
+  });
+
+  test('a suspended customer is told why, and cannot send a new request', async () => {
+    expect((await customer().getPlatformStatus()).suspended).toBe(false);
+
+    const ops = await seedOperator();
+    const suspended = await ops.rpc('ops_set_suspension', {
+      p_user_id: CUSTOMER_ID,
+      p_suspend: true,
+      p_reason: 'مراجعة نشاط الحساب',
+    });
+    expect(suspended.error).toBeNull();
+
+    const status = await customer().getPlatformStatus();
+    expect(status.suspended).toBe(true);
+    expect(status.suspensionReason).toBe('مراجعة نشاط الحساب');
+
+    await expect(
+      customer().createEmergencyOrder({
+        serviceId: batteryServiceId,
+        lon: CAR.lon,
+        lat: CAR.lat,
+        vehicleId,
+        addressAr: 'حي الشاطئ',
+        problem: 'اختبار',
+      }),
+    ).rejects.toThrow();
+
+    await ops.rpc('ops_set_suspension', {
+      p_user_id: CUSTOMER_ID,
+      p_suspend: false,
+      p_reason: 'انتهت المراجعة',
+    });
+    expect((await customer().getPlatformStatus()).suspended).toBe(false);
   });
 });
 

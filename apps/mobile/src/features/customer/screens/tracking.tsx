@@ -42,6 +42,7 @@ import { InProgress } from '@/features/customer/components/tracking/InProgress';
 import { LiveTracking } from '@/features/customer/components/tracking/LiveTracking';
 import { Matched } from '@/features/customer/components/tracking/Matched';
 import { PriceBreakdown } from '@/features/customer/components/tracking/PriceBreakdown';
+import { ReportProblem } from '@/features/customer/components/tracking/ReportProblem';
 import { Searching } from '@/features/customer/components/tracking/Searching';
 import type { OrderStatus } from '@/features/shared/data/types';
 
@@ -346,6 +347,25 @@ function TrackingBody() {
           }
           onDismiss={() => router.replace('/')}
         />
+        <ReportProblem orderId={current.id} />
+      </Screen>
+    );
+  }
+
+  // A complaint is not a cancellation. This used to fall through to the
+  // cancelled card below, telling a customer whose complaint was being
+  // reviewed that their order had been cancelled.
+  if (status === 'disputed') {
+    return (
+      <Screen scrollable>
+        <Card testID="order-disputed" elevation="sm" style={{ gap: theme.spacing.sm }}>
+          <Text variant="heading">{t('tracking.disputedTitle')}</Text>
+          <Text variant="bodySmall" tone="muted">
+            {t('tracking.disputedBody')}
+          </Text>
+        </Card>
+        <PriceBreakdown order={current} />
+        <Button label={t('common.back')} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
   }

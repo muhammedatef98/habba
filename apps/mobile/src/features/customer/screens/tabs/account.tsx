@@ -20,12 +20,12 @@
  */
 
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import Constants from 'expo-constants';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, Icon, ListRow, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
@@ -78,6 +78,17 @@ export default function AccountScreen() {
 
   const profile = useQuery({ queryKey: ['profile'], queryFn: () => repository.getProfile() });
   const vehicles = useQuery({ queryKey: ['vehicles'], queryFn: () => repository.listVehicles() });
+  // Support contacts are set by Habba's operators (0069), not built in: a
+  // number that changes should not need an app release.
+  const platform = useQuery({
+    queryKey: ['platform-status'],
+    queryFn: () => repository.getPlatformStatus(),
+    staleTime: 60_000,
+  });
+  const support = platform.data;
+  const hasSupport =
+    support !== undefined &&
+    (support.supportPhone !== '' || support.supportWhatsapp !== '' || support.supportEmail !== '');
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
@@ -258,6 +269,39 @@ export default function AccountScreen() {
           </View>
         </Card>
       </View>
+
+      {hasSupport ? (
+        <View testID="support-section" style={{ gap: theme.spacing.md }}>
+          <SectionHeader title={t('settings.sectionSupport')} />
+          <Card elevation="none" style={{ borderColor: theme.colors.border, borderWidth: 1 }}>
+            {support.supportPhone !== '' ? (
+              <ListRow
+                title={t('settings.supportCall')}
+                value={support.supportPhone}
+                onPress={() => void Linking.openURL(`tel:${support.supportPhone}`)}
+              />
+            ) : null}
+            {support.supportWhatsapp !== '' ? (
+              <ListRow
+                title={t('settings.supportWhatsapp')}
+                value={support.supportWhatsapp}
+                onPress={() =>
+                  void Linking.openURL(
+                    `https://wa.me/${support.supportWhatsapp.replace(/[^0-9]/g, '')}`,
+                  )
+                }
+              />
+            ) : null}
+            {support.supportEmail !== '' ? (
+              <ListRow
+                title={t('settings.supportEmail')}
+                value={support.supportEmail}
+                onPress={() => void Linking.openURL(`mailto:${support.supportEmail}`)}
+              />
+            ) : null}
+          </Card>
+        </View>
+      ) : null}
 
       <View style={{ gap: theme.spacing.md }}>
         <SectionHeader title={t('settings.sectionAbout')} />

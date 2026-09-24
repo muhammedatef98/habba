@@ -38,6 +38,7 @@ import type {
   OrderSummary,
   OwnershipTransfer,
   OwnershipTransferStatus,
+  PlatformStatus,
   NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
@@ -68,6 +69,7 @@ import type {
   Repository,
   TransferAddress,
 } from './repository.js';
+import { DEFAULT_PLATFORM_STATUS } from './platform-status.js';
 
 interface DispatchTelemetryRow {
   readonly contacted_count: number;
@@ -1286,6 +1288,45 @@ export class SupabaseRepository implements Repository {
       .eq('id', orderId);
 
     if (error !== null) throw new Error(`cancelOrder: ${error.message}`);
+  }
+
+  async openOrderDispute(orderId: string, reason: string): Promise<void> {
+    const { error } = await this.client.rpc('open_order_dispute', {
+      p_order_id: orderId,
+      p_reason: reason,
+    });
+    if (error !== null) throw new Error(`openOrderDispute: ${error.message}`);
+  }
+
+  async getPlatformStatus(): Promise<PlatformStatus> {
+    const settings = await this.client.rpc('get_public_settings');
+    const values = (settings.error === null ? settings.data : {}) as Record<string, unknown>;
+    const text = (key: string) => (typeof values[key] === 'string' ? (values[key] as string) : '');
+
+    // Signed out (or a network failure) reads as "not suspended": the server
+    // refuses a suspended account's every action regardless, so a missed
+    // banner costs an explanation, never a hole.
+    const account = await this.client.rpc('my_account_status');
+    const standing = (account.error === null ? account.data : null) as {
+      suspended?: boolean;
+      reason?: string | null;
+    } | null;
+
+    return {
+      ordersPaused: values['new_orders_paused'] === true,
+      pausedMessageAr: text('new_orders_paused_message_ar'),
+      announcementAr: text('announcement_ar'),
+      announcementEn: text('announcement_en'),
+      supportPhone: text('support_phone'),
+      supportWhatsapp: text('support_whatsapp'),
+      supportEmail: text('support_email'),
+      disputeWindowDays:
+        typeof values['dispute_window_days'] === 'number'
+          ? (values['dispute_window_days'] as number)
+          : DEFAULT_PLATFORM_STATUS.disputeWindowDays,
+      suspended: standing?.suspended === true,
+      suspensionReason: standing?.reason ?? null,
+    };
   }
 
   async confirmOrderCompletion(orderId: string): Promise<void> {

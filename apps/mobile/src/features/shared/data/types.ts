@@ -306,7 +306,25 @@ export interface Order {
   readonly scheduledFor: string | null;
 }
 
-export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'refunded';
+export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'released' | 'refunded' | 'failed';
+
+/**
+ * What Habba's operators have set for the whole app (0069, 0070), and whether
+ * this account may act at all. Read from the server, never assumed: the server
+ * enforces every one of these on its own; the app only explains them.
+ */
+export interface PlatformStatus {
+  readonly ordersPaused: boolean;
+  readonly pausedMessageAr: string;
+  readonly announcementAr: string;
+  readonly announcementEn: string;
+  readonly supportPhone: string;
+  readonly supportWhatsapp: string;
+  readonly supportEmail: string;
+  readonly disputeWindowDays: number;
+  readonly suspended: boolean;
+  readonly suspensionReason: string | null;
+}
 
 export interface OrderPart {
   readonly id: string;

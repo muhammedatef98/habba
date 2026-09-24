@@ -31,8 +31,10 @@ import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
+import { DEFAULT_PLATFORM_STATUS } from './platform-status.js';
 import type {
   AppointmentSlot,
+  PlatformStatus,
   BookingMode,
   BookingProvider,
   City,
@@ -236,6 +238,13 @@ export interface Repository {
   /** The customer's "no" to a quoted part. Recorded, never billed (0067). */
   declineOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
+  /**
+   * The customer's complaint about a finished job (0070). Freezes the
+   * provider's payout for this order until Habba resolves it.
+   */
+  openOrderDispute(orderId: string, reason: string): Promise<void>;
+  /** The operators' switches and this account's standing (0069, 0070). */
+  getPlatformStatus(): Promise<PlatformStatus>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
   rateOrder(input: NewRatingInput): Promise<void>;
@@ -1064,7 +1073,18 @@ class DevOrderSimulator {
   cancel(id: string): void {
     const order = this.orders.get(id);
     if (order === undefined) return;
-    this.orders.set(id, { ...order, status: 'cancelled' });
+    this.orders.set(id, {
+      ...order,
+      status: 'cancelled',
+      escrowStatus: order.escrowStatus === 'authorised' ? 'released' : order.escrowStatus,
+    });
+  }
+
+  dispute(id: string): void {
+    const order = this.orders.get(id);
+    if (order === undefined) return;
+    if (order.status !== 'completed') throw new Error('not_completed');
+    this.orders.set(id, { ...order, status: 'disputed' });
   }
 
   confirmCompletion(id: string): void {
@@ -1499,6 +1519,16 @@ export class InMemoryRepository implements Repository {
 
   async cancelOrder(orderId: string): Promise<void> {
     this.orders.cancel(orderId);
+  }
+
+  async openOrderDispute(orderId: string, reason: string): Promise<void> {
+    if (reason.trim().length < 3) throw new Error('reason_required');
+    this.orders.dispute(orderId);
+  }
+
+  // Development has no operators: nothing paused, nothing announced.
+  async getPlatformStatus(): Promise<PlatformStatus> {
+    return DEFAULT_PLATFORM_STATUS;
   }
 
   async confirmOrderCompletion(orderId: string): Promise<void> {

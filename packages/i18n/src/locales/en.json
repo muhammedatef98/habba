@@ -244,7 +244,11 @@
     "signOutConfirm": "Yes, sign me out",
     "version": "Version",
     "help": "Help and support",
-    "languageHint": "Changing the language changes the writing direction, which needs the app reopened."
+    "languageHint": "Changing the language changes the writing direction, which needs the app reopened.",
+    "sectionSupport": "Support",
+    "supportCall": "Call",
+    "supportWhatsapp": "WhatsApp",
+    "supportEmail": "Email"
   },
   "errors": {
     "generic": "Something went wrong.",
@@ -457,7 +461,15 @@
     "bookedWorkshopBody": "Bring your car to the workshop at the appointed time. We'll let you know when it's checked in, and at every step after.",
     "bookedMobileBody": "The technician will come to you at the appointed time. We'll let you know when they set off.",
     "bookedCancel": "Cancel appointment",
-    "warrantyLine": "{{days}}-day warranty on this work"
+    "warrantyLine": "{{days}}-day warranty on this work",
+    "reportProblem": "Report a problem with the work",
+    "reportProblemTitle": "What went wrong?",
+    "reportProblemHint": "Habba reviews the order and contacts you. The provider is not paid for it until the complaint is resolved.",
+    "reportProblemPlaceholder": "For example: the engine noise came back after two days",
+    "reportProblemSubmit": "Send complaint",
+    "reportProblemFailed": "The complaint could not be sent. The window for complaints on this order may have closed; contact support.",
+    "disputedTitle": "Your complaint is under review",
+    "disputedBody": "Habba is reviewing what happened and will tell you the decision. Any refund goes back to the same payment method."
   },
   "quote": {
     "title": "Parts quote",
@@ -765,5 +777,13 @@
       "insurance": "Insurance",
       "periodic_inspection": "Periodic inspection"
     }
+  },
+  "platform": {
+    "suspendedTitle": "Your account is suspended",
+    "suspendedBody": "You cannot place orders or take jobs right now. Reason: {{reason}}",
+    "suspendedNoReason": "You cannot place orders or take jobs right now. Contact support for details.",
+    "pausedTitle": "New orders are paused for now",
+    "announcementTitle": "From Habba",
+    "contactSupport": "Contact support"
   }
 }
