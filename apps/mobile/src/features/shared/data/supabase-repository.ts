@@ -1324,6 +1324,10 @@ export class SupabaseRepository implements Repository {
         typeof values['dispute_window_days'] === 'number'
           ? (values['dispute_window_days'] as number)
           : DEFAULT_PLATFORM_STATUS.disputeWindowDays,
+      autoCompleteHours:
+        typeof values['auto_complete_after_hours'] === 'number'
+          ? (values['auto_complete_after_hours'] as number)
+          : DEFAULT_PLATFORM_STATUS.autoCompleteHours,
       suspended: standing?.suspended === true,
       suspensionReason: standing?.reason ?? null,
     };

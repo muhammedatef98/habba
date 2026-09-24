@@ -469,7 +469,8 @@
     "reportProblemSubmit": "Send complaint",
     "reportProblemFailed": "The complaint could not be sent. The window for complaints on this order may have closed; contact support.",
     "disputedTitle": "Your complaint is under review",
-    "disputedBody": "Habba is reviewing what happened and will tell you the decision. Any refund goes back to the same payment method."
+    "disputedBody": "Habba is reviewing what happened and will tell you the decision. Any refund goes back to the same payment method.",
+    "autoCompleteNote": "If you neither approve nor report a problem within {{hours}} hours of hand-back, the order closes by itself. You can still complain afterwards."
   },
   "quote": {
     "title": "Parts quote",

@@ -113,10 +113,13 @@ select test.assert_eq(
 
 -- Changing the number revokes its verification, so a verified flag cannot be
 -- carried onto a different phone.
+-- The fixture write, as the owner: no client can open the privileged path (0071).
+reset role;
 select public.begin_privileged_write();
 update public.profiles set phone_verified = true
 where id = '11111111-0000-4000-3333-000000000001';
 select public.end_privileged_write();
+set role authenticated;
 
 update public.profiles set phone = '+966509200099'
 where id = '11111111-0000-4000-3333-000000000001';

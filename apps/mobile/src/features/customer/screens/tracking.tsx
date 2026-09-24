@@ -119,6 +119,14 @@ function TrackingBody() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
 
+  // How long before an unconfirmed job closes by itself — the operators'
+  // setting (0071), shown so the customer is not surprised by it.
+  const platform = useQuery({
+    queryKey: ['platform-status'],
+    queryFn: () => repository.getPlatformStatus(),
+    staleTime: 60_000,
+  });
+
   const rate = useMutation({
     mutationFn: (stars: number) =>
       repository.rateOrder({
@@ -312,6 +320,12 @@ function TrackingBody() {
             {current.warrantyDays !== null && current.warrantyDays > 0 ? (
               <Text testID="approval-warranty" variant="bodySmall" tone="success">
                 {t('tracking.warrantyLine', { days: current.warrantyDays })}
+              </Text>
+            ) : null}
+
+            {platform.data !== undefined ? (
+              <Text testID="auto-complete-note" variant="caption" tone="muted">
+                {t('tracking.autoCompleteNote', { hours: platform.data.autoCompleteHours })}
               </Text>
             ) : null}
 

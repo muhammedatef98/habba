@@ -15,6 +15,10 @@
  * Intended to run on a schedule of roughly 15 seconds. The window is 45, so a
  * slower tick simply delays expansion; a faster one changes nothing, because
  * the staleness test is in the query.
+ *
+ * The same tick closes the orders a customer never confirmed (0071): a
+ * reminder half-way through the window, then completion and capture. That
+ * is also absence-driven, and its rules are likewise all in SQL.
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -31,6 +35,11 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
  * endpoint refuses everything rather than defaulting to open.
  */
 const TICK_SECRET = Deno.env.get('HABBA_DISPATCH_TICK_SECRET') ?? '';
+
+interface ClosedRow {
+  readonly order_id: string;
+  readonly outcome: string;
+}
 
 interface ExpandedRow {
   readonly order_id: string;
@@ -67,6 +76,15 @@ Deno.serve(async (request: Request) => {
 
   const expanded = (data ?? []) as readonly ExpandedRow[];
 
+  const closing = await client.rpc('auto_complete_awaiting_orders');
+  if (closing.error !== null) {
+    return new Response(JSON.stringify({ error: closing.error.message }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+  const closed = (closing.data ?? []) as readonly ClosedRow[];
+
   return new Response(
     JSON.stringify({
       expanded: expanded.length,
@@ -78,6 +96,11 @@ Deno.serve(async (request: Request) => {
         round: row.round,
         sent: row.offers_sent,
       })),
+      // An order that could not be closed (a refused capture, a car sold
+      // mid-job) is listed with the reason, for the operator to take over.
+      reminded: closed.filter((row) => row.outcome === 'reminded').length,
+      completed: closed.filter((row) => row.outcome === 'completed').length,
+      failed: closed.filter((row) => row.outcome.startsWith('failed')),
     }),
     { status: 200, headers: { 'content-type': 'application/json' } },
   );

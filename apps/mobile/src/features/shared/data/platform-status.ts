@@ -10,6 +10,7 @@ export const DEFAULT_PLATFORM_STATUS: PlatformStatus = {
   supportWhatsapp: '',
   supportEmail: '',
   disputeWindowDays: 14,
+  autoCompleteHours: 24,
   suspended: false,
   suspensionReason: null,
 };

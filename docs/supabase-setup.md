@@ -330,13 +330,14 @@ refuses any photo that was not uploaded there.
 
 Two Edge Functions run on their own, and **neither does anything until it is
 scheduled**. Without `dispatch-tick` an emergency nobody accepts is never
-widened past the first radius; without `push-tick` nobody is ever notified —
+widened past the first radius, and a job whose customer never confirms it
+stays open forever with the payment held; without `push-tick` nobody is ever notified —
 not the technician about a new job, not the customer that help has arrived.
 
-| Function        | What it does                                            | How often                                |
-| --------------- | ------------------------------------------------------- | ---------------------------------------- |
-| `dispatch-tick` | widens searches nobody has accepted (0051)              | every 15 seconds                         |
-| `push-tick`     | delivers `notification_outbox` through Expo Push (0066) | on every insert (webhook) + every minute |
+| Function        | What it does                                                                                                 | How often                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `dispatch-tick` | widens searches nobody has accepted (0051); reminds, then closes, orders the customer never confirmed (0071) | every 15 seconds                         |
+| `push-tick`     | delivers `notification_outbox` through Expo Push (0066)                                                      | on every insert (webhook) + every minute |
 
 **Deploy and set their secrets** (each secret a long random string):
 

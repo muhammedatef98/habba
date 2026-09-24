@@ -322,6 +322,8 @@ export interface PlatformStatus {
   readonly supportWhatsapp: string;
   readonly supportEmail: string;
   readonly disputeWindowDays: number;
+  /** An unconfirmed job closes by itself this long after hand-back (0071). */
+  readonly autoCompleteHours: number;
   readonly suspended: boolean;
   readonly suspensionReason: string | null;
 }
