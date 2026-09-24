@@ -20,8 +20,8 @@
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, Icon, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
-import { toLatinDigits } from '@habba/core';
 import type { OpenJob } from '@/features/provider/data/provider-repository';
+import { distanceLabel } from '@/features/provider/lib/distance-band';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 
 export interface OpenJobCardProps {
@@ -65,9 +65,7 @@ export function OpenJobCard({ job, onPress, testID }: OpenJobCardProps) {
             >
               <Icon name="locate" size={theme.iconSize.sm} color={theme.colors.textMuted} />
               <Text variant="caption" tone="muted">
-                {/* The server words the bucket in Arabic-Indic digits
-                    («أقل من ٢ كم»); every other number here is Latin (§8). */}
-                {toLatinDigits(job.distanceBucket)}
+                {distanceLabel(job.distanceBucket, t)}
                 {job.districtNameAr === null ? '' : ` · ${job.districtNameAr}`}
               </Text>
             </View>

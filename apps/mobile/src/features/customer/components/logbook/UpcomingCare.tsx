@@ -14,7 +14,12 @@
  * on the day it was written and stop honouring it on the first edit.
  *
  * Three actions per item, and they are the three things a person actually does
- * when told a service is due: it is already done, not now, or book it.
+ * when told a service is due: it is already done, not now, or book it — but
+ * only when it IS due. Every item carried all three, so a car with nothing
+ * due showed two rows of «تم / ذكّرني لاحقاً / احجز الآن» for oil and filter
+ * whose last change was simply unknown, and the one item that needed doing
+ * looked like the others. An item that is not due yet keeps «تم», which is
+ * how its first date gets recorded.
  */
 
 import { View } from 'react-native';
@@ -111,23 +116,48 @@ export function UpcomingCare({
     <View testID={testID} style={{ gap: theme.spacing.md }}>
       {rows.length > 0 ? (
         <Card elevation="sm" style={{ gap: theme.spacing.md }}>
-          {rows.map(({ item, line }) => {
+          {rows.map(({ item, line }, index) => {
             const snoozed = isSnoozed(item);
+            const due = line.urgency === 'overdue' || line.urgency === 'soon';
+            const state = t(line.key, lineValues(line, i18n.language));
             return (
               <View
                 key={item.itemId}
                 testID={`care-item-${item.itemType}`}
-                style={{ gap: theme.spacing.sm }}
+                style={{
+                  gap: theme.spacing.sm,
+                  ...(index === 0
+                    ? {}
+                    : {
+                        borderTopWidth: 1,
+                        borderTopColor: theme.colors.border,
+                        paddingTop: theme.spacing.md,
+                      }),
+                }}
               >
-                <Row gap="sm" align="center" justify="space-between">
-                  <Text variant="bodyStrong">{isArabic ? item.nameAr : item.nameEn}</Text>
-                  <StatusPill
-                    testID={`care-state-${item.itemType}`}
-                    label={t(line.key, lineValues(line, i18n.language))}
-                    tone={PILL_TONE[line.urgency]}
-                    showDot={line.urgency === 'overdue'}
-                  />
-                </Row>
+                {/* A short state is a pill beside the name; «last time unknown —
+                    record it and we will follow it» is a sentence, and squeezed
+                    into a pill it pushed the name into a corner. */}
+                {line.urgency === 'unknown' ? (
+                  <View style={{ gap: 2 }}>
+                    <Text variant="bodyStrong">{isArabic ? item.nameAr : item.nameEn}</Text>
+                    <Text testID={`care-state-${item.itemType}`} variant="caption" tone="muted">
+                      {state}
+                    </Text>
+                  </View>
+                ) : (
+                  <Row gap="sm" align="center" justify="space-between">
+                    <Text variant="bodyStrong" style={{ flexShrink: 1 }}>
+                      {isArabic ? item.nameAr : item.nameEn}
+                    </Text>
+                    <StatusPill
+                      testID={`care-state-${item.itemType}`}
+                      label={state}
+                      tone={PILL_TONE[line.urgency]}
+                      showDot={line.urgency === 'overdue'}
+                    />
+                  </Row>
+                )}
 
                 {snoozed && item.snoozedUntil !== null ? (
                   <Text variant="caption" tone="subtle">
@@ -149,16 +179,18 @@ export function UpcomingCare({
                     onPress={() => onDone(item.itemId)}
                     loading={busyItemId === item.itemId}
                   />
-                  <Button
-                    testID={`care-snooze-${item.itemType}`}
-                    label={t('care.snooze')}
-                    variant="ghost"
-                    size="medium"
-                    fullWidth={false}
-                    onPress={() => onSnooze(item.itemId)}
-                    disabled={snoozed}
-                  />
-                  {item.serviceId !== null ? (
+                  {due ? (
+                    <Button
+                      testID={`care-snooze-${item.itemType}`}
+                      label={t('care.snooze')}
+                      variant="ghost"
+                      size="medium"
+                      fullWidth={false}
+                      onPress={() => onSnooze(item.itemId)}
+                      disabled={snoozed}
+                    />
+                  ) : null}
+                  {due && item.serviceId !== null ? (
                     <Button
                       testID={`care-book-${item.itemType}`}
                       label={t('care.book')}

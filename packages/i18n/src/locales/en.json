@@ -631,6 +631,12 @@
     "hasVideo": "Has video",
     "payoutLabel": "Estimated payout",
     "distanceLabel": "Distance",
+    "distanceBand": {
+      "under2": "Under 2 km",
+      "from2to5": "2–5 km",
+      "from5to10": "5–10 km",
+      "over10": "Over 10 km"
+    },
     "activeJobsTitle": "In progress",
     "noMyJobs": "No jobs in progress. Nearby requests appear on the shift screen.",
     "goToShift": "Open shift",
