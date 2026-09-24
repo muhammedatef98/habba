@@ -1,63 +1,56 @@
 # Habba (هبّة) — Session Handoff
 
-> **Purpose:** complete context transfer for continuing this project in a new chat.
-> Written 2026-08-31. Read `CLAUDE.md` first (permanent project context, spec §0–5), then this.
+> **Purpose:** everything a new session needs to continue the work.
+> Rewritten 2026-09-24. Read `CLAUDE.md` first (the permanent spec, §0–5.1),
+> then this, then `docs/ROADMAP.md` for the phase-by-phase status.
 
 ---
 
-## 0. How to resume in a new chat
+## 0. How to resume
 
 Paste this at the start of a new session:
 
 ```
-Read CLAUDE.md and HANDOFF.md in /Users/mohamed/habba before doing anything.
-CLAUDE.md is the permanent spec context. HANDOFF.md is the state of the work,
-including open decisions and known-incomplete areas. Then tell me what you
-think the next step is and why, before you write any code.
+Read CLAUDE.md, HANDOFF.md and docs/ROADMAP.md before doing anything.
+CLAUDE.md is the permanent spec. HANDOFF.md is the state of the work and the
+decisions still open. Then tell me what you think the next step is and why,
+before you write any code.
 ```
 
-The original master spec is at:
-`/Users/mohamed/.claude/uploads/75e5d45a-88df-42d7-bc65-5af4e42f1dc8/f5f35d9e-HABBA_BUILD_PROMPT.md`
-
-`CLAUDE.md` holds spec sections 0–5 verbatim. Sections 6–12 (data model,
-algorithms, design system, app surfaces, phased build, anti-goals, definition
-of done) live only in that uploaded file — re-read it when working on a phase.
+The full build prompt (spec §6–12) is in `docs/HABBA_BUILD_PROMPT.md`.
 
 ---
 
 ## 1. What Habba is
 
-A Saudi car-care super-app. Arabic-first, RTL-first. Launch market: Eastern
-Province + Riyadh.
-
-**The moat is not dispatch.** It is دفتر السيارة الرقمي — a permanent,
-immutable, owner-portable vehicle logbook keyed to VIN and plate. Every
-interaction writes to it. At resale the owner generates a verified
-تقرير هبّة (signed report + public QR link), which makes Habba valuable to
-people who are not currently buying a service, and converts the buyer into a
-customer at zero CAC.
-
-**Architectural consequence:** `vehicles` and its append-only `vehicle_timeline`
-are the centre of the schema. Orders, inspections and payments are satellites
-that write to the timeline. The timeline is append-only and tamper-evident —
-enforced by triggers and revoked grants, never by convention.
+A Saudi car-care super-app, Arabic-first and RTL-first, launching in the
+Eastern Province and Riyadh. **The moat is the vehicle logbook**
+(دفتر السيارة): a permanent, append-only, hash-chained service history keyed
+to the car. Every order writes to it, and at resale it becomes a verified
+تقرير هبّة. Orders, payments and inspections are satellites of the logbook.
 
 ---
 
-## 2. Current state — one line
+## 2. Current state — one paragraph
 
-All six backend phases pass their acceptance criteria, and Amendments A and B
-(one mobile app, roles as a join table, admin stays separate) are applied to
-both the spec and the code. Repo is private at **github.com/muhammedatef98/habba**.
+Both request flows work end to end through the app's own code, with two
+identities, against a real database: an emergency request (search → a
+technician accepts → en route → arrived → work → parts approved → hand-back
+with photos and warranty → customer approves → payment captured → logbook);
+and a scheduled or workshop booking (slot → confirmed → check-in → work →
+hand-back). Each step pushes a notification. The **ops console**
+(`apps/admin`) reaches everything an operator is answerable for, behind
+mandatory 2FA and 8-hour sessions, with every change and every file opened
+recorded in an immutable audit log. What stands between this and real users
+is **not code**: see §7, open decisions.
 
 ```
-41 migrations · 20 SQL suites · 2 concurrency tests · tests/rls.spec.ts (17)
-apps/mobile 52 · core 99 · ui 21 · i18n 9 · typecheck + lint + boundaries green
+72 migrations · 45 SQL suites (all pass) · tests/rls.spec.ts
+mobile 221 unit + integration (Vitest) + 8 render (Jest) · core 174 · ui 52 · i18n 10
+admin 16 unit + 8 against the real database · request-flow integration 17
+pnpm verify: typecheck, lint, format, edge-shared sync, unit, bundle,
+             admin secret-key check, SQL suites, integration — twice green
 ```
-
-**There is now ONE mobile app.** `apps/customer` and `apps/provider` are gone;
-`apps/mobile` serves both through `(customer)` and `(provider)` route groups.
-`profiles.role` is gone too — roles live in `user_roles` (ADR-0016).
 
 ---
 
@@ -65,285 +58,147 @@ apps/mobile 52 · core 99 · ui 21 · i18n 9 · typecheck + lint + boundaries gr
 
 ```
 habba/
-├─ CLAUDE.md                 spec §0–5, permanent context — re-read every session
-├─ HANDOFF.md                this file
+├─ CLAUDE.md · HANDOFF.md
 ├─ apps/
-│  └─ mobile/               ONE Expo app — customers and providers
-│     ├─ app/               expo-router routes; (customer)/ and (provider)/ groups
-│     ├─ src/features/customer/  customer screens + components
-│     ├─ src/features/provider/  provider screens + shift state
-│     ├─ src/features/shared/    data layer, lib, session/mode state, shared screens
-│     ├─ metro.config.js    monorepo resolution
-│     └─ vitest.config.ts   the `@/` alias, for tests
-│  (admin/ NOT BUILT — separate Next.js ops dashboard, §9.4 + Amendment B)
+│  ├─ mobile/     ONE Expo app (SDK 57): (customer) and (provider) route groups;
+│  │              features/customer, features/provider, features/shared —
+│  │              customer/provider may not import each other (ESLint error)
+│  └─ admin/      Next.js ops console (web only). README.md: setup, Vercel,
+│                 what it controls and what it deliberately cannot reach
 ├─ packages/
-│  ├─ core/                  saudi validators, SarAmount money, report render,
-│  │                         inspection scoring, job-flow state mirror
-│  ├─ ui/                    design system (tokens, Text, Button, Card, Field,
-│  │                         Screen, ProvenanceBadge, theme)
-│  └─ i18n/                  ar.json + en.json, typed keys
-├─ tests/rls.spec.ts        RLS + Amendment A6, over real HTTP with a real JWT
+│  ├─ core/       money (SarAmount), Saudi validators, job-flow mirror,
+│  │              report render + QR, Expo push envelope and receipts
+│  ├─ ui/         design system (tokens → both apps)
+│  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/            0001–0041, forward-only
-│  ├─ tests/                 00_helpers + 01–19 SQL suites
-│  ├─ seed/                  cities, services, maintenance rules
-│  └─ scripts/               local-db.sh, postgrest.sh, supabase_shim.sql,
-│                            concurrency-test.sh, slot-concurrency-test.sh
-└─ docs/adr/                 ADR-0001 … ADR-0015
+│  ├─ migrations/ 0001–0072, forward-only, each paired with a suite
+│  ├─ tests/      00_helpers + 01–45
+│  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
+│  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
+│  ├─ storage/    storage policies (applied as the storage owner)
+│  ├─ seed/       cities, services, maintenance rules
+│  └─ scripts/    local-db.sh, postgrest.sh, supabase_shim.sql, …
+├─ tests/rls.spec.ts   RLS over real HTTP with real JWTs
+└─ docs/          ROADMAP.md, supabase-setup.md (the deploy runbook), adr/
 ```
 
 ---
 
 ## 4. Local development
 
-No Docker. A throwaway Postgres cluster + PostgREST stand in for Supabase.
+No Docker: a throwaway Postgres cluster and PostgREST stand in for Supabase.
+There is **no GoTrue locally** — sign-in against the harness uses minted JWTs
+in tests; a real sign-in (including the console's 2FA) needs a Supabase
+project.
 
 ```bash
-pnpm db:start        # boot local Postgres (port 54329)
-pnpm db:reset        # drop, recreate, migrate, seed
-pnpm db:test         # reset + run all SQL suites
-pnpm api:start       # PostgREST on 54321
-pnpm verify          # typecheck + lint + unit + SQL suites + integration
+pnpm db:start && pnpm api:start   # Postgres :54329, PostgREST :54321
+pnpm db:test                      # reset + all SQL suites
+pnpm verify                       # everything; run it TWICE before a commit
+pnpm --filter @habba/mobile start # the app (in-memory data if no project)
+pnpm --filter @habba/admin dev    # the console on :3100 (demo data if no project)
 ```
 
-**Run `pnpm verify` TWICE.** The integration suite skips itself if PostgREST is
-still warming, so a single run can show `16 passed | 32 skipped` and still exit 0. Two consecutive green runs is the real check. This is also how a stale-cache
-bug hid for hours (§8).
+Dev credentials: app OTP `123456` (see `apps/mobile/README.md`); console
+`ops@habba.sa`, any password of 8+ characters, authenticator code `123456`.
 
-Run the app:
-
-```bash
-pnpm --filter @habba/mobile start           # Metro
-cd apps/mobile && npx expo start --go --tunnel   # Expo Go over tunnel
-xcrun simctl launch <UDID> sa.habba.app
-```
-
-See `apps/mobile/README.md` for the dev credentials and how to approve a
-provider locally (applying grants nothing — only approval does).
-
-Dev credentials: OTP code is **`1234`**. Email auth is an in-memory stub.
-Location is a fixed Dammam coordinate.
+Deploying is `docs/supabase-setup.md`: create the project, apply migrations
+and storage policies, deploy and **schedule** the two ticks (§7a) — without
+them no search widens, no order auto-closes and nobody is notified.
 
 ---
 
-## 5. Key architectural decisions
+## 5. Architecture and security — the rules that hold everything up
 
-| ADR  | Decision                                                                                                                                              |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0003 | Timeline append-only via three independent layers: no INSERT policy, revoked grants, SECURITY DEFINER write path                                      |
-| 0004 | Hash chain over timeline rows; ordered by `seq` (identity column), **not** `recorded_at` — `now()` is transaction-start so all rows tie               |
-| 0005 | Provenance levels: `self_reported`, `self_documented`, `habba_verified`, `third_party`. Derived server-side; a client can never request a trust level |
-| 0006 | Order state machine in `order_transitions` table; `checked_in` replaces en_route/arrived for workshop mode                                            |
-| 0007 | `SarAmount` = branded string, integer-halala arithmetic, ROUND_HALF_UP to match Postgres                                                              |
-| 0008 | **UNRESOLVED — blocks shipping payments.** Merchant of record / SAMA question                                                                         |
-| 0009 | **UNRESOLVED — completed orders may be unbillable.** ZATCA seller of record                                                                           |
-| 0010 | **UNRESOLVED.** Supabase region / data residency / PDPL                                                                                               |
-| 0013 | Providers see masked order info before accepting; exact address only after                                                                            |
-| 0015 | Local harness exists so migrations are _verified_, not merely written                                                                                 |
-| 0016 | Roles are `user_roles` rows, not a column; approval grants the provider role; one app with lint-enforced feature boundaries                           |
-| 0017 | The report QR is generated in-page (no external request); KYC sealing is a stub until ADR-0010 lands                                                  |
-
----
-
-## 6. Security model — read this before touching RLS
-
-**The recurring bug class:** RLS grants row-level access and _cannot express
-which columns_. `WITH CHECK` sees only the new row, never the old one. Fifteen
-vulnerabilities were found across four adversarial audit passes; **none** was
-found by the ~150 feature tests, because those all exercise the intended flow.
-
-**The mechanisms:**
-
-- **Column write guards** — `BEFORE UPDATE` triggers named `<table>_a_guard_columns`.
-  The `_a_` makes them sort first, before the state-machine trigger.
-- **`ENABLE ALWAYS`** on every guard, so they fire for `service_role` — the one
-  actor RLS never applies to. Two guards were found missing this by the audit.
-- **Privileged-write flag** — `begin_privileged_write()` / `end_privileged_write()`.
-  Transaction-local, so it **must** be closed immediately; leaving it open
-  reopens every hole for the rest of the transaction.
-- **`is_ops()` is NOT exempted in `guard_profile_columns`** — deliberately.
-  Exempting it would be circular: a user who set their own role to `ops` would
-  pass the guard that stops them setting their own role.
-- **Column read control** is a _grant-layer_ problem, not RLS. A column-level
-  `REVOKE` is a **silent no-op** against an existing table-level grant. You must
-  `REVOKE SELECT ON <table>` then `GRANT SELECT (explicit, column, list)`.
-
-**Standing audits (these are build steps, not documentation):**
-
-- `tests/16_write_surface_audit.sql` — every client-updatable table classified,
-  every guarded table has a guard, every guard is `ENABLE ALWAYS`, sensitive
-  columns still exist on guarded tables, append-only tables expose no write policy.
-- `tests/17_read_surface_audit.sql` — uses `has_column_privilege()` (not
-  `information_schema`, which reports the same false-safe answer a naive REVOKE
-  would) to keep KYC columns off the client SELECT surface.
-
-**Vulnerabilities fixed (migrations 0033–0039):** forged escrow status, price
-rewriting, odometer rollback, VIN transplant, self-granted reputation/Nafath,
-self-approval, part re-pricing after approval, alert rewriting, **privilege
-escalation to `ops`** (invalidated all prior guards), issued-report payload
-tampering, `booked_count` editing, provider KYC columns readable by any
-authenticated client, ownership-transfer OTP hash exposed via self-declared
-phone, globally-readable commission rates and invoice sellers.
+- **Rules live in SQL.** Every state change, price, permission and payment
+  step is a Postgres function or trigger, proven in a suite. Edge Functions
+  are transport only; the apps are thin clients.
+- **Column guards** (`<table>_a_guard_columns`, `ENABLE ALWAYS`) — RLS cannot
+  say which columns; these triggers do. Suite 16 audits that every guarded
+  table has one and that it fires for `service_role`.
+- **Privileged writes** — `begin_privileged_write()` lets a definer function
+  make a change a client cannot. Transaction-local, closed immediately, and
+  since 0071 **not callable by any client role**.
+- **Payment state** (`escrow_status`, `payment_intent_id`, `refunded_amount`)
+  is closed to direct writes by operators too (0069). Voids and refunds are
+  rows in `payment_operations` for the PSP to carry out.
+- **The logbook** is append-only (ADR-0003) and hash-chained (ADR-0004).
+  Corrections are new `record_annotated` entries signed by Habba. An order
+  closed by timeout says so in its entry (0071).
+- **Ops access** — `is_ops()` requires an unrevoked `ops`/`super_admin` role
+  AND a second factor verified within 8 hours (0068). Every console function
+  checks it itself (0070); every change on an ops-writable table and every
+  opening of a person's file is written to `audit_log`, which nobody can alter.
+- **KYC ciphertext** (national ID, IBAN) is unreadable from every client,
+  the console included (0037).
 
 ---
 
-## 7. What was built in this session
+## 6. What was built across the last sessions (0064–0072)
 
-### Amendments A and B, in the spec and then in the code
+| Area                                | Migrations | What it gave                                                                                                               |
+| ----------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Completion evidence                 | 0064       | Real camera photos into a private bucket; the server verifies they exist                                                   |
+| The request actually goes somewhere | 0065       | `submit_order` (funded before dispatch), the bill computed at hand-back, warranty chosen with the evidence, booking priced |
+| Notifications                       | 0066, 0072 | Outbox with leased claims, per-kind TTL, push-tick; **receipts**: delivered vs sent, dead installs retired                 |
+| Parts                               | 0067       | Customer approves or declines each line; hand-back waits for every answer                                                  |
+| Ops console                         | 0068–0070  | 2FA + 8h, audit log, settings, suspension, disputes and refunds, every read and action (see `apps/admin/README.md`)        |
+| Orders that end                     | 0071       | Reminder half-way, then auto-close + capture when the customer never confirms                                              |
 
-`docs/HABBA_BUILD_PROMPT.md` gained §5.1 (app topology), mirrored verbatim into
-`CLAUDE.md`, and the amendments were threaded through §2, §4, §6.1, §6.4, §6.9,
-a new §6.10 (admin `audit_log`), §9, §10, §11 and §12.
-
-### Roles as a join table (0040, 0041 — ADR-0016)
-
-`profiles.role` dropped; `user_roles(user_id, role, granted_at, revoked_at,
-granted_by)` added, closed to clients three ways. `customer` on profile insert;
-`technician`/`workshop_admin` from `providers.verification_status='approved'`,
-in the same transaction, revoked on suspension.
-
-**Two real holes closed on the way**, both found by writing `tests/rls.spec.ts`
-rather than by reading the schema:
-
-- `current_provider_id()` matched ANY providers row, so a self-registered
-  applicant held provider RLS access — open orders, live locations — before
-  anyone read their ID.
-- `providers` had no uniqueness on `owner_profile_id`. One user could hold
-  several records; `sync_provider_role()` then reasoned about the row being
-  written rather than the account, so inserting a second record revoked a role
-  the first had earned.
-
-### One app (`apps/mobile`)
-
-Route groups, a provider-group guard that fails closed while roles load, a mode
-switcher visible only to approved providers, last-mode persistence in
-SecureStore, and «اشتغل معنا كفنّي» → KYC → pending → approval. Boundaries are
-an ESLint error, verified by deliberately writing a cross-import and watching
-lint fail.
-
-### Phase 2 surfaces
-
-Timeline grouped by the year work HAPPENED; an event detail screen that shows
-both dates, the structured record and what the provenance level does not claim;
-a mileage screen with progression; manual entry extended to service type, cost
-(as `SarAmount`), parts with part numbers, and photos — where attaching a photo
-moves the entry from `self_reported` to `self_documented`, derived server-side.
-
-### The report QR (ADR-0017)
-
-A dependency-free encoder in `@habba/core`, inlined as SVG so the page still
-fetches nothing. `qr.test.ts` round-trips through jsQR, and immediately caught
-two defects that produce a code which photographs perfectly and scans as
-nothing: a Reed–Solomon generator polynomial built leading-coefficient-last,
-and a transposed format-information block. **Structural assertions would have
-passed on both.**
-
-### Design system
-
-`ListRow`, `EmptyState` and `BottomSheet`; `self_documented` promoted to a real
-token pair with the contrast test extended to all three provenance levels.
-
-## 8. Things that were never true until this session
-
-- **Nothing had ever bundled.** No `metro.config.js` existed anywhere, so Metro
-  could not resolve the workspace packages' `.js`-suffixed TypeScript imports
-  (correct for `tsc` Node resolution, not something Metro rewrites). Both apps
-  now bundle for iOS. The config adds `watchFolders`, `nodeModulesPaths`, and a
-  `resolveRequest` fallback that retries a failed `.js` resolution
-  extensionless.
-- **Nothing had ever rendered on a device.** The customer app now runs on the
-  iOS simulator.
+Real bugs found and fixed along the way, all with tests: orders were never
+submitted or funded; accept was an RLS no-op; the technician's position was
+never sent; cancelling left the customer's money held; disputes had no way
+out; a provider could dispute their own job; operators could mark an order
+paid by editing it; the console could not sign anyone in (it read a dropped
+column); the customer saw "cancelled" for an order under complaint.
 
 ---
 
-## 9. Open decisions — these block real work
+## 7. Open decisions — these block launch, and none is a coding task
 
-> Also summarised, with what each one blocks per phase, in `docs/ROADMAP.md`.
-
-| #   | Decision                                                             | Blocks                                                                                                                                                              |
-| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **ADR-0008 — payments / merchant of record / SAMA**                  | Anything that moves real money. `authorise_order_payment` / `capture_order_payment` are the interface; the PSP behind them is unchosen                              |
-| 2   | **ADR-0009 — ZATCA seller of record**                                | Completed orders may be unbillable. Schema records _which_ seller so invoices stay attributable either way                                                          |
-| 3   | **ADR-0010 — PDPL transfer basis** (region decided: `eu-central-1`)  | No hosted project exists. App falls back to in-memory repository                                                                                                    |
-| 4   | **SMS provider** (Unifonic / Taqnyat / Twilio)                       | Real phone OTP. CITC sender-ID registration required                                                                                                                |
-| 5   | **Plate letter map verification** against official MOI/Absher source | ADR-0011, now load-bearing in 5+ places                                                                                                                             |
-| 6   | **Expo SDK 57 vs Expo Go**                                           | SDK 57 _is_ the current stable release, so an up-to-date Expo Go supports it. If the user's Expo Go is outdated the fallback is a dev build, or downgrade to SDK 54 |
+| #   | Decision                                                        | Blocks                                                                                                                                                                                                              |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **ADR-0008 — payments, merchant of record, SAMA**               | Real money. Authorise/capture/void/refund are interfaces over a dev provider; `payment_operations` is the queue a Moyasar worker would drain (today an operator carries them out by hand and records the reference) |
+| 2   | **ADR-0009 — ZATCA seller of record**                           | Lawful invoices, and the credit note a refund needs                                                                                                                                                                 |
+| 3   | **ADR-0010 — PDPL** (region: Frankfurt)                         | KYC sealing (so provider mode stays off), and counsel's sign-off on erasure-by-anonymisation (0070)                                                                                                                 |
+| 4   | **SMS provider** (Unifonic / Taqnyat / Twilio) + CITC sender ID | Phone OTP, so any launch                                                                                                                                                                                            |
+| 5   | **Plate letter map** checked against an official source         | ADR-0011; the logbook is keyed on plates                                                                                                                                                                            |
+| 6   | **Warranty options**                                            | The technician chooses 30/90/180 days, default 30, no "none" — confirm                                                                                                                                              |
 
 ---
 
-## 10. Known incomplete
+## 8. Known incomplete (code)
 
-- **Admin dashboard (§9.4, Next.js + Amendment B)** — not started. Provider
-  verification queue (which is what grants the provider role), live order map,
-  dispute resolution, pricing tuning, payout runs, `audit_log` (spec §6.10 —
-  the table is specified but not yet migrated), 2FA, 8-hour sessions, and the
-  CI check that fails on a client-reachable service-role key.
-- **Booking flow (§9.1)** — placeholder screen. Backend built and tested,
-  including the slot-concurrency guarantee. This is the obvious next increment.
-- **Inspection screens (Phase 5)** — backend done, no customer UI.
-- **Camera and GPS are stubs** — both behind interfaces (`location-provider.ts`
-  mirrors `otp-provider.ts`); swapping in real implementations is one file each.
-- **KYC sealing is a stub** (ADR-0017). Real encryption is Supabase Vault /
-  pgsodium and waits on ADR-0010, so no real ID or IBAN may be accepted yet.
-- **Guest → account conversion** uses the dev stub. Real Supabase
-  `signInAnonymously` + identity linking is not wired.
-- **Video triage (§9.1)** — the 20-second clip before dispatch is not built.
-- **PDF generation** — print-to-PDF only, no server-side render.
-- **Ownership transfer acceptance** — `accept_ownership_transfer()` exists
-  (0037) with OTP verification, atomic claim, privileged owner reassignment and
-  a timeline event. Wired in SQL and tested; no UI.
+- **Inspection screens** (Phase 5) — backend and its integration test exist; no
+  customer or provider UI.
+- **Payment provider worker** — waits on decision 1.
+- **ZATCA credit notes** — waits on decision 2.
+- **Real two-phone run** — every flow is proven by integration tests through
+  the app's own repositories, but never by two people on two devices.
+- **No E2E (Detox) and few render tests** — screens are covered by typecheck,
+  lint, render smoke tests and the data layer beneath them.
+- **Server-side PDF** — the report prints to PDF in-app (ADR-0019).
 
 ---
 
-## 11. Conventions to follow
+## 9. Conventions
 
-- **Every migration is paired with a test suite.** One fix, one test. No
-  exceptions since 0033.
-- **Migration comments explain the attack**, not the syntax. Several open with
-  the exact SQL that used to work.
-- **Money never touches float.** `@habba/core`'s `SarAmount` everywhere. A first
-  draft of `quote.tsx` used floats — caught in review, not by a test.
-- **Never `select()` on `providers`.** Always an explicit column list — 0037
-  revoked the KYC columns, and a bare `select()` requests every column and fails
-  the whole query. This broke three integration tests when introduced.
-- **No hardcoded strings.** All copy in `packages/i18n`, typed keys.
-- **Errors surface in Arabic, plainly, with a next action** (§12). Never a raw
-  Postgres or provider code.
-- **Any status change goes through the state machine**, never a direct UPDATE.
-- **The in-memory dev repository mirrors real server behaviour** where that
-  behaviour is load-bearing. A stub more permissive than production hides bugs
-  until launch.
+- Every migration has a suite. Migration comments explain the failure they
+  prevent, not the syntax.
+- Money is `numeric(12,2)` in SQL and `SarAmount` in TypeScript; never float.
+- Never `select()` on `providers` — always a column list (0037).
+- All copy in `packages/i18n`, Modern Standard Arabic. Errors are explained in
+  Arabic with a next step; never a raw database message.
+- Status changes go through the state machine, never a hand-written status.
+- The in-memory repository and the console's demo data mirror the server
+  where behaviour depends on it.
+- `pnpm verify` twice green, then commit and push the same turn (CLAUDE.md §6).
 
 ---
 
-## 12. Anti-goals (spec §11) — do not violate
+## 10. Anti-goals (spec §11)
 
-- No chat-first or bidding-first experience. Saudi users want a price, not an auction.
-- Providers **cannot** set their own prices for `emergency` services. Enforced
-  by `reject_custom_price_on_fixed_service`.
-- The logbook is **never** gated behind a paywall or behind having ordered.
-- National IDs and IBANs are **never** stored in plaintext. Check constraints
-  make an obvious plaintext write fail loudly.
-- Completion photos and mileage are **never** skippable — without them the moat
-  is empty.
-- No web before mobile.
-- No ride-hailing, fuel subscriptions, or car sales in v1.
-
----
-
-## 13. Honest assessment
-
-**What is solid:** the schema, the hash chain, the security guards, and the
-test suites behind them. Fifteen vulnerabilities were found and fixed, and the
-class they belong to is now a build step rather than a memory.
-
-**What is thin:** everything above the database. Most screens are new and have
-only been clicked through by hand on a simulator — there are no component tests
-and no E2E coverage. The apps bundled for the first time this session, which
-means every screen from every earlier phase had never actually run.
-
-**What I would not trust yet:** that the read-side audit is complete. It was one
-pass, and each prior write-side pass found things the previous one missed —
-including a hole that made the previous passes moot. The standing audits narrow
-the class, but they are _completeness_ checks, not proofs: they verify every
-table has been classified and guarded, not that each guard is correct.
+No bidding or chat-first flow; providers cannot price emergency services; the
+logbook is never paywalled; IDs and IBANs are never plaintext; completion
+photos and mileage are never skippable; no web before mobile; no ride-hailing,
+fuel subscriptions or car sales in v1.
