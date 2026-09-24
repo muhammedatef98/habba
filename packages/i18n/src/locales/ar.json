@@ -305,7 +305,7 @@
     "lastReading": "آخر قراءة {{km}} كم",
     "greetingMorning": "صباح الخير",
     "greetingEvening": "مساء الخير",
-    "greetingNight": "ليلة بخير",
+    "greetingNight": "أهلاً بك",
     "activeTitle": "طلبك جارٍ الآن",
     "activeTrack": "تتبّع الطلب",
     "quickTitle": "خدمات سريعة",
@@ -318,7 +318,9 @@
     "switchVehicle": "تبديل",
     "otherVehicles": "سياراتك الأخرى",
     "statEmpty": "—",
-    "emergencyBadge": "متاح الآن"
+    "emergencyBadge": "متاح الآن",
+    "bookTitle": "احجز خدمة",
+    "priceFrom": "من {{amount}} ر.س"
   },
   "booking": {
     "title": "حجز موعد",
@@ -342,7 +344,7 @@
     "modeLockedWorkshop": "هذه الخدمة تحتاج رافعة، فتتم في الورشة فقط.",
     "modeLockedMobile": "هذه الخدمة متاحة كخدمة متنقّلة فقط.",
     "providerHeadline": "اختر مقدّم الخدمة",
-    "providerSubhead": "الأعلى تقييماً أولاً. السعر شامل الخدمة قبل الضريبة.",
+    "providerSubhead": "الأعلى تقييماً أولاً. الأسعار شاملة ضريبة القيمة المضافة.",
     "providerJobs": "{{jobs}} خدمة منجزة",
     "providerComesToYou": "يأتيك في موقعك",
     "providerNone": "لا يوجد مقدّم خدمة متاح لهذه الخدمة بهذه الطريقة حالياً. جرّب الطريقة الأخرى.",
@@ -389,7 +391,7 @@
       "paymentFailed": "تعذّر حجز المبلغ على بطاقتك. تحقّق من البطاقة وحاول مرة أخرى."
     },
     "serviceHeadline": "ما المشكلة؟",
-    "serviceSubhead": "اختر وبنبحث لك عن أقرب فنّي فوراً.",
+    "serviceSubhead": "اختر المشكلة، وسنبحث لك عن أقرب فنّي فوراً.",
     "estimatedPrice": "سعر {{service}}",
     "priceRange": "{{min}} – {{max}} ر.س",
     "dragToAdjust": "اسحب لتعديل الموقع",

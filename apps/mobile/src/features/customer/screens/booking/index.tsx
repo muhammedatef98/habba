@@ -23,6 +23,9 @@ import { BookingSteps } from '@/features/customer/components/booking/BookingStep
 import { repository } from '@/features/shared/data/repository';
 import { serviceIcon } from '@/features/shared/lib/service-icon';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+// VAT included, as on the home screen, the emergency screen and the card
+// hold: one service must not show two prices on the way to booking it.
+import { priceWithVat } from '@/features/shared/lib/order-price';
 import { vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useSession } from '@/features/shared/state/session';
@@ -185,7 +188,7 @@ export default function BookingServiceScreen() {
               <Text variant="bodyStrong" tone="accent" numeric>
                 {option.basePrice === null
                   ? t('booking.priceByProvider')
-                  : t('common.sar', { amount: formatSarDisplay(option.basePrice) })}
+                  : t('common.sar', { amount: formatSarDisplay(priceWithVat(option.basePrice)) })}
               </Text>
             </Card>
           );

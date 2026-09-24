@@ -298,7 +298,9 @@
     "switchVehicle": "Switch",
     "otherVehicles": "Your other vehicles",
     "statEmpty": "—",
-    "emergencyBadge": "Available now"
+    "emergencyBadge": "Available now",
+    "bookTitle": "Book a service",
+    "priceFrom": "From {{amount}} SAR"
   },
   "booking": {
     "title": "Book an appointment",
@@ -318,7 +320,7 @@
     "modeLockedWorkshop": "This service needs a lift, so it is workshop-only.",
     "modeLockedMobile": "This service is available as a mobile visit only.",
     "providerHeadline": "Choose a provider",
-    "providerSubhead": "Highest rated first. Price is for the service, before VAT.",
+    "providerSubhead": "Highest rated first. Prices include VAT.",
     "providerJobs": "{{jobs}} jobs completed",
     "providerComesToYou": "Comes to you",
     "providerNone": "No provider offers this service that way right now. Try the other option.",

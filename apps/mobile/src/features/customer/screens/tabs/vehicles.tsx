@@ -16,8 +16,14 @@
  *
  * The order below is the fix, and it is an order of urgency rather than of
  * feature importance: what is happening now, what you might need to start,
- * what your car is warning you about, what your car *is*, and only then the
- * account nudge and the history.
+ * your car and what it needs next, what you can book for it, and only then
+ * the history and the account nudge.
+ *
+ * Revised again from screenshots: the car — the logbook, the product's reason
+ * to exist between emergencies — sat at the bottom under a separate orange
+ * alert about it, and booking was one card describing services instead of
+ * showing them. The alert now lives in the car's card, and the services are
+ * on the screen with their prices, one tap from a booking already filled in.
  *
  * Rhythm is explicit here. `Screen`'s uniform gap is switched off and each
  * section carries its own top margin, so grouped things (hero + quick
@@ -31,18 +37,19 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, ErrorState, Icon, Row, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Screen, Text, useTheme } from '@habba/ui';
 import { ActiveOrderCard } from '@/features/customer/components/home/ActiveOrderCard';
+import { BookableServices } from '@/features/customer/components/home/BookableServices';
 import { EmergencyHero } from '@/features/customer/components/home/EmergencyHero';
 import { HomeHeader } from '@/features/customer/components/home/HomeHeader';
-import { MaintenanceAlertCard } from '@/features/customer/components/home/MaintenanceAlertCard';
 import { QuickServices } from '@/features/customer/components/home/QuickServices';
 import { RecentOrderRow } from '@/features/customer/components/home/RecentOrderRow';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { VehicleHeroCard } from '@/features/customer/components/home/VehicleHeroCard';
 import { repository } from '@/features/shared/data/repository';
-import { formatShortDate } from '@/features/shared/lib/format-number';
+import { formatCount, formatShortDate } from '@/features/shared/lib/format-number';
 import { summariseLogbook } from '@/features/shared/lib/logbook-summary';
+import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useEmergencyDraft } from '@/features/shared/state/emergency-draft';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/features/shared/state/session';
 import type { Service } from '@/features/shared/data/types';
@@ -63,6 +70,7 @@ export default function HomeScreen() {
   const selectVehicle = useSession((state) => state.selectVehicle);
 
   const selectDraftService = useEmergencyDraft((state) => state.selectService);
+  const bookingDraft = useBookingDraft();
   const selectDraftVehicle = useEmergencyDraft((state) => state.selectVehicle);
 
   const queryClient = useQueryClient();
@@ -108,6 +116,13 @@ export default function HomeScreen() {
   const services = useQuery({
     queryKey: ['emergency-services'],
     queryFn: () => repository.listEmergencyServices(),
+  });
+
+  // Same key as the booking screen's, so opening it after a tap here is a
+  // cache hit.
+  const bookable = useQuery({
+    queryKey: ['bookable-services'],
+    queryFn: () => repository.listBookableServices(),
   });
 
   /**
@@ -162,6 +177,20 @@ export default function HomeScreen() {
       ? formatShortDate(logbook.lastServiceAt, i18n.language)
       : undefined;
 
+  /**
+   * Opens booking with the service already chosen: the card the customer
+   * tapped was the answer to the first question on that screen. A draft left
+   * from an earlier, abandoned booking is cleared first so its provider and
+   * slot do not ride along with a different service.
+   */
+  function bookService(service: Service | undefined) {
+    bookingDraft.reset();
+    if (service !== undefined) bookingDraft.selectService(service);
+    router.push('/booking');
+  }
+
+  const alert = (alerts.data ?? [])[0];
+
   function openEmergency() {
     if (!hasVehicles) {
       router.push('/add-vehicle');
@@ -193,6 +222,7 @@ export default function HomeScreen() {
       <HomeHeader
         testID="home-header"
         {...(!isGuest && fullName !== null ? { name: fullName } : {})}
+        onAccount={() => router.push('/account')}
       />
 
       {activeOrder !== undefined ? (
@@ -214,46 +244,9 @@ export default function HomeScreen() {
           isArabic={isArabic}
           onSelect={startQuickService}
         />
-
-        {/* §9.1's second primary action, with its own breathing room: the
-            hero and the tiles are one group (start an emergency now), and
-            booking ahead is a different intent that should not read as a
-            fifth tile. */}
-        {/* A card rather than a bare button: it is the app's second flow, and
-            a secondary button under the hero read as a footnote to it. It
-            says what can be booked, so nobody has to open it to find out. */}
-        <Card
-          testID="home-booking"
-          elevation="sm"
-          onPress={() => router.push('/booking')}
-          accessibilityLabel={t('home.bookAppointment')}
-          style={{ marginTop: theme.spacing.sm }}
-        >
-          <Row gap="md">
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: theme.radius.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: theme.colors.primarySubtle,
-              }}
-            >
-              <Icon name="calendar" size={theme.iconSize.md} color={theme.colors.primary} />
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text variant="bodyStrong">{t('home.bookAppointment')}</Text>
-              <Text variant="caption" tone="muted">
-                {t('home.bookAppointmentHint')}
-              </Text>
-            </View>
-            <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
-          </Row>
-        </Card>
       </View>
 
-      {/* Above the alerts and below the live job: someone is standing next to
+      {/* Above the car and below the live job: someone is standing next to
           this person waiting to hand over a car, which outranks a maintenance
           reminder and does not outrank a technician already on the way. */}
       {incomingTransfer.data !== null && incomingTransfer.data !== undefined ? (
@@ -278,16 +271,6 @@ export default function HomeScreen() {
           </Card>
         </View>
       ) : null}
-
-      {(alerts.data ?? []).slice(0, 1).map((alert) => (
-        <View key={alert.id} style={{ marginTop: theme.spacing.xl }}>
-          <MaintenanceAlertCard
-            testID="home-maintenance-alert"
-            alert={alert}
-            onBook={() => router.push('/booking')}
-          />
-        </View>
-      ))}
 
       <View style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}>
         <SectionHeader
@@ -320,6 +303,22 @@ export default function HomeScreen() {
             models={allModels.data}
             {...(logbook !== undefined ? { recordCount: logbook.recordCount } : {})}
             {...(lastServiceLabel !== undefined ? { lastServiceLabel } : {})}
+            {...(alert !== undefined
+              ? {
+                  alert: {
+                    message: isArabic ? alert.messageAr : alert.messageEn,
+                    ...(alert.estimatedKm !== null
+                      ? {
+                          detail: t('home.lastReading', {
+                            km: formatCount(alert.estimatedKm, i18n.language),
+                          }),
+                        }
+                      : {}),
+                  },
+                  onAlertPress: () =>
+                    bookService(bookable.data?.find((service) => service.id === alert.serviceId)),
+                }
+              : {})}
             onSelect={selectVehicle}
             onOpenLogbook={() =>
               router.push({ pathname: '/logbook', params: { id: selectedVehicle.id } })
@@ -341,6 +340,54 @@ export default function HomeScreen() {
           </Card>
         )}
       </View>
+
+      {(bookable.data?.length ?? 0) > 0 ? (
+        <View testID="home-booking" style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}>
+          <SectionHeader
+            title={t('home.bookTitle')}
+            actionLabel={t('home.quickAll')}
+            onAction={() => bookService(undefined)}
+          />
+          <BookableServices
+            testID="home-bookable"
+            services={bookable.data ?? []}
+            onSelect={bookService}
+          />
+        </View>
+      ) : null}
+
+      {pastOrders.length > 0 ? (
+        <View style={{ marginTop: theme.spacing.xl }}>
+          <SectionHeader
+            title={t('home.recentTitle')}
+            actionLabel={t('home.quickAll')}
+            onAction={() => router.push('/orders')}
+          />
+          {/* In a card, as on the orders tab: the same rows on bare page
+              background here read as a different, lesser list. */}
+          <Card
+            elevation="none"
+            style={{ marginTop: theme.spacing.md, paddingVertical: theme.spacing.xs }}
+          >
+            {pastOrders.map((order, index) => (
+              <View
+                key={order.id}
+                style={
+                  index === 0
+                    ? undefined
+                    : { borderTopWidth: 1, borderTopColor: theme.colors.border }
+                }
+              >
+                <RecentOrderRow
+                  testID="home-recent-order"
+                  order={order}
+                  onPress={() => router.push({ pathname: '/tracking', params: { id: order.id } })}
+                />
+              </View>
+            ))}
+          </Card>
+        </View>
+      ) : null}
 
       {/* Demoted, on purpose. §11 says the logbook is never gated and the
           prompt should ask rather than demand — a filled amber block above the
@@ -376,34 +423,6 @@ export default function HomeScreen() {
               {t('auth.guestBannerAction')}
             </Text>
           </Card>
-        </View>
-      ) : null}
-
-      {pastOrders.length > 0 ? (
-        <View style={{ marginTop: theme.spacing.xl }}>
-          <SectionHeader
-            title={t('home.recentTitle')}
-            actionLabel={t('home.quickAll')}
-            onAction={() => router.push('/orders')}
-          />
-          <View style={{ marginTop: theme.spacing.xs }}>
-            {pastOrders.map((order, index) => (
-              <View
-                key={order.id}
-                style={
-                  index === 0
-                    ? undefined
-                    : { borderTopWidth: 1, borderTopColor: theme.colors.border }
-                }
-              >
-                <RecentOrderRow
-                  testID="home-recent-order"
-                  order={order}
-                  onPress={() => router.push({ pathname: '/tracking', params: { id: order.id } })}
-                />
-              </View>
-            ))}
-          </View>
         </View>
       ) : null}
     </Screen>

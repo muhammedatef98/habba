@@ -38,6 +38,13 @@ export interface VehicleHeroCardProps {
   readonly lastServiceLabel?: string | undefined;
   readonly onOpenLogbook: () => void;
   readonly onSelect: (vehicleId: string) => void;
+  /**
+   * What this car needs next, if anything (a maintenance alert). Inside the
+   * car's card rather than a banner of its own: on its own it sat between
+   * the booking card and «سيارتك», about a car the screen had not shown yet.
+   */
+  readonly alert?: { readonly message: string; readonly detail?: string | undefined } | undefined;
+  readonly onAlertPress?: (() => void) | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -50,6 +57,8 @@ export function VehicleHeroCard({
   lastServiceLabel,
   onOpenLogbook,
   onSelect,
+  alert,
+  onAlertPress,
   testID,
 }: VehicleHeroCardProps) {
   const { t, i18n } = useTranslation();
@@ -94,11 +103,13 @@ export function VehicleHeroCard({
 
   return (
     <View style={{ gap: theme.spacing.sm }}>
+      {/* Not one big button: the switcher and the alert are buttons of their
+          own, and a button inside a button is one a screen reader cannot
+          reach (and invalid wherever this renders as HTML). The car's details
+          open the logbook; so does the row that says so. */}
       <Card
         {...(testID !== undefined ? { testID } : {})}
         elevation="sm"
-        onPress={onOpenLogbook}
-        accessibilityLabel={`${vehicleLabel(selected, sources)} — ${t('home.openLogbook')}`}
         style={{ borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.md }}
       >
         <View
@@ -108,14 +119,20 @@ export function VehicleHeroCard({
             gap: theme.spacing.md,
           }}
         >
-          <View style={{ flex: 1, gap: 2 }}>
+          <Pressable
+            testID="home-vehicle-open"
+            onPress={onOpenLogbook}
+            accessibilityRole="button"
+            accessibilityLabel={`${vehicleLabel(selected, sources)} — ${t('home.openLogbook')}`}
+            style={{ flex: 1, gap: 2 }}
+          >
             <Text variant="heading" numberOfLines={1}>
               {title}
             </Text>
             <Text variant="bodySmall" tone="muted" numberOfLines={1}>
               {subtitle}
             </Text>
-          </View>
+          </Pressable>
 
           {switchable ? (
             <Pressable
@@ -146,36 +163,88 @@ export function VehicleHeroCard({
           ) : null}
         </View>
 
-        {plate !== null ? <PlateBadge testID="vehicle-plate" plate={plate} /> : null}
+        {/* Tappable for thumbs, silent for screen readers: the title above
+            is the same destination, already announced. */}
+        <Pressable onPress={onOpenLogbook} accessible={false} style={{ gap: theme.spacing.md }}>
+          {plate !== null ? <PlateBadge testID="vehicle-plate" plate={plate} /> : null}
 
-        <View style={{ height: 1, backgroundColor: theme.colors.border }} />
+          <View style={{ height: 1, backgroundColor: theme.colors.border }} />
 
-        <StatCluster
-          testID="home-vehicle-stats"
-          items={[
-            { key: 'mileage', value: mileage, label: t('home.statMileage') },
+          <StatCluster
+            testID="home-vehicle-stats"
+            items={[
+              { key: 'mileage', value: mileage, label: t('home.statMileage') },
+              {
+                key: 'records',
+                value:
+                  recordCount === undefined ? undefined : formatCount(recordCount, i18n.language),
+                label: t('home.statRecords'),
+              },
+              { key: 'last', value: lastServiceLabel, label: t('home.statLastService') },
+            ]}
+          />
+        </Pressable>
+
+        {alert !== undefined ? (
+          <Pressable
+            testID="home-maintenance-alert"
+            onPress={onAlertPress}
+            accessibilityRole="button"
+            accessibilityLabel={`${alert.message} — ${t('home.bookNow')}`}
+            style={({ pressed }) => [
+              {
+                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                alignItems: 'center',
+                gap: theme.spacing.md,
+                padding: theme.spacing.md,
+                borderRadius: theme.radius.md,
+                backgroundColor: theme.colors.warningSubtle,
+                borderWidth: 1,
+                borderColor: theme.colors.warningBorder,
+              },
+              pressed ? { opacity: 0.85 } : null,
+            ]}
+          >
+            <Icon name="alert" size={theme.iconSize.md} color={theme.colors.warningFg} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                variant="bodySmall"
+                tone="warning"
+                style={{ fontWeight: theme.fontWeight.semibold }}
+              >
+                {alert.message}
+              </Text>
+              {alert.detail !== undefined ? (
+                <Text variant="caption" tone="muted" numeric>
+                  {alert.detail}
+                </Text>
+              ) : null}
+            </View>
+            <Text variant="label" tone="warning">
+              {t('home.bookNow')}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          testID="home-open-logbook"
+          onPress={onOpenLogbook}
+          accessibilityRole="button"
+          style={({ pressed }) => [
             {
-              key: 'records',
-              value:
-                recordCount === undefined ? undefined : formatCount(recordCount, i18n.language),
-              label: t('home.statRecords'),
+              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+              alignItems: 'center',
+              gap: theme.spacing.xs,
+              minHeight: theme.minTouchTarget,
             },
-            { key: 'last', value: lastServiceLabel, label: t('home.statLastService') },
+            pressed ? { opacity: 0.7 } : null,
           ]}
-        />
-
-        <View
-          style={{
-            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-            alignItems: 'center',
-            gap: theme.spacing.xs,
-          }}
         >
           <Text variant="label" tone="primary" style={{ flex: 1 }}>
             {t('home.openLogbook')}
           </Text>
           <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.primary} />
-        </View>
+        </Pressable>
       </Card>
 
       {switching ? (

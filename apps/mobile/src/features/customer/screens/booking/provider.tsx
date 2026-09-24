@@ -31,6 +31,9 @@ import { BookingSteps } from '@/features/customer/components/booking/BookingStep
 import { repository } from '@/features/shared/data/repository';
 import { formatCount } from '@/features/shared/lib/format-number';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+// VAT included, as on the home screen, the emergency screen and the card
+// hold: one service must not show two prices on the way to booking it.
+import { priceWithVat } from '@/features/shared/lib/order-price';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import type { BookingProvider } from '@/features/shared/data/types';
 
@@ -163,7 +166,7 @@ export default function BookingProviderScreen() {
                   </View>
 
                   <Text variant="bodyStrong" tone="accent" numeric>
-                    {t('common.sar', { amount: formatSarDisplay(provider.price) })}
+                    {t('common.sar', { amount: formatSarDisplay(priceWithVat(provider.price)) })}
                   </Text>
                 </View>
 
