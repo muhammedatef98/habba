@@ -48,7 +48,7 @@ is **not code**: see §7, open decisions.
 
 ```
 73 migrations · 46 SQL suites (all pass) · tests/rls.spec.ts
-mobile 226 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 52 · i18n 10
+mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
 pnpm verify: typecheck, lint, format, edge-shared sync, unit, bundle,
@@ -148,6 +148,7 @@ them no search widens, no order auto-closes and nobody is notified.
 | Ops console                         | 0068–0070  | 2FA + 8h, audit log, settings, suspension, disputes and refunds, every read and action (see `apps/admin/README.md`)        |
 | Orders that end                     | 0071       | Reminder half-way, then auto-close + capture when the customer never confirms                                              |
 | Inspections in the app              | 0073       | Technician's form, report on the order + PDF, bought car joins the account; hand-back waits for the report                 |
+| UI/UX passes (3 rounds)             | —          | Every screen screenshotted in Arabic, English and dark; fixes listed below                                                 |
 
 Real bugs found and fixed along the way, all with tests: orders were never
 submitted or funded; accept was an RLS no-op; the technician's position was
@@ -157,6 +158,28 @@ paid by editing it; the console could not sign anyone in (it read a dropped
 column); the customer saw "cancelled" for an order under complaint.
 
 ---
+
+### UI/UX passes — what changed and what now guards it
+
+Each screen was rendered at phone size (390px) through react-native-web in a
+throwaway setup — never committed; the app is not a web target — and walked
+as a user would. The fixes that matter beyond one screen:
+
+- **Arabic plurals.** Every counted phrase has Arabic's six CLDR forms
+  (`_zero … _other`) and English's two; callers pass a number as `count`.
+  `packages/i18n` tests that each plural key has exactly its language's forms.
+- **Every `t('…')` key exists.** `apps/mobile/src/features/shared/lib/i18n-keys.test.ts`
+  reads every literal key in the app and fails on one missing in either
+  language (it found `quote.partsTotal` and `common.close` shipping raw).
+- **Direction on the first Arabic launch.** Besides `rowDirectionFor`, there
+  is now `alignStartFor` for "at the reading start" in a column; ListRow,
+  Button (compact), badges, pills, ChipRow and the logos use them. Both tab
+  bars are `shared/components/HabbaTabBar`.
+- **Numbers and dates.** Latin digits throughout (§8); phone numbers are
+  grouped inside an LTR isolate (`format-phone.ts`); booking days and times
+  are Riyadh's (`slot-days.ts`), matching the confirmation.
+- **Register.** The dialect test also catches spoken negation and future
+  («ما عندك», «ما فيه», «بيظهر», «تسوي شي», «يشتغل»…).
 
 ## 7. Open decisions — these block launch, and none is a coding task
 

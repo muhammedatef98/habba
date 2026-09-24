@@ -136,6 +136,10 @@ export function Field({
           secureTextEntry={rest.secureTextEntry === true && !revealed}
           style={{
             flex: 1,
+            // Lets a narrow field (a quantity beside a price) shrink below the
+            // input's intrinsic width, which a browser enforces and let the
+            // value spill out of its box.
+            minWidth: 0,
             minHeight: scaledHeight(theme.minTouchTarget, PixelRatio.getFontScale()),
             paddingEnd: prefix === undefined || showReveal ? 0 : theme.spacing.md,
             color: theme.colors.text,

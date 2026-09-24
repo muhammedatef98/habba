@@ -10,7 +10,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Text, useTheme } from '@habba/ui';
 import { RatingStars } from '@/features/customer/components/RatingStars';
 import { PriceBreakdown } from './PriceBreakdown';
 import type { Order, ProviderSummary } from '@/features/shared/data/types';
@@ -54,9 +54,9 @@ export function Completed({
             justifyContent: 'center',
           }}
         >
-          <Text variant="title" tone="success">
-            ✓
-          </Text>
+          {/* The icon, not a «✓» character: the Arabic display face has no
+              check glyph and fell back to one that read as «√». */}
+          <Icon name="check" size={theme.iconSize['2xl']} color={theme.colors.successFg} />
         </View>
         <View style={{ gap: theme.spacing.xs }}>
           <Text variant="title" align="center">

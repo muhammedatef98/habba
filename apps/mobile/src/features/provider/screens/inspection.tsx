@@ -141,7 +141,7 @@ export default function InspectionScreen() {
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{template.data?.nameAr ?? t('inspection.title')}</Text>
         <Text testID="inspection-progress" variant="caption" tone="muted" numeric>
-          {t('inspection.progress', { answered: progress.answered, total: progress.total })}
+          {t('inspection.progress', { answered: progress.answered, count: progress.total })}
           {progress.missingRequired.length > 0
             ? ` · ${t('inspection.requiredLeft', { count: progress.missingRequired.length })}`
             : ''}
@@ -209,7 +209,10 @@ export default function InspectionScreen() {
                   {item.label_ar}
                   {item.required === true ? ' *' : ''}
                 </Text>
-                <Row gap="xs" wrap>
+                {/* Four equal segments across the row: a technician rates forty
+                    items with one thumb, and small chips of four different
+                    widths put each answer somewhere else on every line. */}
+                <Row gap="xs" align="stretch">
                   {RATINGS.map((rating) => {
                     const selected = entry?.rating === rating;
                     const tint =
@@ -228,16 +231,22 @@ export default function InspectionScreen() {
                         onPress={() => rate(section.key, item.key, rating)}
                         accessibilityLabel={`${item.label_ar}: ${t(`inspection.rating.${rating}`)}`}
                         style={{
+                          flex: 1,
                           minHeight: theme.minTouchTarget,
+                          alignItems: 'center',
                           justifyContent: 'center',
                           paddingVertical: theme.spacing.xs,
-                          paddingHorizontal: theme.spacing.md,
+                          paddingHorizontal: theme.spacing.xs,
                           backgroundColor: selected ? tint : theme.colors.surface,
                           borderColor: selected ? theme.colors.primary : theme.colors.border,
                           borderWidth: selected ? 1.5 : 1,
                         }}
                       >
-                        <Text variant="caption" tone={selected ? 'default' : 'muted'}>
+                        <Text
+                          variant={selected ? 'bodyStrong' : 'bodySmall'}
+                          tone={selected ? 'default' : 'muted'}
+                          align="center"
+                        >
                           {t(`inspection.rating.${rating}`)}
                         </Text>
                       </Card>

@@ -44,7 +44,11 @@ function readingsFrom(events: readonly TimelineEvent[]): readonly Reading[] {
   const points = events
     .filter((event) => event.mileage !== null)
     .map((event) => ({ at: new Date(event.occurredAt), mileage: event.mileage as number }))
-    .sort((a, b) => a.at.getTime() - b.at.getTime());
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    // The same figure twice is one reading, not progress: adding a car with
+    // its odometer writes the registration and the reading together, and the
+    // list showed «85,000» twice with «0 km since the previous reading».
+    .filter((point, index, all) => index === 0 || point.mileage !== all[index - 1]?.mileage);
 
   return points.map((point, index) => {
     const previous = index === 0 ? undefined : points[index - 1];

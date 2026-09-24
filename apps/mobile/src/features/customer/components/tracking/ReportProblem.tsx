@@ -47,7 +47,7 @@ export function ReportProblem({ orderId }: { readonly orderId: string }) {
         {t('tracking.reportProblemHint')}
       </Text>
       <Field
-        label={t('tracking.reportProblemTitle')}
+        label={t('tracking.reportProblemField')}
         value={reason}
         onChangeText={setReason}
         placeholder={t('tracking.reportProblemPlaceholder')}
