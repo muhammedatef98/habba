@@ -53,11 +53,19 @@ export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 export function ttlSecondsFor(kind: string): number {
   if (kind === 'job_offer') return 5 * 60;
   if (kind === 'booking_confirmed' || kind === 'care_reminder') return 12 * 60 * 60;
+  if (kind === 'announcement' || kind === 'order_auto_completed') return 24 * 60 * 60;
+  if (kind === 'approval_reminder') return 6 * 60 * 60;
   return 30 * 60;
 }
 
+/**
+ * Not time-critical: delivered quietly, on the channel a person can mute
+ * without missing a technician at the door.
+ */
+const QUIET_KINDS = new Set(['care_reminder', 'announcement']);
+
 export function toExpoMessage(row: ClaimedPush): ExpoPushMessage {
-  const reminder = row.kind === 'care_reminder';
+  const reminder = QUIET_KINDS.has(row.kind);
   return {
     to: row.token,
     title: row.title,
@@ -88,6 +96,13 @@ export type ExpoTicket =
       readonly details?: { readonly error?: string } | undefined;
     };
 
+/** A message Expo accepted, to be checked against its receipt later. */
+export interface AcceptedTicket {
+  readonly ticket_id: string;
+  readonly notification_id: string;
+  readonly token: string;
+}
+
 export interface PushOutcome {
   /** Reached at least one of its person's devices. */
   readonly sent: string[];
@@ -95,6 +110,8 @@ export interface PushOutcome {
   readonly retry: string[];
   /** Installs Expo says no longer exist. */
   readonly deadTokens: string[];
+  /** Accepted by Expo — which is not yet delivered by Apple or Google. */
+  readonly tickets: AcceptedTicket[];
 }
 
 /**
@@ -117,11 +134,17 @@ export function settle(
   const delivered = new Set<string>();
   const failed = new Set<string>();
   const deadTokens: string[] = [];
+  const accepted: AcceptedTicket[] = [];
 
   rows.forEach((row, index) => {
     const ticket = tickets[index];
     if (ticket?.status === 'ok') {
       delivered.add(row.notification_id);
+      accepted.push({
+        ticket_id: ticket.id,
+        notification_id: row.notification_id,
+        token: row.token,
+      });
       return;
     }
     if (ticket?.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') {
@@ -134,5 +157,56 @@ export function settle(
     sent: [...delivered],
     retry: [...failed].filter((id) => !delivered.has(id)),
     deadTokens,
+    tickets: accepted,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Receipts
+// ---------------------------------------------------------------------------
+// A ticket says Expo accepted the message. Whether Apple or Google took it is
+// only known from the receipt, fetched later (Expo keeps them for a day). The
+// receipt is where most uninstalled apps actually surface — a ticket for an
+// uninstalled app is usually `ok` — so without it dead tokens were never
+// retired and every notification to them silently went nowhere.
+
+export const EXPO_RECEIPTS_URL = 'https://exp.host/--/api/v2/push/getReceipts';
+
+/** Expo accepts at most this many ids per receipts request. */
+export const EXPO_RECEIPTS_BATCH_SIZE = 1000;
+
+export type ExpoReceipt =
+  | { readonly status: 'ok' }
+  | {
+      readonly status: 'error';
+      readonly message?: string | undefined;
+      readonly details?: { readonly error?: string } | undefined;
+    };
+
+/** What became of one ticket, for record_push_receipts (0072). */
+export interface ReceiptResult {
+  readonly ticket_id: string;
+  /** `pending`: Expo has no receipt yet — ask again next tick. */
+  readonly status: 'ok' | 'error' | 'pending';
+  readonly error: string | null;
+}
+
+/**
+ * Reads Expo's receipts back onto the tickets that were asked about. A ticket
+ * Expo did not answer for is `pending`, not `ok`: silence is not delivery.
+ */
+export function readReceipts(
+  ticketIds: readonly string[],
+  receipts: Readonly<Record<string, ExpoReceipt | undefined>>,
+): ReceiptResult[] {
+  return ticketIds.map((ticketId) => {
+    const receipt = receipts[ticketId];
+    if (receipt === undefined) return { ticket_id: ticketId, status: 'pending', error: null };
+    if (receipt.status === 'ok') return { ticket_id: ticketId, status: 'ok', error: null };
+    return {
+      ticket_id: ticketId,
+      status: 'error',
+      error: receipt.details?.error ?? receipt.message ?? 'unknown',
+    };
+  });
 }

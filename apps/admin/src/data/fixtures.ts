@@ -828,6 +828,7 @@ function seed(): State {
           user_name: 'سارة القحطاني',
           created_at: ago(53),
           sent_at: ago(53),
+          delivered_at: ago(52),
           abandoned_at: null,
           attempts: 1,
           last_error: null,

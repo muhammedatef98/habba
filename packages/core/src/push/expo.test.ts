@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { chunk, settle, toExpoMessage, ttlSecondsFor, type ClaimedPush } from './expo.js';
+import {
+  chunk,
+  readReceipts,
+  settle,
+  toExpoMessage,
+  ttlSecondsFor,
+  type ClaimedPush,
+} from './expo.js';
 
 function row(fields: Partial<ClaimedPush>): ClaimedPush {
   return {
@@ -83,5 +90,47 @@ describe('settle', () => {
     );
     expect(outcome.sent).toEqual(['n4']);
     expect(outcome.retry).toEqual(['n5']);
+  });
+});
+
+describe('ttl and channel for the kinds added with the console', () => {
+  it('an announcement is quiet and may wait a day; an approval reminder a few hours', () => {
+    expect(ttlSecondsFor('announcement')).toBe(24 * 60 * 60);
+    expect(ttlSecondsFor('approval_reminder')).toBe(6 * 60 * 60);
+    const message = toExpoMessage({
+      notification_id: 'n1',
+      kind: 'announcement',
+      token: 't1',
+      title: 'تحديث',
+      body: 'نص',
+      data: {},
+    });
+    expect(message.channelId).toBe('reminders');
+    expect(message.priority).toBe('default');
+  });
+});
+
+describe('receipts', () => {
+  it('an accepted message becomes a ticket to check later', () => {
+    const outcome = settle(
+      [{ notification_id: 'n1', kind: 'job_offer', token: 'tok', title: '', body: '', data: {} }],
+      [{ status: 'ok', id: 'ticket-1' }],
+    );
+    expect(outcome.tickets).toEqual([
+      { ticket_id: 'ticket-1', notification_id: 'n1', token: 'tok' },
+    ]);
+  });
+
+  it('each ticket is ok, an error with its reason, or still pending', () => {
+    expect(
+      readReceipts(['a', 'b', 'c'], {
+        a: { status: 'ok' },
+        b: { status: 'error', message: 'gone', details: { error: 'DeviceNotRegistered' } },
+      }),
+    ).toEqual([
+      { ticket_id: 'a', status: 'ok', error: null },
+      { ticket_id: 'b', status: 'error', error: 'DeviceNotRegistered' },
+      { ticket_id: 'c', status: 'pending', error: null },
+    ]);
   });
 });

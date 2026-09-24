@@ -100,8 +100,15 @@ export function NotificationsSection() {
                     {
                       label: 'الحالة',
                       render: (row) =>
-                        row['sent_at'] !== null ? (
-                          <Badge tone="good">أُرسل</Badge>
+                        // Delivered is Apple's or Google's word, from the
+                        // receipt (0072); sent is only Expo accepting it.
+                        row['delivered_at'] !== null && row['delivered_at'] !== undefined ? (
+                          <Badge tone="good">وصل</Badge>
+                        ) : row['sent_at'] !== null &&
+                          String(row['last_error'] ?? '').startsWith('receipt:') ? (
+                          <Badge tone="bad">لم يصل</Badge>
+                        ) : row['sent_at'] !== null ? (
+                          <Badge tone="info">أُرسل</Badge>
                         ) : row['abandoned_at'] !== null ? (
                           <Badge tone="bad">لم يُرسل</Badge>
                         ) : (
