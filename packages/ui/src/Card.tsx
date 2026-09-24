@@ -15,6 +15,13 @@ export interface CardProps {
   readonly elevation?: 'none' | 'sm' | 'md';
   readonly onPress?: () => void;
   readonly accessibilityLabel?: string;
+  /**
+   * For a card used as one choice among several. Said to the screen reader;
+   * the look of the selected state stays the caller's. Without it a blind
+   * user heard six identical "button"s and could not tell which service,
+   * car or rating was chosen.
+   */
+  readonly selected?: boolean | undefined;
   readonly style?: ViewStyle;
   readonly testID?: string;
 }
@@ -24,6 +31,7 @@ export function Card({
   elevation = 'sm',
   onPress,
   accessibilityLabel,
+  selected,
   style,
   testID,
 }: CardProps) {
@@ -58,6 +66,7 @@ export function Card({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      {...(selected === undefined ? {} : { accessibilityState: { selected } })}
       style={({ pressed }) => [
         base,
         pressed ? { opacity: 0.92, transform: [{ scale: 0.99 }] } : null,

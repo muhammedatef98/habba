@@ -54,7 +54,7 @@ import {
 const INK = '#14201F';
 const PETROL = '#12514F';
 const MUTED = '#4A5654';
-const SUBTLE = '#66706E';
+const SUBTLE = '#5F6967';
 const LINE = '#E2DDD2';
 const BAND = '#F0EBE1';
 const TINT = '#EFF7F6';

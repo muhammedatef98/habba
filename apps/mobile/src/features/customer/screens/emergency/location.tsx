@@ -166,6 +166,7 @@ export default function LocationConfirmScreen() {
           const isSelected = draft.placeKind === place.kind;
           return (
             <Card
+              selected={isSelected}
               key={place.kind}
               testID={`emergency-place-${place.kind}`}
               elevation="none"

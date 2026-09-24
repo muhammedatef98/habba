@@ -114,6 +114,7 @@ export default function BookingServiceScreen() {
 
           return (
             <Card
+              selected={selected}
               key={option.id}
               testID={`booking-service-${option.id}`}
               elevation={selected ? 'sm' : 'none'}
@@ -216,6 +217,7 @@ export default function BookingServiceScreen() {
                 const selected = draft.mode === mode;
                 return (
                   <Card
+                    selected={selected}
                     key={mode}
                     testID={`booking-mode-${mode}`}
                     elevation="none"
@@ -275,6 +277,7 @@ export default function BookingServiceScreen() {
                 const selected = effectiveVehicleId === vehicle.id;
                 return (
                   <Card
+                    selected={selected}
                     key={vehicle.id}
                     testID={`booking-vehicle-${vehicle.id}`}
                     elevation="none"

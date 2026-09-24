@@ -209,6 +209,7 @@ export default function PartsScreen() {
               const selected = isOem === oem;
               return (
                 <Card
+                  selected={selected}
                   key={String(oem)}
                   testID={oem ? 'part-oem' : 'part-aftermarket'}
                   elevation="none"

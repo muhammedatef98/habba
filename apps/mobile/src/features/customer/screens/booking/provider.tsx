@@ -91,6 +91,7 @@ export default function BookingProviderScreen() {
 
             return (
               <Card
+                selected={selected}
                 key={provider.id}
                 testID={`booking-provider-${provider.id}`}
                 elevation={selected ? 'sm' : 'none'}

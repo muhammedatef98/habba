@@ -346,6 +346,7 @@ export default function TransferScreen() {
               const selected = channel === option;
               return (
                 <Card
+                  selected={selected}
                   key={option}
                   testID={`transfer-channel-${option}`}
                   elevation="none"

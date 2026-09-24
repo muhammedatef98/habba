@@ -237,6 +237,7 @@ export default function EvidenceScreen() {
             const selected = warrantyDays === days;
             return (
               <Card
+                selected={selected}
                 key={days}
                 testID={`warranty-${days}`}
                 elevation="none"

@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, rowDirectionFor, useTheme } from '@habba/ui';
 
 export interface RatingStarsProps {
@@ -17,6 +18,7 @@ export interface RatingStarsProps {
 const STAR_VALUES = [1, 2, 3, 4, 5] as const;
 
 export function RatingStars({ onRate, disabled = false }: RatingStarsProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -35,7 +37,10 @@ export function RatingStars({ onRate, disabled = false }: RatingStarsProps) {
             testID={`rating-star-${value}`}
             disabled={disabled}
             accessibilityRole="button"
-            accessibilityLabel={`${value}`}
+            // «3 نجوم من 5», not «3»: a bare digit gave a screen-reader user
+            // no idea what the five buttons were.
+            accessibilityLabel={t('tracking.rateStars', { count: value })}
+            accessibilityState={{ selected: selected === value, disabled }}
             onPress={() => {
               setSelected(value);
               onRate(value);

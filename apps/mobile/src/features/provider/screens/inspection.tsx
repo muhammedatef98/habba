@@ -225,6 +225,7 @@ export default function InspectionScreen() {
                             : theme.colors.surfaceSunken;
                     return (
                       <Card
+                        selected={selected}
                         key={rating}
                         testID={`rate-${section.key}-${item.key}-${rating}`}
                         elevation="none"

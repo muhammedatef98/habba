@@ -245,6 +245,7 @@ export default function BookingSlotScreen() {
               const selected = day.key === activeKey;
               return (
                 <Card
+                  selected={selected}
                   key={day.key}
                   testID={`booking-day-${day.key}`}
                   elevation="none"
@@ -284,6 +285,7 @@ export default function BookingSlotScreen() {
               const selected = draft.slot?.id === slot.id;
               return (
                 <Card
+                  selected={selected}
                   key={slot.id}
                   testID={`booking-slot-${slot.id}`}
                   elevation="none"

@@ -500,7 +500,9 @@
     "disputedTitle": "Your complaint is under review",
     "disputedBody": "Habba is reviewing what happened and will tell you the decision. Any refund goes back to the same payment method.",
     "autoCompleteNote_one": "If you neither approve nor report a problem within 1 hour of hand-back, the order closes by itself. You can still complain afterwards.",
-    "autoCompleteNote_other": "If you neither approve nor report a problem within {{count}} hours of hand-back, the order closes by itself. You can still complain afterwards."
+    "autoCompleteNote_other": "If you neither approve nor report a problem within {{count}} hours of hand-back, the order closes by itself. You can still complain afterwards.",
+    "rateStars_one": "1 star of 5",
+    "rateStars_other": "{{count}} stars of 5"
   },
   "quote": {
     "title": "Parts quote",

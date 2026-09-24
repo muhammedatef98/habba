@@ -406,6 +406,7 @@ export default function LogbookScreen() {
                 const selected = filter === option;
                 return (
                   <Card
+                    selected={selected}
                     key={option}
                     testID={`logbook-filter-${option}`}
                     elevation="none"

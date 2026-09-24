@@ -105,6 +105,7 @@ export default function ServiceSelectionScreen() {
           const isSelected = service?.id === option.id;
           return (
             <Card
+              selected={isSelected}
               key={option.id}
               testID={`emergency-service-${option.id}`}
               elevation={isSelected ? 'md' : 'none'}
@@ -173,6 +174,7 @@ export default function ServiceSelectionScreen() {
               const isSelected = effectiveVehicleId === vehicle.id;
               return (
                 <Card
+                  selected={isSelected}
                   key={vehicle.id}
                   testID={`emergency-vehicle-${vehicle.id}`}
                   elevation={isSelected ? 'md' : 'none'}
