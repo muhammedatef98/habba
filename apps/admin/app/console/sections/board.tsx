@@ -16,8 +16,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { opsRepository } from '@/data/ops-repository';
+import { api } from '@/data/api';
+import { explain } from '@/data/transport';
 import type { Attention, BoardOrder } from '@/data/types';
+import { go } from '../router';
+import { PageHead } from '../ui';
 
 /** Refreshed rather than streamed: a board is read, not watched frame by frame. */
 const REFRESH_MS = 10_000;
@@ -83,17 +86,29 @@ function age(seconds: number): string {
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 }
 
-export function Board() {
+export function BoardSection() {
+  return (
+    <>
+      <PageHead
+        title="اللوحة الحية"
+        description="الطلبات الجارية مرتّبة بحسب المشكلة لا بحسب الوقت، وتتحدّث كل عشر ثوانٍ. اضغط على أي طلب لفتح ملفه والتصرّف فيه."
+      />
+      <Board />
+    </>
+  );
+}
+
+function Board() {
   const [orders, setOrders] = useState<readonly BoardOrder[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      setOrders(await opsRepository.listBoard());
+      setOrders(await api.board());
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذّر تحميل اللوحة');
+      setError(explain(cause));
     } finally {
       setLoading(false);
     }
@@ -165,7 +180,14 @@ export function Board() {
             <li
               key={order.orderId}
               className="board-row"
+              role="link"
+              tabIndex={0}
+              onClick={() => go('orders', order.orderId)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') go('orders', order.orderId);
+              }}
               style={{
+                cursor: 'pointer',
                 padding: 'var(--space-md) var(--space-base)',
                 border: '1px solid var(--color-border)',
                 // A left edge in the flag colour rather than a tinted row: the

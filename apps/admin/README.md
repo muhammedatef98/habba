@@ -33,6 +33,40 @@ boundary.
   columns (`*_encrypted`) are redacted from it. The log is shown in the
   «سجلّ التدقيق» section.
 
+## What the console controls
+
+Every section reads and acts through server functions that check `is_ops()`
+themselves (`supabase/migrations/0070_console_functions.sql`). Every change
+lands in the audit log, and so does every opening of a person's file.
+
+| Section            | What an operator can do                                                                                                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| الرئيسية           | Today's numbers, growth, 14-day charts, and the queues waiting on the team                                                                                                                                                                       |
+| اللوحة الحية       | Live orders sorted by trouble, refreshed every 10 s; open any order                                                                                                                                                                              |
+| الطلبات            | Search and filter every order; the full file (history, offers, parts, money, disputes, notes); cancel, assign or reassign a technician, search again, confirm completion for the customer, open and resolve a complaint (full or partial refund) |
+| الشكاوى            | Open and resolved disputes                                                                                                                                                                                                                       |
+| مقدّمو الخدمة      | Verification queue (approve, review, reject, suspend), full file, services and custom prices, force offline, build payouts                                                                                                                       |
+| المستخدمون         | Every account; rename, suspend and reinstate (this also blocks sign-in on a hosted project), PDPL export, and erasure (super admin only)                                                                                                         |
+| المركبات والدفتر   | Logbook with provenance and hash, a correction note appended by Habba, deactivate, cancel ownership transfers, revoke Habba reports                                                                                                              |
+| التقييمات          | Hide or show a review; hidden reviews stop counting                                                                                                                                                                                              |
+| المالية            | Revenue, VAT and refund summary; payment operations (voids and refunds) to carry out and record with the PSP reference; approve payouts and record them paid                                                                                     |
+| الكتالوج           | Services and prices, cities, makes and models, maintenance items and rules, commission, VAT, invoice sellers, inspection templates                                                                                                               |
+| الإشعارات          | Broadcast to everyone, customers, providers, or one city; log of every notification sent                                                                                                                                                         |
+| الإعدادات          | Pause new orders, the announcement, support contacts, dispatch rounds and radii, OTP and transfer limits, board thresholds, care reminders, all within bounds set in the migration                                                               |
+| الخصوصية والامتثال | Data-request log, transfers, reports, and what the console deliberately cannot reach                                                                                                                                                             |
+| الفريق             | Staff list; a super admin grants and removes staff roles                                                                                                                                                                                         |
+| سجلّ التدقيق       | Every change and every file opened, filterable by table                                                                                                                                                                                          |
+
+Deliberately out of reach, even for a super admin:
+
+- editing or deleting logbook entries (corrections are appended);
+- editing the audit log;
+- KYC ciphertext, card numbers, passwords and OTPs;
+- signing in as a user;
+- setting payment state directly.
+
+The **خصوصية والامتثال → ما لا تصل إليه اللوحة** tab explains each of these on screen.
+
 ## Environment variables
 
 | Variable                        | Where   | Value                                    |
@@ -107,6 +141,7 @@ on the first visit.
 ```bash
 pnpm --filter @habba/admin typecheck
 pnpm --filter @habba/admin test        # unit tests, including the bundle scanner
+pnpm test:integration                  # includes the console against the local database
 pnpm admin:check-bundle                # build + no-secret-in-bundle check
 ```
 

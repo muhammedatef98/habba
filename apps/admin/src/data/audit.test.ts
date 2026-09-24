@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { changedFields } from './ops-repository';
+import { changedFields, intervalToSeconds } from './audit';
 
 describe('changedFields', () => {
   test('names the fields an update changed, from what to what', () => {
@@ -21,5 +21,15 @@ describe('changedFields', () => {
 
   test('compares values, not references — an unchanged object is not a change', () => {
     expect(changedFields({ hours: { sun: [1, 2] } }, { hours: { sun: [1, 2] } })).toEqual([]);
+  });
+});
+
+describe('intervalToSeconds', () => {
+  test('reads the clock form PostgREST sends', () => {
+    expect(intervalToSeconds('00:08:32')).toBe(512);
+  });
+
+  test('and the day prefix once an order has been stuck that long', () => {
+    expect(intervalToSeconds('1 day 02:00:00.5')).toBe(86_400 + 7_200);
   });
 });
