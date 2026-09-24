@@ -15,7 +15,7 @@
  * shape of this interface reflects the shape of the security model.
  */
 
-import type { HabbaReport } from '@habba/core';
+import type { HabbaReport, InvoiceDocument } from '@habba/core';
 import {
   addSar,
   applyRate,
@@ -27,6 +27,7 @@ import {
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-language.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
+import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
 import { useSession } from '@/features/shared/state/session.js';
@@ -246,6 +247,12 @@ export interface Repository {
   openOrderDispute(orderId: string, reason: string): Promise<void>;
   /** The inspection report filed on this order, if one was (0026). */
   getOrderInspection(orderId: string): Promise<OrderInspection | null>;
+  /**
+   * The tax invoice issued when this order completed (0074), with the seller
+   * and the billed lines — or null: not completed yet, nothing charged, or
+   * no seller configured.
+   */
+  getOrderInvoice(orderId: string): Promise<InvoiceDocument | null>;
   /**
    * The buyer bought the car: it joins their vehicles with the inspection as
    * the first entry in its logbook (0027). Returns the new vehicle's id.
@@ -1544,6 +1551,61 @@ export class InMemoryRepository implements Repository {
     return null;
   }
 
+  /**
+   * An invoice for a completed dev order, shaped as 0074 issues one — with a
+   * genuine ZATCA TLV in its QR, so the viewer shows a code that scans.
+   */
+  async getOrderInvoice(orderId: string): Promise<InvoiceDocument | null> {
+    const order = this.orders.get(orderId);
+    if (order === null || order.status !== 'completed') return null;
+    if (order.totalAmount === null || order.vatAmount === null) return null;
+
+    const services = [
+      ...(await this.listEmergencyServices()),
+      ...(await this.listBookableServices()),
+    ];
+    const service = services.find((candidate) => candidate.id === order.serviceId);
+    const parts = this.orders.listParts(orderId);
+    const lines = invoiceLines(
+      `أجرة الخدمة — ${service?.nameAr ?? 'خدمة'}`,
+      order.labourAmount,
+      parts.map((part) => ({
+        nameAr: part.nameAr,
+        quantity: part.quantity,
+        unitPrice: part.unitPrice,
+        approved: part.approvedByCustomer && part.declinedAt === null,
+      })),
+    );
+
+    const issuedAt = new Date().toISOString();
+    const seller = {
+      legalNameAr: 'شركة هبّة للتقنية',
+      vatNumber: '300000000000003',
+      crNumber: '1010000000',
+    };
+    const net = (Number(order.totalAmount) - Number(order.vatAmount)).toFixed(2);
+
+    return {
+      invoiceNumber: `HB-INV-DEV-${orderId.replace(/\D/g, '').padStart(6, '0')}`,
+      issuedAt,
+      invoiceType: 'simplified',
+      seller,
+      orderNumber: null,
+      lines,
+      net,
+      vat: order.vatAmount,
+      vatRate: 0.15,
+      total: order.totalAmount,
+      qrBase64: devZatcaQr([
+        seller.legalNameAr,
+        seller.vatNumber,
+        `${issuedAt.slice(0, 19)}Z`,
+        Number(order.totalAmount).toFixed(2),
+        Number(order.vatAmount).toFixed(2),
+      ]),
+    };
+  }
+
   async convertInspectionToVehicle(): Promise<string> {
     throw new Error('convertInspectionToVehicle: not available in the dev build');
   }
@@ -2014,3 +2076,15 @@ function createRepository(): Repository {
 }
 
 export const repository: Repository = createRepository();
+
+/** ZATCA Phase 1 TLV (tags 1–5, UTF-8 lengths), base64 — as zatca_qr (0030) builds it. */
+function devZatcaQr(values: readonly string[]): string {
+  const bytes: number[] = [];
+  values.forEach((value, index) => {
+    const encoded = [...new TextEncoder().encode(value)];
+    bytes.push(index + 1, encoded.length, ...encoded);
+  });
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}

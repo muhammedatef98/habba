@@ -18,9 +18,11 @@ import {
   sarOrThrow,
   type HabbaReport,
   type InspectionReport,
+  type InvoiceDocument,
   type SarAmount,
 } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
+import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
@@ -1303,6 +1305,87 @@ export class SupabaseRepository implements Repository {
       p_reason: reason,
     });
     if (error !== null) throw new Error(`openOrderDispute: ${error.message}`);
+  }
+
+  async getOrderInvoice(orderId: string): Promise<InvoiceDocument | null> {
+    // RLS lets the customer (and the provider) read the invoice and the
+    // seller it names (0030, 0038); the lines come from the order.
+    const invoice = await this.client
+      .from('zatca_invoices')
+      .select(
+        'invoice_number, invoice_type, issued_at, net_amount, vat_amount, total_amount, vat_rate, qr_base64, ' +
+          'invoice_sellers(legal_name_ar, vat_number, cr_number), ' +
+          'orders(order_number, labour_amount, services(name_ar))',
+      )
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (invoice.error !== null) throw new Error(`getOrderInvoice: ${invoice.error.message}`);
+    if (invoice.data === null) return null;
+
+    const row = invoice.data as unknown as {
+      invoice_number: string;
+      invoice_type: 'simplified' | 'standard';
+      issued_at: string;
+      net_amount: number | string;
+      vat_amount: number | string;
+      total_amount: number | string;
+      vat_rate: number | string;
+      qr_base64: string;
+      invoice_sellers: {
+        legal_name_ar: string;
+        vat_number: string;
+        cr_number: string | null;
+      } | null;
+      orders: {
+        order_number: string | null;
+        labour_amount: number | string | null;
+        services: { name_ar: string } | null;
+      } | null;
+    };
+
+    const parts = await this.client
+      .from('order_parts')
+      .select('name_ar, quantity, unit_price, approved_by_customer, declined_at')
+      .eq('order_id', orderId);
+    if (parts.error !== null) throw new Error(`getOrderInvoice: ${parts.error.message}`);
+
+    const fixed = (value: number | string) => Number(value).toFixed(2);
+    const labour = row.orders?.labour_amount;
+
+    return {
+      invoiceNumber: row.invoice_number,
+      issuedAt: row.issued_at,
+      invoiceType: row.invoice_type,
+      seller: {
+        legalNameAr: row.invoice_sellers?.legal_name_ar ?? '',
+        vatNumber: row.invoice_sellers?.vat_number ?? '',
+        crNumber: row.invoice_sellers?.cr_number ?? null,
+      },
+      orderNumber: row.orders?.order_number ?? null,
+      lines: invoiceLines(
+        `أجرة الخدمة — ${row.orders?.services?.name_ar ?? 'خدمة'}`,
+        labour === null || labour === undefined ? null : fixed(labour),
+        (
+          parts.data as {
+            name_ar: string;
+            quantity: number;
+            unit_price: number | string;
+            approved_by_customer: boolean;
+            declined_at: string | null;
+          }[]
+        ).map((part) => ({
+          nameAr: part.name_ar,
+          quantity: part.quantity,
+          unitPrice: fixed(part.unit_price),
+          approved: part.approved_by_customer && part.declined_at === null,
+        })),
+      ),
+      net: fixed(row.net_amount),
+      vat: fixed(row.vat_amount),
+      vatRate: Number(row.vat_rate),
+      total: fixed(row.total_amount),
+      qrBase64: row.qr_base64,
+    };
   }
 
   async getOrderInspection(orderId: string): Promise<OrderInspection | null> {

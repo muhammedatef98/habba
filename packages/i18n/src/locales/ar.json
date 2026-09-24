@@ -1026,5 +1026,18 @@
     "nicknamePlaceholder": "مثال: سيارة العائلة",
     "convert": "إضافة السيارة",
     "convertFailed": "تعذّرت إضافة السيارة. قد تكون مسجّلة في هبّة باسم مالك آخر."
+  },
+  "documents": {
+    "sharePdf": "مشاركة أو تنزيل PDF",
+    "shareFailed": "تعذّر إنشاء ملف PDF أو فتح نافذة المشاركة على هذا الجهاز.",
+    "missing": "لم يعد هذا المستند مفتوحاً. ارجع وافتحه من جديد.",
+    "habbaReport": "تقرير هبّة",
+    "inspectionReport": "تقرير الفحص",
+    "invoice": "الفاتورة الضريبية",
+    "viewReport": "عرض التقرير",
+    "viewInvoice": "عرض الفاتورة",
+    "sharePdfShort": "مشاركة PDF",
+    "invoiceNumber": "فاتورة رقم {{number}}",
+    "preparing": "جارٍ تجهيز المستند…"
   }
 }

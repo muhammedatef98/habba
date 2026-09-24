@@ -11,6 +11,7 @@ export * from './report/labels.js';
 export * from './report/render.js';
 export * from './report/pdf.js';
 export * from './report/inspection.js';
+export * from './report/invoice.js';
 export * from './orders/job-flow.js';
 export * from './sms/unifonic.js';
 export * from './supabase/api-keys.js';

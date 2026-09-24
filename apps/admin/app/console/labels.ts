@@ -164,6 +164,7 @@ export const TABLE_NAME: Readonly<Record<string, string>> = {
   maintenance_item_types: 'بند صيانة',
   inspection_templates: 'نموذج فحص',
   invoice_sellers: 'بائع فوترة',
+  zatca_invoices: 'فاتورة ضريبية',
 };
 
 export function label(map: Readonly<Record<string, Label>>, key: string | null | undefined): Label {

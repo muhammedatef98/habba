@@ -19,7 +19,8 @@ import { collectFindings, countByRating } from '@habba/core';
 import { Button, Card, Field, ListRow, Row, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import type { OrderInspection } from '@/features/shared/data/types';
-import { shareInspectionPdf } from '@/features/shared/lib/report-pdf';
+import { inspectionDocument } from '@/features/shared/lib/report-pdf';
+import { DocumentActions } from '@/features/shared/components/DocumentActions';
 
 export function InspectionReportCard({
   inspection,
@@ -33,14 +34,6 @@ export function InspectionReportCard({
   const { report } = inspection;
   const findings = collectFindings(report);
   const counts = countByRating(report);
-  const [shareFailed, setShareFailed] = useState(false);
-
-  const share = useMutation({
-    mutationFn: () => shareInspectionPdf(report),
-    onSuccess: (result) => setShareFailed(!result.ok),
-    onError: () => setShareFailed(true),
-  });
-
   const verdictTone =
     report.recommendation === 'buy'
       ? 'success'
@@ -100,18 +93,11 @@ export function InspectionReportCard({
         ) : null}
       </View>
 
-      <Button
+      <DocumentActions
         testID="share-inspection"
-        label={t('inspectionReport.share')}
-        variant="secondary"
-        onPress={() => share.mutate()}
-        loading={share.isPending}
+        load={() => Promise.resolve(inspectionDocument(report, t('documents.inspectionReport')))}
+        viewLabel={t('documents.viewReport')}
       />
-      {shareFailed ? (
-        <Text variant="caption" tone="warning">
-          {t('inspectionReport.shareFailed')}
-        </Text>
-      ) : null}
 
       {orderCompleted && inspection.vehicleId === null ? (
         <AddBoughtCar reportId={inspection.reportId} />

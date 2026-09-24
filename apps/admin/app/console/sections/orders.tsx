@@ -644,6 +644,17 @@ function OrderActions({ file, reload }: { readonly file: OrderFile; readonly rel
         />
       ) : null}
 
+      {status === 'completed' && file.invoices.length === 0 && (order.total_amount ?? 0) > 0 ? (
+        <ActionButton
+          label="إصدار الفاتورة"
+          description="اكتمل الطلب دون فاتورة لأن بيانات البائع لم تكن مُعدّة حينها. تُصدر الفاتورة الضريبية الآن بمبالغ الطلب كما حُصّلت."
+          reason="none"
+          onConfirm={() => api.issueInvoice(order.id)}
+          onDone={reload}
+          success="صدرت الفاتورة."
+        />
+      ) : null}
+
       {status === 'disputed' ? <ResolveDispute file={file} onDone={reload} /> : null}
 
       {OPEN.has(status) ? (

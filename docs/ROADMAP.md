@@ -175,6 +175,11 @@ orders, disputes and refunds, people and suspension, cars and the logbook,
 reviews, finance and payouts, the catalogue, broadcasts, settings, PDPL
 requests, staff (0069–0070; `apps/admin/README.md` lists it all).
 
+The acceptance line above now holds in the app: 0074 issues the simplified
+tax invoice when an order completes (never blocking completion; the console
+issues it later if no seller was configured), and the customer opens it on
+the completion screen or shares it as a PDF (`47_invoices_issued_at_completion.sql`).
+
 **What it needs:** ZATCA delivery and refund credit notes (open decision 2).
 
 ---

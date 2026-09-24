@@ -270,7 +270,9 @@ select test.assert(
 
 
 -- Issuing an invoice ------------------------------------------------------------
-select public.issue_zatca_invoice('f0000000-0000-4000-c000-000000000001') as invoice_id \gset
+-- Issued by completing the order (0074), not by anyone calling for it.
+select id as invoice_id from public.zatca_invoices
+ where order_id = 'f0000000-0000-4000-c000-000000000001' \gset
 
 select test.assert(
   (select invoice_number from public.zatca_invoices where id = :'invoice_id') like 'HB-INV-%',

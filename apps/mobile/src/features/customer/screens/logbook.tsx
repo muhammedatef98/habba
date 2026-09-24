@@ -52,7 +52,8 @@ import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCar
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
-import { shareHabbaReportPdf } from '@/features/shared/lib/report-pdf';
+import { habbaReportDocument } from '@/features/shared/lib/report-pdf';
+import { DocumentActions } from '@/features/shared/components/DocumentActions';
 import { formatCount } from '@/features/shared/lib/format-number';
 import {
   countByFilter,
@@ -88,7 +89,7 @@ export default function LogbookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isArabic = i18n.language.startsWith('ar');
 
-  const [reportShared, setReportShared] = useState(false);
+  const [reportReady, setReportReady] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [filter, setFilter] = useState<LogbookFilter>('all');
 
@@ -176,32 +177,28 @@ export default function LogbookScreen() {
     queryFn: () => repository.listAllModels(),
   });
 
-  // Issue, read back, render, share — one action from the owner's side, and
-  // the whole of ADR-0019 from ours. The payload is read back by token rather
-  // than rebuilt from the timeline: the PDF must say what the database froze,
-  // or the document and the record it claims to be are different things.
-  const report = useMutation({
-    mutationFn: async () => {
-      const token = await repository.generateReport(id ?? '');
-      const payload = await repository.getReport(token);
-      if (payload === null) throw new Error('report_missing');
-      return shareHabbaReportPdf(payload);
-    },
-    onSuccess: (result) => {
-      setReportShared(result.ok);
-      setReportError(result.ok ? null : t('logbook.errors.reportShareUnavailable'));
-    },
-    onError: (error: Error) => {
-      setReportShared(false);
-      // A refused report means the logbook failed verification. That is not a
-      // transient error and must not invite a retry — it needs support.
-      setReportError(
-        error.message.includes('failed verification')
-          ? t('logbook.errors.reportChainBroken')
-          : t('logbook.errors.reportFailed'),
-      );
-    },
-  });
+  // Issue and read back — one press from the owner's side, the whole of
+  // ADR-0019 from ours. The payload is read back by token rather than rebuilt
+  // from the timeline: the document must say what the database froze, or the
+  // document and the record it claims to be are different things. Issued once
+  // per visit; viewing and then sharing are the same report.
+  const loadReport = async () => {
+    const token = await repository.generateReport(id ?? '');
+    const payload = await repository.getReport(token);
+    if (payload === null) throw new Error('report_missing');
+    return habbaReportDocument(payload, t('documents.habbaReport'));
+  };
+
+  const onReportFailed = (error: Error) => {
+    setReportReady(false);
+    // A refused report means the logbook failed verification. That is not a
+    // transient error and must not invite a retry — it needs support.
+    setReportError(
+      error.message.includes('failed verification')
+        ? t('logbook.errors.reportChainBroken')
+        : t('logbook.errors.reportFailed'),
+    );
+  };
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
@@ -335,16 +332,19 @@ export default function LogbookScreen() {
               selfReported={selfReportedCount}
             />
 
-            <Button
+            <DocumentActions
               testID="generate-report"
-              label={t('logbook.generateReport')}
-              variant="accent"
-              size="medium"
-              onPress={() => report.mutate()}
-              loading={report.isPending}
+              load={loadReport}
+              viewLabel={t('documents.viewReport')}
+              viewVariant="accent"
+              onPrepared={() => {
+                setReportReady(true);
+                setReportError(null);
+              }}
+              onLoadError={onReportFailed}
             />
 
-            {reportShared ? (
+            {reportReady ? (
               <View
                 style={{
                   gap: theme.spacing.xs,

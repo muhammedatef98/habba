@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-73 migrations · 46 SQL suites (all pass) · tests/rls.spec.ts
+74 migrations · 47 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0073, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0074, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -137,25 +137,28 @@ them no search widens, no order auto-closes and nobody is notified.
 
 ---
 
-## 6. What was built across the last sessions (0064–0073)
+## 6. What was built across the last sessions (0064–0074)
 
-| Area                                | Migrations | What it gave                                                                                                               |
-| ----------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Completion evidence                 | 0064       | Real camera photos into a private bucket; the server verifies they exist                                                   |
-| The request actually goes somewhere | 0065       | `submit_order` (funded before dispatch), the bill computed at hand-back, warranty chosen with the evidence, booking priced |
-| Notifications                       | 0066, 0072 | Outbox with leased claims, per-kind TTL, push-tick; **receipts**: delivered vs sent, dead installs retired                 |
-| Parts                               | 0067       | Customer approves or declines each line; hand-back waits for every answer                                                  |
-| Ops console                         | 0068–0070  | 2FA + 8h, audit log, settings, suspension, disputes and refunds, every read and action (see `apps/admin/README.md`)        |
-| Orders that end                     | 0071       | Reminder half-way, then auto-close + capture when the customer never confirms                                              |
-| Inspections in the app              | 0073       | Technician's form, report on the order + PDF, bought car joins the account; hand-back waits for the report                 |
-| UI/UX passes (3 rounds)             | —          | Every screen screenshotted in Arabic, English and dark; fixes listed below                                                 |
+| Area                                | Migrations | What it gave                                                                                                                                                                                 |
+| ----------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Completion evidence                 | 0064       | Real camera photos into a private bucket; the server verifies they exist                                                                                                                     |
+| The request actually goes somewhere | 0065       | `submit_order` (funded before dispatch), the bill computed at hand-back, warranty chosen with the evidence, booking priced                                                                   |
+| Notifications                       | 0066, 0072 | Outbox with leased claims, per-kind TTL, push-tick; **receipts**: delivered vs sent, dead installs retired                                                                                   |
+| Parts                               | 0067       | Customer approves or declines each line; hand-back waits for every answer                                                                                                                    |
+| Ops console                         | 0068–0070  | 2FA + 8h, audit log, settings, suspension, disputes and refunds, every read and action (see `apps/admin/README.md`)                                                                          |
+| Orders that end                     | 0071       | Reminder half-way, then auto-close + capture when the customer never confirms                                                                                                                |
+| Inspections in the app              | 0073       | Technician's form, report on the order + PDF, bought car joins the account; hand-back waits for the report                                                                                   |
+| Invoices, and reading documents     | 0074       | Tax invoice issued at completion (never blocks it; ops can issue it later, audited); raw issue closed to clients; every document viewed in the app **and** shared as PDF (ADR-0019 addendum) |
+| UI/UX passes (3 rounds)             | —          | Every screen screenshotted in Arabic, English and dark; fixes listed below                                                                                                                   |
 
 Real bugs found and fixed along the way, all with tests: orders were never
 submitted or funded; accept was an RLS no-op; the technician's position was
 never sent; cancelling left the customer's money held; disputes had no way
 out; a provider could dispute their own job; operators could mark an order
 paid by editing it; the console could not sign anyone in (it read a dropped
-column); the customer saw "cancelled" for an order under complaint.
+column); the customer saw "cancelled" for an order under complaint; any
+signed-in user could issue a tax invoice for any order, while nothing issued
+one for a finished job.
 
 ---
 

@@ -141,6 +141,13 @@ function TrackingBody() {
       (order.data?.status === 'awaiting_approval' || order.data?.status === 'completed'),
   });
 
+  // The tax invoice, issued with completion (0074). Asked for only then.
+  const invoice = useQuery({
+    queryKey: ['order-invoice', id],
+    queryFn: () => repository.getOrderInvoice(id ?? ''),
+    enabled: id !== undefined && order.data?.status === 'completed',
+  });
+
   const platform = useQuery({
     queryKey: ['platform-status'],
     queryFn: () => repository.getPlatformStatus(),
@@ -398,6 +405,7 @@ function TrackingBody() {
             router.push({ pathname: '/logbook', params: { id: current.vehicleId ?? '' } })
           }
           onDismiss={() => router.replace('/')}
+          invoice={invoice.data ?? null}
         />
         {inspection.data !== null && inspection.data !== undefined ? (
           <InspectionReportCard inspection={inspection.data} orderCompleted />

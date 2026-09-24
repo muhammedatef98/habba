@@ -57,7 +57,8 @@ import {
   useTheme,
 } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
-import { shareHabbaReportPdf } from '@/features/shared/lib/report-pdf';
+import { habbaReportDocument } from '@/features/shared/lib/report-pdf';
+import { DocumentActions } from '@/features/shared/components/DocumentActions';
 import { daysUntil } from '@/features/shared/lib/transfer-window';
 import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -85,7 +86,7 @@ export default function TransferScreen() {
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
-  const [reportShared, setReportShared] = useState(false);
+  const [reportReady, setReportReady] = useState(false);
 
   const vehicle = useQuery({
     queryKey: ['vehicle', id],
@@ -151,23 +152,16 @@ export default function TransferScreen() {
       ),
   });
 
-  // The same issue-read-render-share sequence the logbook uses. It is offered
-  // HERE, on the warning screen, because after acceptance the seller can no
-  // longer generate a report for this car at all — offering the export
-  // afterwards would be offering it too late.
-  const report = useMutation({
-    mutationFn: async () => {
-      const token = await repository.generateReport(id ?? '');
-      const payload = await repository.getReport(token);
-      if (payload === null) throw new Error('report_missing');
-      return shareHabbaReportPdf(payload);
-    },
-    onSuccess: (result) => {
-      setReportShared(result.ok);
-      setReportError(result.ok ? null : t('logbook.errors.reportShareUnavailable'));
-    },
-    onError: () => setReportError(t('logbook.errors.reportFailed')),
-  });
+  // The same issue-and-read-back the logbook uses. It is offered HERE, on
+  // the warning screen, because after acceptance the seller can no longer
+  // generate a report for this car at all — offering the export afterwards
+  // would be offering it too late.
+  const loadReport = async () => {
+    const token = await repository.generateReport(id ?? '');
+    const payload = await repository.getReport(token);
+    if (payload === null) throw new Error('report_missing');
+    return habbaReportDocument(payload, t('documents.habbaReport'));
+  };
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
@@ -306,15 +300,21 @@ export default function TransferScreen() {
             <Text variant="caption" tone="muted">
               {t('transfer.pdfOfferHint')}
             </Text>
-            <Button
+            <DocumentActions
               testID="transfer-report"
-              label={t('logbook.generateReport')}
-              variant="accent"
-              size="medium"
-              loading={report.isPending}
-              onPress={() => report.mutate()}
+              load={loadReport}
+              viewLabel={t('documents.viewReport')}
+              viewVariant="accent"
+              onPrepared={() => {
+                setReportReady(true);
+                setReportError(null);
+              }}
+              onLoadError={() => {
+                setReportReady(false);
+                setReportError(t('logbook.errors.reportFailed'));
+              }}
             />
-            {reportShared ? (
+            {reportReady ? (
               <Text variant="caption" tone="success">
                 {t('logbook.reportReady')}
               </Text>

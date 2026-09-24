@@ -10,10 +10,13 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { InvoiceDocument } from '@habba/core';
 import { Button, Card, Icon, Text, useTheme } from '@habba/ui';
 import { RatingStars } from '@/features/customer/components/RatingStars';
 import { PriceBreakdown } from './PriceBreakdown';
 import type { Order, ProviderSummary } from '@/features/shared/data/types';
+import { DocumentActions } from '@/features/shared/components/DocumentActions';
+import { invoiceDocument } from '@/features/shared/lib/report-pdf';
 
 export interface CompletedProps {
   readonly order: Order;
@@ -24,6 +27,11 @@ export interface CompletedProps {
   readonly rateFailed?: boolean | undefined;
   readonly onViewLogbook: () => void;
   readonly onDismiss: () => void;
+  /**
+   * The tax invoice, issued by the database when the order completed (0074).
+   * Null while it loads, and for an order with nothing to invoice.
+   */
+  readonly invoice?: InvoiceDocument | null | undefined;
 }
 
 export function Completed({
@@ -35,6 +43,7 @@ export function Completed({
   rateFailed = false,
   onViewLogbook,
   onDismiss,
+  invoice = null,
 }: CompletedProps) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -75,6 +84,25 @@ export function Completed({
             <Text variant="caption" tone="muted">
               {t('tracking.paidWith', { method: 'mada' })}
             </Text>
+          ) : null}
+          {invoice !== null ? (
+            <View
+              style={{
+                gap: theme.spacing.sm,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+                paddingTop: theme.spacing.md,
+              }}
+            >
+              <Text variant="caption" tone="muted">
+                {t('documents.invoiceNumber', { number: invoice.invoiceNumber })}
+              </Text>
+              <DocumentActions
+                testID="completed-invoice"
+                load={() => Promise.resolve(invoiceDocument(invoice, t('documents.invoice')))}
+                viewLabel={t('documents.viewInvoice')}
+              />
+            </View>
           ) : null}
         </View>
       </Card>

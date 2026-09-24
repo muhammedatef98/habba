@@ -898,5 +898,18 @@
     "nicknamePlaceholder": "For example: the family car",
     "convert": "Add the car",
     "convertFailed": "The car could not be added. It may be registered in Habba to another owner."
+  },
+  "documents": {
+    "sharePdf": "Share or download PDF",
+    "shareFailed": "Could not create the PDF or open the share sheet on this device.",
+    "missing": "This document is no longer open. Go back and open it again.",
+    "habbaReport": "Habba report",
+    "inspectionReport": "Inspection report",
+    "invoice": "Tax invoice",
+    "viewReport": "View report",
+    "viewInvoice": "View invoice",
+    "sharePdfShort": "Share PDF",
+    "invoiceNumber": "Invoice {{number}}",
+    "preparing": "Preparing the document…"
   }
 }

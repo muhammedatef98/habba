@@ -362,8 +362,9 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     const completed = await owner.from('orders').update({ status: 'completed' }).eq('id', orderId);
     expect(completed.error).toBeNull();
 
-    const issued = await owner.rpc('issue_zatca_invoice', { p_order_id: orderId });
-    expect(issued.error).toBeNull();
+    // Issued by completing the order (0074); no client may issue one itself.
+    const refused = await owner.rpc('issue_zatca_invoice', { p_order_id: orderId });
+    expect(refused.error).not.toBeNull();
 
     const invoice = await owner
       .from('zatca_invoices')

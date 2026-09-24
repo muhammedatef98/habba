@@ -1161,6 +1161,29 @@ export class FixtureTransport implements Transport {
       case 'ops_retry_dispatch':
         return 2;
 
+      case 'ops_issue_invoice': {
+        const file = this.orderFile(args['p_order_id']);
+        if (file.order.status !== 'completed') {
+          throw new ApiError('Only a completed order can be invoiced', '23514', null);
+        }
+        if (file.invoices.length > 0) {
+          throw new ApiError('This order is already invoiced', '23505', null);
+        }
+        const id = `inv-${file.order.id}`;
+        const invoice = {
+          id,
+          invoice_number: `HB-INV-DEV-${file.order.order_number}`,
+          invoice_type: 'simplified',
+          total_amount: file.order.total_amount ?? 0,
+          issued_at: new Date().toISOString(),
+        };
+        this.state.orders = this.state.orders.map((candidate) =>
+          candidate.order.id === file.order.id ? { ...candidate, invoices: [invoice] } : candidate,
+        );
+        this.audit('insert', 'zatca_invoices', id, { ...invoice, order_id: file.order.id });
+        return id;
+      }
+
       case 'ops_open_dispute': {
         const reason = reasonOf(args['p_reason']);
         const file = this.orderFile(args['p_order_id']);

@@ -122,6 +122,9 @@ export function createApi(transport: Transport) {
 
     retryDispatch: (id: string) => transport.rpc<number>('ops_retry_dispatch', { p_order_id: id }),
 
+    /** For a completed order completion could not invoice (no seller configured then). */
+    issueInvoice: (id: string) => transport.rpc<string>('ops_issue_invoice', { p_order_id: id }),
+
     openDispute: (id: string, reason: string) =>
       transport.rpc<void>('ops_open_dispute', { p_order_id: id, p_reason: reason }),
 
