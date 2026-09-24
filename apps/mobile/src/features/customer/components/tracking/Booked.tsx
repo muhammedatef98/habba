@@ -12,8 +12,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, StatusPill, Text, useTheme } from '@habba/ui';
 import { formatAppointment, formatHijriDate } from '@/features/shared/lib/dates';
-import { agreedTotal } from '@/features/shared/lib/order-price';
-import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
 import type { Order, ProviderSummary } from '@/features/shared/data/types';
 
@@ -32,7 +31,6 @@ export function Booked({ order, provider, onCancel, cancelPending }: BookedProps
     order.scheduledFor === null ? null : formatAppointment(order.scheduledFor, i18n.language);
   const hijri =
     order.scheduledFor === null ? null : formatHijriDate(order.scheduledFor, i18n.language);
-  const total = agreedTotal(order);
 
   return (
     <View style={{ gap: theme.spacing.base, flex: 1 }}>
@@ -68,11 +66,7 @@ export function Booked({ order, provider, onCancel, cancelPending }: BookedProps
               ? t('tracking.bookedWorkshopBody')
               : t('tracking.bookedMobileBody')}
           </Text>
-          {total !== null ? (
-            <Text variant="bodyStrong" numeric>
-              {t('emergency.priceFixed', { amount: formatSarDisplay(total) })}
-            </Text>
-          ) : null}
+          <AgreedTotalRow order={order} label={t('tracking.totalLine')} fixed={false} />
         </View>
       </Card>
 

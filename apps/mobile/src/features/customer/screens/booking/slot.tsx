@@ -23,7 +23,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { subtractSar, type SarAmount } from '@habba/core';
+import { subtractSar, toLatinDigits, type SarAmount } from '@habba/core';
 import {
   Button,
   Card,
@@ -36,6 +36,7 @@ import {
 } from '@habba/ui';
 import { BookingSteps } from '@/features/customer/components/booking/BookingSteps';
 import { repository } from '@/features/shared/data/repository';
+import { formatAppointment } from '@/features/shared/lib/dates';
 import { daysFromToday, groupSlotsByDay } from '@/features/shared/lib/slot-days';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { priceWithVat } from '@/features/shared/lib/order-price';
@@ -152,19 +153,23 @@ export default function BookingSlotScreen() {
     const offset = daysFromToday(date);
     if (offset === 0) return t('booking.slotToday');
     if (offset === 1) return t('booking.slotTomorrow');
-    return date.toLocaleDateString(
-      i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
-      {
+    return toLatinDigits(
+      date.toLocaleDateString(i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language, {
         weekday: 'short',
         day: 'numeric',
-      },
+        timeZone: 'Asia/Riyadh',
+      }),
     );
   };
 
   const timeLabel = (slot: AppointmentSlot) =>
-    new Date(slot.startsAt).toLocaleTimeString(
-      i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
-      { hour: '2-digit', minute: '2-digit' },
+    toLatinDigits(
+      new Date(slot.startsAt).toLocaleTimeString(
+        i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
+        // Riyadh time, as the confirmation and the technician's schedule show
+        // it (dates.ts `formatAppointment`) — not the phone's zone.
+        { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' },
+      ),
     );
 
   return (
@@ -332,16 +337,7 @@ export default function BookingSlotScreen() {
               value={undefined}
             />
             <SummaryRow
-              label={new Date(draft.slot.startsAt).toLocaleString(
-                i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
-                {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                },
-              )}
+              label={formatAppointment(draft.slot.startsAt, i18n.language)}
               value={undefined}
             />
           </View>

@@ -72,7 +72,9 @@ export default function BookingServiceScreen() {
     }
   }, [available, draft]);
 
-  const effectiveVehicleId = draft.vehicleId ?? homeVehicleId;
+  // The first car when none is chosen yet, as on the emergency screen: most
+  // owners have one, and the chip shows which car the booking is for.
+  const effectiveVehicleId = draft.vehicleId ?? homeVehicleId ?? vehicles.data?.[0]?.id ?? null;
   const needsVehicle = service?.requiresVehicle ?? false;
   const canContinue =
     service !== null && draft.mode !== null && (!needsVehicle || effectiveVehicleId !== null);

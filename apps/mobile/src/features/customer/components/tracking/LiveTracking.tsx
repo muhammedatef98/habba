@@ -77,25 +77,33 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
             <Text variant="caption" tone="muted">
               {t('tracking.arrivesIn')}
             </Text>
-            <View
-              style={{
-                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-                alignItems: 'baseline',
-                gap: theme.spacing.xs,
-              }}
-            >
-              <Text
-                variant="display"
-                tone="primary"
-                numeric
-                style={{ lineHeight: theme.fontSize['3xl'] }}
+            {/* No estimate yet reads as that, in words — a big dash with
+                "minutes" after it looked like a broken number. */}
+            {progress?.etaMinutes === undefined ? (
+              <Text variant="subheading" tone="muted">
+                {t('tracking.etaPending')}
+              </Text>
+            ) : (
+              <View
+                style={{
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                  alignItems: 'baseline',
+                  gap: theme.spacing.xs,
+                }}
               >
-                {progress?.etaMinutes ?? '—'}
-              </Text>
-              <Text variant="body" tone="primary">
-                {t('tracking.unitMinutes')}
-              </Text>
-            </View>
+                <Text
+                  variant="display"
+                  tone="primary"
+                  numeric
+                  style={{ lineHeight: theme.fontSize['3xl'] }}
+                >
+                  {progress.etaMinutes}
+                </Text>
+                <Text variant="body" tone="primary">
+                  {t('tracking.unitMinutes', { count: progress.etaMinutes })}
+                </Text>
+              </View>
+            )}
           </View>
 
           <StatCluster

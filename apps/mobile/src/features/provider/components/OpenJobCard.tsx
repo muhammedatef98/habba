@@ -20,7 +20,9 @@
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, Icon, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { toLatinDigits } from '@habba/core';
 import type { OpenJob } from '@/features/provider/data/provider-repository';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
 
 export interface OpenJobCardProps {
   readonly job: OpenJob;
@@ -63,7 +65,9 @@ export function OpenJobCard({ job, onPress, testID }: OpenJobCardProps) {
             >
               <Icon name="locate" size={theme.iconSize.sm} color={theme.colors.textMuted} />
               <Text variant="caption" tone="muted">
-                {job.distanceBucket}
+                {/* The server words the bucket in Arabic-Indic digits
+                    («أقل من ٢ كم»); every other number here is Latin (§8). */}
+                {toLatinDigits(job.distanceBucket)}
                 {job.districtNameAr === null ? '' : ` · ${job.districtNameAr}`}
               </Text>
             </View>
@@ -97,7 +101,7 @@ export function OpenJobCard({ job, onPress, testID }: OpenJobCardProps) {
               zero — a technician reading "0 ر.س" would skip a job that may pay
               perfectly well. */}
           <Text variant="heading" tone="primary" numeric>
-            {job.estimatedPayout ?? '—'}
+            {job.estimatedPayout === null ? '—' : formatSarDisplay(job.estimatedPayout)}
           </Text>
           <Text variant="caption" tone="muted">
             {t('provider.sarSuffix')}

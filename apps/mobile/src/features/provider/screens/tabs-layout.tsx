@@ -14,6 +14,7 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Icon, useTheme } from '@habba/ui';
+import { HabbaTabBar } from '@/features/shared/components/HabbaTabBar';
 
 export default function ProviderTabsLayout() {
   const { t } = useTranslation();
@@ -21,6 +22,10 @@ export default function ProviderTabsLayout() {
 
   return (
     <Tabs
+      // The same bar as the customer's: React Navigation's own ordered the
+      // tabs by the platform's RTL flag, so on the first Arabic launch الوردية
+      // sat on the left, and it clipped the Arabic labels at the bottom.
+      tabBar={(props) => <HabbaTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,

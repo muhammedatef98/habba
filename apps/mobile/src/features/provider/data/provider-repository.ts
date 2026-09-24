@@ -543,7 +543,7 @@ const DEV_OPEN_JOB: OpenJob = {
   fulfilmentMode: 'mobile_ondemand',
   distanceBucket: 'أقل من ٢ كم',
   districtNameAr: 'الرياض',
-  problemSummary: 'السيارة ما تشتغل',
+  problemSummary: 'السيارة لا تعمل',
   hasTriageVideo: false,
   estimatedPayout: '120.00',
 };
@@ -619,7 +619,7 @@ export class InMemoryProviderRepository implements ProviderRepository {
       fulfilmentMode: 'mobile_ondemand',
       serviceNameAr: 'بطارية — شحن أو تبديل',
       addressAr: 'حي الفيصلية، شارع ١٢',
-      problemDescription: 'السيارة ما تشتغل',
+      problemDescription: 'السيارة لا تعمل',
       completionMileage: null,
       completionMedia: [],
       requiresCompletionPhotos: true,

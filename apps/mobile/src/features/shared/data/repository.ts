@@ -704,7 +704,7 @@ const BOOKABLE_SERVICES: readonly Service[] = [
     category: 'inspection',
     nameAr: 'فحص ما قبل الشراء',
     nameEn: 'Pre-purchase inspection',
-    descriptionAr: 'تقرير مفصّل قبل ما تشتري — ١٢٠ نقطة فحص',
+    descriptionAr: 'تقرير مفصّل قبل الشراء — 120 نقطة فحص',
     icon: 'inspection',
     basePrice: sarOrThrow('450.00'),
     // §7.3: the car being inspected is not the customer's yet. This is the one
@@ -943,7 +943,7 @@ class DevOrderSimulator {
         {
           id: `${id}-part-1`,
           orderId: id,
-          nameAr: 'بطارية ٧٠ أمبير',
+          nameAr: 'بطارية 70 أمبير',
           partNumber: 'BAT-70A',
           isOem: false,
           quantity: 1,

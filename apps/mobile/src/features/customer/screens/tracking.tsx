@@ -46,15 +46,24 @@ import { ReportProblem } from '@/features/customer/components/tracking/ReportPro
 import { InspectionReportCard } from '@/features/customer/components/tracking/InspectionReportCard';
 import { Searching } from '@/features/customer/components/tracking/Searching';
 import type { OrderStatus } from '@/features/shared/data/types';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { agreedTotal } from '@/features/shared/lib/order-price';
 
 const TERMINAL: readonly OrderStatus[] = ['completed', 'cancelled', 'disputed'];
 const SEARCHING: readonly OrderStatus[] = ['searching'];
 
 function TrackingBody() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  // The same query the service screen ran a moment ago, so a cache hit: it
+  // names the service on the searching screen.
+  const services = useQuery({
+    queryKey: ['emergency-services'],
+    queryFn: () => repository.listEmergencyServices(),
+  });
 
   const order = useQuery({
     queryKey: ['order', id],
@@ -242,6 +251,20 @@ function TrackingBody() {
           onCancel={() => cancel.mutate()}
           cancelPending={cancel.isPending}
           cancelFailed={cancel.isError}
+          summary={{
+            service: (() => {
+              const service = services.data?.find(
+                (candidate) => candidate.id === current.serviceId,
+              );
+              if (service === undefined) return null;
+              return i18n.language.startsWith('ar') ? service.nameAr : service.nameEn;
+            })(),
+            address: current.serviceAddressAr,
+            held: (() => {
+              const total = agreedTotal(current);
+              return total === null ? null : formatSarDisplay(total);
+            })(),
+          }}
         />
       </Screen>
     );

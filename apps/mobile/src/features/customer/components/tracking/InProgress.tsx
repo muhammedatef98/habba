@@ -25,7 +25,7 @@ import {
   useTheme,
 } from '@habba/ui';
 import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
-import { agreedTotal } from '@/features/shared/lib/order-price';
+import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/features/shared/data/types';
 
@@ -142,22 +142,7 @@ export function InProgress({
         </Card>
       ) : null}
 
-      <View
-        style={{
-          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-          justifyContent: 'space-between',
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border,
-          paddingTop: theme.spacing.base,
-        }}
-      >
-        <Text variant="body" tone="muted">
-          {t('tracking.agreedTotalLong')}
-        </Text>
-        <Text variant="bodyStrong" numeric>
-          {t('emergency.priceFixed', { amount: agreedTotal(order) ?? '—' })}
-        </Text>
-      </View>
+      <AgreedTotalRow order={order} label={t('tracking.agreedTotalLong')} divided />
     </View>
   );
 }

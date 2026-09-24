@@ -109,7 +109,7 @@ export default function ServiceSelectionScreen() {
               testID={`emergency-service-${option.id}`}
               elevation={isSelected ? 'md' : 'none'}
               onPress={() => selectService(option)}
-              accessibilityLabel={option.nameAr}
+              accessibilityLabel={isArabic ? option.nameAr : option.nameEn}
               style={{
                 // Two per row, with the gap accounted for. minWidth keeps the
                 // card usable if a long service name wraps.
@@ -144,8 +144,9 @@ export default function ServiceSelectionScreen() {
                 ) : null}
               </Row>
               <View style={{ gap: theme.spacing.xs }}>
-                <Text variant="subheading">{option.nameAr}</Text>
-                {option.descriptionAr !== null ? (
+                <Text variant="subheading">{isArabic ? option.nameAr : option.nameEn}</Text>
+                {/* The catalogue's descriptions are Arabic only. */}
+                {isArabic && option.descriptionAr !== null ? (
                   <Text variant="caption" tone="muted">
                     {option.descriptionAr}
                   </Text>
@@ -220,7 +221,9 @@ export default function ServiceSelectionScreen() {
           style={{ backgroundColor: theme.colors.surfaceSunken, gap: theme.spacing.xs }}
         >
           <Text variant="caption" tone="muted">
-            {t('emergency.estimatedPrice', { service: service.nameAr })}
+            {t('emergency.estimatedPrice', {
+              service: isArabic ? service.nameAr : service.nameEn,
+            })}
           </Text>
           <Text variant="bodyStrong" numeric>
             {t('emergency.priceFixed', {

@@ -16,10 +16,17 @@ import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
+import {
+  canQuoteParts,
+  canRecordEvidence,
+  isEvidenceComplete,
+  nextJobStep,
+  toLatinDigits,
+} from '@habba/core';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { formatAppointment } from '@/features/shared/lib/dates';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
 
 export default function JobScreen() {
   const { t, i18n } = useTranslation();
@@ -162,12 +169,13 @@ export default function JobScreen() {
         >
           <View style={{ gap: theme.spacing.xs }}>
             <Text variant="bodyStrong">
-              {t('provider.distanceLabel')}: {data.offer.distanceBucket}
+              {t('provider.distanceLabel')}: {toLatinDigits(data.offer.distanceBucket)}
               {data.offer.districtNameAr !== null ? ` · ${data.offer.districtNameAr}` : ''}
             </Text>
             {data.offer.estimatedPayout !== null ? (
               <Text variant="body" numeric>
-                {t('provider.payoutLabel')}: {data.offer.estimatedPayout} {t('provider.sarSuffix')}
+                {t('provider.payoutLabel')}: {formatSarDisplay(data.offer.estimatedPayout)}{' '}
+                {t('provider.sarSuffix')}
               </Text>
             ) : null}
             {data.offer.hasTriageVideo ? (

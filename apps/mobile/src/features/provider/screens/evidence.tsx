@@ -29,6 +29,7 @@ import {
 } from '@habba/core';
 import { Button, Card, Field, Row, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { formatCount } from '@/features/shared/lib/format-number';
 
 const GAP_LABEL_KEY: Record<EvidenceGap, string> = {
   mileage: 'provider.gapMileage',
@@ -55,7 +56,7 @@ const CAMERA_DENIED = 'camera_denied';
 const WARRANTY_OPTIONS: readonly number[] = [30, 90, 180];
 
 export default function EvidenceScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -169,11 +170,15 @@ export default function EvidenceScreen() {
           hint={
             data.vehicleCurrentMileage === null
               ? undefined
-              : t('provider.mileageLastKnown', { km: data.vehicleCurrentMileage })
+              : t('provider.mileageLastKnown', {
+                  km: formatCount(data.vehicleCurrentMileage, i18n.language),
+                })
           }
           error={
             mileageWarning === 'below_recorded'
-              ? t('provider.mileageBelowRecorded', { km: data.vehicleCurrentMileage })
+              ? t('provider.mileageBelowRecorded', {
+                  km: formatCount(data.vehicleCurrentMileage ?? 0, i18n.language),
+                })
               : mileageWarning === 'implausible_jump'
                 ? t('provider.mileageImplausible')
                 : undefined
