@@ -203,10 +203,22 @@ export function Stat({
   readonly tone?: 'alert' | undefined;
   readonly href?: string | undefined;
 }) {
+  // An amount keeps its currency on the number's line, smaller: at the
+  // tile's width «2,184.50 ر.س» wrapped, leaving «ر.س» alone under it.
+  const currency = typeof value === 'string' && value.endsWith(' ر.س');
   const body = (
     <>
       <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
+      <div className="stat-value">
+        {currency ? (
+          <>
+            {value.slice(0, -' ر.س'.length)}
+            <span className="stat-unit">ر.س</span>
+          </>
+        ) : (
+          value
+        )}
+      </div>
     </>
   );
   if (href !== undefined) {
@@ -297,6 +309,11 @@ export interface Column<T> {
   readonly label: string;
   readonly render: (row: T) => ReactNode;
   readonly numeric?: boolean | undefined;
+  /**
+   * Keep the cell on one line: a name or a short label. Squeezed by the
+   * table's automatic layout, «ونش الشرقية السريع» broke one word per line.
+   */
+  readonly nowrap?: boolean | undefined;
 }
 
 export function DataTable<T>({
@@ -331,7 +348,16 @@ export function DataTable<T>({
               onClick={onRowClick !== undefined ? () => onRowClick(row) : undefined}
             >
               {columns.map((column) => (
-                <td key={column.label} className={column.numeric === true ? 'numeric' : undefined}>
+                <td
+                  key={column.label}
+                  className={
+                    column.numeric === true
+                      ? 'numeric'
+                      : column.nowrap === true
+                        ? 'nowrap'
+                        : undefined
+                  }
+                >
                   {column.render(row)}
                 </td>
               ))}

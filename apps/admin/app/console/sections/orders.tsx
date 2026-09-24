@@ -135,6 +135,11 @@ function OrderList() {
                     <>
                       <strong className="numeric">{row.order_number}</strong>
                       <div className="subtle">{row.service_name_ar}</div>
+                      {/* The kind of order under its service, rather than a
+                          column of its own that squeezed every other one. */}
+                      <div className="subtle">
+                        {MODE[row.fulfilment_mode] ?? row.fulfilment_mode}
+                      </div>
                     </>
                   ),
                 },
@@ -143,11 +148,8 @@ function OrderList() {
                   render: (row) => <LabelBadge value={label(ORDER_STATUS, row.status)} />,
                 },
                 {
-                  label: 'النوع',
-                  render: (row) => MODE[row.fulfilment_mode] ?? row.fulfilment_mode,
-                },
-                {
                   label: 'العميل',
+                  nowrap: true,
                   render: (row) => (
                     <>
                       {row.customer_name}
@@ -155,7 +157,11 @@ function OrderList() {
                     </>
                   ),
                 },
-                { label: 'مقدّم الخدمة', render: (row) => row.provider_name_ar ?? '—' },
+                {
+                  label: 'مقدّم الخدمة',
+                  nowrap: true,
+                  render: (row) => row.provider_name_ar ?? '—',
+                },
                 {
                   label: 'المبلغ',
                   numeric: true,

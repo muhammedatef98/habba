@@ -48,8 +48,8 @@ export function AuditSection() {
             value={limit}
             onChange={(event) => setLimit(Number(event.target.value))}
           >
-            <option value={200}>آخر ٢٠٠</option>
-            <option value={1000}>آخر ١٠٠٠</option>
+            <option value={200}>آخر 200</option>
+            <option value={1000}>آخر 1000</option>
           </select>
         </Field>
       </div>

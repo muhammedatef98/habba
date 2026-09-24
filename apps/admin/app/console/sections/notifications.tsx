@@ -83,7 +83,7 @@ export function NotificationsSection() {
             </Loadable>
           </Card>
 
-          <Card title="سجل الإشعارات (آخر ٢٠٠)">
+          <Card title="سجل الإشعارات (آخر 200)">
             <Loadable state={outbox}>
               {(rows) => (
                 <DataTable<Row>

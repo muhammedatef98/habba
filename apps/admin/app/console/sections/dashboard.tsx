@@ -69,16 +69,16 @@ function Overview({ data }: { readonly data: Dashboard }) {
 
       <h2 style={{ fontSize: 'var(--text-lg)', margin: '0 0 var(--space-sm)' }}>النمو</h2>
       <div className="stats">
-        <Stat label="إيراد ٧ أيام" value={money(data.gmv_7d)} />
-        <Stat label="إيراد ٣٠ يوماً" value={money(data.gmv_30d)} />
-        <Stat label="طلبات ٧ أيام" value={count(data.orders_7d)} />
-        <Stat label="نسبة الإلغاء ٧ أيام" value={`${cancelRate}%`} />
+        <Stat label="إيراد 7 أيام" value={money(data.gmv_7d)} />
+        <Stat label="إيراد 30 يوماً" value={money(data.gmv_30d)} />
+        <Stat label="طلبات 7 أيام" value={count(data.orders_7d)} />
+        <Stat label="نسبة الإلغاء 7 أيام" value={`${cancelRate}%`} />
         <Stat label="العملاء" value={count(data.customers_total)} href={hrefFor('users')} />
-        <Stat label="عملاء جدد ٧ أيام" value={count(data.customers_new_7d)} />
+        <Stat label="عملاء جدد 7 أيام" value={count(data.customers_new_7d)} />
         <Stat label="السيارات في هبّة" value={count(data.vehicles_total)} />
         <Stat label="مقدّمو خدمة معتمدون" value={count(data.providers_approved)} />
         <Stat
-          label="متوسط التقييم ٣٠ يوماً"
+          label="متوسط التقييم 30 يوماً"
           value={data.avg_rating_30d === null ? '—' : data.avg_rating_30d.toFixed(2)}
           href={hrefFor('ratings')}
         />
@@ -90,7 +90,7 @@ function Overview({ data }: { readonly data: Dashboard }) {
       </div>
 
       <div className="grid two">
-        <Card title="الطلبات — آخر ١٤ يوماً">
+        <Card title="الطلبات — آخر 14 يوماً">
           <Bars
             values={data.by_day.map((day) => ({
               key: day.day,
@@ -99,7 +99,7 @@ function Overview({ data }: { readonly data: Dashboard }) {
             }))}
           />
         </Card>
-        <Card title="الإيراد — آخر ١٤ يوماً">
+        <Card title="الإيراد — آخر 14 يوماً">
           <Bars
             values={data.by_day.map((day) => ({
               key: day.day,

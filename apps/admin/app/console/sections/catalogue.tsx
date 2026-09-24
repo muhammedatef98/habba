@@ -286,7 +286,7 @@ const SPECS: readonly TableSpec[] = [
     order: 'valid_from',
     columns: [
       { key: 'category', label: 'الفئة', kind: 'select', options: CATEGORY, nullable: true },
-      { key: 'rate', label: 'النسبة', kind: 'rate', required: true, hint: 'مثل 20 تعني ٢٠٪' },
+      { key: 'rate', label: 'النسبة', kind: 'rate', required: true, hint: 'مثل 20 تعني 20%' },
       { key: 'valid_from', label: 'تسري من', kind: 'date', required: true },
       { key: 'valid_to', label: 'حتى', kind: 'date', nullable: true },
     ],
@@ -298,7 +298,7 @@ const SPECS: readonly TableSpec[] = [
     key: 'id',
     order: 'valid_from',
     columns: [
-      { key: 'rate', label: 'النسبة', kind: 'rate', required: true, hint: 'مثل 15 تعني ١٥٪' },
+      { key: 'rate', label: 'النسبة', kind: 'rate', required: true, hint: 'مثل 15 تعني 15%' },
       { key: 'valid_from', label: 'تسري من', kind: 'date', required: true },
       { key: 'valid_to', label: 'حتى', kind: 'date', nullable: true },
     ],

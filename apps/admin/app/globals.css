@@ -419,9 +419,19 @@ select {
 .stat-value {
   font-family: var(--font-latin);
   font-variant-numeric: tabular-nums;
-  font-size: var(--text-xl);
+  /* Shrinks with the window before the amount could overflow its tile. */
+  font-size: clamp(var(--text-lg), 1.2vw + 0.6rem, var(--text-xl));
   line-height: var(--leading-xl);
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.stat-unit {
+  font-family: var(--font-arabic);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-inline-start: var(--space-xs);
 }
 
 .kv {
@@ -473,6 +483,7 @@ table.table {
 }
 
 .table td.numeric,
+.table td.nowrap,
 .table td .numeric {
   white-space: nowrap;
 }

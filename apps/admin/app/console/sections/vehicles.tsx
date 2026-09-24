@@ -135,7 +135,7 @@ function VehicleFileView({
               tone="primary"
               description="تُضاف كسجل جديد موقّع من هبّة ويظهر في تقرير السيارة. لا يُعدَّل ولا يُحذف أي سجل سابق."
               reasonLabel="نص الملاحظة"
-              reasonHint="مثال: قراءة العداد في سجل ١٢ مارس خاطئة، الصحيح ٨٤٬١٥٠ كم."
+              reasonHint="مثال: قراءة العداد في سجل 12 مارس خاطئة، الصحيح 84,150 كم."
               onConfirm={(note) => api.annotateVehicle(vehicle.id, note)}
               onDone={reload}
               success="أُضيفت الملاحظة إلى الدفتر."
