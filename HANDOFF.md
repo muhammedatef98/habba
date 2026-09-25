@@ -214,10 +214,16 @@ as a user would. The fixes that matter beyond one screen:
 - **Vercel** `habba-admin`: `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_ANON_KEY` set for all environments; production
   (`habba-admin.vercel.app`) serves the console against the live project.
-- **Not yet done on the project:** the first operator (see
-  `apps/admin/README.md`), the SMS hook (phone sign-in), Anonymous sign-ins
-  (guest), leaked-password protection, and the scheduled functions (§7a/§7b of
-  `docs/supabase-setup.md`).
+- **Operators:** one super admin (the owner's email), created 2026-09-25.
+- **Scheduled work:** `habba-dispatch-tick` runs in the database itself
+  (pg_cron, every 15 s: `expand_stale_searches()` then
+  `auto_complete_awaiting_orders()`), so it needs neither the Edge Function nor
+  its secret. The three jobs 0056/0062 schedule are active.
+- **Switched off until configured:** guest sign-in (`feature_guest_login` =
+  false; turn on Anonymous sign-ins in Supabase first).
+- **Not yet done on the project:** the SMS hook (phone sign-in), `push-tick`
+  and `payments` Edge Functions with their secrets (§7a/§7b of
+  `docs/supabase-setup.md`), leaked-password protection.
 
 ## 7. Open decisions — these block launch, and none is a coding task
 
