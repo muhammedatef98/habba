@@ -19,7 +19,12 @@
  */
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
-import { apiKeyOnlyFetch, resolveSecretKey, secretsMatch } from '../_shared/api-keys.ts';
+import {
+  apiKeyOnlyFetch,
+  resolveSecretKey,
+  resolveTickSecret,
+  secretsMatch,
+} from '../_shared/api-keys.ts';
 import {
   chunk,
   EXPO_PUSH_URL,
@@ -44,6 +49,7 @@ const SERVICE_KEY = resolveSecretKey({
 /**
  * The function drains everyone's notifications with the service role, so it
  * must never answer a stranger. Absent secret means it refuses everything.
+ * Set it as a function secret, or in Vault as `push_tick_secret` (0087).
  */
 const TICK_SECRET = Deno.env.get('HABBA_PUSH_TICK_SECRET') ?? '';
 
@@ -59,14 +65,17 @@ Deno.serve(async (request: Request) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  if (!secretsMatch(request.headers.get('x-habba-tick'), TICK_SECRET)) {
-    return new Response('Not found', { status: 404 });
-  }
-
   const db = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false },
     global: { fetch: apiKeyOnlyFetch(SERVICE_KEY, fetch) },
   });
+
+  const expected = await resolveTickSecret(TICK_SECRET, () =>
+    db.rpc('edge_tick_secret', { p_name: 'push_tick_secret' }),
+  );
+  if (!secretsMatch(request.headers.get('x-habba-tick'), expected)) {
+    return new Response('Not found', { status: 404 });
+  }
 
   const claim = await db.rpc('claim_push_notifications', { p_limit: 300 });
   if (claim.error !== null) {

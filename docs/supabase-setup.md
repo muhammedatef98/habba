@@ -355,6 +355,12 @@ supabase secrets set HABBA_DISPATCH_TICK_SECRET=… HABBA_PUSH_TICK_SECRET=…
 supabase secrets set EXPO_ACCESS_TOKEN=…
 ```
 
+**Or keep the secrets in Vault only (0087).** When a function's environment
+variable is unset, it reads the secret from Vault with its own service key
+(`edge_tick_secret()`, callable by `service_role` only). Create the Vault
+secrets below and skip `supabase secrets set` for the tick secrets entirely —
+one copy, set from SQL.
+
 `--no-verify-jwt` because the caller is the scheduler, not a user; the shared
 secret in the `x-habba-tick` header is the gate, and a missing or wrong one
 gets a 404.

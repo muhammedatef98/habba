@@ -119,3 +119,22 @@ export function secretsMatch(presented: string | null, expected: string): boolea
   }
   return difference === 0;
 }
+
+/**
+ * The shared secret a ticking function expects (0087): its own environment
+ * variable when set, otherwise the copy in Vault, read with the function's
+ * service key through `edge_tick_secret()`. Any failure reads as no secret,
+ * so the function stays closed rather than open.
+ */
+export async function resolveTickSecret(
+  fromEnvironment: string,
+  fromVault: () => PromiseLike<{ readonly data: unknown; readonly error: unknown }>,
+): Promise<string> {
+  if (fromEnvironment !== '') return fromEnvironment;
+  try {
+    const { data, error } = await fromVault();
+    return error === null && typeof data === 'string' ? data : '';
+  } catch {
+    return '';
+  }
+}

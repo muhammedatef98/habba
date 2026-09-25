@@ -22,7 +22,12 @@
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { apiKeyOnlyFetch, resolveSecretKey, secretsMatch } from '../_shared/api-keys.ts';
+import {
+  apiKeyOnlyFetch,
+  resolveSecretKey,
+  resolveTickSecret,
+  secretsMatch,
+} from '../_shared/api-keys.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 // The new secret keys (sb_secret_…) where the project has them, the legacy
@@ -60,16 +65,19 @@ Deno.serve(async (request: Request) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  if (!secretsMatch(request.headers.get('x-habba-tick'), TICK_SECRET)) {
-    // Deliberately identical for "no secret configured" and "wrong secret":
-    // distinguishing them tells a prober whether the endpoint is live.
-    return new Response('Not found', { status: 404 });
-  }
-
   const client = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false },
     global: { fetch: apiKeyOnlyFetch(SERVICE_KEY, fetch) },
   });
+
+  const expected = await resolveTickSecret(TICK_SECRET, () =>
+    client.rpc('edge_tick_secret', { p_name: 'dispatch_tick_secret' }),
+  );
+  if (!secretsMatch(request.headers.get('x-habba-tick'), expected)) {
+    // Deliberately identical for "no secret configured" and "wrong secret":
+    // distinguishing them tells a prober whether the endpoint is live.
+    return new Response('Not found', { status: 404 });
+  }
 
   const { data, error } = await client.rpc('expand_stale_searches');
 

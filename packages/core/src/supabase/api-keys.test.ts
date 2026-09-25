@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { apiKeyOnlyFetch, isJwtApiKey, resolveSecretKey, secretsMatch } from './api-keys.js';
+import {
+  apiKeyOnlyFetch,
+  isJwtApiKey,
+  resolveSecretKey,
+  resolveTickSecret,
+  secretsMatch,
+} from './api-keys.js';
 
 /** A real-shaped legacy key: three base64url segments, header first. */
 const LEGACY_JWT =
@@ -132,5 +138,33 @@ describe('secretsMatch', () => {
   test('an unset secret matches nothing, not even an empty header', () => {
     expect(secretsMatch('', '')).toBe(false);
     expect(secretsMatch('anything', '')).toBe(false);
+  });
+});
+
+describe('resolveTickSecret', () => {
+  test('the environment wins, and Vault is not asked', async () => {
+    let asked = false;
+    const secret = await resolveTickSecret('from-env', () => {
+      asked = true;
+      return Promise.resolve({ data: 'from-vault', error: null });
+    });
+    expect(secret).toBe('from-env');
+    expect(asked).toBe(false);
+  });
+
+  test('without an environment variable, Vault supplies it', async () => {
+    expect(
+      await resolveTickSecret('', () => Promise.resolve({ data: 'from-vault', error: null })),
+    ).toBe('from-vault');
+  });
+
+  test('any failure means no secret, never an open door', async () => {
+    expect(
+      await resolveTickSecret('', () => Promise.resolve({ data: null, error: { message: 'x' } })),
+    ).toBe('');
+    expect(await resolveTickSecret('', () => Promise.resolve({ data: null, error: null }))).toBe(
+      '',
+    );
+    expect(await resolveTickSecret('', () => Promise.reject(new Error('down')))).toBe('');
   });
 });
