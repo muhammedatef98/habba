@@ -206,6 +206,27 @@ export default function AccountScreen() {
           </Text>
           <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
         </Card>
+
+        <Card
+          testID="account-invoices"
+          elevation="none"
+          onPress={() => router.push('/invoices')}
+          accessibilityLabel={t('settings.myInvoices')}
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.md,
+            minHeight: theme.minTouchTarget,
+            borderColor: theme.colors.border,
+            borderWidth: 1,
+          }}
+        >
+          <Icon name="wallet" size={theme.iconSize.md} color={theme.colors.textMuted} />
+          <Text variant="bodySmall" style={{ flex: 1 }}>
+            {t('settings.myInvoices')}
+          </Text>
+          <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
+        </Card>
       </View>
 
       <View style={{ gap: theme.spacing.md }}>

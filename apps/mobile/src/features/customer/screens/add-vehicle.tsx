@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { View } from 'react-native';
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { normalisePlate } from '@habba/core';
@@ -59,6 +59,10 @@ export default function AddVehicleScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
   const isArabic = i18n.language === 'ar';
+  // `then=back`: opened from inside a request (emergency or booking) that
+  // could not go on without a car. The car is what they came for, not the
+  // garage — back to the request, which picks the new car up by itself.
+  const { then } = useLocalSearchParams<{ then?: string }>();
 
   const [makeId, setMakeId] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
@@ -107,7 +111,8 @@ export default function AddVehicleScreen() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      router.replace('/vehicles');
+      if (then === 'back' && router.canGoBack()) router.back();
+      else router.replace('/vehicles');
     },
   });
 

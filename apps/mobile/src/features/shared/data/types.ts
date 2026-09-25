@@ -261,8 +261,20 @@ export interface OrderSummary {
   readonly id: string;
   readonly status: OrderStatus;
   readonly serviceNameAr: string;
+  readonly serviceNameEn: string;
   readonly totalAmount: SarAmount | null;
   readonly createdAt: string;
+}
+
+/** One issued tax invoice, as the customer's list shows it (0074). */
+export interface InvoiceSummary {
+  readonly orderId: string;
+  readonly invoiceNumber: string;
+  readonly issuedAt: string;
+  /** Including VAT, 2dp, as issued. */
+  readonly total: string;
+  readonly serviceNameAr: string;
+  readonly serviceNameEn: string;
 }
 
 /** A provider's public-facing card — never the KYC columns behind it (0037). */

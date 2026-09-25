@@ -126,6 +126,13 @@ export function renderInvoiceHtml(invoice: InvoiceDocument): string {
   .qr svg { width: 120px; height: 120px; flex: none; }
   .qr-fallback { font-size: 10px; word-break: break-all; }
   bdi { unicode-bidi: isolate; }
+  .totals span:last-child { white-space: nowrap; }
+  /* Read in the app on a phone as well as printed on A4: at phone width the
+     totals take the full line rather than wrapping the grand total. */
+  @media (max-width: 520px) {
+    body { padding: 12px; font-size: 13px; }
+    .totals { width: 100%; min-width: 0; }
+  }
 </style>
 </head>
 <body>

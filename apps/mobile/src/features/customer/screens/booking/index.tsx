@@ -264,7 +264,9 @@ export default function BookingServiceScreen() {
                   testID="booking-add-vehicle"
                   label={t('vehicle.addTitle')}
                   size="medium"
-                  onPress={() => router.push('/add-vehicle')}
+                  onPress={() =>
+                    router.push({ pathname: '/add-vehicle', params: { then: 'back' } })
+                  }
                 />
               </View>
             </Card>

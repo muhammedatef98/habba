@@ -481,3 +481,37 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     expect((provider.data as { rating_count: number }).rating_count).toBe(countBefore + 1);
   });
 });
+
+describe.skipIf(!harnessUp)('what the customer reads back afterwards', () => {
+  test('the order history names the service', async () => {
+    const repo = new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+    const rows = await repo.listRecentOrders(50);
+    const row = rows.find((candidate) => candidate.id === orderId);
+    expect(row?.serviceNameAr ?? '').not.toBe('');
+    expect(row?.serviceNameEn ?? '').not.toBe('');
+  });
+
+  test('an order rated once reads back as rated, so it is not asked for again', async () => {
+    const customer = new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+    expect(await customer.getOrderRating(orderId)).toBe(5);
+  });
+
+  test("the completed order is in the customer's invoices, and opens", async () => {
+    const customer = new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+    const invoices = await customer.listInvoices();
+    const listed = invoices.find((invoice) => invoice.orderId === orderId);
+    expect(listed).toBeDefined();
+    expect(listed?.serviceNameAr ?? '').not.toBe('');
+
+    const document = await customer.getOrderInvoice(orderId);
+    expect(document?.invoiceNumber).toBe(listed?.invoiceNumber);
+    expect(document?.total).toBe(listed?.total);
+  });
+
+  test('nobody else sees them in their invoices', async () => {
+    const stranger = new SupabaseRepository(clientFor(STRANGER_ID), () => STRANGER_ID);
+    const invoices = await stranger.listInvoices();
+    expect(invoices.some((invoice) => invoice.orderId === orderId)).toBe(false);
+    expect(await stranger.getOrderInvoice(orderId)).toBeNull();
+  });
+});

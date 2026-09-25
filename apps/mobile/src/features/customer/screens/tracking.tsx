@@ -148,6 +148,14 @@ function TrackingBody() {
     enabled: id !== undefined && order.data?.status === 'completed',
   });
 
+  // Whether this order was rated already — it is opened again from the
+  // history long after the job, and must not ask twice.
+  const givenRating = useQuery({
+    queryKey: ['order-rating', id],
+    queryFn: () => repository.getOrderRating(id ?? ''),
+    enabled: id !== undefined && order.data?.status === 'completed',
+  });
+
   const platform = useQuery({
     queryKey: ['platform-status'],
     queryFn: () => repository.getPlatformStatus(),
@@ -161,6 +169,7 @@ function TrackingBody() {
         providerId: order.data?.providerId ?? '',
         stars,
       }),
+    onSuccess: (_, stars) => queryClient.setQueryData(['order-rating', id], stars),
   });
 
   if (order.isLoading) {
@@ -406,6 +415,8 @@ function TrackingBody() {
           }
           onDismiss={() => router.replace('/')}
           invoice={invoice.data ?? null}
+          // Unknown reads as "not rated": a failed read must not hide the stars.
+          givenRating={givenRating.isError ? null : givenRating.data}
         />
         {inspection.data !== null && inspection.data !== undefined ? (
           <InspectionReportCard inspection={inspection.data} orderCompleted />

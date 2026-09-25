@@ -278,7 +278,8 @@
     "sectionSupport": "الدعم",
     "supportCall": "اتصال",
     "supportWhatsapp": "واتساب",
-    "supportEmail": "البريد الإلكتروني"
+    "supportEmail": "البريد الإلكتروني",
+    "myInvoices": "فواتيري"
   },
   "errors": {
     "generic": "حدث خطأ غير متوقّع.",
@@ -520,6 +521,7 @@
     "paidWith": "مدفوع · {{method}}",
     "zatcaInvoice": "فاتورة ضريبية معتمدة (ZATCA)",
     "rateProviderQuestion": "كيف كان {{name}}؟",
+    "youRated": "قيّمت {{name}}",
     "vatLine": "ضريبة القيمة المضافة 15%",
     "labourLine": "أجرة الخدمة",
     "partsLine": "قطع الغيار",
@@ -594,14 +596,15 @@
     "partsLabel": "قطع الغيار",
     "vatLabel": "ضريبة القيمة المضافة",
     "totalLabel": "الإجمالي",
-    "allApprovedHint": "بعد الموافقة على كل القطع سيُرسَل العمل لتأكيد الإنجاز.",
+    "allApprovedHint": "تمت الإجابة عن كل القطع. يسلّم الفنّي العمل، ثم تؤكّد الإنجاز من صفحة الطلب.",
     "pendingHint": "لم تتم الموافقة على كل القطع بعد.",
     "pendingBadge": "{{count}} بانتظار موافقتك",
     "allApprovedBadge": "تمت الموافقة",
     "approveFailed": "تعذّر تسجيل ردّك على هذه القطعة. تحقّق من الاتصال وحاول مرة أخرى.",
     "declineLine": "لا أريدها",
     "declinedLine": "رفضتَ هذه القطعة، ولن تُضاف إلى فاتورتك.",
-    "changedMind": "غيّرتُ رأيي — اعتمدها"
+    "changedMind": "غيّرتُ رأيي — اعتمدها",
+    "backToOrder": "العودة إلى الطلب"
   },
   "job": {
     "accept": "قبول الطلب",
@@ -1039,5 +1042,12 @@
     "sharePdfShort": "مشاركة PDF",
     "invoiceNumber": "فاتورة رقم {{number}}",
     "preparing": "جارٍ تجهيز المستند…"
+  },
+  "invoices": {
+    "title": "فواتيري",
+    "subtitle": "الفاتورة الضريبية لكل طلب مكتمل، الأحدث أولاً.",
+    "empty": "لا توجد فواتير بعد",
+    "emptyBody": "تصدر فاتورة ضريبية لكل طلب يكتمل، وتجدها هنا لتعرضها أو تشاركها.",
+    "openFailed": "تعذّر فتح الفاتورة. حاول مرة أخرى."
   }
 }

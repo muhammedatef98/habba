@@ -158,7 +158,10 @@ out; a provider could dispute their own job; operators could mark an order
 paid by editing it; the console could not sign anyone in (it read a dropped
 column); the customer saw "cancelled" for an order under complaint; any
 signed-in user could issue a tax invoice for any order, while nothing issued
-one for a finished job.
+one for a finished job; the order history showed every service with an empty
+name against the real backend (a many-to-one embed read as an array); a
+completed order opened again asked to be rated a second time, and the second
+rating failed; an emergency with no car on file was a dead end.
 
 ---
 

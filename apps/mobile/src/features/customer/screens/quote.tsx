@@ -278,7 +278,14 @@ export default function QuoteScreen() {
         {allApproved ? t('quote.allApprovedHint') : t('quote.pendingHint')}
       </Text>
 
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
+      {/* Once every line is answered there is nothing left to do here, and
+          the next step — confirming the work — is on the order. */}
+      <Button
+        testID="quote-back"
+        label={allApproved ? t('quote.backToOrder') : t('common.back')}
+        variant={allApproved ? 'primary' : 'ghost'}
+        onPress={() => router.back()}
+      />
     </Screen>
   );
 }

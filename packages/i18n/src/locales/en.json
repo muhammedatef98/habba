@@ -258,7 +258,8 @@
     "sectionSupport": "Support",
     "supportCall": "Call",
     "supportWhatsapp": "WhatsApp",
-    "supportEmail": "Email"
+    "supportEmail": "Email",
+    "myInvoices": "My invoices"
   },
   "errors": {
     "generic": "Something went wrong.",
@@ -464,6 +465,7 @@
     "paidWith": "Paid · {{method}}",
     "zatcaInvoice": "Approved tax invoice (ZATCA)",
     "rateProviderQuestion": "How was {{name}}?",
+    "youRated": "You rated {{name}}",
     "vatLine": "VAT 15%",
     "labourLine": "Service charge",
     "partsLine": "Parts",
@@ -522,14 +524,15 @@
     "partsLabel": "Parts",
     "vatLabel": "VAT",
     "totalLabel": "Total",
-    "allApprovedHint": "Once every part is approved, the work moves to completion confirmation.",
+    "allApprovedHint": "Every part is answered. The technician hands the work back, then you confirm completion on the order.",
     "pendingHint": "Not every part is approved yet.",
     "pendingBadge": "{{count}} awaiting you",
     "allApprovedBadge": "All approved",
     "approveFailed": "Your answer on this part didn't go through. Check your connection and try again.",
     "declineLine": "Decline",
     "declinedLine": "You declined this part. It won't be on your bill.",
-    "changedMind": "Changed my mind — approve it"
+    "changedMind": "Changed my mind — approve it",
+    "backToOrder": "Back to the order"
   },
   "job": {
     "accept": "Accept job",
@@ -911,5 +914,12 @@
     "sharePdfShort": "Share PDF",
     "invoiceNumber": "Invoice {{number}}",
     "preparing": "Preparing the document…"
+  },
+  "invoices": {
+    "title": "My invoices",
+    "subtitle": "The tax invoice for every completed order, newest first.",
+    "empty": "No invoices yet",
+    "emptyBody": "Every completed order gets a tax invoice. You will find it here to view or share.",
+    "openFailed": "Couldn't open the invoice. Try again."
   }
 }

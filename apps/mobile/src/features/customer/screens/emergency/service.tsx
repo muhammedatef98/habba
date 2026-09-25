@@ -163,6 +163,27 @@ export default function ServiceSelectionScreen() {
           <Text variant="label" tone="muted">
             {t('vehicle.myVehicles')}
           </Text>
+          {/* No car on file left a heading over nothing and a continue button
+              that never woke up — a dead end, on the one screen where the
+              person reading it may be stranded. */}
+          {vehicles.isSuccess && vehicles.data.length === 0 ? (
+            <Card
+              testID="emergency-no-vehicle"
+              elevation="none"
+              style={{ backgroundColor: theme.colors.surfaceSunken, gap: theme.spacing.sm }}
+            >
+              <Text variant="bodyStrong">{t('home.noVehicleTitle')}</Text>
+              <Text variant="bodySmall" tone="muted">
+                {t('home.noVehicleBody')}
+              </Text>
+              <Button
+                testID="emergency-add-vehicle"
+                label={t('vehicle.addTitle')}
+                size="medium"
+                onPress={() => router.push({ pathname: '/add-vehicle', params: { then: 'back' } })}
+              />
+            </Card>
+          ) : null}
           <View
             style={{
               flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),

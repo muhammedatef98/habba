@@ -15,6 +15,43 @@ export interface RatingStarsProps {
   readonly disabled?: boolean;
 }
 
+/**
+ * A rating already given, shown rather than asked for. One element to a
+ * screen reader — «4 نجوم من 5» — not five buttons that do nothing.
+ */
+export function RatingStarsValue({
+  stars,
+  testID,
+}: {
+  readonly stars: number;
+  readonly testID?: string;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+
+  return (
+    <View
+      testID={testID}
+      accessible
+      accessibilityLabel={t('tracking.rateStars', { count: stars })}
+      style={{
+        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+        gap: theme.spacing.xs,
+      }}
+    >
+      {STAR_VALUES.map((value) => (
+        <Text
+          key={value}
+          variant="title"
+          style={{ color: value <= stars ? theme.colors.accent : theme.colors.border }}
+        >
+          ★
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 const STAR_VALUES = [1, 2, 3, 4, 5] as const;
 
 export function RatingStars({ onRate, disabled = false }: RatingStarsProps) {

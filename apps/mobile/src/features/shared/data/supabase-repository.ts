@@ -44,6 +44,7 @@ import type {
   MaintenanceItem,
   MintedTransfer,
   OrderSummary,
+  InvoiceSummary,
   OwnershipTransfer,
   OwnershipTransferStatus,
   OrderInspection,
@@ -100,15 +101,21 @@ interface MaintenanceAlertRow {
   readonly confidence: AlertConfidence;
 }
 
+interface ServiceNames {
+  readonly name_ar: string;
+  readonly name_en: string | null;
+}
+
 interface OrderSummaryRow {
   readonly id: string;
   readonly status: OrderStatus;
   readonly total_amount: number | null;
   readonly created_at: string;
-  // PostgREST returns an embedded resource as an array even when the foreign
-  // key makes it one-to-one, and supabase-js types it that way. Narrowed at
-  // the boundary rather than pretending the join is scalar.
-  readonly services: readonly { readonly name_ar: string }[] | null;
+  // A many-to-one embed. PostgREST returns it as an object; supabase-js,
+  // without generated types, cannot say which, so both shapes are accepted.
+  // This was typed as an array only, which read `[0]` of an object and gave
+  // every order in the history an empty name against the real backend.
+  readonly services: ServiceNames | readonly ServiceNames[] | null;
 }
 
 /** Shape of one `order_live_progress` row (migration 0040). */
@@ -1125,19 +1132,23 @@ export class SupabaseRepository implements Repository {
     const rows = unwrap(
       await this.client
         .from('orders')
-        .select('id, status, total_amount, created_at, services(name_ar)')
+        .select('id, status, total_amount, created_at, services(name_ar, name_en)')
         .order('created_at', { ascending: false })
         .limit(limit),
       'listRecentOrders',
     );
 
-    return (rows as readonly OrderSummaryRow[]).map((row) => ({
-      id: row.id,
-      status: row.status,
-      serviceNameAr: row.services?.[0]?.name_ar ?? '',
-      totalAmount: toSarOrNull(row.total_amount),
-      createdAt: row.created_at,
-    }));
+    return (rows as readonly OrderSummaryRow[]).map((row) => {
+      const service = Array.isArray(row.services) ? row.services[0] : row.services;
+      return {
+        id: row.id,
+        status: row.status,
+        serviceNameAr: service?.name_ar ?? '',
+        serviceNameEn: service?.name_en ?? service?.name_ar ?? '',
+        totalAmount: toSarOrNull(row.total_amount),
+        createdAt: row.created_at,
+      };
+    });
   }
 
   /**
@@ -1494,6 +1505,57 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`rateOrder: ${error.message}`);
+  }
+
+  async getOrderRating(orderId: string): Promise<number | null> {
+    // The read policy shows a customer their own rating even once operators
+    // have hidden it (0069), so "already rated" stays true after moderation.
+    const { data, error } = await this.client
+      .from('ratings')
+      .select('stars')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (error !== null) throw new Error(`getOrderRating: ${error.message}`);
+    return data === null ? null : (data as { stars: number }).stars;
+  }
+
+  async listInvoices(): Promise<readonly InvoiceSummary[]> {
+    // Only the orders this user placed. RLS also lets a provider read the
+    // invoices for jobs they did (0030), and those are not this list.
+    const userId = this.userId();
+    if (userId === null) return [];
+    const rows = unwrap(
+      await this.client
+        .from('zatca_invoices')
+        .select(
+          'order_id, invoice_number, issued_at, total_amount, orders!inner(customer_id, services(name_ar, name_en))',
+        )
+        .eq('orders.customer_id', userId)
+        .order('issued_at', { ascending: false })
+        .limit(100),
+      'listInvoices',
+    );
+
+    return (
+      rows as unknown as readonly {
+        order_id: string;
+        invoice_number: string;
+        issued_at: string;
+        total_amount: number | string;
+        orders: { services: ServiceNames | readonly ServiceNames[] | null } | null;
+      }[]
+    ).map((row) => {
+      const embedded = row.orders?.services ?? null;
+      const service = Array.isArray(embedded) ? embedded[0] : embedded;
+      return {
+        orderId: row.order_id,
+        invoiceNumber: row.invoice_number,
+        issuedAt: row.issued_at,
+        total: Number(row.total_amount).toFixed(2),
+        serviceNameAr: service?.name_ar ?? '',
+        serviceNameEn: service?.name_en ?? service?.name_ar ?? '',
+      };
+    });
   }
 
   // نقل الملكية ---------------------------------------------------------------

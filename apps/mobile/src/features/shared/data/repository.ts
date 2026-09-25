@@ -45,6 +45,7 @@ import type {
   MaintenanceAlert,
   MaintenanceItem,
   OrderSummary,
+  InvoiceSummary,
   NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
@@ -268,6 +269,15 @@ export interface Repository {
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
   rateOrder(input: NewRatingInput): Promise<void>;
+  /**
+   * The stars this customer gave the order, or null if they have not rated
+   * it. A completed order is opened again from the history; without this it
+   * asked to be rated a second time, and the second rating failed (0019 keeps
+   * one rating per order).
+   */
+  getOrderRating(orderId: string): Promise<number | null>;
+  /** The customer's tax invoices, newest first (0074). */
+  listInvoices(): Promise<readonly InvoiceSummary[]>;
 
   // نقل الملكية — the handover (0011, completed in 0054).
   //
@@ -858,11 +868,11 @@ const DEV_PROVIDER: ProviderSummary = {
 };
 
 /** The Arabic name of any catalogue entry, emergency or bookable. */
-function serviceNameFor(serviceId: string): string {
+function serviceNamesFor(serviceId: string): { readonly ar: string; readonly en: string } {
   const match = [...EMERGENCY_SERVICES, ...BOOKABLE_SERVICES].find(
     (candidate) => candidate.id === serviceId,
   );
-  return match?.nameAr ?? serviceId;
+  return { ar: match?.nameAr ?? serviceId, en: match?.nameEn ?? serviceId };
 }
 
 /**
@@ -1084,7 +1094,8 @@ class DevOrderSimulator {
         // Both halves of the catalogue: a booked oil change would otherwise
         // show its raw id in the history, which is what the emergency-only
         // lookup did the moment booking started creating orders.
-        serviceNameAr: serviceNameFor(order.serviceId),
+        serviceNameAr: serviceNamesFor(order.serviceId).ar,
+        serviceNameEn: serviceNamesFor(order.serviceId).en,
         totalAmount: order.totalAmount,
         createdAt: this.createdAt.get(order.id) ?? new Date().toISOString(),
       }));
@@ -1356,10 +1367,12 @@ export class InMemoryRepository implements Repository {
       report_version: 2,
       generated_at: new Date().toISOString(),
       vehicle: {
-        make_ar: vehicle.makeId,
-        make_en: vehicle.makeId,
-        model_ar: vehicle.modelId,
-        model_en: vehicle.modelId,
+        // Names, as the database joins them — the ids printed as
+        // «make-toyota m-camry» across the top of the dev report.
+        make_ar: MAKES.find((make) => make.id === vehicle.makeId)?.nameAr ?? vehicle.makeId,
+        make_en: MAKES.find((make) => make.id === vehicle.makeId)?.nameEn ?? vehicle.makeId,
+        model_ar: MODELS.find((model) => model.id === vehicle.modelId)?.nameAr ?? vehicle.modelId,
+        model_en: MODELS.find((model) => model.id === vehicle.modelId)?.nameEn ?? vehicle.modelId,
         year: vehicle.year,
         plate: vehicle.plateNormalised,
         vin: vehicle.vin,
@@ -1646,9 +1659,37 @@ export class InMemoryRepository implements Repository {
     this.absorbOrderIntoCare(order.vehicleId, order.serviceId);
   }
 
-  async rateOrder(): Promise<void> {
-    // No read surface depends on the dev rating yet — accepting and
-    // discarding it is enough to exercise the flow offline.
+  private readonly ratings = new Map<string, number>();
+
+  async rateOrder(input: NewRatingInput): Promise<void> {
+    if (this.ratings.has(input.orderId)) throw new Error('rateOrder: already rated');
+    this.ratings.set(input.orderId, input.stars);
+  }
+
+  async getOrderRating(orderId: string): Promise<number | null> {
+    return this.ratings.get(orderId) ?? null;
+  }
+
+  async listInvoices(): Promise<readonly InvoiceSummary[]> {
+    const completed = this.orders
+      .recent(Number.MAX_SAFE_INTEGER)
+      .filter((order) => order.status === 'completed' && order.totalAmount !== null);
+    const invoices = await Promise.all(
+      completed.map(async (order) => {
+        const invoice = await this.getOrderInvoice(order.id);
+        return invoice === null
+          ? null
+          : {
+              orderId: order.id,
+              invoiceNumber: invoice.invoiceNumber,
+              issuedAt: order.createdAt,
+              total: invoice.total,
+              serviceNameAr: order.serviceNameAr,
+              serviceNameEn: order.serviceNameEn,
+            };
+      }),
+    );
+    return invoices.filter((invoice): invoice is InvoiceSummary => invoice !== null);
   }
 
   // نقل الملكية --------------------------------------------------------------

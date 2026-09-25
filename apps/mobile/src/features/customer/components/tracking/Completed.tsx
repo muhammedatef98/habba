@@ -12,7 +12,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { InvoiceDocument } from '@habba/core';
 import { Button, Card, Icon, Text, useTheme } from '@habba/ui';
-import { RatingStars } from '@/features/customer/components/RatingStars';
+import { RatingStars, RatingStarsValue } from '@/features/customer/components/RatingStars';
 import { PriceBreakdown } from './PriceBreakdown';
 import type { Order, ProviderSummary } from '@/features/shared/data/types';
 import { DocumentActions } from '@/features/shared/components/DocumentActions';
@@ -32,6 +32,12 @@ export interface CompletedProps {
    * Null while it loads, and for an order with nothing to invoice.
    */
   readonly invoice?: InvoiceDocument | null | undefined;
+  /**
+   * The stars already given, when the order is opened again from the history.
+   * Undefined while that is still being read, so the stars do not flash up
+   * inviting a second rating the server would refuse.
+   */
+  readonly givenRating?: number | null | undefined;
 }
 
 export function Completed({
@@ -44,9 +50,11 @@ export function Completed({
   onViewLogbook,
   onDismiss,
   invoice = null,
+  givenRating,
 }: CompletedProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const rated = rateSucceeded || (givenRating !== null && givenRating !== undefined);
 
   return (
     <View style={{ gap: theme.spacing.base, flex: 1 }}>
@@ -111,35 +119,51 @@ export function Completed({
         <Button label={t('tracking.viewLogbook')} variant="secondary" onPress={onViewLogbook} />
       ) : null}
 
-      <Card testID="completed-rating">
-        <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>
-          <Text variant="bodyStrong">
-            {t('tracking.rateProviderQuestion', { name: provider?.businessNameAr ?? '' })}
-          </Text>
-          {rateSucceeded ? (
-            <Text variant="body" tone="success">
-              {t('tracking.rateThanks')}
+      {givenRating === undefined && !rateSucceeded ? null : (
+        <Card testID="completed-rating">
+          <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>
+            <Text variant="bodyStrong" align="center">
+              {givenRating !== null && givenRating !== undefined
+                ? t('tracking.youRated', { name: provider?.businessNameAr ?? '' })
+                : t('tracking.rateProviderQuestion', { name: provider?.businessNameAr ?? '' })}
             </Text>
-          ) : (
-            <>
-              <RatingStars onRate={onRate} disabled={ratePending} />
-              {/* The stars stay tappable underneath, so the message is an
-                  invitation to try again rather than a dead end. */}
-              {rateFailed ? (
-                <Text variant="caption" tone="emergency" align="center">
-                  {t('tracking.errors.rateFailed')}
-                </Text>
-              ) : null}
-            </>
-          )}
-        </View>
-      </Card>
+            {givenRating !== null && givenRating !== undefined ? (
+              <>
+                <RatingStarsValue testID="completed-rating-given" stars={givenRating} />
+                {rateSucceeded ? (
+                  <Text variant="body" tone="success">
+                    {t('tracking.rateThanks')}
+                  </Text>
+                ) : null}
+              </>
+            ) : rateSucceeded ? (
+              <Text variant="body" tone="success">
+                {t('tracking.rateThanks')}
+              </Text>
+            ) : (
+              <>
+                <RatingStars onRate={onRate} disabled={ratePending} />
+                {/* The stars stay tappable underneath, so the message is an
+                    invitation to try again rather than a dead end. */}
+                {rateFailed ? (
+                  <Text variant="caption" tone="emergency" align="center">
+                    {t('tracking.errors.rateFailed')}
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        </Card>
+      )}
 
       <View style={{ flex: 1 }} />
 
-      {!rateSucceeded ? (
-        <Button label={t('common.later')} variant="ghost" onPress={onDismiss} />
-      ) : null}
+      <Button
+        testID="completed-done"
+        label={rated ? t('common.done') : t('common.later')}
+        variant={rated ? 'secondary' : 'ghost'}
+        onPress={onDismiss}
+      />
     </View>
   );
 }
