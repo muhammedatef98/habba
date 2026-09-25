@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-85 migrations · 53 SQL suites (all pass) · tests/rls.spec.ts
+86 migrations · 54 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0085, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0086, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -137,7 +137,7 @@ them no search widens, no order auto-closes and nobody is notified.
 
 ---
 
-## 6. What was built across the last sessions (0064–0085)
+## 6. What was built across the last sessions (0064–0086)
 
 | Area                                | Migrations | What it gave                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ----------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -158,6 +158,7 @@ them no search widens, no order auto-closes and nobody is notified.
 | Terms, privacy, report lifetime     | 0082       | The app never linked a privacy policy (both stores and the PDPL require one). `terms_url` / `privacy_url` are console settings (https only, enforced in SQL and on the phone); the sign-in screen shows «بالمتابعة فإنك توافق على…» and «حسابي» lists both. A Habba report link lives `habba_report_valid_days` (was a fixed 90). Suite 52.                                                                                                                                                                                                                                                                           |
 | Legal documents                     | 0083       | Terms, privacy policy and provider terms written (AR authoritative + EN, `docs/legal/`; **needs a Saudi lawyer's review**). Versioned and immutable in `legal_documents`; `{{placeholders}}` filled from settings so the text never disagrees with the app. Acceptance recorded per user per version (`legal_acceptances`, append-only); the app holds a signed-in user at an acceptance screen until they accept what is in force; applicants accept the provider terms. Console section to publish versions (dated ahead, re-acceptance optional); public `/legal/*` pages for store listings. Suite 53.            |
 | Security round 2                    | 0084, 0085 | Every definer function a client can call was reviewed. Setting readers and the limits built on them, and has_role/is_provider/is_suspended for any user id, were callable by any signed-in user (read the OTP limits, ask who is an operator): closed, and suite 48 fails if reopened. Media buckets take only video ≤ 50 MB / images ≤ 10 MB; the triage clip records at 720p/4 Mb/s (~10 MB, was camera default). Console: no framing (clickjacking), nosniff, no-referrer, HSTS, no X-Powered-By. Edge tick secrets compared in constant time; dispatch-tick accepts the new secret keys like the other functions. |
+| Delete my account                   | 0086       | «حسابي» → «حذف الحساب»: the person erases their own account (App Store guideline 5.1.1(v), PDPL destruction), typing «حذف» to confirm. Same erasure as the console's (now one function, erase_account), refused while an order, a dispute or a payout is open, and for staff. Logbook stays with the car; invoices stay. Suite 54.                                                                                                                                                                                                                                                                                    |
 | UI/UX passes (3 rounds)             | —          | Every screen screenshotted in Arabic, English and dark; fixes listed below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 Real bugs found and fixed along the way, all with tests: orders were never

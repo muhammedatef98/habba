@@ -1505,6 +1505,16 @@ export class SupabaseRepository implements Repository {
     if (error !== null) throw new Error(`acceptLegalDocuments: ${error.message}`);
   }
 
+  async deleteMyAccount(): Promise<void> {
+    const { error } = await this.client.rpc('delete_my_account', { p_confirmation: 'DELETE' });
+    if (error === null) return;
+    // The refusals a person can act on, by the server's own words (0086).
+    if (/order in progress or in dispute/i.test(error.message)) throw new Error('open_order');
+    if (/payout still to be paid/i.test(error.message)) throw new Error('pending_payout');
+    if (/staff role/i.test(error.message)) throw new Error('staff_account');
+    throw new Error(`deleteMyAccount: ${error.message}`);
+  }
+
   async getPlatformStatus(): Promise<PlatformStatus> {
     const settings = await this.client.rpc('get_public_settings');
     const values = (settings.error === null ? settings.data : {}) as Record<string, unknown>;

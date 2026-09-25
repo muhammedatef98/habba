@@ -79,4 +79,18 @@ describe.skipIf(!harnessUp)('legal documents through the repository', () => {
     await repo.acceptLegalDocuments(pending.map((document) => document.id));
     expect(await repo.listPendingLegalDocuments()).toEqual([]);
   });
+
+  test('a person deletes their own account from the app', async () => {
+    const userId = randomUUID();
+    const phone = `+9665${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
+    const client = clientFor(userId);
+    await client.rpc('test_seed_auth_user', { p_id: userId, p_phone: phone });
+    await client.from('profiles').upsert({ id: userId, full_name: 'المغادر', phone });
+    const repo = new SupabaseRepository(client, () => userId);
+
+    await repo.deleteMyAccount();
+
+    const profile = await client.from('profiles').select('full_name, phone').eq('id', userId);
+    expect(profile.data?.[0]).toEqual({ full_name: 'مستخدم محذوف', phone: null });
+  });
 });

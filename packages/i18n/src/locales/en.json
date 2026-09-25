@@ -260,7 +260,20 @@
     "supportCall": "Call",
     "supportWhatsapp": "WhatsApp",
     "supportEmail": "Email",
-    "myInvoices": "My invoices"
+    "myInvoices": "My invoices",
+    "deleteAccount": {
+      "open": "Delete account",
+      "title": "Delete your account permanently",
+      "gone": "Your name, number, email, addresses and comments are deleted, and you can't sign in to this account again.",
+      "kept": "The logbook stays with the car without your name, and invoices are kept because the law requires it.",
+      "final": "This can't be undone.",
+      "typeToConfirm": "Type \"delete\" to confirm",
+      "confirm": "Delete my account",
+      "failed": "Couldn't delete the account. Check your connection and try again.",
+      "openOrder": "You have an order in progress or an open complaint. Finish or cancel it first, then delete the account.",
+      "pendingPayout": "You have earnings not yet paid out. The account can be deleted once they are.",
+      "staffAccount": "Operations staff accounts are removed from the console."
+    }
   },
   "errors": {
     "generic": "Something went wrong.",

@@ -280,6 +280,11 @@ export interface Repository {
   listPendingLegalDocuments(): Promise<readonly PendingLegalDocument[]>;
   /** Records acceptance of these versions, which must be the ones in force. */
   acceptLegalDocuments(documentIds: readonly string[]): Promise<void>;
+  /**
+   * Erases this account (0086). Throws `open_order`, `pending_payout` or
+   * `staff_account` when the server refuses, so the screen can say why.
+   */
+  deleteMyAccount(): Promise<void>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
   /**
@@ -1697,6 +1702,8 @@ export class InMemoryRepository implements Repository {
   }
 
   async acceptLegalDocuments(): Promise<void> {}
+
+  async deleteMyAccount(): Promise<void> {}
 
   async confirmOrderCompletion(orderId: string): Promise<void> {
     // As the server refuses it (0078): the difference first.

@@ -34,6 +34,7 @@ import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
 import { unregisterThisDevice } from '@/features/shared/lib/push';
 import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
+import { DeleteAccountCard } from '@/features/shared/components/DeleteAccountCard';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
 export default function AccountScreen() {
@@ -440,6 +441,8 @@ export default function AccountScreen() {
           onPress={() => setConfirmingSignOut(true)}
         />
       )}
+
+      <DeleteAccountCard />
     </Screen>
   );
 }
