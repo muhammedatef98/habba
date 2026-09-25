@@ -377,6 +377,10 @@ select public.record_completion_evidence('f0000000-0000-4000-c000-000000000002',
 select test.become('11111111-0000-4000-c000-000000000001');
 update public.orders set status = 'awaiting_approval' where id = 'f0000000-0000-4000-c000-000000000002';
 select test.become('11111111-0000-4000-c000-000000000001');
+-- Parts took the bill past the hold: the customer covers the difference
+-- before confirming (0078).
+select public.authorise_order_top_up('f0000000-0000-4000-c000-000000000002', 'test_top_up_000002', d)
+  from (select public.order_top_up_due('f0000000-0000-4000-c000-000000000002') as d) due where d > 0;
 update public.orders set status = 'completed' where id = 'f0000000-0000-4000-c000-000000000002';
 
 select test.become('33333333-0000-4000-c000-000000000003');

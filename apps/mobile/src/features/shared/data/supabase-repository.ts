@@ -1497,6 +1497,31 @@ export class SupabaseRepository implements Repository {
     }
   }
 
+  async getTopUpDue(orderId: string): Promise<SarAmount> {
+    const { data, error } = await this.client.rpc('order_top_up_due', { p_order_id: orderId });
+    if (error !== null) throw new Error(`getTopUpDue: ${error.message}`);
+    return toSar(Number(data ?? 0));
+  }
+
+  async payTopUp(orderId: string): Promise<void> {
+    const due = await this.getTopUpDue(orderId);
+    if (isZeroSar(due)) return;
+
+    const held = await this.payments.authorise(orderId, due, 'top_up');
+    if (!held.ok) throw new Error(`payTopUp/payment: ${held.reason}`);
+
+    // As with the first hold: the payment service has already recorded a
+    // live one; only the development provider's goes through the client.
+    if (!held.recordedByServer) {
+      const { error } = await this.client.rpc('authorise_order_top_up', {
+        p_order_id: orderId,
+        p_payment_id: held.paymentIntentId,
+        p_amount: due,
+      });
+      if (error !== null) throw new Error(`payTopUp: ${error.message}`);
+    }
+  }
+
   async rateOrder(input: NewRatingInput): Promise<void> {
     const raterId = this.userId();
     if (raterId === null) throw new Error('rateOrder: not authenticated');

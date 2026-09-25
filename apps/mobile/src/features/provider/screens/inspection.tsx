@@ -68,7 +68,6 @@ export default function InspectionScreen() {
 
   const submit = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
     mutationFn: () =>
       providerRepository.submitInspection(id ?? '', templateKey ?? '', results, {

@@ -419,7 +419,8 @@
       "notFound": "We couldn't find that request.",
       "confirmFailed": "Confirmation failed. Try again.",
       "cancelFailed": "The request could not be cancelled.",
-      "rateFailed": "We couldn't send your rating. Try again."
+      "rateFailed": "We couldn't send your rating. Try again.",
+      "topUpFailed": "The difference couldn't be held on your card. The order is not confirmed — try again."
     },
     "searchingHeadline": "Finding you a technician",
     "searchingReassure": "Nothing needed from you. Keep your phone handy and we'll tell you the moment we find someone.",
@@ -508,7 +509,10 @@
     "autoCompleteNote_one": "If you neither approve nor report a problem within 1 hour of hand-back, the order closes by itself. You can still complain afterwards.",
     "autoCompleteNote_other": "If you neither approve nor report a problem within {{count}} hours of hand-back, the order closes by itself. You can still complain afterwards.",
     "rateStars_one": "1 star of 5",
-    "rateStars_other": "{{count}} stars of 5"
+    "rateStars_other": "{{count}} stars of 5",
+    "topUpTitle": "The final bill is more than the amount held",
+    "topUpBody": "The parts you approved took the total past what was held when you ordered. The difference ({{amount}} SAR) is held on your card when you confirm, and taken with the rest.",
+    "topUpAction": "Hold the difference ({{amount}} SAR) and confirm"
   },
   "quote": {
     "title": "Parts quote",

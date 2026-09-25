@@ -19,11 +19,16 @@ import type { HabbaReport, InvoiceDocument } from '@habba/core';
 import {
   addSar,
   applyRate,
+  compareSar,
+  isZeroSar,
   multiplySar,
   normalisePlate,
   sarOrThrow,
   SAUDI_VAT_RATE,
+  subtractSar,
+  type SarAmount,
 } from '@habba/core';
+import { priceWithVat } from '@/features/shared/lib/order-price.js';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-language.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
@@ -269,6 +274,14 @@ export interface Repository {
   getPlatformStatus(): Promise<PlatformStatus>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
+  /**
+   * What the customer still has to authorise before confirming: the final
+   * bill less what is already held (0078). Zero for most jobs; approved parts
+   * are what make it more.
+   */
+  getTopUpDue(orderId: string): Promise<SarAmount>;
+  /** Holds exactly that difference, through the same provider as the first hold. */
+  payTopUp(orderId: string): Promise<void>;
   rateOrder(input: NewRatingInput): Promise<void>;
   /**
    * The stars this customer gave the order, or null if they have not rated
@@ -1427,7 +1440,31 @@ export class InMemoryRepository implements Repository {
   }
 
   async submitOrder(orderId: string): Promise<OrderStatus> {
+    const order = this.orders.get(orderId);
+    // The dev hold, as the server records it: the quoted price with VAT.
+    if (order !== null && order.status === 'draft' && order.quotedAmount !== null) {
+      this.held.set(orderId, priceWithVat(order.quotedAmount));
+    }
     return this.orders.submit(orderId);
+  }
+
+  private readonly held = new Map<string, SarAmount>();
+
+  async getTopUpDue(orderId: string): Promise<SarAmount> {
+    const order = this.orders.get(orderId);
+    if (order === null || order.status !== 'awaiting_approval' || order.totalAmount === null) {
+      return sarOrThrow('0.00');
+    }
+    const held = this.held.get(orderId) ?? sarOrThrow('0.00');
+    return compareSar(order.totalAmount, held) > 0
+      ? subtractSar(order.totalAmount, held)
+      : sarOrThrow('0.00');
+  }
+
+  async payTopUp(orderId: string): Promise<void> {
+    const due = await this.getTopUpDue(orderId);
+    if (isZeroSar(due)) return;
+    this.held.set(orderId, addSar(this.held.get(orderId) ?? sarOrThrow('0.00'), due));
   }
 
   async listBookableServices(): Promise<readonly Service[]> {
@@ -1634,6 +1671,8 @@ export class InMemoryRepository implements Repository {
   }
 
   async confirmOrderCompletion(orderId: string): Promise<void> {
+    // As the server refuses it (0078): the difference first.
+    if (!isZeroSar(await this.getTopUpDue(orderId))) throw new Error('top_up_required');
     this.orders.confirmCompletion(orderId);
 
     // Phase 3's acceptance criterion (build prompt §10): a completed job

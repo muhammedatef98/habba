@@ -23,7 +23,6 @@ export function ReportProblem({ orderId }: { readonly orderId: string }) {
 
   const send = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
     mutationFn: () => repository.openOrderDispute(orderId, reason.trim()),
     onSuccess: () => {

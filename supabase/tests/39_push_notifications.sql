@@ -192,6 +192,10 @@ select test.assert(
   'in both languages, naming the technician, opening the tracking screen');
 
 select test.become('11111111-0000-4000-e900-000000000001');
+-- Parts took the bill past the hold: the customer covers the difference
+-- before confirming (0078).
+select public.authorise_order_top_up(:'emergency', 'test_top_up_rgency', d)
+  from (select public.order_top_up_due(:'emergency') as d) due where d > 0;
 update public.orders set status = 'completed' where id = :'emergency';
 
 select test.assert_eq(

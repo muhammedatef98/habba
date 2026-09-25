@@ -14,6 +14,13 @@
  *     (checkAuthorisation, unit-tested in @habba/core). The order must be the
  *     caller's: the session is verified here, and the database checks again.
  *
+ *   { "action": "confirm_top_up", "order_id": "…", "payment_id": "…" }
+ *     Authorization: Bearer <the customer's session>
+ *
+ *     The same check for the second hold a job needs when approved parts
+ *     took the final bill past the first (0078): the payment must be for
+ *     exactly order_top_up_due().
+ *
  *   { "action": "tick" }
  *     x-habba-tick: <HABBA_PAYMENTS_TICK_SECRET>
  *
@@ -70,7 +77,8 @@ Deno.serve(async (request: Request) => {
     global: { fetch: apiKeyOnlyFetch(SERVICE_KEY, fetch) },
   });
 
-  if (body['action'] === 'confirm') return confirm(request, body, db);
+  if (body['action'] === 'confirm') return confirm(request, body, db, 'initial');
+  if (body['action'] === 'confirm_top_up') return confirm(request, body, db, 'top_up');
   if (body['action'] === 'tick') {
     if (TICK_SECRET === '' || request.headers.get('x-habba-tick') !== TICK_SECRET) {
       return new Response('Not found', { status: 404 });
@@ -84,6 +92,7 @@ async function confirm(
   request: Request,
   body: Record<string, unknown>,
   db: SupabaseClient,
+  purpose: 'initial' | 'top_up',
 ): Promise<Response> {
   const orderId = typeof body['order_id'] === 'string' ? body['order_id'] : '';
   const paymentId = typeof body['payment_id'] === 'string' ? body['payment_id'] : '';
@@ -107,9 +116,14 @@ async function confirm(
     return json({ error: 'not_found' }, 404);
   }
 
-  const hold = await db.rpc('order_hold_amount', { p_order_id: orderId });
-  if (hold.error !== null || hold.data === null) return json({ error: 'unavailable' }, 503);
-  const holdSar = Number(hold.data).toFixed(2);
+  // What this payment must be for: the first hold, or the difference the
+  // final bill left (0078) — computed here, never taken from the phone.
+  const expected = await db.rpc(purpose === 'initial' ? 'order_hold_amount' : 'order_top_up_due', {
+    p_order_id: orderId,
+  });
+  if (expected.error !== null || expected.data === null) return json({ error: 'unavailable' }, 503);
+  const holdSar = Number(expected.data).toFixed(2);
+  if (Number(holdSar) <= 0) return json({ error: 'nothing_due' }, 409);
 
   const fetchRequest = fetchPaymentRequest(MOYASAR_SECRET_KEY, paymentId);
   let payment: MoyasarPayment;
@@ -124,12 +138,15 @@ async function confirm(
   const check = checkAuthorisation(payment, { orderId, amountHalalas: toHalalas(holdSar) });
   if (!check.ok) return json({ error: check.reason }, 402);
 
-  const recorded = await db.rpc('record_payment_authorisation', {
-    p_order_id: orderId,
-    p_customer_id: customerId,
-    p_payment_id: payment.id,
-    p_amount: holdSar,
-  });
+  const recorded = await db.rpc(
+    purpose === 'initial' ? 'record_payment_authorisation' : 'record_payment_top_up',
+    {
+      p_order_id: orderId,
+      p_customer_id: customerId,
+      p_payment_id: payment.id,
+      p_amount: holdSar,
+    },
+  );
   if (recorded.error !== null) return json({ error: recorded.error.message }, 409);
 
   return json({ ok: true, payment_id: payment.id }, 200);

@@ -17,10 +17,12 @@
  * stubbed with invented numbers.
  */
 
+import { useState } from 'react';
 import { Share, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { isZeroSar } from '@habba/core';
 import {
   Button,
   Card,
@@ -115,7 +117,6 @@ function TrackingBody() {
 
   const cancel = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
     mutationFn: () => repository.cancelOrder(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
@@ -130,12 +131,39 @@ function TrackingBody() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
 
+  // Approved parts can take the final bill past what the card holds; the
+  // difference is held before the confirmation, in the same tap (0078).
+  const topUpDue = useQuery({
+    queryKey: ['order-top-up', id],
+    queryFn: () => repository.getTopUpDue(id ?? ''),
+    enabled: id !== undefined && order.data?.status === 'awaiting_approval',
+  });
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
   const confirmCompletion = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
-    mutationFn: () => repository.confirmOrderCompletion(id ?? ''),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+    mutationFn: async () => {
+      if (topUpDue.data !== undefined && !isZeroSar(topUpDue.data)) {
+        await repository.payTopUp(id ?? '');
+      }
+      await repository.confirmOrderCompletion(id ?? '');
+    },
+    onMutate: () => setConfirmError(null),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['order', id] });
+      await queryClient.invalidateQueries({ queryKey: ['order-top-up', id] });
+    },
+    onError: async (error: Error) => {
+      await queryClient.invalidateQueries({ queryKey: ['order-top-up', id] });
+      // Closing the card form is a decision, not a failure.
+      if (error.message === 'payTopUp/payment: cancelled') return;
+      setConfirmError(
+        error.message.startsWith('payTopUp')
+          ? t('tracking.errors.topUpFailed')
+          : t('tracking.errors.confirmFailed'),
+      );
+    },
   });
 
   // How long before an unconfirmed job closes by itself — the operators'
@@ -173,7 +201,6 @@ function TrackingBody() {
 
   const rate = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
     mutationFn: (stars: number) =>
       repository.rateOrder({
@@ -195,6 +222,7 @@ function TrackingBody() {
       ['order', id],
       ['order-parts', id],
       ['order-progress', id],
+      ['order-top-up', id],
     ],
     id !== undefined,
   );
@@ -410,15 +438,40 @@ function TrackingBody() {
               </Text>
             ) : null}
 
+            {topUpDue.data !== undefined && !isZeroSar(topUpDue.data) ? (
+              <Card
+                testID="approval-top-up"
+                elevation="none"
+                style={{
+                  gap: theme.spacing.xs,
+                  backgroundColor: theme.colors.accentSubtle,
+                  borderColor: theme.colors.accent,
+                  borderWidth: 1,
+                }}
+              >
+                <Text variant="bodyStrong" tone="accent">
+                  {t('tracking.topUpTitle')}
+                </Text>
+                <Text variant="bodySmall" tone="muted">
+                  {t('tracking.topUpBody', { amount: formatSarDisplay(topUpDue.data) })}
+                </Text>
+              </Card>
+            ) : null}
+
             <Button
               testID="confirm-completion"
-              label={t('tracking.confirmCompletionAction')}
+              label={
+                topUpDue.data !== undefined && !isZeroSar(topUpDue.data)
+                  ? t('tracking.topUpAction', { amount: formatSarDisplay(topUpDue.data) })
+                  : t('tracking.confirmCompletionAction')
+              }
               onPress={() => confirmCompletion.mutate()}
               loading={confirmCompletion.isPending}
+              disabled={topUpDue.isPending && topUpDue.fetchStatus !== 'idle'}
             />
-            {confirmCompletion.isError ? (
+            {confirmError !== null ? (
               <Text variant="caption" tone="emergency">
-                {t('tracking.errors.confirmFailed')}
+                {confirmError}
               </Text>
             ) : null}
           </View>

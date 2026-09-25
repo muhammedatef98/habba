@@ -70,8 +70,15 @@ export type RefundResult =
     };
 
 export interface PaymentProvider {
-  /** Holds funds at booking. The order cannot be accepted until this succeeds. */
-  authorise(orderId: string, amount: SarAmount): Promise<AuthorisationResult>;
+  /**
+   * Holds funds: at booking (`initial`), and again for the difference when
+   * approved parts took the final bill past the first hold (`top_up`, 0078).
+   */
+  authorise(
+    orderId: string,
+    amount: SarAmount,
+    purpose?: 'initial' | 'top_up',
+  ): Promise<AuthorisationResult>;
   /** Takes the money. Called only after the customer confirms, or after the dispute window. */
   capture(paymentIntentId: string, amount: SarAmount): Promise<CaptureResult>;
   release(paymentIntentId: string): Promise<RefundResult>;
@@ -104,7 +111,12 @@ export class DevPaymentProvider implements PaymentProvider {
 
   async authorise(orderId: string, amount: SarAmount): Promise<AuthorisationResult> {
     this.counter += 1;
-    const paymentIntentId = `dev_intent_${this.counter}`;
+    // Unique across instances and runs, as a real payment id is: the
+    // database refuses a payment id it has seen before (0078), which is what
+    // stops one payment being presented for two orders.
+    const paymentIntentId = `dev_intent_${Date.now().toString(36)}_${this.counter}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
     const expiresAt = new Date(Date.now() + AUTHORISATION_VALIDITY_DAYS * 86_400_000);
 
     this.intents.set(paymentIntentId, {

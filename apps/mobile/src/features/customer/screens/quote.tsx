@@ -67,7 +67,6 @@ export default function QuoteScreen() {
 
   const approve = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
     mutationFn: (partId: string) => repository.approveOrderPart(partId),
     onSuccess: refresh,
@@ -75,7 +74,6 @@ export default function QuoteScreen() {
 
   const decline = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
     mutationFn: (partId: string) => repository.declineOrderPart(partId),
     onSuccess: refresh,

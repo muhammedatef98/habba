@@ -30,20 +30,31 @@ export class MoyasarPaymentProvider implements PaymentProvider {
     private readonly collect: CardFormCollector | null,
   ) {}
 
-  async authorise(orderId: string, amount: SarAmount): Promise<AuthorisationResult> {
+  async authorise(
+    orderId: string,
+    amount: SarAmount,
+    purpose: 'initial' | 'top_up' = 'initial',
+  ): Promise<AuthorisationResult> {
     if (this.collect === null) return { ok: false, reason: 'card_form_unavailable' };
 
     const card = await this.collect({
       publishableKey: this.publishableKey,
       orderId,
       amountHalalas: halalasOf(amount),
-      description: `هبّة — طلب ${orderId.slice(0, 8)}`,
+      description:
+        purpose === 'top_up'
+          ? `هبّة — فرق فاتورة الطلب ${orderId.slice(0, 8)}`
+          : `هبّة — طلب ${orderId.slice(0, 8)}`,
     });
     if (card.status === 'cancelled') return { ok: false, reason: 'cancelled' };
     if (card.status === 'failed') return { ok: false, reason: 'declined' };
 
     const { data, error } = await this.client.functions.invoke('payments', {
-      body: { action: 'confirm', order_id: orderId, payment_id: card.paymentId },
+      body: {
+        action: purpose === 'top_up' ? 'confirm_top_up' : 'confirm',
+        order_id: orderId,
+        payment_id: card.paymentId,
+      },
     });
     if (error !== null || (data as { ok?: boolean } | null)?.ok !== true) {
       return { ok: false, reason: 'declined' };

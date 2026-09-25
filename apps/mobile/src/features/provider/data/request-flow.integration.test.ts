@@ -18,7 +18,13 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
-import { addSar, nextJobStep, sarOrThrow, type CompletionMediaItem } from '@habba/core';
+import {
+  addSar,
+  nextJobStep,
+  sarOrThrow,
+  subtractSar,
+  type CompletionMediaItem,
+} from '@habba/core';
 import { SupabaseRepository } from '@/features/shared/data/supabase-repository.js';
 import { mintTestJwt } from '@/features/shared/data/test-jwt.js';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
@@ -550,6 +556,16 @@ describe.skipIf(!harnessUp)('a workshop booking, through the app', () => {
     expect(before?.totalAmount).toBe(
       priceWithVat(addSar(before!.quotedAmount!, sarOrThrow('45.00'))),
     );
+
+    // The approved part took the bill past the hold made at booking: the
+    // customer is shown the difference, cannot confirm without it, and holds
+    // it in the same step (0078).
+    const due = await customer().getTopUpDue(orderId);
+    expect(due).toBe(subtractSar(before!.totalAmount!, priceWithVat(before!.quotedAmount!)));
+    await expect(customer().confirmOrderCompletion(orderId)).rejects.toThrow(/difference/);
+
+    await customer().payTopUp(orderId);
+    expect(await customer().getTopUpDue(orderId)).toBe('0.00');
 
     await customer().confirmOrderCompletion(orderId);
     const after = await customer().getOrder(orderId);

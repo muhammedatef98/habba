@@ -84,7 +84,6 @@ export default function AddVehicleScreen() {
 
   const addVehicle = useMutation({
     // Its failure is shown in place, not as a toast.
-
     meta: { inlineError: true },
     mutationFn: async () => {
       const vehicle = await repository.addVehicle({
