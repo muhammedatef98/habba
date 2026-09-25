@@ -147,9 +147,15 @@ passwords: Habba's identity is the number plus an OTP.
 
 ### 5a. The SMS provider is our Edge Function, not a built-in
 
-Supabase's built-in SMS providers do not include Unifonic, and Unifonic is the
-choice because CITC sender-ID registration is the slow part of sending SMS in
-Saudi Arabia and a local aggregator does it as part of onboarding.
+Supabase's built-in SMS providers include neither Authentica nor Unifonic.
+Both are Saudi gateways, and a Saudi gateway is the point: sender-ID
+registration with the CITC is the slow part of sending SMS here, and they
+have done it already. **Authentica** is the default. It sends on its own
+approved sender and templates, so it works from day one. Unifonic stays
+supported. The function uses Authentica whenever its key is present.
+
+Supabase Auth still generates, expires and verifies the code. The gateway only
+carries it (`packages/core/src/sms/authentica.ts`).
 
 So delivery goes through a **Send SMS auth hook**:
 
@@ -164,27 +170,41 @@ So delivery goes through a **Send SMS auth hook**:
    webhook signature rather than a user JWT, and the function verifies that
    signature itself. Without it, the hook would reject GoTrue.
 
-2. **Set the function's secrets.** Edge Functions → `send-sms-hook` → Secrets,
-   or:
+2. **Register the hook.** Authentication → Hooks → **Send SMS** → enable →
+   HTTPS → URI `https://<ref>.supabase.co/functions/v1/send-sms-hook` →
+   **Generate secret**. The secret looks like `v1,whsec_…`.
 
-   ```bash
-   supabase secrets set \
-     UNIFONIC_APP_SID='<from the Unifonic console>' \
-     UNIFONIC_SENDER_ID='<your CITC-registered sender ID>'
-   # UNIFONIC_BASE_URL only if Unifonic gave you a different API host
+3. **Put the two secrets in Vault** (SQL editor), rather than in chat or a file:
+
+   ```sql
+   select vault.create_secret('<the v1,whsec_… secret from step 2>', 'send_sms_hook_secret');
+   select vault.create_secret('<Authentica → API Keys>', 'authentica_api_key');
    ```
+
+   The function reads them through `edge_provider_secret()` (0088). Only the
+   service key can call it, and only for these two names. It reads them on
+   every request, so no redeploy is needed. To replace one later, use
+   `vault.update_secret(id, '<new>')`. The function's own secrets
+   (`SEND_SMS_HOOK_SECRET`, `AUTHENTICA_API_KEY`) still work, and win when set.
+
+   Optional function secrets:
+   - `AUTHENTICA_TEMPLATE_ID`: the Authentica template to send on. The default is 1.
+   - `AUTHENTICA_SENDER_NAME`: once Authentica approves a sender name for you,
+     setting it switches to `send-sms` with Habba's own wording
+     («رمز الدخول إلى هبّة: …»).
+   - Unifonic instead of Authentica: `UNIFONIC_APP_SID`, `UNIFONIC_SENDER_ID`,
+     and optionally `UNIFONIC_BASE_URL`, with no Authentica key set.
 
    `SUPABASE_URL` is injected automatically, along with the keys: legacy
    projects get `SUPABASE_SERVICE_ROLE_KEY`, migrated ones also get
    `SUPABASE_SECRET_KEYS` (a JSON object of name → key). The functions prefer
    the latter, so disabling the legacy key needs no redeploy.
 
-3. **Register the hook.** Authentication → Hooks → **Send SMS** → enable →
-   HTTP → URI `https://<ref>.supabase.co/functions/v1/send-sms-hook`.
-
-4. **Copy the signing secret** the dashboard shows (`v1,whsec_…`) into the
-   function's secrets as `SEND_SMS_HOOK_SECRET`. The function refuses to run
-   without it — an unsigned endpoint that sends SMS is someone else's bill.
+4. **Prove it once.** Sign in from the app with a staff phone. The code that
+   arrives must be the one the app accepts. If Authentica sends a code of its
+   own, the template ignores `otp`: pick another template, or use a sender
+   name. The function refuses to run without the hook secret. An unsigned
+   endpoint that sends SMS is someone else's bill.
 
 5. **Rate limits.** Authentication → Rate limits → SMS. Set something sane
    (30/hour is a reasonable project-wide ceiling). This is a second layer: the

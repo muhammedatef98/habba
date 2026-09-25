@@ -28,22 +28,24 @@ Supabase، ومزوّد الرسائل (OTP)، وبوابة الدفع. لا ش�
 
 ## 2. رمز التحقّق (OTP) بالرسائل
 
-الرمز يولّده ويتحقّق منه Supabase Auth؛ الإرسال عبر دالة `send-sms-hook` إلى
-Unifonic. التفاصيل: `supabase-setup.md` §5.
+الرمز يولّده ويتحقّق منه Supabase Auth، والإرسال عبر دالة `send-sms-hook` إلى
+**Authentica** (أو Unifonic إن لم يُضبط مفتاح Authentica). التفاصيل في
+`supabase-setup.md` §5.
 
-```bash
-supabase functions deploy send-sms-hook --no-verify-jwt
-supabase secrets set UNIFONIC_APP_SID=… UNIFONIC_SENDER_ID=… SEND_SMS_HOOK_SECRET=v1,whsec_…
-```
+الدالة منشورة على مشروع الإنتاج. المتبقّي كلّه من لوحة Supabase:
 
-ثم في لوحة Supabase:
+1. Authentication → Hooks → **Send SMS** → HTTPS →
+   `https://<ref>.supabase.co/functions/v1/send-sms-hook` → **Generate secret**.
+2. SQL Editor (المفاتيح تُحفظ في Vault، ولا تُرسَل في المحادثات):
 
-- Authentication → Providers → **Phone**: فعّله، طول الرمز **6**، الصلاحية **120 ثانية**
-  (يطابقان `OTP_LENGTH` و `OTP_TTL_SECONDS` في `otp-provider.ts`).
-- Authentication → Hooks → **Send SMS**: اختر الدالة `send-sms-hook` وانسخ السرّ
-  إلى `SEND_SMS_HOOK_SECRET`.
-- **اسم المرسِل** يجب أن يكون معتمداً لدى Unifonic وهيئة الاتصالات (§5b)،
-  وإلا لن تصل الرسائل رغم نجاح الطلب.
+   ```sql
+   select vault.create_secret('v1,whsec_…', 'send_sms_hook_secret');
+   select vault.create_secret('<مفتاح Authentica>', 'authentica_api_key');
+   ```
+
+3. Authentication → Providers → **Phone**: فعّله. طول الرمز **6** والصلاحية
+   **120 ثانية** (يطابقان `OTP_LENGTH` و `OTP_TTL_SECONDS` في `otp-provider.ts`).
+4. جرّب من التطبيق برقم حقيقي، وتأكّد أن الرمز الذي وصل هو نفسه الذي يقبله التطبيق.
 
 البريد الإلكتروني (اختياري، §5c): فعّل مزوّد Email واجعل القالب يرسل `{{ .Token }}`.
 
