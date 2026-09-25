@@ -51,6 +51,18 @@ function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
   return fetch(raw.replace('/rest/v1/', '/'), init);
 }
 
+/** The server's own role — for internal functions no client may call (0075). */
+function serviceClient(): SupabaseClient {
+  const token = mintTestJwt(JWT_SECRET, {
+    sub: '00000000-0000-4000-8000-000000000000',
+    role: 'service_role',
+  });
+  return createClient(POSTGREST_URL, token, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+  });
+}
+
 function clientFor(userId: string): SupabaseClient {
   const token = mintTestJwt(JWT_SECRET, { sub: userId, role: 'authenticated' });
   return createClient(POSTGREST_URL, token, {
@@ -222,7 +234,12 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     expect(searching.error).toBeNull();
     expect((searching.data as { status: string }).status).toBe('searching');
 
-    const matches = await customer.rpc('match_providers', { p_order_id: orderId });
+    // Matching is the server's own business (0075): a client that could call
+    // it could see which technicians are online near any order.
+    const refused = await customer.rpc('match_providers', { p_order_id: orderId });
+    expect(refused.error).not.toBeNull();
+
+    const matches = await serviceClient().rpc('match_providers', { p_order_id: orderId });
     expect(matches.error).toBeNull();
     expect((matches.data as unknown[]).length).toBeGreaterThanOrEqual(1);
     expect((matches.data as { provider_id: string }[])[0]?.provider_id).toBe(providerId);

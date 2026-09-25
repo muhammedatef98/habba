@@ -131,8 +131,7 @@ select test.assert(
 
 
 -- Report tampering ----------------------------------------------------------------
-select public.append_vehicle_timeline_event(
-  'd0000000-0000-4000-3333-000000000001', 'vehicle_registered', 'تسجيل', 'Registered');
+select public.log_vehicle_registration('d0000000-0000-4000-3333-000000000001');
 select public.generate_habba_report('d0000000-0000-4000-3333-000000000001') as tok \gset
 
 select test.assert_eq(

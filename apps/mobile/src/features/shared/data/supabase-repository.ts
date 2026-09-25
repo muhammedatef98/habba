@@ -566,13 +566,11 @@ export class SupabaseRepository implements Repository {
 
     const vehicle = toVehicle(row as VehicleRow);
 
-    // The registration event. Provenance is derived server-side — this call
-    // cannot request a trust level (ADR-0005).
-    const { error } = await this.client.rpc('append_vehicle_timeline_event', {
+    // The registration event: fixed wording, once per car (0075). The general
+    // timeline writer is closed to clients — it let an owner store any text
+    // as a Habba-verified entry.
+    const { error } = await this.client.rpc('log_vehicle_registration', {
       p_vehicle_id: vehicle.id,
-      p_event_type: 'vehicle_registered',
-      p_summary_ar: 'تم تسجيل السيارة في هبّة',
-      p_summary_en: 'Vehicle registered with Habba',
     });
     if (error !== null) throw new Error(`addVehicle/timeline: ${error.message}`);
 

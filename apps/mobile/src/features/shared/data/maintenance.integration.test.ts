@@ -46,6 +46,18 @@ function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
   return fetch(raw.replace('/rest/v1/', '/'), init);
 }
 
+/** The server's own role — for internal functions no client may call (0075). */
+function serviceClient(): SupabaseClient {
+  const token = mintTestJwt(JWT_SECRET, {
+    sub: '00000000-0000-4000-8000-000000000000',
+    role: 'service_role',
+  });
+  return createClient(POSTGREST_URL, token, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+  });
+}
+
 function clientFor(userId: string): SupabaseClient {
   // The operator has passed their second factor, as the console requires
   // (0068); for everyone else the claim is inert.
@@ -213,7 +225,9 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
       expect(error).toBeNull();
     }
 
-    const { data, error } = await owner.rpc('estimate_current_mileage', {
+    // Internal since 0075 — the estimator reads any car's history, so only
+    // the server's own role may call it directly.
+    const { data, error } = await serviceClient().rpc('estimate_current_mileage', {
       p_vehicle_id: vehicleId,
     });
     expect(error).toBeNull();

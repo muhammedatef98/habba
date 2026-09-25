@@ -47,8 +47,7 @@ values ('d0000000-0000-4000-9999-000000000001', '22222222-0000-4000-9999-0000000
         'a0000000-0000-4000-9999-000000000001', 'b0000000-0000-4000-9999-000000000001',
         2020, 'ABJ 99');
 
-select public.append_vehicle_timeline_event(
-  'd0000000-0000-4000-9999-000000000001', 'vehicle_registered', 'تسجيل', 'Registered');
+select public.log_vehicle_registration('d0000000-0000-4000-9999-000000000001');
 
 select test.assert_eq(
   (select count(*)::int from public.vehicles

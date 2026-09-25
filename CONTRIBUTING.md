@@ -42,6 +42,17 @@ this repo was watching. Hence the list below.
 
 ---
 
+## Writing a migration: closed until opened
+
+Since 0075 a new function in `public` is executable by **nobody but its
+owner** until the migration says otherwise. Every RPC the app calls needs an
+explicit `grant execute on function ... to authenticated;` — and one a
+signed-out caller needs must also be added to suite 48's list, which fails on
+anything else `anon` can run. Internal machinery (dispatch, matching, the
+general timeline writer) gets no grant at all: definer functions call it with
+their owner's rights. A new view must be `with (security_invoker = true)` or
+it reads past RLS; suite 48 fails on one that is not.
+
 ## Manual checklist
 
 Run through this on a **preview build**, not Expo Go — see the next section for

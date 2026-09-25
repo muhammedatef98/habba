@@ -213,6 +213,13 @@ select test.assert_eq(
 
 
 -- Capture happens only after the customer confirms -----------------------------------
+-- Only the customer releases the money (0075); anyone else is refused first.
+select test.assert_raises(
+  $$select public.capture_order_payment('f0000000-0000-4000-f000-000000000001')$$,
+  'a provider cannot release the customer''s payment',
+  '42501');
+
+select test.become('11111111-0000-4000-f000-000000000001');
 select test.assert_raises(
   $$select public.capture_order_payment('f0000000-0000-4000-f000-000000000001')$$,
   'capture is refused while the job is still running',
