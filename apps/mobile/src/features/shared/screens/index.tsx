@@ -17,9 +17,11 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
-import { Button, Field, HabbaWordmark, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Field, HabbaWordmark, Row, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/features/shared/lib/otp';
 import { repository } from '@/features/shared/data/repository';
+import { LegalConsent } from '@/features/shared/components/LegalConsent';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
 import { useMode } from '@/features/shared/state/mode';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
@@ -28,6 +30,7 @@ export default function PhoneScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
+  const features = useFeatures();
   const setPendingPhone = useSession((state) => state.setPendingPhone);
   const signInAsGuest = useSession((state) => state.signInAsGuest);
   const mode = useMode((state) => state.mode);
@@ -97,7 +100,12 @@ export default function PhoneScreen() {
           {/* The full lockup, not the mark alone: this is the one screen that
               introduces the brand, and the wordmark is where the name and the
               gust are shown together. */}
-          <HabbaWordmark size={56} />
+          {/* In a Row so it sits at the reading start (the right, in Arabic)
+              on every launch, including the first, when the platform still
+              lays columns out left-to-right. */}
+          <Row>
+            <HabbaWordmark size={56} />
+          </Row>
           <Text variant="display">{t('auth.welcomeTitle')}</Text>
           <Text variant="body" tone="muted">
             {t('auth.welcomeSubtitle')}
@@ -138,28 +146,34 @@ export default function PhoneScreen() {
 
         {/* Phone stays the primary path (§9.1). These are alternatives, and
             their weight in the hierarchy says so — secondary, then ghost. */}
-        <Button
-          testID="email-signin"
-          label={t('auth.useEmail')}
-          variant="secondary"
-          onPress={() => router.push('/email')}
-        />
+        {features.emailLogin ? (
+          <Button
+            testID="email-signin"
+            label={t('auth.useEmail')}
+            variant="secondary"
+            onPress={() => router.push('/email')}
+          />
+        ) : null}
 
         {/* §11: the logbook is top-of-funnel and must never be gated. Letting
             someone in before they hand over a phone number is what that
             actually means in an onboarding screen. */}
-        <View style={{ gap: theme.spacing.xs }}>
-          <Button
-            testID="continue-as-guest"
-            label={t('auth.continueAsGuest')}
-            variant="ghost"
-            onPress={() => void handleGuest()}
-            loading={enteringAsGuest}
-          />
-          <Text variant="caption" tone="subtle" align="center">
-            {t('auth.guestHint')}
-          </Text>
-        </View>
+        {features.guestLogin ? (
+          <View style={{ gap: theme.spacing.xs }}>
+            <Button
+              testID="continue-as-guest"
+              label={t('auth.continueAsGuest')}
+              variant="ghost"
+              onPress={() => void handleGuest()}
+              loading={enteringAsGuest}
+            />
+            <Text variant="caption" tone="subtle" align="center">
+              {t('auth.guestHint')}
+            </Text>
+          </View>
+        ) : null}
+
+        <LegalConsent />
       </View>
     </Screen>
   );

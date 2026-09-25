@@ -20,12 +20,13 @@ import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Row, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { useEmergencyDraft } from '@/features/shared/state/emergency-draft';
 
 /** §9.1. Long enough to show a fault, short enough that nobody narrates. */
 const MAX_SECONDS = 20;
+const VIDEO_BITRATE = 4_000_000;
 
 export default function VideoTriageScreen() {
   const { t } = useTranslation();
@@ -88,7 +89,9 @@ export default function VideoTriageScreen() {
     setElapsed(0);
     setRecording(true);
     try {
-      const video = await camera.current.recordAsync({ maxDuration: MAX_SECONDS });
+      // H.264: the codec every provider's phone plays, and the one iOS needs
+      // named for the bitrate below to apply.
+      const video = await camera.current.recordAsync({ maxDuration: MAX_SECONDS, codec: 'avc1' });
       if (video !== undefined) {
         setClip({ uri: video.uri, seconds: Math.min(MAX_SECONDS, Math.round(elapsed)) });
       }
@@ -127,8 +130,19 @@ export default function VideoTriageScreen() {
           borderColor: theme.colors.border,
         }}
       >
+        {/* 720p at 4 Mb/s: about 10 MB for the full 20 s. Enough to see a
+            leak and hear a noise; the camera's default could be 4K, a
+            100 MB upload from a roadside on mobile data. The bucket refuses
+            anything over 50 MB (0085). */}
         {granted ? (
-          <CameraView ref={camera} style={{ flex: 1 }} mode="video" facing="back" />
+          <CameraView
+            ref={camera}
+            style={{ flex: 1 }}
+            mode="video"
+            facing="back"
+            videoQuality="720p"
+            videoBitrate={VIDEO_BITRATE}
+          />
         ) : (
           <View
             style={{
@@ -142,17 +156,21 @@ export default function VideoTriageScreen() {
             <Text variant="bodySmall" tone="muted" align="center">
               {t('emergency.triagePermission')}
             </Text>
-            <Button
-              testID="triage-allow"
-              label={t('emergency.triageAllow')}
-              variant="secondary"
-              size="medium"
-              fullWidth={false}
-              onPress={() => {
-                void requestCamera();
-                void requestMic();
-              }}
-            />
+            {/* A non-full-width Button pins itself to the reading start; the
+                Row puts it back under the centred line above it. */}
+            <Row justify="center">
+              <Button
+                testID="triage-allow"
+                label={t('emergency.triageAllow')}
+                variant="secondary"
+                size="medium"
+                fullWidth={false}
+                onPress={() => {
+                  void requestCamera();
+                  void requestMic();
+                }}
+              />
+            </Row>
           </View>
         )}
       </View>
@@ -183,7 +201,7 @@ export default function VideoTriageScreen() {
 
       {clip !== null && !recording ? (
         <Text variant="caption" tone="success" align="center">
-          {t('emergency.triageRecorded', { seconds: clip.seconds })}
+          {t('emergency.triageRecorded', { count: clip.seconds })}
         </Text>
       ) : null}
 

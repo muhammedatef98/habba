@@ -22,10 +22,12 @@
     "db:test": "./supabase/scripts/local-db.sh test",
     "api:start": "./supabase/scripts/postgrest.sh start",
     "api:stop": "./supabase/scripts/postgrest.sh stop",
-    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features && pnpm test:rls && pnpm test:rls:hosted-shape",
-    "verify": "pnpm typecheck && pnpm lint && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm bundle && pnpm db:test && pnpm test:integration",
+    "test:integration": "pnpm api:stop && pnpm db:reset && pnpm api:start && pnpm --filter @habba/mobile exec vitest run src/features && pnpm --filter @habba/admin exec vitest run --config vitest.integration.config.ts && pnpm test:rls && pnpm test:rls:hosted-shape",
+    "test:payments-e2e": "node supabase/scripts/payments-e2e.mjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && ./supabase/scripts/sync-edge-shared.sh --check && pnpm test && pnpm bundle && pnpm admin:check-bundle && pnpm db:test && pnpm test:integration",
     "test:rls": "vitest run --config vitest.config.ts",
-    "test:rls:hosted-shape": "./supabase/scripts/hosted-shape.sh"
+    "test:rls:hosted-shape": "./supabase/scripts/hosted-shape.sh",
+    "admin:check-bundle": "pnpm --filter @habba/admin check:bundle"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

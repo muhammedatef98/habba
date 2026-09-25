@@ -11,16 +11,21 @@
  * refuses.
  */
 
+import { useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
+import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
+import { distanceLabel } from '@/features/provider/lib/distance-band';
+import { formatAppointment } from '@/features/shared/lib/dates';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
 
 export default function JobScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,27 +56,61 @@ export default function JobScreen() {
     },
   });
 
+  const [notice, setNotice] = useState<string | undefined>(undefined);
+
+  const quotable = job.data !== null && job.data !== undefined && canQuoteParts(job.data.status);
+  const parts = useQuery({
+    queryKey: ['job-parts', id],
+    queryFn: () => providerRepository.listParts(id ?? ''),
+    enabled: quotable,
+    refetchInterval: quotable ? 5000 : false,
+  });
+  const waitingParts = (parts.data ?? []).filter((line) => line.answer === 'pending').length;
+
   const advance = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<'done' | 'taken'> => {
       const current = job.data;
-      if (current === null || current === undefined) return;
+      if (current === null || current === undefined) return 'done';
 
       const step = nextJobStep(current.status, current.fulfilmentMode);
-      if (step.toStatus === null) return;
+      if (step.toStatus === null) return 'done';
 
       if (step.action === 'accept') {
-        await providerRepository.acceptJob(current.orderId);
-      } else if (step.action === 'check_in_vehicle') {
+        return (await providerRepository.acceptJob(current.orderId)) === 'accepted'
+          ? 'done'
+          : 'taken';
+      }
+      if (step.action === 'check_in_vehicle') {
         await providerRepository.checkInVehicle(current.orderId);
       } else {
         await providerRepository.advanceJob(current.orderId, step.toStatus);
       }
+      return 'done';
     },
-    onSuccess: async () => {
+    onMutate: () => setNotice(undefined),
+    onSuccess: async (outcome) => {
       await queryClient.invalidateQueries({ queryKey: ['job', id] });
       await queryClient.invalidateQueries({ queryKey: ['open-jobs'] });
+      await queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
+      // Said plainly rather than as an error: several technicians are offered
+      // every emergency and one wins. The offer is gone from their list too.
+      if (outcome === 'taken') setNotice(t('job.lostRace'));
     },
+    onError: () => setNotice(t('job.actionFailed')),
   });
+
+  // The customer's answer to a quoted part, or a cancellation, lands at once.
+  useLiveRefresh(
+    [
+      { table: 'orders', filter: `id=eq.${id ?? ''}` },
+      { table: 'order_parts', filter: `order_id=eq.${id ?? ''}` },
+    ],
+    [
+      ['job', id],
+      ['job-parts', id],
+    ],
+    id !== undefined,
+  );
 
   const data = job.data;
 
@@ -102,14 +141,60 @@ export default function JobScreen() {
   // error after tapping.
   const blockedForEvidence = step.action === 'submit_for_approval' && !evidenceReady;
 
+  // Same rule as the server (0067): every quoted part answered first. Said
+  // here, with the way out, instead of a refusal after the tap.
+  const blockedForParts = step.action === 'submit_for_approval' && waitingParts > 0;
+
+  // An inspection is handed back with its report, or not at all (0073).
+  const needsInspection = data.inspectionTemplateKey !== null;
+  const blockedForInspection =
+    step.action === 'submit_for_approval' && needsInspection && !data.inspectionFiled;
+
   return (
     <Screen scrollable>
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{data.serviceNameAr}</Text>
         <Text variant="caption" tone="muted">
-          {data.orderNumber} · {t(`job.status.${data.status}`)}
+          {data.orderNumber.length > 0
+            ? `${data.orderNumber} · ${t(`job.status.${data.status}`)}`
+            : t(`job.status.${data.status}`)}
         </Text>
+        {data.scheduledFor !== null ? (
+          <Text testID="job-scheduled" variant="bodyStrong">
+            {t('provider.scheduledFor', {
+              when: formatAppointment(data.scheduledFor, i18n.language),
+            })}
+          </Text>
+        ) : null}
       </View>
+
+      {/* What a technician needs to decide on an offer: how far, and what it
+          pays. The address arrives once they accept (ADR-0013). */}
+      {data.offer !== null ? (
+        <Card
+          testID="job-offer"
+          elevation="none"
+          style={{ backgroundColor: theme.colors.surfaceSunken }}
+        >
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text variant="bodyStrong">
+              {t('provider.distanceLabel')}: {distanceLabel(data.offer.distanceBucket, t)}
+              {data.offer.districtNameAr !== null ? ` · ${data.offer.districtNameAr}` : ''}
+            </Text>
+            {data.offer.estimatedPayout !== null ? (
+              <Text variant="body" numeric>
+                {t('provider.payoutLabel')}: {formatSarDisplay(data.offer.estimatedPayout)}{' '}
+                {t('provider.sarSuffix')}
+              </Text>
+            ) : null}
+            {data.offer.hasTriageVideo ? (
+              <Text variant="caption" tone="muted">
+                {t('provider.hasVideo')}
+              </Text>
+            ) : null}
+          </View>
+        </Card>
+      ) : null}
 
       <Card>
         <View style={{ gap: theme.spacing.sm }}>
@@ -138,6 +223,48 @@ export default function JobScreen() {
           ) : null}
         </View>
       </Card>
+
+      {quotable ? (
+        <Card testID="job-parts" elevation="none">
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('provider.partsTitle')}</Text>
+            <Text variant="caption" tone="muted">
+              {(parts.data ?? []).length === 0
+                ? t('provider.noParts')
+                : waitingParts > 0
+                  ? t('provider.partsWaiting', { count: waitingParts })
+                  : t('provider.partsAllAnswered')}
+            </Text>
+            <Button
+              testID="open-parts"
+              label={t('provider.partsManage')}
+              variant="secondary"
+              onPress={() => router.push({ pathname: '/parts', params: { id: data.orderId } })}
+            />
+          </View>
+        </Card>
+      ) : null}
+
+      {needsInspection && (data.status === 'in_progress' || data.inspectionFiled) ? (
+        <Card testID="job-inspection" elevation={data.inspectionFiled ? 'none' : 'sm'}>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{t('inspection.jobCardTitle')}</Text>
+            <Text variant="caption" tone="muted">
+              {data.inspectionFiled ? t('inspection.jobCardFiled') : t('inspection.jobCardTodo')}
+            </Text>
+            {!data.inspectionFiled ? (
+              <Button
+                testID="open-inspection"
+                label={t('inspection.jobCardAction')}
+                variant="accent"
+                onPress={() =>
+                  router.push({ pathname: '/inspection', params: { id: data.orderId } })
+                }
+              />
+            ) : null}
+          </View>
+        </Card>
+      ) : null}
 
       {canRecordEvidence(data.status) ? (
         <Card elevation={evidenceReady ? 'sm' : 'none'}>
@@ -170,9 +297,27 @@ export default function JobScreen() {
           label={t(step.labelKey)}
           onPress={() => advance.mutate()}
           loading={advance.isPending}
-          disabled={blockedForEvidence}
+          disabled={blockedForEvidence || blockedForParts || blockedForInspection}
         />
       )}
+
+      {notice !== undefined ? (
+        <Text testID="job-notice" variant="bodySmall" tone="warning">
+          {notice}
+        </Text>
+      ) : null}
+
+      {blockedForParts ? (
+        <Text variant="caption" style={{ color: theme.colors.warning }}>
+          {t('provider.partsBlockHandBack')}
+        </Text>
+      ) : null}
+
+      {blockedForInspection ? (
+        <Text variant="caption" style={{ color: theme.colors.warning }}>
+          {t('inspection.blocksHandBack')}
+        </Text>
+      ) : null}
 
       {blockedForEvidence ? (
         <Text variant="caption" style={{ color: theme.colors.warning }}>

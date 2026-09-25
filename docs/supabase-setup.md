@@ -147,9 +147,15 @@ passwords: Habba's identity is the number plus an OTP.
 
 ### 5a. The SMS provider is our Edge Function, not a built-in
 
-Supabase's built-in SMS providers do not include Unifonic, and Unifonic is the
-choice because CITC sender-ID registration is the slow part of sending SMS in
-Saudi Arabia and a local aggregator does it as part of onboarding.
+Supabase's built-in SMS providers include neither Authentica nor Unifonic.
+Both are Saudi gateways, and a Saudi gateway is the point: sender-ID
+registration with the CITC is the slow part of sending SMS here, and they
+have done it already. **Authentica** is the default. It sends on its own
+approved sender and templates, so it works from day one. Unifonic stays
+supported. The function uses Authentica whenever its key is present.
+
+Supabase Auth still generates, expires and verifies the code. The gateway only
+carries it (`packages/core/src/sms/authentica.ts`).
 
 So delivery goes through a **Send SMS auth hook**:
 
@@ -164,27 +170,41 @@ So delivery goes through a **Send SMS auth hook**:
    webhook signature rather than a user JWT, and the function verifies that
    signature itself. Without it, the hook would reject GoTrue.
 
-2. **Set the function's secrets.** Edge Functions → `send-sms-hook` → Secrets,
-   or:
+2. **Register the hook.** Authentication → Hooks → **Send SMS** → enable →
+   HTTPS → URI `https://<ref>.supabase.co/functions/v1/send-sms-hook` →
+   **Generate secret**. The secret looks like `v1,whsec_…`.
 
-   ```bash
-   supabase secrets set \
-     UNIFONIC_APP_SID='<from the Unifonic console>' \
-     UNIFONIC_SENDER_ID='<your CITC-registered sender ID>'
-   # UNIFONIC_BASE_URL only if Unifonic gave you a different API host
+3. **Put the two secrets in Vault** (SQL editor), rather than in chat or a file:
+
+   ```sql
+   select vault.create_secret('<the v1,whsec_… secret from step 2>', 'send_sms_hook_secret');
+   select vault.create_secret('<Authentica → API Keys>', 'authentica_api_key');
    ```
+
+   The function reads them through `edge_provider_secret()` (0088). Only the
+   service key can call it, and only for these two names. It reads them on
+   every request, so no redeploy is needed. To replace one later, use
+   `vault.update_secret(id, '<new>')`. The function's own secrets
+   (`SEND_SMS_HOOK_SECRET`, `AUTHENTICA_API_KEY`) still work, and win when set.
+
+   Optional function secrets:
+   - `AUTHENTICA_TEMPLATE_ID`: the Authentica template to send on. The default is 1.
+   - `AUTHENTICA_SENDER_NAME`: once Authentica approves a sender name for you,
+     setting it switches to `send-sms` with Habba's own wording
+     («رمز الدخول إلى هبّة: …»).
+   - Unifonic instead of Authentica: `UNIFONIC_APP_SID`, `UNIFONIC_SENDER_ID`,
+     and optionally `UNIFONIC_BASE_URL`, with no Authentica key set.
 
    `SUPABASE_URL` is injected automatically, along with the keys: legacy
    projects get `SUPABASE_SERVICE_ROLE_KEY`, migrated ones also get
    `SUPABASE_SECRET_KEYS` (a JSON object of name → key). The functions prefer
    the latter, so disabling the legacy key needs no redeploy.
 
-3. **Register the hook.** Authentication → Hooks → **Send SMS** → enable →
-   HTTP → URI `https://<ref>.supabase.co/functions/v1/send-sms-hook`.
-
-4. **Copy the signing secret** the dashboard shows (`v1,whsec_…`) into the
-   function's secrets as `SEND_SMS_HOOK_SECRET`. The function refuses to run
-   without it — an unsigned endpoint that sends SMS is someone else's bill.
+4. **Prove it once.** Sign in from the app with a staff phone. The code that
+   arrives must be the one the app accepts. If Authentica sends a code of its
+   own, the template ignores `otp`: pick another template, or use a sender
+   name. The function refuses to run without the hook secret. An unsigned
+   endpoint that sends SMS is someone else's bill.
 
 5. **Rate limits.** Authentication → Rate limits → SMS. Set something sane
    (30/hour is a reasonable project-wide ceiling). This is a second layer: the
@@ -305,21 +325,128 @@ ownership of the table it is on, and the project's `postgres` role — the one
 the owning role. This is the same shape as PostGIS in §2: a privileged one-off
 that a migration cannot perform.
 
-**Dashboard → SQL Editor**, paste and run once, after the migrations:
+Migration `0064` does the same for the private `completion-media` bucket,
+where technicians upload before/after photos. **Dashboard → SQL Editor**,
+paste and run each once, after the migrations:
 
 ```
 supabase/storage/triage-media-policies.sql
+supabase/storage/completion-media-policies.sql
 ```
 
 **How to tell it worked:** §6's run prints `storage policies for triage-media
-are in place`. Until then it prints a warning naming this step — and video
-triage uploads are refused, because RLS denies by default. The failure mode of
-forgetting is a closed bucket, never an open one.
+are in place` and `storage policies for completion-media are in place`. Until
+then it prints a warning naming this step. The failure mode of forgetting is a
+closed bucket, never an open one — but for completion-media a closed bucket
+means no technician can hand a job back, because `record_completion_evidence()`
+refuses any photo that was not uploaded there.
 
 > The local harness applies the same file as the storage owner
 > (`local-db.sh`), so `supabase/tests/24_triage_media_storage.sql` exercises
 > the real policies rather than a weaker stand-in. Suite `31` asserts the
 > harness has not quietly given itself ownership it would not have here.
+
+**Size and type limits** are set by migration 0085 on a hosted project:
+`triage-media` takes `video/mp4` and `video/quicktime` up to 50 MB,
+`completion-media` takes images up to 10 MB. Check them under Storage →
+the bucket → Edit; if the migration ran before the buckets had those columns,
+set the same values there.
+
+## 7a. Deploy and schedule the two ticking functions
+
+Two Edge Functions run on their own, and **neither does anything until it is
+scheduled**. Without `dispatch-tick` an emergency nobody accepts is never
+widened past the first radius, and a job whose customer never confirms it
+stays open forever with the payment held; without `push-tick` nobody is ever notified —
+not the technician about a new job, not the customer that help has arrived.
+
+| Function        | What it does                                                                                                 | How often                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `dispatch-tick` | widens searches nobody has accepted (0051); reminds, then closes, orders the customer never confirmed (0071) | every 15 seconds                         |
+| `push-tick`     | delivers `notification_outbox` through Expo Push (0066)                                                      | on every insert (webhook) + every minute |
+
+**Deploy and set their secrets** (each secret a long random string):
+
+```bash
+supabase functions deploy dispatch-tick --no-verify-jwt
+supabase functions deploy push-tick --no-verify-jwt
+supabase secrets set HABBA_DISPATCH_TICK_SECRET=… HABBA_PUSH_TICK_SECRET=…
+# Once "enhanced push security" is on for the Expo project (it should be before launch):
+supabase secrets set EXPO_ACCESS_TOKEN=…
+```
+
+**Or keep the secrets in Vault only (0087).** When a function's environment
+variable is unset, it reads the secret from Vault with its own service key
+(`edge_tick_secret()`, callable by `service_role` only). Create the Vault
+secrets below and skip `supabase secrets set` for the tick secrets entirely —
+one copy, set from SQL.
+
+`--no-verify-jwt` because the caller is the scheduler, not a user; the shared
+secret in the `x-habba-tick` header is the gate, and a missing or wrong one
+gets a 404.
+
+**Schedule them** from the SQL editor, with the secrets in Vault rather than
+in the job text (anyone who can read `cron.job` can read the command):
+
+```sql
+select vault.create_secret('<HABBA_DISPATCH_TICK_SECRET>', 'dispatch_tick_secret');
+select vault.create_secret('<HABBA_PUSH_TICK_SECRET>', 'push_tick_secret');
+
+select cron.schedule('habba-dispatch-tick', '15 seconds', $$
+  select net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/dispatch-tick',
+    headers := jsonb_build_object('x-habba-tick',
+                 (select decrypted_secret from vault.decrypted_secrets where name = 'dispatch_tick_secret')),
+    body    := '{}'::jsonb);
+$$);
+
+select cron.schedule('habba-push-tick', '1 minute', $$
+  select net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/push-tick',
+    headers := jsonb_build_object('x-habba-tick',
+                 (select decrypted_secret from vault.decrypted_secrets where name = 'push_tick_secret')),
+    body    := '{}'::jsonb);
+$$);
+```
+
+**Make push immediate.** A minute is fine for a retry and far too slow for a
+job offer, which is decided in seconds. Dashboard → Database → Webhooks → new
+webhook on `notification_outbox`, event **INSERT**, type **Supabase Edge
+Function** `push-tick`, with the header `x-habba-tick` set to the push secret.
+The schedule stays as the safety net: claims are leased (0066), so the webhook
+and the schedule never send the same notification twice.
+
+**How to tell it worked:** go online as a technician on a real phone, create
+an emergency near them from a second account, and the phone should buzz
+within a couple of seconds. If it does not,
+`select kind, attempts, last_error, abandoned_at from notification_outbox order by created_at desc limit 5`
+says why — `no_device` means the phone never registered (see §9, the EAS
+project id), `expired` means nothing called `push-tick` in time.
+
+### 7b. The payments function (only when payments go live)
+
+`payments` (0077) verifies a Moyasar authorisation with the secret key and
+carries out queued captures, voids and refunds. It is off the payment path
+until the `payments_gateway` setting says `moyasar`; deploy it before that.
+
+```bash
+supabase functions deploy payments          # JWT verified: customers call it
+supabase secrets set MOYASAR_SECRET_KEY=sk_live_… HABBA_PAYMENTS_TICK_SECRET=…
+```
+
+```sql
+select vault.create_secret('<HABBA_PAYMENTS_TICK_SECRET>', 'payments_tick_secret');
+
+select cron.schedule('habba-payments-tick', '30 seconds', $$
+  select net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/payments',
+    headers := jsonb_build_object('x-habba-tick',
+                 (select decrypted_secret from vault.decrypted_secrets where name = 'payments_tick_secret')),
+    body    := '{"action":"tick"}'::jsonb);
+$$);
+```
+
+`docs/GO-LIVE.md` has the full switch-over, app side included.
 
 ## 8. There is no report function to deploy
 
@@ -343,7 +470,12 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false
+EAS_PROJECT_ID=<from `eas init`, or expo.dev → project → ID>
 ```
+
+`EAS_PROJECT_ID` is what a phone needs to get a push token at all. Without it
+the app still works, and registers for nothing — every notification then
+settles as `no_device` (§7a).
 
 Restart Metro. With those set, the app switches from the in-memory repository
 to Supabase and from the dev OTP to real SMS — the same switch, in one place

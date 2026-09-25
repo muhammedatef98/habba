@@ -14,15 +14,17 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { toLatinDigits } from '@habba/core';
 import {
   Button,
   Card,
+  FadeIn,
+  rowDirectionFor,
   StatusPill,
   Text,
   TimelineList,
-  rowDirectionFor,
-  type TimelineItem,
   useTheme,
+  type TimelineItem,
 } from '@habba/ui';
 import { SearchingPulse } from './SearchingPulse';
 import type { DispatchTelemetry } from '@/features/shared/data/types';
@@ -33,16 +35,32 @@ export interface SearchingProps {
   readonly cancelPending: boolean;
   /** The cancel request failed. Silence would leave a live order behind. */
   readonly cancelFailed?: boolean | undefined;
+  /**
+   * What was asked for, read back while nobody has answered yet. Waiting on
+   * a spinner with no sign the request went out as sent is when people
+   * cancel and send it again.
+   */
+  readonly summary?: SearchingSummary | undefined;
+}
+
+export interface SearchingSummary {
+  readonly service: string | null;
+  readonly address: string | null;
+  /** Already formatted: «172.50 ر.س». */
+  readonly held: string | null;
 }
 
 function formatClock(iso: string): string {
   // Wall-clock to the second, as the design shows. Intl is used rather than a
   // hand-rolled slice so the 24h/12h convention follows the device.
-  return new Date(iso).toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  // Latin digits whatever the device's numbering system (§8).
+  return toLatinDigits(
+    new Date(iso).toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }),
+  );
 }
 
 export function Searching({
@@ -50,6 +68,7 @@ export function Searching({
   onCancel,
   cancelPending,
   cancelFailed = false,
+  summary,
 }: SearchingProps) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -71,7 +90,8 @@ export function Searching({
   }));
 
   return (
-    <View style={{ gap: theme.spacing.lg, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.lg, flex: 1 }}>
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('tracking.searchingHeadline')}</Text>
         <Text variant="body" tone="muted">
@@ -80,6 +100,25 @@ export function Searching({
       </View>
 
       <SearchingPulse />
+
+      {summary !== undefined && summary.service !== null ? (
+        <Card testID="searching-summary" elevation="none" style={{ gap: theme.spacing.xs }}>
+          <Text variant="caption" tone="muted">
+            {t('tracking.yourRequest')}
+          </Text>
+          <Text variant="bodyStrong">{summary.service}</Text>
+          {summary.address !== null ? (
+            <Text variant="bodySmall" tone="muted">
+              {summary.address}
+            </Text>
+          ) : null}
+          {summary.held !== null ? (
+            <Text variant="caption" tone="subtle">
+              {t('tracking.heldNotCharged', { amount: summary.held })}
+            </Text>
+          ) : null}
+        </Card>
+      ) : null}
 
       {radiusKm !== undefined ? (
         <Text variant="caption" tone="muted" align="center">
@@ -171,6 +210,6 @@ export function Searching({
           </Text>
         )}
       </View>
-    </View>
+    </FadeIn>
   );
 }

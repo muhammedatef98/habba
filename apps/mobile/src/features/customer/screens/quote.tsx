@@ -2,12 +2,11 @@
  * Quote approval — §9.1: line-itemed parts + labour, each part with OEM flag
  * and price, approve/reject per line.
  *
- * "Reject" in the schema is not a separate state from "not yet approved" —
- * order_parts has only `approved_by_customer` (0035's guard_order_parts is
- * the authority). A customer who disagrees with a line leaves it unapproved,
- * which already blocks hand-back server-side; there is deliberately no
- * separate reject action to build here; adding one would be inventing a
- * server capability that does not exist rather than reflecting it.
+ * Each line gets an answer: approve, or decline (0067). A declined line stays
+ * on the screen, muted, because it stays on the record — and a customer who
+ * changes their mind can still approve it while the job is open. The
+ * technician cannot hand the job back until every line has one answer or the
+ * other, which is why the count of lines still waiting leads the screen.
  *
  * Re-pricing an approved line revokes its approval (0035) — if that happens
  * while this screen is open, the next poll shows the line reverted and
@@ -18,7 +17,17 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  Icon,
+  Row,
+  Screen,
+  StatusPill,
+  Text,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
 import {
   addSar,
   applyRate,
@@ -28,6 +37,7 @@ import {
   type SarAmount,
 } from '@habba/core';
 import { repository } from '@/features/shared/data/repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { formatCount } from '@/features/shared/lib/format-number';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -50,26 +60,54 @@ export default function QuoteScreen() {
     refetchInterval: 3000,
   });
 
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['order-parts', id] });
+    await queryClient.invalidateQueries({ queryKey: ['order', id] });
+  };
+
   const approve = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
     mutationFn: (partId: string) => repository.approveOrderPart(partId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['order-parts', id] });
-      await queryClient.invalidateQueries({ queryKey: ['order', id] });
-    },
+    onSuccess: refresh,
   });
+
+  const decline = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
+    mutationFn: (partId: string) => repository.declineOrderPart(partId),
+    onSuccess: refresh,
+  });
+
+  // A line the technician adds appears while the customer is looking.
+  useLiveRefresh(
+    [
+      { table: 'order_parts', filter: `order_id=eq.${id ?? ''}` },
+      { table: 'orders', filter: `id=eq.${id ?? ''}` },
+    ],
+    [
+      ['order-parts', id],
+      ['order', id],
+    ],
+    id !== undefined,
+  );
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
   const lines = parts.data ?? [];
-  const pendingCount = lines.filter((line) => !line.approvedByCustomer).length;
+  const isDeclined = (line: (typeof lines)[number]) => line.declinedAt !== null;
+  const pendingCount = lines.filter((line) => !line.approvedByCustomer && !isDeclined(line)).length;
   const allApproved = lines.length > 0 && pendingCount === 0;
 
   // CLAUDE.md §2.5 / ADR-0007: exact SAR arithmetic, never float — same
-  // module and same rate-rounding rule the server uses.
-  const partsAmount = lines.reduce(
-    (sum, line) => addSar(sum, multiplySar(line.unitPrice, line.quantity)),
-    sarOrThrow('0.00'),
-  );
+  // module and same rate-rounding rule the server uses. A declined line is
+  // never billed, so it is not in the total either.
+  const partsAmount = lines
+    .filter((line) => !isDeclined(line))
+    .reduce(
+      (sum, line) => addSar(sum, multiplySar(line.unitPrice, line.quantity)),
+      sarOrThrow('0.00'),
+    );
   const labourAmount = order.data?.quotedAmount ?? sarOrThrow('0.00');
   const vatAmount = applyRate(addSar(partsAmount, labourAmount), SAUDI_VAT_RATE);
   const totalAmount = addSar(addSar(partsAmount, labourAmount), vatAmount);
@@ -114,15 +152,20 @@ export default function QuoteScreen() {
           <Card
             key={line.id}
             testID={`quote-line-${line.id}`}
-            elevation={line.approvedByCustomer ? 'none' : 'sm'}
+            elevation={line.approvedByCustomer || isDeclined(line) ? 'none' : 'sm'}
             style={{
               borderWidth: 1,
               borderColor: line.approvedByCustomer
                 ? theme.colors.successBorder
-                : theme.colors.accent,
+                : isDeclined(line)
+                  ? theme.colors.border
+                  : theme.colors.accent,
               backgroundColor: line.approvedByCustomer
                 ? theme.colors.successSubtle
-                : theme.colors.surface,
+                : isDeclined(line)
+                  ? theme.colors.surfaceSunken
+                  : theme.colors.surface,
+              opacity: isDeclined(line) ? 0.75 : 1,
             }}
           >
             <View style={{ gap: theme.spacing.sm }}>
@@ -157,7 +200,7 @@ export default function QuoteScreen() {
               </Text>
               {line.warrantyDays !== null ? (
                 <Text variant="caption" tone="muted">
-                  {t('quote.warranty', { days: line.warrantyDays })}
+                  {t('quote.warranty', { count: line.warrantyDays })}
                 </Text>
               ) : null}
 
@@ -178,21 +221,50 @@ export default function QuoteScreen() {
                     {t('quote.approvedLine')}
                   </Text>
                 </View>
-              ) : (
-                <View style={{ gap: theme.spacing.sm }}>
+              ) : isDeclined(line) ? (
+                <View style={{ gap: theme.spacing.xs }}>
+                  <Text variant="caption" tone="muted">
+                    {t('quote.declinedLine')}
+                  </Text>
                   <Button
-                    testID={`approve-part-${line.id}`}
-                    label={t('quote.approveLine')}
+                    testID={`reapprove-part-${line.id}`}
+                    label={t('quote.changedMind')}
+                    variant="ghost"
                     size="medium"
                     onPress={() => approve.mutate(line.id)}
                     loading={approve.isPending && approve.variables === line.id}
                   />
+                </View>
+              ) : (
+                <View style={{ gap: theme.spacing.sm }}>
+                  <Row gap="sm">
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        testID={`approve-part-${line.id}`}
+                        label={t('quote.approveLine')}
+                        size="medium"
+                        onPress={() => approve.mutate(line.id)}
+                        loading={approve.isPending && approve.variables === line.id}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        testID={`decline-part-${line.id}`}
+                        label={t('quote.declineLine')}
+                        variant="secondary"
+                        size="medium"
+                        onPress={() => decline.mutate(line.id)}
+                        loading={decline.isPending && decline.variables === line.id}
+                      />
+                    </View>
+                  </Row>
 
                   {/* Approving a part is the customer agreeing to pay for it.
                       A failure that says nothing leaves them believing they
                       approved it, and the job waiting on an approval that
                       never landed — on the line that carries the money. */}
-                  {approve.isError && approve.variables === line.id ? (
+                  {(approve.isError && approve.variables === line.id) ||
+                  (decline.isError && decline.variables === line.id) ? (
                     <Text variant="caption" tone="emergency">
                       {t('quote.approveFailed')}
                     </Text>
@@ -224,7 +296,14 @@ export default function QuoteScreen() {
         {allApproved ? t('quote.allApprovedHint') : t('quote.pendingHint')}
       </Text>
 
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
+      {/* Once every line is answered there is nothing left to do here, and
+          the next step — confirming the work — is on the order. */}
+      <Button
+        testID="quote-back"
+        label={allApproved ? t('quote.backToOrder') : t('common.back')}
+        variant={allApproved ? 'primary' : 'ghost'}
+        onPress={() => router.back()}
+      />
     </Screen>
   );
 }

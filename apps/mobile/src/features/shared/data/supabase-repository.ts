@@ -13,9 +13,23 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { sarOrThrow, type HabbaReport, type SarAmount } from '@habba/core';
+import {
+  fillLegalTemplate,
+  isZeroSar,
+  legalTemplateValues,
+  sarOrThrow,
+  type HabbaReport,
+  type InspectionReport,
+  type InvoiceDocument,
+  type LegalDocumentKind,
+  type SarAmount,
+} from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
+import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
+import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
+import { priceWithVat } from '@/features/shared/lib/order-price.js';
+import { DevPaymentProvider, type PaymentProvider } from '@/features/shared/lib/payments.js';
 import type {
   AlertConfidence,
   AppointmentSlot,
@@ -33,8 +47,13 @@ import type {
   MaintenanceItem,
   MintedTransfer,
   OrderSummary,
+  InvoiceSummary,
   OwnershipTransfer,
   OwnershipTransferStatus,
+  OrderInspection,
+  PlatformStatus,
+  LegalDocument,
+  PendingLegalDocument,
   NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
@@ -65,6 +84,7 @@ import type {
   Repository,
   TransferAddress,
 } from './repository.js';
+import { DEFAULT_PLATFORM_STATUS } from './platform-status.js';
 
 interface DispatchTelemetryRow {
   readonly contacted_count: number;
@@ -86,15 +106,21 @@ interface MaintenanceAlertRow {
   readonly confidence: AlertConfidence;
 }
 
+interface ServiceNames {
+  readonly name_ar: string;
+  readonly name_en: string | null;
+}
+
 interface OrderSummaryRow {
   readonly id: string;
   readonly status: OrderStatus;
   readonly total_amount: number | null;
   readonly created_at: string;
-  // PostgREST returns an embedded resource as an array even when the foreign
-  // key makes it one-to-one, and supabase-js types it that way. Narrowed at
-  // the boundary rather than pretending the join is scalar.
-  readonly services: readonly { readonly name_ar: string }[] | null;
+  // A many-to-one embed. PostgREST returns it as an object; supabase-js,
+  // without generated types, cannot say which, so both shapes are accepted.
+  // This was typed as an array only, which read `[0]` of an object and gave
+  // every order in the history an empty name against the real backend.
+  readonly services: ServiceNames | readonly ServiceNames[] | null;
 }
 
 /** Shape of one `order_live_progress` row (migration 0040). */
@@ -235,6 +261,8 @@ interface OrderRow {
   total_amount: number | null;
   escrow_status: EscrowStatus;
   readonly completion_media: readonly CompletionMedia[] | null;
+  warranty_days: number | null;
+  scheduled_for: string | null;
 }
 
 interface OrderPartRow {
@@ -247,6 +275,7 @@ interface OrderPartRow {
   unit_price: number;
   warranty_days: number | null;
   approved_by_customer: boolean;
+  declined_at: string | null;
 }
 
 // PostgREST serialises `numeric` as a JSON number, so it arrives here as a
@@ -269,7 +298,7 @@ function toService(row: ServiceRow): Service {
     nameEn: row.name_en,
     descriptionAr: row.description_ar,
     icon: row.icon,
-    basePrice: toSar(row.base_price),
+    basePrice: toSarOrNull(row.base_price),
     requiresVehicle: row.requires_vehicle,
     supportedModes: row.supported_modes,
     estDurationMin: row.est_duration_min,
@@ -297,6 +326,8 @@ function toOrder(row: OrderRow): Order {
     // column list would see undefined — normalise rather than let a screen
     // map over nothing.
     completionMedia: row.completion_media ?? [],
+    warrantyDays: row.warranty_days ?? null,
+    scheduledFor: row.scheduled_for ?? null,
   };
 }
 
@@ -311,6 +342,7 @@ function toOrderPart(row: OrderPartRow): OrderPart {
     unitPrice: toSar(row.unit_price),
     warrantyDays: row.warranty_days,
     approvedByCustomer: row.approved_by_customer,
+    declinedAt: row.declined_at ?? null,
   };
 }
 
@@ -430,6 +462,9 @@ export class SupabaseRepository implements Repository {
   constructor(
     private readonly client: SupabaseClient,
     private readonly userId: () => string | null,
+    // The app passes the provider its build is configured for
+    // (lib/payment-provider.ts); tests get the development one.
+    private readonly payments: PaymentProvider = new DevPaymentProvider(),
   ) {}
 
   async listMakes(): Promise<readonly VehicleMake[]> {
@@ -527,7 +562,7 @@ export class SupabaseRepository implements Repository {
           year: input.year,
           // plate_normalised is a generated column — the server computes the
           // search key from this, and the client never supplies it.
-          plate_en: input.plate ?? null,
+          plate_en: input.plate,
           nickname: input.nickname ?? null,
           current_mileage: input.currentMileage ?? 0,
           created_by: ownerId,
@@ -539,13 +574,11 @@ export class SupabaseRepository implements Repository {
 
     const vehicle = toVehicle(row as VehicleRow);
 
-    // The registration event. Provenance is derived server-side — this call
-    // cannot request a trust level (ADR-0005).
-    const { error } = await this.client.rpc('append_vehicle_timeline_event', {
+    // The registration event: fixed wording, once per car (0075). The general
+    // timeline writer is closed to clients — it let an owner store any text
+    // as a Habba-verified entry.
+    const { error } = await this.client.rpc('log_vehicle_registration', {
       p_vehicle_id: vehicle.id,
-      p_event_type: 'vehicle_registered',
-      p_summary_ar: 'تم تسجيل السيارة في هبّة',
-      p_summary_en: 'Vehicle registered with Habba',
     });
     if (error !== null) throw new Error(`addVehicle/timeline: ${error.message}`);
 
@@ -835,6 +868,37 @@ export class SupabaseRepository implements Repository {
     return data as string;
   }
 
+  async submitOrder(orderId: string): Promise<OrderStatus> {
+    const order = await this.getOrder(orderId);
+    if (order === null) throw new Error('submitOrder: order not found');
+
+    // Held at the price the customer was shown — catalogue plus VAT — which is
+    // also what the server bills at hand-back when no parts are added.
+    const owed = order.quotedAmount !== null && !isZeroSar(order.quotedAmount);
+    if (owed && order.status === 'draft' && order.escrowStatus === 'none') {
+      const held = await this.payments.authorise(
+        orderId,
+        priceWithVat(order.quotedAmount as SarAmount),
+      );
+      if (!held.ok) throw new Error(`submitOrder/payment: ${held.reason}`);
+
+      // A live gateway has already recorded the hold, after checking it with
+      // the provider (0077). Only the development provider's word goes
+      // through the client path — which the database refuses once live.
+      if (!held.recordedByServer) {
+        const { error } = await this.client.rpc('authorise_order_payment', {
+          p_order_id: orderId,
+          p_payment_intent_id: held.paymentIntentId,
+        });
+        if (error !== null) throw new Error(`submitOrder/payment: ${error.message}`);
+      }
+    }
+
+    const { data, error } = await this.client.rpc('submit_order', { p_order_id: orderId });
+    if (error !== null) throw new Error(`submitOrder: ${error.message}`);
+    return data as OrderStatus;
+  }
+
   async listBookableServices(): Promise<readonly Service[]> {
     const rows = unwrap(
       await this.client
@@ -877,9 +941,15 @@ export class SupabaseRepository implements Repository {
     // fixed-price service (0018's price guard), which is most of them.
     const service = await this.serviceById(serviceId);
 
-    return (rows as BookingProviderRow[]).map((row) => {
+    return (rows as BookingProviderRow[]).flatMap((row) => {
       const workshop = Array.isArray(row.workshops) ? row.workshops[0] : row.workshops;
       const custom = row.provider_services?.[0]?.custom_price ?? null;
+      const price = custom === null ? (service?.basePrice ?? null) : toSar(custom);
+
+      // A provider who has not priced a service the catalogue does not price
+      // either has nothing to book at. Offering them showed "0.00", and the
+      // booking went through with nothing held and nothing billed.
+      if (price === null) return [];
 
       return {
         id: row.id,
@@ -890,7 +960,7 @@ export class SupabaseRepository implements Repository {
         ratingCount: row.rating_count,
         jobsCompleted: row.jobs_completed,
         addressAr: workshop?.address_ar ?? null,
-        price: custom === null ? (service?.basePrice ?? toSar(0)) : toSar(custom),
+        price,
       };
     });
   }
@@ -952,7 +1022,7 @@ export class SupabaseRepository implements Repository {
     const { data, error } = await this.client
       .from('orders')
       .select(
-        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media',
+        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media, warranty_days, scheduled_for',
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -1073,19 +1143,23 @@ export class SupabaseRepository implements Repository {
     const rows = unwrap(
       await this.client
         .from('orders')
-        .select('id, status, total_amount, created_at, services(name_ar)')
+        .select('id, status, total_amount, created_at, services(name_ar, name_en)')
         .order('created_at', { ascending: false })
         .limit(limit),
       'listRecentOrders',
     );
 
-    return (rows as readonly OrderSummaryRow[]).map((row) => ({
-      id: row.id,
-      status: row.status,
-      serviceNameAr: row.services?.[0]?.name_ar ?? '',
-      totalAmount: toSarOrNull(row.total_amount),
-      createdAt: row.created_at,
-    }));
+    return (rows as readonly OrderSummaryRow[]).map((row) => {
+      const service = Array.isArray(row.services) ? row.services[0] : row.services;
+      return {
+        id: row.id,
+        status: row.status,
+        serviceNameAr: service?.name_ar ?? '',
+        serviceNameEn: service?.name_en ?? service?.name_ar ?? '',
+        totalAmount: toSarOrNull(row.total_amount),
+        createdAt: row.created_at,
+      };
+    });
   }
 
   /**
@@ -1131,6 +1205,38 @@ export class SupabaseRepository implements Repository {
     }
   }
 
+  async registerPushDevice(
+    token: string,
+    platform: 'ios' | 'android',
+    locale: string,
+  ): Promise<void> {
+    const { error } = await this.client.rpc('register_push_device', {
+      p_token: token,
+      p_platform: platform,
+      p_locale: locale.startsWith('en') ? 'en' : 'ar',
+    });
+    if (error !== null) throw new Error(`registerPushDevice: ${error.message}`);
+  }
+
+  async unregisterPushDevice(token: string): Promise<void> {
+    const { error } = await this.client.rpc('unregister_push_device', { p_token: token });
+    if (error !== null) throw new Error(`unregisterPushDevice: ${error.message}`);
+  }
+
+  async resolveMediaUrl(ref: string): Promise<string | null> {
+    const stored = parseStorageRef(ref);
+    if (stored === null) return ref;
+
+    // Long enough to look at a job's photos, short enough that a URL copied
+    // out of the app stops working the same day. The bucket's read policy
+    // decides who gets one at all.
+    const { data, error } = await this.client.storage
+      .from(stored.bucket)
+      .createSignedUrl(stored.path, 60 * 60);
+
+    return error !== null ? null : data.signedUrl;
+  }
+
   /**
    * Dispatch figures for the waiting screen (0042).
    *
@@ -1164,7 +1270,7 @@ export class SupabaseRepository implements Repository {
       await this.client
         .from('order_parts')
         .select(
-          'id, order_id, name_ar, part_number, is_oem, quantity, unit_price, warranty_days, approved_by_customer',
+          'id, order_id, name_ar, part_number, is_oem, quantity, unit_price, warranty_days, approved_by_customer, declined_at',
         )
         .eq('order_id', orderId)
         .order('created_at'),
@@ -1180,10 +1286,27 @@ export class SupabaseRepository implements Repository {
     // customer on the order this line belongs to.
     const { error } = await this.client
       .from('order_parts')
-      .update({ approved_by_customer: true, approved_at: new Date().toISOString() })
+      // Clearing a previous "no": a customer may change their mind, and a
+      // line cannot hold both answers (0067).
+      .update({
+        approved_by_customer: true,
+        approved_at: new Date().toISOString(),
+        declined_at: null,
+      })
       .eq('id', partId);
 
     if (error !== null) throw new Error(`approveOrderPart: ${error.message}`);
+  }
+
+  async declineOrderPart(partId: string): Promise<void> {
+    // Same authority as approving: guard_order_parts (0067) lets only the
+    // customer answer, and only while the job is open.
+    const { error } = await this.client
+      .from('order_parts')
+      .update({ declined_at: new Date().toISOString() })
+      .eq('id', partId);
+
+    if (error !== null) throw new Error(`declineOrderPart: ${error.message}`);
   }
 
   async cancelOrder(orderId: string, reason?: string): Promise<void> {
@@ -1196,6 +1319,249 @@ export class SupabaseRepository implements Repository {
       .eq('id', orderId);
 
     if (error !== null) throw new Error(`cancelOrder: ${error.message}`);
+  }
+
+  async openOrderDispute(orderId: string, reason: string): Promise<void> {
+    const { error } = await this.client.rpc('open_order_dispute', {
+      p_order_id: orderId,
+      p_reason: reason,
+    });
+    if (error !== null) throw new Error(`openOrderDispute: ${error.message}`);
+  }
+
+  async getOrderInvoice(orderId: string): Promise<InvoiceDocument | null> {
+    // RLS lets the customer (and the provider) read the invoice and the
+    // seller it names (0030, 0038); the lines come from the order.
+    const invoice = await this.client
+      .from('zatca_invoices')
+      .select(
+        'invoice_number, invoice_type, issued_at, net_amount, vat_amount, total_amount, vat_rate, qr_base64, ' +
+          'invoice_sellers(legal_name_ar, vat_number, cr_number), ' +
+          'orders(order_number, labour_amount, services(name_ar))',
+      )
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (invoice.error !== null) throw new Error(`getOrderInvoice: ${invoice.error.message}`);
+    if (invoice.data === null) return null;
+
+    const row = invoice.data as unknown as {
+      invoice_number: string;
+      invoice_type: 'simplified' | 'standard';
+      issued_at: string;
+      net_amount: number | string;
+      vat_amount: number | string;
+      total_amount: number | string;
+      vat_rate: number | string;
+      qr_base64: string;
+      invoice_sellers: {
+        legal_name_ar: string;
+        vat_number: string;
+        cr_number: string | null;
+      } | null;
+      orders: {
+        order_number: string | null;
+        labour_amount: number | string | null;
+        services: { name_ar: string } | null;
+      } | null;
+    };
+
+    const parts = await this.client
+      .from('order_parts')
+      .select('name_ar, quantity, unit_price, approved_by_customer, declined_at')
+      .eq('order_id', orderId);
+    if (parts.error !== null) throw new Error(`getOrderInvoice: ${parts.error.message}`);
+
+    const fixed = (value: number | string) => Number(value).toFixed(2);
+    const labour = row.orders?.labour_amount;
+
+    return {
+      invoiceNumber: row.invoice_number,
+      issuedAt: row.issued_at,
+      invoiceType: row.invoice_type,
+      seller: {
+        legalNameAr: row.invoice_sellers?.legal_name_ar ?? '',
+        vatNumber: row.invoice_sellers?.vat_number ?? '',
+        crNumber: row.invoice_sellers?.cr_number ?? null,
+      },
+      orderNumber: row.orders?.order_number ?? null,
+      lines: invoiceLines(
+        `أجرة الخدمة — ${row.orders?.services?.name_ar ?? 'خدمة'}`,
+        labour === null || labour === undefined ? null : fixed(labour),
+        (
+          parts.data as {
+            name_ar: string;
+            quantity: number;
+            unit_price: number | string;
+            approved_by_customer: boolean;
+            declined_at: string | null;
+          }[]
+        ).map((part) => ({
+          nameAr: part.name_ar,
+          quantity: part.quantity,
+          unitPrice: fixed(part.unit_price),
+          approved: part.approved_by_customer && part.declined_at === null,
+        })),
+      ),
+      net: fixed(row.net_amount),
+      vat: fixed(row.vat_amount),
+      vatRate: Number(row.vat_rate),
+      total: fixed(row.total_amount),
+      qrBase64: row.qr_base64,
+    };
+  }
+
+  async getOrderInspection(orderId: string): Promise<OrderInspection | null> {
+    const row = await this.client
+      .from('inspection_reports')
+      .select('id, vehicle_id, public_token')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (row.error !== null) throw new Error(`getOrderInspection: ${row.error.message}`);
+    if (row.data === null) return null;
+    const found = row.data as { id: string; vehicle_id: string | null; public_token: string };
+
+    // The same frozen document anyone with the token reads (0026): no
+    // customer identity in it, so the file the buyer shares is safe to share.
+    const report = await this.client.rpc('get_inspection_report', { p_token: found.public_token });
+    if (report.error !== null) throw new Error(`getOrderInspection: ${report.error.message}`);
+    if (report.data === null) return null;
+
+    return {
+      reportId: found.id,
+      vehicleId: found.vehicle_id,
+      report: report.data as InspectionReport,
+    };
+  }
+
+  async convertInspectionToVehicle(
+    reportId: string,
+    makeId: string,
+    modelId: string,
+    nickname: string | null,
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('convert_inspection_to_vehicle', {
+      p_report_id: reportId,
+      p_make_id: makeId,
+      p_model_id: modelId,
+      p_nickname: nickname,
+    });
+    if (error !== null) throw new Error(`convertInspectionToVehicle: ${error.message}`);
+    return data as string;
+  }
+
+  async getLegalDocument(kind: LegalDocumentKind): Promise<LegalDocument> {
+    const [document, settings] = await Promise.all([
+      this.client
+        .from('legal_documents')
+        .select('id, kind, version, published_at, body_ar, body_en')
+        .eq('kind', kind)
+        .lte('published_at', new Date().toISOString())
+        .order('version', { ascending: false })
+        .limit(1)
+        .single(),
+      this.client.rpc('get_public_settings'),
+    ]);
+    if (document.error !== null) throw new Error(`getLegalDocument: ${document.error.message}`);
+    const row = document.data as {
+      id: string;
+      kind: LegalDocumentKind;
+      version: number;
+      published_at: string;
+      body_ar: string;
+      body_en: string;
+    };
+    // The company's name, the complaint window…: whatever the settings say
+    // now, so the text never disagrees with the app (0083).
+    const values = (settings.error === null ? settings.data : {}) as Record<string, unknown>;
+    const version = { version: row.version, publishedAt: row.published_at };
+    return {
+      id: row.id,
+      kind: row.kind,
+      version: row.version,
+      publishedAt: row.published_at,
+      bodyAr: fillLegalTemplate(row.body_ar, legalTemplateValues(values, version, 'ar')),
+      bodyEn: fillLegalTemplate(row.body_en, legalTemplateValues(values, version, 'en')),
+    };
+  }
+
+  async listPendingLegalDocuments(): Promise<readonly PendingLegalDocument[]> {
+    if (this.userId() === null) return [];
+    const { data, error } = await this.client.rpc('my_pending_legal_documents');
+    if (error !== null) throw new Error(`listPendingLegalDocuments: ${error.message}`);
+    return (
+      data as { id: string; kind: LegalDocumentKind; version: number; summary_ar: string | null }[]
+    ).map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      version: row.version,
+      summaryAr: row.summary_ar,
+    }));
+  }
+
+  async acceptLegalDocuments(documentIds: readonly string[]): Promise<void> {
+    const { error } = await this.client.rpc('accept_legal_documents', {
+      p_document_ids: [...documentIds],
+    });
+    if (error !== null) throw new Error(`acceptLegalDocuments: ${error.message}`);
+  }
+
+  async deleteMyAccount(): Promise<void> {
+    const { error } = await this.client.rpc('delete_my_account', { p_confirmation: 'DELETE' });
+    if (error === null) return;
+    // The refusals a person can act on, by the server's own words (0086).
+    if (/order in progress or in dispute/i.test(error.message)) throw new Error('open_order');
+    if (/payout still to be paid/i.test(error.message)) throw new Error('pending_payout');
+    if (/staff role/i.test(error.message)) throw new Error('staff_account');
+    throw new Error(`deleteMyAccount: ${error.message}`);
+  }
+
+  async getPlatformStatus(): Promise<PlatformStatus> {
+    const settings = await this.client.rpc('get_public_settings');
+    const values = (settings.error === null ? settings.data : {}) as Record<string, unknown>;
+    const text = (key: string) => (typeof values[key] === 'string' ? (values[key] as string) : '');
+
+    // Signed out (or a network failure) reads as "not suspended": the server
+    // refuses a suspended account's every action regardless, so a missed
+    // banner costs an explanation, never a hole.
+    const account = await this.client.rpc('my_account_status');
+    const standing = (account.error === null ? account.data : null) as {
+      suspended?: boolean;
+      reason?: string | null;
+    } | null;
+
+    return {
+      ordersPaused: values['new_orders_paused'] === true,
+      pausedMessageAr: text('new_orders_paused_message_ar'),
+      announcementAr: text('announcement_ar'),
+      announcementEn: text('announcement_en'),
+      supportPhone: text('support_phone'),
+      supportWhatsapp: text('support_whatsapp'),
+      supportEmail: text('support_email'),
+      disputeWindowDays:
+        typeof values['dispute_window_days'] === 'number'
+          ? (values['dispute_window_days'] as number)
+          : DEFAULT_PLATFORM_STATUS.disputeWindowDays,
+      autoCompleteHours:
+        typeof values['auto_complete_after_hours'] === 'number'
+          ? (values['auto_complete_after_hours'] as number)
+          : DEFAULT_PLATFORM_STATUS.autoCompleteHours,
+      suspended: standing?.suspended === true,
+      suspensionReason: standing?.reason ?? null,
+      // Only an explicit `false` switches a part off (see platform-status.ts).
+      features: {
+        emergency: values['feature_emergency'] !== false,
+        booking: values['feature_booking'] !== false,
+        videoTriage: values['feature_video_triage'] !== false,
+        ownershipTransfer: values['feature_ownership_transfer'] !== false,
+        habbaReport: values['feature_habba_report'] !== false,
+        providerApplications: values['feature_provider_applications'] !== false,
+        guestLogin: values['feature_guest_login'] !== false,
+        emailLogin: values['feature_email_login'] !== false,
+      },
+      minAppVersion: text('min_app_version'),
+      appStoreUrl: text('app_store_url'),
+      playStoreUrl: text('play_store_url'),
+    };
   }
 
   async confirmOrderCompletion(orderId: string): Promise<void> {
@@ -1216,6 +1582,31 @@ export class SupabaseRepository implements Repository {
     }
   }
 
+  async getTopUpDue(orderId: string): Promise<SarAmount> {
+    const { data, error } = await this.client.rpc('order_top_up_due', { p_order_id: orderId });
+    if (error !== null) throw new Error(`getTopUpDue: ${error.message}`);
+    return toSar(Number(data ?? 0));
+  }
+
+  async payTopUp(orderId: string): Promise<void> {
+    const due = await this.getTopUpDue(orderId);
+    if (isZeroSar(due)) return;
+
+    const held = await this.payments.authorise(orderId, due, 'top_up');
+    if (!held.ok) throw new Error(`payTopUp/payment: ${held.reason}`);
+
+    // As with the first hold: the payment service has already recorded a
+    // live one; only the development provider's goes through the client.
+    if (!held.recordedByServer) {
+      const { error } = await this.client.rpc('authorise_order_top_up', {
+        p_order_id: orderId,
+        p_payment_id: held.paymentIntentId,
+        p_amount: due,
+      });
+      if (error !== null) throw new Error(`payTopUp: ${error.message}`);
+    }
+  }
+
   async rateOrder(input: NewRatingInput): Promise<void> {
     const raterId = this.userId();
     if (raterId === null) throw new Error('rateOrder: not authenticated');
@@ -1230,6 +1621,57 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`rateOrder: ${error.message}`);
+  }
+
+  async getOrderRating(orderId: string): Promise<number | null> {
+    // The read policy shows a customer their own rating even once operators
+    // have hidden it (0069), so "already rated" stays true after moderation.
+    const { data, error } = await this.client
+      .from('ratings')
+      .select('stars')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (error !== null) throw new Error(`getOrderRating: ${error.message}`);
+    return data === null ? null : (data as { stars: number }).stars;
+  }
+
+  async listInvoices(): Promise<readonly InvoiceSummary[]> {
+    // Only the orders this user placed. RLS also lets a provider read the
+    // invoices for jobs they did (0030), and those are not this list.
+    const userId = this.userId();
+    if (userId === null) return [];
+    const rows = unwrap(
+      await this.client
+        .from('zatca_invoices')
+        .select(
+          'order_id, invoice_number, issued_at, total_amount, orders!inner(customer_id, services(name_ar, name_en))',
+        )
+        .eq('orders.customer_id', userId)
+        .order('issued_at', { ascending: false })
+        .limit(100),
+      'listInvoices',
+    );
+
+    return (
+      rows as unknown as readonly {
+        order_id: string;
+        invoice_number: string;
+        issued_at: string;
+        total_amount: number | string;
+        orders: { services: ServiceNames | readonly ServiceNames[] | null } | null;
+      }[]
+    ).map((row) => {
+      const embedded = row.orders?.services ?? null;
+      const service = Array.isArray(embedded) ? embedded[0] : embedded;
+      return {
+        orderId: row.order_id,
+        invoiceNumber: row.invoice_number,
+        issuedAt: row.issued_at,
+        total: Number(row.total_amount).toFixed(2),
+        serviceNameAr: service?.name_ar ?? '',
+        serviceNameEn: service?.name_en ?? service?.name_ar ?? '',
+      };
+    });
   }
 
   // نقل الملكية ---------------------------------------------------------------

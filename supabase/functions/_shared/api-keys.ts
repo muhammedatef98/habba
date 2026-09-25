@@ -111,3 +111,38 @@ export function apiKeyOnlyFetch(key: string, inner: FetchLike): FetchLike {
     return inner(input, { ...init, headers });
   };
 }
+
+/**
+ * Whether a presented secret (a tick header, a webhook secret) is the
+ * expected one, in time that does not depend on how much of it matched.
+ * `!==` stops at the first differing character, which lets a caller who can
+ * time enough requests find a secret one character at a time. An empty
+ * expected secret never matches: an unset secret means closed, not open.
+ */
+export function secretsMatch(presented: string | null, expected: string): boolean {
+  if (expected === '' || presented === null) return false;
+  let difference = presented.length ^ expected.length;
+  for (let index = 0; index < expected.length; index++) {
+    difference |= (presented.charCodeAt(index) || 0) ^ expected.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+/**
+ * The shared secret a ticking function expects (0087): its own environment
+ * variable when set, otherwise the copy in Vault, read with the function's
+ * service key through `edge_tick_secret()`. Any failure reads as no secret,
+ * so the function stays closed rather than open.
+ */
+export async function resolveTickSecret(
+  fromEnvironment: string,
+  fromVault: () => PromiseLike<{ readonly data: unknown; readonly error: unknown }>,
+): Promise<string> {
+  if (fromEnvironment !== '') return fromEnvironment;
+  try {
+    const { data, error } = await fromVault();
+    return error === null && typeof data === 'string' ? data : '';
+  } catch {
+    return '';
+  }
+}

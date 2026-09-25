@@ -54,7 +54,7 @@ import {
 const INK = '#14201F';
 const PETROL = '#12514F';
 const MUTED = '#4A5654';
-const SUBTLE = '#66706E';
+const SUBTLE = '#5F6967';
 const LINE = '#E2DDD2';
 const BAND = '#F0EBE1';
 const TINT = '#EFF7F6';
@@ -575,6 +575,24 @@ const STYLE = `
     border-top: 1px solid ${LINE}; padding-top: 12px; margin-top: 8px;
     display: flex; justify-content: space-between; gap: 16px;
     font-size: 12px; color: ${SUBTLE};
+  }
+
+  /* Read in the app on a phone as well as printed. The layout is set for
+     A4; at phone width it steps down so nothing runs off the side. Print
+     never matches — an A4 page is wider than this. */
+  @media (max-width: 520px) {
+    body { font-size: 13.5px; padding: 12px; }
+    .masthead, .running-head { flex-wrap: wrap; gap: 6px; }
+    .masthead-title { font-size: 22px; }
+    .car-name { font-size: 24px; }
+    .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .panel { padding: 14px; }
+    .ratio-value { font-size: 34px; }
+    .event-date { width: 76px; font-size: 12px; white-space: nowrap; }
+    .table-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .inspection { flex-direction: column; align-items: stretch; }
+    .score { border-left: 0; padding-left: 0; }
+    .foot { flex-direction: column; gap: 4px; }
   }
 `;
 

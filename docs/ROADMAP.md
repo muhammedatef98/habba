@@ -7,17 +7,17 @@ The phase definitions come from `docs/HABBA_BUILD_PROMPT.md` §10; this file is
 the status view over them. Where the two disagree, the build prompt is the
 specification and this is the mistake.
 
-**Last updated:** 2026-09-04 · **Amendments applied:** A (one mobile app,
+**Last updated:** 2026-09-24 · **Amendments applied:** A (one mobile app,
 `user_roles`) and B (admin stays a separate web app) — see CLAUDE.md §5.1.
 
-| Phase                         | Status                        |
-| ----------------------------- | ----------------------------- |
-| 1 — Foundation                | ✅ **Done**                   |
-| 2 — The logbook (the moat)    | ✅ **Done**                   |
-| 3 — On-demand emergency       | 🟡 Backend done, not launched |
-| 4 — Scheduled & workshop      | 🟡 Backend done, no screens   |
-| 5 — Inspections               | 🟡 Backend done, no screens   |
-| 6 — Intelligence & compliance | 🟡 Backend partial, no admin  |
+| Phase                         | Status                                                 |
+| ----------------------------- | ------------------------------------------------------ |
+| 1 — Foundation                | ✅ **Done**                                            |
+| 2 — The logbook (the moat)    | ✅ **Done**                                            |
+| 3 — On-demand emergency       | ✅ Built end to end; launch waits on decisions 1 and 4 |
+| 4 — Scheduled & workshop      | ✅ Built end to end                                    |
+| 5 — Inspections               | ✅ Built end to end                                    |
+| 6 — Intelligence & compliance | 🟡 Console done; ZATCA waits on decision 2             |
 
 "Backend done" means the migrations exist, run, and pass their own SQL suites.
 It does **not** mean the phase is shippable — see each phase below, and §Open
@@ -97,11 +97,18 @@ completion evidence all pass their suites. Customer screens exist (emergency,
 tracking, quote); provider screens exist (shift, jobs, evidence). The upgrade
 flow and role grant are built.
 
-**What it needs:** a payment provider (open decision 1) — `authorise_order_payment`
-and `capture_order_payment` are interfaces with a dev implementation behind
-them, so nothing has moved real money; real Nafath for KYC; the ops console
-that approves providers (Phase 6); and the two-device run itself, which has
-never been done.
+**Since then (0064–0072):** the order is submitted and funded before anyone
+is asked (0065); the technician's live position, accept and offers work
+through the app; completion photos are real and verified (0064); parts are
+approved or declined line by line (0067); every step pushes a notification
+with delivery receipts (0066, 0072); an unconfirmed job closes by itself
+(0071); complaints and refunds are resolved from the console (0069–0070).
+`request-flow.integration.test.ts` drives the whole flow through the app's
+own repositories with two identities.
+
+**What it needs:** a payment provider (open decision 1) — authorise, capture,
+void and refund are interfaces over a dev provider; real Nafath for KYC; and
+a two-device run by people.
 
 ---
 
@@ -119,13 +126,13 @@ clients against a capacity-3 slot: exactly 3 succeed, 13 are refused cleanly
 rather than by a constraint error. Warranty claim and routing pass
 `08_scheduling.sql`.
 
-**What it needs:** the customer booking screen — today `booking.tsx` is an
-honest "coming soon" rather than a flow. This is the smallest remaining gap
-between a built backend and a usable feature.
+**Since then:** the booking flow is built (service → provider with its own
+price → free slot → confirm), and `booking.integration.test.ts` runs a
+workshop booking with a warranty claim through the app.
 
 ---
 
-## Phase 5 — Inspections 🟡
+## Phase 5 — Inspections ✅
 
 Templates, structured capture with photos, scoring, PDF, public share,
 pre-purchase flow with no owned vehicle, buyer → owner conversion.
@@ -134,9 +141,15 @@ pre-purchase flow with no owned vehicle, buyer → owner conversion.
 buyer purchases, the report converts into a new `vehicles` row with the
 inspection as its first timeline event.
 
-**Where it stands.** Migrations 0026–0027, covered by `09_inspections.sql`
-including the conversion. No customer or provider screens at all — this phase
-is backend-only.
+**Where it stands.** Migrations 0026–0027 and 0073, covered by
+`09_inspections.sql` and `46_inspections_in_the_app.sql`. Each service names
+the template it is performed against (set from the console's catalogue); the
+report must match it, and the job cannot be handed back until it is filed.
+The technician fills the template item by item in the app (the server scores
+it); the buyer reads it on the order, shares it as a PDF made on the phone
+(ADR-0019), and, having bought the car, adds it — its logbook opens with the
+inspection. Proven through the app's repositories in
+`inspection-flow.integration.test.ts`. Photos per item are not captured yet.
 
 ---
 
@@ -154,11 +167,20 @@ client-reachable service-role key.)_
 **Where it stands.** Migrations 0028–0031: the maintenance scan, alert
 conversion, ZATCA TLV/QR and payout building all pass `10_intelligence.sql`.
 
-**What it needs:** most of the phase. `apps/admin` **does not exist** — no
-provider verification queue (which is what grants the provider role), no live
-order map, no dispute resolution, no payout runs. The `audit_log` table is
-specified (build prompt §6.10) but not migrated. ZATCA delivery is blocked on
-open decision 2.
+**Since then:** `apps/admin` exists and meets Amendment B — mandatory 2FA,
+8-hour sessions, no remember-me, an immutable `audit_log` (0068), a CI check
+that fails if a secret key reaches the client bundle, and a README for local
+and Vercel. It reaches every operator task: verification queue, live board,
+orders, disputes and refunds, people and suspension, cars and the logbook,
+reviews, finance and payouts, the catalogue, broadcasts, settings, PDPL
+requests, staff (0069–0070; `apps/admin/README.md` lists it all).
+
+The acceptance line above now holds in the app: 0074 issues the simplified
+tax invoice when an order completes (never blocking completion; the console
+issues it later if no seller was configured), and the customer opens it on
+the completion screen or shares it as a PDF (`47_invoices_issued_at_completion.sql`).
+
+**What it needs:** ZATCA delivery and refund credit notes (open decision 2).
 
 ---
 
@@ -181,7 +203,7 @@ they gate visible behaviour:
 | Decision                                    | Effect                                                                                                                         |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **KYC sealing is a placeholder** (ADR-0017) | `ENABLE_PROVIDER_MODE` stays off; no real ID or IBAN may be accepted. Lifts when decision 3 lands and Vault/pgsodium is wired. |
-| **No ops console** (Amendment B, Phase 6)   | Provider approval has no home but the local harness shim, so nobody can be approved in production.                             |
+| **Erasure is anonymisation** (0070)         | The account keeps its id so invoices and the logbook's hash stay valid; needs counsel's sign-off with decision 3.              |
 
 ---
 
@@ -189,10 +211,7 @@ they gate visible behaviour:
 
 In the order that buys the most, given the above:
 
-1. **Decisions 3 and 4** — a hosted project and an SMS provider. Phase 2 is
-   finished code that cannot reach a user without them.
-2. **The booking screen** (Phase 4). The backend, including the concurrency
-   guarantee, is already there.
-3. **`apps/admin`** (Amendment B). Everything provider-side is gated behind an
-   approval nobody can currently give.
-4. **Decision 1**, then the Phase 3 two-device run.
+1. **Decisions 3 and 4** — a hosted project and an SMS provider. Everything
+   built is finished code that cannot reach a user without them.
+2. **Decision 1**, then a two-phone run by people, emergency and booking.
+3. **Decision 2** — ZATCA delivery and credit notes.

@@ -23,6 +23,9 @@ import { BookingSteps } from '@/features/customer/components/booking/BookingStep
 import { repository } from '@/features/shared/data/repository';
 import { serviceIcon } from '@/features/shared/lib/service-icon';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+// VAT included, as on the home screen, the emergency screen and the card
+// hold: one service must not show two prices on the way to booking it.
+import { priceWithVat } from '@/features/shared/lib/order-price';
 import { vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useSession } from '@/features/shared/state/session';
@@ -72,7 +75,9 @@ export default function BookingServiceScreen() {
     }
   }, [available, draft]);
 
-  const effectiveVehicleId = draft.vehicleId ?? homeVehicleId;
+  // The first car when none is chosen yet, as on the emergency screen: most
+  // owners have one, and the chip shows which car the booking is for.
+  const effectiveVehicleId = draft.vehicleId ?? homeVehicleId ?? vehicles.data?.[0]?.id ?? null;
   const needsVehicle = service?.requiresVehicle ?? false;
   const canContinue =
     service !== null && draft.mode !== null && (!needsVehicle || effectiveVehicleId !== null);
@@ -112,6 +117,7 @@ export default function BookingServiceScreen() {
 
           return (
             <Card
+              selected={selected}
               key={option.id}
               testID={`booking-service-${option.id}`}
               elevation={selected ? 'sm' : 'none'}
@@ -167,7 +173,7 @@ export default function BookingServiceScreen() {
                   }}
                 >
                   <Text variant="caption" tone="subtle" numeric>
-                    {t('booking.durationMinutes', { minutes: option.estDurationMin })}
+                    {t('booking.durationMinutes', { count: option.estDurationMin })}
                   </Text>
                   {onlyMode(option) !== null ? (
                     <Text variant="caption" tone="muted">
@@ -180,7 +186,9 @@ export default function BookingServiceScreen() {
               </View>
 
               <Text variant="bodyStrong" tone="accent" numeric>
-                {t('common.sar', { amount: formatSarDisplay(option.basePrice) })}
+                {option.basePrice === null
+                  ? t('booking.priceByProvider')
+                  : t('common.sar', { amount: formatSarDisplay(priceWithVat(option.basePrice)) })}
               </Text>
             </Card>
           );
@@ -212,6 +220,7 @@ export default function BookingServiceScreen() {
                 const selected = draft.mode === mode;
                 return (
                   <Card
+                    selected={selected}
                     key={mode}
                     testID={`booking-mode-${mode}`}
                     elevation="none"
@@ -255,7 +264,9 @@ export default function BookingServiceScreen() {
                   testID="booking-add-vehicle"
                   label={t('vehicle.addTitle')}
                   size="medium"
-                  onPress={() => router.push('/add-vehicle')}
+                  onPress={() =>
+                    router.push({ pathname: '/add-vehicle', params: { then: 'back' } })
+                  }
                 />
               </View>
             </Card>
@@ -271,6 +282,7 @@ export default function BookingServiceScreen() {
                 const selected = effectiveVehicleId === vehicle.id;
                 return (
                   <Card
+                    selected={selected}
                     key={vehicle.id}
                     testID={`booking-vehicle-${vehicle.id}`}
                     elevation="none"

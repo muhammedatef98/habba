@@ -6,7 +6,13 @@
  * from the migrations and removes the risk of drift.
  */
 
-import type { FulfilmentMode, OrderStatus, SarAmount } from '@habba/core';
+import type {
+  FulfilmentMode,
+  InspectionReport,
+  LegalDocumentKind,
+  OrderStatus,
+  SarAmount,
+} from '@habba/core';
 
 export type Provenance = 'self_reported' | 'self_documented' | 'habba_verified' | 'third_party';
 
@@ -19,7 +25,9 @@ export type TimelineEventType =
   | 'warranty_claimed'
   | 'ownership_transferred'
   | 'alert_raised'
-  | 'alert_dismissed';
+  | 'alert_dismissed'
+  /** An operator's correction: a new entry beside the one it corrects (0069). */
+  | 'record_annotated';
 
 export interface VehicleMake {
   readonly id: string;
@@ -133,7 +141,13 @@ export interface NewVehicleInput {
   readonly makeId: string;
   readonly modelId: string;
   readonly year: number;
-  readonly plate?: string | undefined;
+  /**
+   * Required. A car with neither plate nor VIN is refused by the database
+   * (0008's vehicles_plate_or_vin): the logbook, the report and a handover
+   * all identify the car by it. The screen once called it optional, and every
+   * owner who took it at its word got «تعذّر حفظ السيارة».
+   */
+  readonly plate: string;
   readonly nickname?: string | undefined;
   readonly currentMileage?: number | undefined;
 }
@@ -151,8 +165,12 @@ export interface Service {
   readonly nameEn: string;
   readonly descriptionAr: string | null;
   readonly icon: string | null;
-  /** CLAUDE.md §2.5: never a float — see @habba/core's money module (ADR-0007). */
-  readonly basePrice: SarAmount;
+  /**
+   * The catalogue price, before VAT. Null for a service each provider prices
+   * themselves (brakes, bodywork, detailing) — there is no one number to show.
+   * CLAUDE.md §2.5: never a float — see @habba/core's money module (ADR-0007).
+   */
+  readonly basePrice: SarAmount | null;
   readonly requiresVehicle: boolean;
   /**
    * Which fulfilment modes the service can actually be delivered in
@@ -255,8 +273,20 @@ export interface OrderSummary {
   readonly id: string;
   readonly status: OrderStatus;
   readonly serviceNameAr: string;
+  readonly serviceNameEn: string;
   readonly totalAmount: SarAmount | null;
   readonly createdAt: string;
+}
+
+/** One issued tax invoice, as the customer's list shows it (0074). */
+export interface InvoiceSummary {
+  readonly orderId: string;
+  readonly invoiceNumber: string;
+  readonly issuedAt: string;
+  /** Including VAT, 2dp, as issued. */
+  readonly total: string;
+  readonly serviceNameAr: string;
+  readonly serviceNameEn: string;
 }
 
 /** A provider's public-facing card — never the KYC columns behind it (0037). */
@@ -294,9 +324,58 @@ export interface Order {
   readonly totalAmount: SarAmount | null;
   readonly escrowStatus: EscrowStatus;
   readonly completionMedia: readonly CompletionMedia[];
+  /** What the provider committed to at hand-back (0065). Null until then. */
+  readonly warrantyDays: number | null;
+  /** The appointment time for a booked order; null for an emergency. */
+  readonly scheduledFor: string | null;
 }
 
-export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'refunded';
+export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'released' | 'refunded' | 'failed';
+
+/** An inspection report on an order, as the customer who paid for it reads it (0026). */
+export interface OrderInspection {
+  readonly reportId: string;
+  /** Null for a pre-purchase inspection until the buyer adds the car (0027). */
+  readonly vehicleId: string | null;
+  readonly report: InspectionReport;
+}
+
+/**
+ * What Habba's operators have set for the whole app (0069, 0070), and whether
+ * this account may act at all. Read from the server, never assumed: the server
+ * enforces every one of these on its own; the app only explains them.
+ */
+export interface PlatformStatus {
+  readonly ordersPaused: boolean;
+  readonly pausedMessageAr: string;
+  readonly announcementAr: string;
+  readonly announcementEn: string;
+  readonly supportPhone: string;
+  readonly supportWhatsapp: string;
+  readonly supportEmail: string;
+  readonly disputeWindowDays: number;
+  /** An unconfirmed job closes by itself this long after hand-back (0071). */
+  readonly autoCompleteHours: number;
+  readonly suspended: boolean;
+  readonly suspensionReason: string | null;
+  /** The parts of the app operators can switch off (0081). */
+  readonly features: AppFeatures;
+  /** Builds below this are asked to update before anything else (0081). */
+  readonly minAppVersion: string;
+  readonly appStoreUrl: string;
+  readonly playStoreUrl: string;
+}
+
+export interface AppFeatures {
+  readonly emergency: boolean;
+  readonly booking: boolean;
+  readonly videoTriage: boolean;
+  readonly ownershipTransfer: boolean;
+  readonly habbaReport: boolean;
+  readonly providerApplications: boolean;
+  readonly guestLogin: boolean;
+  readonly emailLogin: boolean;
+}
 
 export interface OrderPart {
   readonly id: string;
@@ -308,6 +387,8 @@ export interface OrderPart {
   readonly unitPrice: SarAmount;
   readonly warrantyDays: number | null;
   readonly approvedByCustomer: boolean;
+  /** The customer said no (0067). Kept on the record, never billed. */
+  readonly declinedAt: string | null;
 }
 
 /**
@@ -535,3 +616,22 @@ export interface VehicleCareBaseline {
 // Re-exported here (not just from @habba/core) so every screen imports domain
 // types from one place — data/types.ts — rather than mixing import sources.
 export type { FulfilmentMode, OrderStatus };
+
+/** A version of the terms, privacy policy or provider terms (0083), filled in. */
+export interface LegalDocument {
+  readonly id: string;
+  readonly kind: LegalDocumentKind;
+  readonly version: number;
+  readonly publishedAt: string;
+  /** Arabic is authoritative; English is its translation. */
+  readonly bodyAr: string;
+  readonly bodyEn: string;
+}
+
+/** A document this person has yet to accept (0083). */
+export interface PendingLegalDocument {
+  readonly id: string;
+  readonly kind: LegalDocumentKind;
+  readonly version: number;
+  readonly summaryAr: string | null;
+}

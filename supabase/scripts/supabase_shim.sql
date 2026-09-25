@@ -63,6 +63,19 @@ as $$
   );
 $$;
 
+-- The whole verified token, as Supabase's own auth.jwt() returns it. 0068
+-- reads `aal` and `amr` from it to require a second factor for ops.
+create or replace function auth.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')
+  )::jsonb;
+$$;
+
 do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then
@@ -271,6 +284,38 @@ end;
 $$;
 
 grant execute on function public.test_grant_role(uuid, text) to authenticated;
+
+-- Stands in for a photo upload through the Storage API, which the harness does
+-- not run. Returns the media list record_completion_evidence() accepts (0064).
+--
+-- SECURITY INVOKER, deliberately unlike the fixtures above: the Storage API
+-- inserts into storage.objects AS the caller, with RLS applied, so this does
+-- too. It stands in for the transport, not the authorisation — a customer or
+-- an unassigned provider calling it is refused by the real insert policy.
+--
+-- ⚠️ LOCAL ONLY, same as above.
+create or replace function public.test_upload_completion_photos(p_order_id uuid)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_stamp text := to_char(clock_timestamp(), 'YYYYMMDDHH24MISSUS');
+begin
+  insert into storage.objects (bucket_id, name, owner) values
+    ('completion-media', p_order_id::text || '/before-' || v_stamp || '.jpg', auth.uid()),
+    ('completion-media', p_order_id::text || '/after-' || v_stamp || '.jpg', auth.uid());
+
+  return jsonb_build_array(
+    jsonb_build_object('url', 'storage://completion-media/' || p_order_id::text
+                              || '/before-' || v_stamp || '.jpg', 'kind', 'before'),
+    jsonb_build_object('url', 'storage://completion-media/' || p_order_id::text
+                              || '/after-' || v_stamp || '.jpg', 'kind', 'after'));
+end;
+$$;
+
+grant execute on function public.test_upload_completion_photos(uuid) to authenticated;
 
 -- The default privileges on `public` used to be set here, and they were not the
 -- ones Supabase actually sets — anon had SELECT where hosted anon has ALL. That

@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { View } from 'react-native';
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { normalisePlate } from '@habba/core';
@@ -59,6 +59,10 @@ export default function AddVehicleScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
   const isArabic = i18n.language === 'ar';
+  // `then=back`: opened from inside a request (emergency or booking) that
+  // could not go on without a car. The car is what they came for, not the
+  // garage — back to the request, which picks the new car up by itself.
+  const { then } = useLocalSearchParams<{ then?: string }>();
 
   const [makeId, setMakeId] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
@@ -79,12 +83,14 @@ export default function AddVehicleScreen() {
   });
 
   const addVehicle = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
     mutationFn: async () => {
       const vehicle = await repository.addVehicle({
         makeId: makeId ?? '',
         modelId: modelId ?? '',
         year: year ?? CURRENT_YEAR,
-        plate: plate.length > 0 ? plate : undefined,
+        plate: plate.trim(),
         nickname: nickname.length > 0 ? nickname : undefined,
         currentMileage: mileage.length > 0 ? Number(mileage) : undefined,
       });
@@ -107,7 +113,8 @@ export default function AddVehicleScreen() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      router.replace('/vehicles');
+      if (then === 'back' && router.canGoBack()) router.back();
+      else router.replace('/vehicles');
     },
   });
 
@@ -116,7 +123,11 @@ export default function AddVehicleScreen() {
   function handleSubmit() {
     // Validate the plate with the same function the database uses, so the user
     // is told here rather than by a failed write (ADR-0011).
-    if (plate.length > 0 && normalisePlate(plate) === null) {
+    if (plate.trim().length === 0) {
+      setPlateError(t('vehicle.errors.plateRequired'));
+      return;
+    }
+    if (normalisePlate(plate) === null) {
       setPlateError(t('vehicle.errors.plateUnparseable'));
       return;
     }
@@ -182,10 +193,11 @@ export default function AddVehicleScreen() {
         />
       ) : null}
 
-      {/* Optional, below the required three. */}
+      {/* Required with the three above: the database refuses a car with
+          neither plate nor VIN, and this screen asks for no VIN. */}
       <Field
         testID="plate-input"
-        label={`${t('vehicle.plateLabel')} — ${t('common.optional')}`}
+        label={t('vehicle.plateLabel')}
         value={plate}
         onChangeText={(value) => {
           setPlate(value);

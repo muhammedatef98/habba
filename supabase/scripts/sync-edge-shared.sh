@@ -42,13 +42,29 @@ generate_sms() {
   cat "$CORE/sms/unifonic.ts"
 }
 
+# Imports its shared types from unifonic.ts, which is vendored as sms.ts.
+generate_authentica() {
+  header 'packages/core/src/sms/authentica.ts'
+  sed "s#from './unifonic.js'#from './sms.ts'#" "$CORE/sms/authentica.ts"
+}
+
 generate_api_keys() {
   header 'packages/core/src/supabase/api-keys.ts'
   cat "$CORE/supabase/api-keys.ts"
 }
 
+generate_moyasar() {
+  header 'packages/core/src/payments/moyasar.ts'
+  cat "$CORE/payments/moyasar.ts"
+}
+
+generate_push() {
+  header 'packages/core/src/push/expo.ts'
+  cat "$CORE/push/expo.ts"
+}
+
 # name → generator
-MODULES=("sms:generate_sms" "api-keys:generate_api_keys")
+MODULES=("sms:generate_sms" "authentica:generate_authentica" "api-keys:generate_api_keys" "push:generate_push" "moyasar:generate_moyasar")
 
 mkdir -p "$SHARED"
 status=0

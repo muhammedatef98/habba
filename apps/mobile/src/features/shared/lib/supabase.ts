@@ -11,6 +11,7 @@
 
 import Constants from 'expo-constants';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { authStorage } from './auth-storage';
 
 interface HabbaExtra {
   readonly supabaseUrl?: string;
@@ -43,10 +44,11 @@ export function getSupabaseClient(): SupabaseClient | null {
 
   cached = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
     auth: {
-      // React Native has no localStorage; a storage adapter is wired when auth
-      // becomes real. Until then sessions are not persisted, which is correct
-      // for a client that cannot yet sign anyone in.
-      persistSession: false,
+      // The sign-in must survive closing the app, in the keychain (see
+      // lib/auth-storage). Without it every request after a relaunch went out
+      // as `anon` while the app still showed the person as signed in.
+      storage: authStorage,
+      persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
     },

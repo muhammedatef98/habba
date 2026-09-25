@@ -45,6 +45,30 @@ describe('colour contrast (WCAG 2.2)', () => {
     expect(contrast(colors.textMuted, colors.background)).toBeGreaterThanOrEqual(4.5);
   });
 
+  // The pairs the screens actually put together, found by screenshotting
+  // them: captions sit on cards and tinted cards far more than on the page,
+  // and a selected chip's label is the primary on its own tint.
+  test.each(schemes)('%s: captions meet 4.5:1 on every surface they sit on', (_name, colors) => {
+    for (const surface of [colors.background, colors.surface, colors.surfaceSunken]) {
+      expect(contrast(colors.textSubtle, surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colors.textMuted, surface)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test.each(schemes)('%s: primary as text — links, selected choices', (_name, colors) => {
+    expect(contrast(colors.primary, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.primary, colors.primarySubtle)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.textLink, colors.background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test.each(schemes)('%s: each status colour reads on its own tint', (_name, colors) => {
+    expect(contrast(colors.successFg, colors.successSubtle)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.warningFg, colors.warningSubtle)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.emergencyFg, colors.emergencySubtle)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.infoFg, colors.infoSubtle)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.accentFg, colors.accentSubtle)).toBeGreaterThanOrEqual(4.5);
+  });
+
   test.each(schemes)('%s: button labels meet 4.5:1 on their surfaces', (_name, colors) => {
     expect(contrast(colors.primaryText, colors.primary)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(colors.accentText, colors.accent)).toBeGreaterThanOrEqual(4.5);

@@ -165,7 +165,7 @@ select test.assert_eq(
 update public.orders set status = 'in_progress' where id = :'order3';
 -- Recorded through the provider RPC; a customer cannot write evidence (0033).
 select test.become('22222222-0000-4000-a000-000000000002');
-select public.record_completion_evidence(:'order3', 90500, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence(:'order3', 90500, test.completion_photos(:'order3'));
 select test.become('11111111-0000-4000-a000-000000000001');
 select test.become('22222222-0000-4000-a000-000000000002');
 update public.orders
@@ -246,7 +246,7 @@ update public.orders set status = 'in_progress' where id = :'claim';
 -- car and still belongs in the logbook with evidence.
 -- Recorded through the provider RPC; a customer cannot write evidence (0033).
 select test.become('22222222-0000-4000-a000-000000000002');
-select public.record_completion_evidence(:'claim', 90800, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence(:'claim', 90800, test.completion_photos(:'claim'));
 select test.become('11111111-0000-4000-a000-000000000001');
 update public.orders set status = 'awaiting_approval' where id = :'claim';
 update public.orders set status = 'completed' where id = :'claim';

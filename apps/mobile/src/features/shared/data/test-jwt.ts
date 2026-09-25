@@ -22,8 +22,14 @@ function base64url(input: Buffer | string): string {
 
 export interface TestJwtClaims {
   readonly sub: string;
-  readonly role: 'authenticated' | 'anon';
+  readonly role: 'authenticated' | 'anon' | 'service_role';
   readonly expiresInSeconds?: number;
+  /**
+   * A second factor verified at this moment, claimed the way GoTrue claims it
+   * (`aal2` and a `totp` entry in `amr`). The ops console needs one within the
+   * last eight hours before `is_ops()` is true (0068).
+   */
+  readonly secondFactorAt?: Date;
 }
 
 export function mintTestJwt(secret: string, claims: TestJwtClaims): string {
@@ -36,6 +42,15 @@ export function mintTestJwt(secret: string, claims: TestJwtClaims): string {
       role: claims.role,
       iat: now,
       exp: now + (claims.expiresInSeconds ?? 3600),
+      ...(claims.secondFactorAt === undefined
+        ? { aal: 'aal1', amr: [{ method: 'password', timestamp: now }] }
+        : {
+            aal: 'aal2',
+            amr: [
+              { method: 'password', timestamp: now },
+              { method: 'totp', timestamp: Math.floor(claims.secondFactorAt.getTime() / 1000) },
+            ],
+          }),
     }),
   );
 

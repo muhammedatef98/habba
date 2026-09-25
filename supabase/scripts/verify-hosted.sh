@@ -152,6 +152,26 @@ if [ "$MODE" != "--verify-only" ]; then
     echo "    supabase_storage_admin, and this connection is not."
     echo
   fi
+
+  # Same story for completion photos (0064) — and here forgetting matters
+  # more: record_completion_evidence() refuses any photo that is not in this
+  # bucket, so without the policies no technician can hand a job back at all.
+  completion_policies=$(psql "$SUPABASE_DB_URL" -t -A -c \
+    "select count(*) from pg_policies
+      where schemaname = 'storage' and tablename = 'objects'
+        and policyname like 'completion_media%'" 2>/dev/null || echo 0)
+
+  if [ "$completion_policies" = "2" ]; then
+    echo "── storage policies for completion-media are in place"
+  else
+    echo
+    echo "⚠️  completion-media storage policies are NOT applied ($completion_policies of 2)."
+    echo "    Technicians cannot upload completion photos, so no job can be handed back."
+    echo
+    echo "    Open Dashboard → SQL Editor and run:"
+    echo "      supabase/storage/completion-media-policies.sql"
+    echo
+  fi
 fi
 
 # ---------------------------------------------------------------------------

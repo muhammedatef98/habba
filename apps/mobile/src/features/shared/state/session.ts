@@ -23,6 +23,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/features/shared/lib/preferences';
+import { getSupabaseClient } from '@/features/shared/lib/supabase';
 
 interface SessionState {
   readonly phoneE164: string | null;
@@ -94,13 +95,35 @@ export const useSession = create<SessionState>((set) => ({
     // Cleared rather than overwritten: a signed-out device should not keep a
     // record of who used it last.
     void clearStoredSession();
+    // And the tokens with it. Clearing only the identity above left a live
+    // refresh token in the keychain for whoever picked the phone up next.
+    void getSupabaseClient()
+      ?.auth.signOut({ scope: 'local' })
+      .catch(() => undefined);
   },
   setLocale: (locale) => set({ locale }),
   setThemePreference: (themePreference) => set({ themePreference }),
   selectVehicle: (selectedVehicleId) => set({ selectedVehicleId }),
 
   hydrate: async () => {
-    const stored = await readStoredSession();
+    let stored = await readStoredSession();
+
+    // An identity with no sign-in behind it is a signed-out person the app
+    // would show as signed in, over screens RLS returns empty. Reconciled only
+    // on a definite answer: offline, the tokens cannot be refreshed, and
+    // signing someone out for being in a basement car park is §2.7's opposite.
+    const client = getSupabaseClient();
+    if (stored !== null && client !== null) {
+      try {
+        const { data, error } = await client.auth.getSession();
+        if (error === null && data.session?.user.id !== stored.userId) {
+          stored = null;
+          void clearStoredSession();
+        }
+      } catch {
+        // Unknown — keep the person signed in.
+      }
+    }
 
     set(
       stored === null

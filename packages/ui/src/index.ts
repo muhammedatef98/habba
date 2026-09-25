@@ -2,6 +2,7 @@ export * from './tokens.js';
 export * from './direction.js';
 export * from './font-scale.js';
 export * from './theme.js';
+export * from './motion.js';
 export * from './Text.js';
 export * from './Row.js';
 export * from './Button.js';

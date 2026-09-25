@@ -90,13 +90,7 @@ export default function AcceptTransferScreen() {
   const transfer = incoming.data ?? null;
 
   if (acceptedVehicleId !== null) {
-    return (
-      <Accepted
-        vehicleId={acceptedVehicleId}
-        records={transfer?.recordsTotal ?? 0}
-        locale={i18n.language}
-      />
-    );
+    return <Accepted vehicleId={acceptedVehicleId} records={transfer?.recordsTotal ?? 0} />;
   }
 
   return (
@@ -215,9 +209,7 @@ export default function AcceptTransferScreen() {
           )}
 
           <Text variant="caption" tone="subtle">
-            {t('transfer.acceptExpires', {
-              days: formatCount(daysUntil(transfer.expiresAt), i18n.language),
-            })}
+            {t('transfer.acceptExpires', { count: daysUntil(transfer.expiresAt) })}
           </Text>
         </>
       )}
@@ -245,9 +237,7 @@ function LogbookWeight({ transfer }: { readonly transfer: IncomingTransfer }) {
     <Card testID="accept-weight" elevation="sm" style={{ gap: theme.spacing.sm }}>
       <WeightLine
         icon="inspection"
-        text={t('transfer.weightRecords', {
-          count: formatCount(transfer.recordsTotal, i18n.language),
-        })}
+        text={t('transfer.weightRecords', { count: transfer.recordsTotal })}
         strong
       />
       {transfer.habbaVerified > 0 ? (
@@ -274,9 +264,7 @@ function LogbookWeight({ transfer }: { readonly transfer: IncomingTransfer }) {
         <WeightLine
           icon="wrench"
           colour={theme.colors.successFg}
-          text={t('transfer.weightWarranties', {
-            count: formatCount(transfer.openWarranties, i18n.language),
-          })}
+          text={t('transfer.weightWarranties', { count: transfer.openWarranties })}
         />
       ) : null}
     </Card>
@@ -309,11 +297,9 @@ function WeightLine({
 function Accepted({
   vehicleId,
   records,
-  locale,
 }: {
   readonly vehicleId: string;
   readonly records: number;
-  readonly locale: string;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -326,7 +312,7 @@ function Accepted({
           <Text variant="subheading">{t('transfer.acceptedTitle')}</Text>
         </Row>
         <Text variant="body" tone="muted">
-          {t('transfer.acceptedBody', { count: formatCount(records, locale) })}
+          {t('transfer.acceptedBody', { count: records })}
         </Text>
       </Card>
 

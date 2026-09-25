@@ -16,12 +16,13 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   Card,
+  FadeIn,
   ProgressStages,
+  rowDirectionFor,
   StatCluster,
   Text,
-  rowDirectionFor,
-  type ProgressStage,
   useTheme,
+  type ProgressStage,
 } from '@habba/ui';
 import { agreedTotal } from '@/features/shared/lib/order-price';
 import { ProviderRow } from './ProviderRow';
@@ -64,7 +65,8 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
   ];
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <Card testID="live-headline" elevation="md">
         <View
           style={{
@@ -77,25 +79,33 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
             <Text variant="caption" tone="muted">
               {t('tracking.arrivesIn')}
             </Text>
-            <View
-              style={{
-                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-                alignItems: 'baseline',
-                gap: theme.spacing.xs,
-              }}
-            >
-              <Text
-                variant="display"
-                tone="primary"
-                numeric
-                style={{ lineHeight: theme.fontSize['3xl'] }}
+            {/* No estimate yet reads as that, in words — a big dash with
+                "minutes" after it looked like a broken number. */}
+            {progress?.etaMinutes === undefined ? (
+              <Text variant="subheading" tone="muted">
+                {t('tracking.etaPending')}
+              </Text>
+            ) : (
+              <View
+                style={{
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                  alignItems: 'baseline',
+                  gap: theme.spacing.xs,
+                }}
               >
-                {progress?.etaMinutes ?? '—'}
-              </Text>
-              <Text variant="body" tone="primary">
-                {t('tracking.unitMinutes')}
-              </Text>
-            </View>
+                <Text
+                  variant="display"
+                  tone="primary"
+                  numeric
+                  style={{ lineHeight: theme.fontSize['3xl'] }}
+                >
+                  {progress.etaMinutes}
+                </Text>
+                <Text variant="body" tone="primary">
+                  {t('tracking.unitMinutes', { count: progress.etaMinutes })}
+                </Text>
+              </View>
+            )}
           </View>
 
           <StatCluster
@@ -149,6 +159,6 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
           {t('common.share')}
         </Text>
       </View>
-    </View>
+    </FadeIn>
   );
 }

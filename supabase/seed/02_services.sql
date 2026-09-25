@@ -73,6 +73,11 @@ on conflict do nothing;
 -- customer does not own (build prompt §6.5, Phase 5).
 update public.services set requires_vehicle = false where name_en = 'Pre-purchase inspection';
 
+-- And it files a structured report against this template (0073). The
+-- migration sets it on a database already seeded; this sets it on a fresh one.
+update public.services set inspection_template_key = 'pre_purchase_v1'
+ where name_en = 'Pre-purchase inspection';
+
 
 -- Completion evidence exemptions (0032).
 --

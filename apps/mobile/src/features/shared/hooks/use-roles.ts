@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { repository } from '@/features/shared/data/repository';
 import { canApplyAsProvider, canEnterProviderMode } from '@/features/shared/access/provider-access';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 
 export function useRoles() {
   const isAuthenticated = useIsAuthenticated();
@@ -43,7 +44,9 @@ export function useIsApprovedProvider(): boolean {
 /** Whether «اشتغل معنا كفنّي» is offered and the KYC form may open. */
 export function useCanApplyAsProvider(): boolean {
   const roles = useRoles();
-  return canApplyAsProvider({ roles: roles.data ?? [] });
+  // The build's flag and the operators' switch (0081) must both allow it.
+  const open = useFeatures().providerApplications;
+  return open && canApplyAsProvider({ roles: roles.data ?? [] });
 }
 
 export function useProviderApplication() {

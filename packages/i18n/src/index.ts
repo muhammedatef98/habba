@@ -66,6 +66,24 @@ export function resolveLocale(preferred: readonly string[] | string | undefined)
   return DEFAULT_LOCALE;
 }
 
+/**
+ * The plural categories each locale's copy must provide (CLDR, which is what
+ * `Intl.PluralRules` and i18next both use). Arabic has six: «سيارة واحدة»,
+ * «سيارتان», «3 سيارات», «11 سيارةً», «100 سيارة», and «لا سيارات» for none.
+ * Writing "{{count}} سيارة" for all of them reads as a machine translation.
+ */
+export const PLURAL_FORMS: Readonly<Record<Locale, readonly Intl.LDMLPluralRule[]>> = {
+  ar: ['zero', 'one', 'two', 'few', 'many', 'other'],
+  en: ['one', 'other'],
+};
+
+const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
+
+/** `settings.vehiclesCount_few` → `settings.vehiclesCount`; other keys unchanged. */
+export function pluralBase(key: string): string {
+  return key.replace(PLURAL_SUFFIX, '');
+}
+
 /** Reads a dotted path out of a resource tree. */
 export function lookup(locale: Locale, key: string): string | undefined {
   const segments = key.split('.');
@@ -99,8 +117,32 @@ export function interpolate(template: string, params?: Readonly<Record<string, s
  * and gets ignored.
  */
 export function createTranslator(locale: Locale) {
-  return function t(key: TranslationKey, params?: Readonly<Record<string, string | number>>) {
-    const template = lookup(locale, key) ?? lookup(FALLBACK_LOCALE, key) ?? key;
+  return function t(
+    key: TranslationKey | PluralKey,
+    params?: Readonly<Record<string, string | number>>,
+  ) {
+    const template =
+      pluralLookup(locale, key, params?.['count']) ??
+      pluralLookup(FALLBACK_LOCALE, key, params?.['count']) ??
+      key;
     return interpolate(template, params);
   };
+}
+
+/** A key written in the copy with plural suffixes, called by its base name. */
+export type PluralKey = TranslationKey extends infer K
+  ? K extends `${infer Base}_${'zero' | 'one' | 'two' | 'few' | 'many' | 'other'}`
+    ? Base
+    : never
+  : never;
+
+/** The i18next rule: `key_<category>` for a numeric count, then `key_other`, then `key`. */
+function pluralLookup(locale: Locale, key: string, count: unknown): string | undefined {
+  if (typeof count === 'number') {
+    const category = new Intl.PluralRules(locale).select(count);
+    return (
+      lookup(locale, `${key}_${category}`) ?? lookup(locale, `${key}_other`) ?? lookup(locale, key)
+    );
+  }
+  return lookup(locale, key);
 }

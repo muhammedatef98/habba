@@ -26,7 +26,8 @@ export interface ActiveOrderCardProps {
 }
 
 export function ActiveOrderCard({ order, onPress, testID }: ActiveOrderCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const serviceName = i18n.language.startsWith('ar') ? order.serviceNameAr : order.serviceNameEn;
   const theme = useTheme();
 
   return (
@@ -34,7 +35,7 @@ export function ActiveOrderCard({ order, onPress, testID }: ActiveOrderCardProps
       {...(testID !== undefined ? { testID } : {})}
       elevation="sm"
       onPress={onPress}
-      accessibilityLabel={`${t('home.activeTitle')} — ${order.serviceNameAr}`}
+      accessibilityLabel={`${t('home.activeTitle')} — ${serviceName}`}
       style={{
         backgroundColor: theme.colors.primarySubtle,
         borderColor: theme.colors.primary,
@@ -69,7 +70,7 @@ export function ActiveOrderCard({ order, onPress, testID }: ActiveOrderCardProps
         >
           <View style={{ flex: 1 }}>
             <Text variant="bodyStrong" numberOfLines={1}>
-              {order.serviceNameAr}
+              {serviceName}
             </Text>
             <Text variant="caption" tone="primary">
               {t('home.activeTrack')}

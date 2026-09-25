@@ -24,6 +24,8 @@ import {
   useProviderApplication,
 } from '@/features/shared/hooks/use-roles';
 import { useMode } from '@/features/shared/state/mode';
+import { formatPhone } from '@/features/shared/lib/format-phone';
+import { unregisterThisDevice } from '@/features/shared/lib/push';
 import { useIsAuthenticated, useIsGuest, useSession } from '@/features/shared/state/session';
 import type { ProviderApplicationStatus } from '@/features/shared/data/types';
 
@@ -67,7 +69,9 @@ export default function ProfileScreen() {
         <View style={{ gap: theme.spacing.xs }}>
           <Text variant="heading">{profile.data?.fullName ?? t('profile.unnamed')}</Text>
           <Text variant="caption" tone="muted">
-            {profile.data?.phone ?? profile.data?.email ?? t('profile.noIdentity')}
+            {profile.data?.phone !== null && profile.data?.phone !== undefined
+              ? formatPhone(profile.data.phone)
+              : (profile.data?.email ?? t('profile.noIdentity'))}
           </Text>
         </View>
       </Card>
@@ -132,7 +136,10 @@ export default function ProfileScreen() {
         testID="sign-out"
         label={t('profile.signOut')}
         variant="secondary"
-        onPress={() => {
+        onPress={async () => {
+          // Before the session ends: only a signed-in person can take their
+          // own phone off the list.
+          await unregisterThisDevice();
           signOut();
           router.replace('/');
         }}

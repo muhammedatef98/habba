@@ -56,6 +56,19 @@ const DIALECT_WORDS = [
   'خليك',
   'خلها',
   'خله',
+  // Spoken negation and future, which read as a chat message in interface
+  // copy: «ما عندك طلبات», «ما فيه مواعيد», «بيظهر هنا», «ما تحتاج تسوي شي».
+  'ما عندك',
+  'ما فيه',
+  'بيظهر',
+  'بيحدّثك',
+  'تسوي',
+  'شي',
+  'خلّ',
+  'بنخبرك',
+  'يشتغل',
+  'وبنبحث',
+  'نلقى',
 ];
 
 function leaves(node: unknown, prefix = ''): Array<[string, string]> {

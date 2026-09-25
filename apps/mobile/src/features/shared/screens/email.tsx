@@ -93,13 +93,21 @@ export default function EmailScreen() {
     // empty name falls back to the address rather than blocking the sign-in on
     // a field nobody has to fill in.
     const normalised = normaliseEmail(email);
-    const profile = await repository.upsertProfile({
-      fullName: fullName.trim().length > 1 ? fullName.trim() : normalised,
-      phone: null,
-      email: normalised,
-      isGuest: false,
-      preferredLocale: locale,
-    });
+    let profile: Awaited<ReturnType<typeof repository.upsertProfile>>;
+    try {
+      profile = await repository.upsertProfile({
+        fullName: fullName.trim().length > 1 ? fullName.trim() : normalised,
+        phone: null,
+        email: normalised,
+        isGuest: false,
+        preferredLocale: locale,
+      });
+    } catch {
+      // As on the phone screen: the code was right, the save was not.
+      setBusy(false);
+      setError(t('auth.errors.network'));
+      return;
+    }
 
     setBusy(false);
     signIn(profile.id, profile.fullName);

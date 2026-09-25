@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  inspectionProgress,
   collectFindings,
   countByRating,
   renderInspectionReport,
@@ -172,5 +173,42 @@ describe('renderInspectionReport', () => {
   test('never renders the buyer identity', () => {
     expect(html).not.toContain('+9665');
     expect(html).not.toContain('customer_id');
+  });
+});
+
+describe('as a file, with no public link (ADR-0019)', () => {
+  test('renders without a link when none is given', () => {
+    const html = renderInspectionReport(REPORT);
+    expect(html).not.toContain('<code>');
+    expect(html).toContain('عن هذا التقرير');
+  });
+});
+
+describe('inspectionProgress', () => {
+  const sections = [
+    {
+      key: 'engine',
+      title_ar: 'المحرك',
+      items: [
+        { key: 'oil', label_ar: 'زيت', required: true },
+        { key: 'belts', label_ar: 'سيور', required: false },
+      ],
+    },
+  ];
+
+  test('counts what is answered and names the required items still open', () => {
+    expect(inspectionProgress(sections, {})).toEqual({
+      answered: 0,
+      total: 2,
+      missingRequired: [{ section: 'engine', item: 'oil' }],
+    });
+  });
+
+  test('an optional item left open does not block submission', () => {
+    expect(inspectionProgress(sections, { engine: { oil: { rating: 'pass' } } })).toEqual({
+      answered: 1,
+      total: 2,
+      missingRequired: [],
+    });
   });
 });

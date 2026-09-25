@@ -116,7 +116,7 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
                 {yearCounts !== undefined ? (
                   <Text variant="caption" tone="muted">
                     {t('logbook.yearSummary', {
-                      count: formatCount(yearCounts.total, i18n.language),
+                      count: yearCounts.total,
                       verified: formatCount(yearCounts.verified, i18n.language),
                     })}
                   </Text>

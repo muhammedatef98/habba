@@ -20,22 +20,25 @@
  */
 
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import Constants from 'expo-constants';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, Icon, ListRow, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
-import { formatCount } from '@/features/shared/lib/format-number';
+import { formatPhone } from '@/features/shared/lib/format-phone';
 import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
+import { unregisterThisDevice } from '@/features/shared/lib/push';
+import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
+import { DeleteAccountCard } from '@/features/shared/components/DeleteAccountCard';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
 export default function AccountScreen() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
 
@@ -77,6 +80,18 @@ export default function AccountScreen() {
 
   const profile = useQuery({ queryKey: ['profile'], queryFn: () => repository.getProfile() });
   const vehicles = useQuery({ queryKey: ['vehicles'], queryFn: () => repository.listVehicles() });
+  // Support contacts are set by Habba's operators (0069), not built in: a
+  // number that changes should not need an app release.
+  const platform = useQuery({
+    queryKey: ['platform-status'],
+    queryFn: () => repository.getPlatformStatus(),
+    staleTime: 60_000,
+  });
+  const support = platform.data;
+  const isProvider = useIsApprovedProvider();
+  const hasSupport =
+    support !== undefined &&
+    (support.supportPhone !== '' || support.supportWhatsapp !== '' || support.supportEmail !== '');
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
@@ -92,7 +107,10 @@ export default function AccountScreen() {
   ];
 
   const person = profile.data ?? null;
-  const contact = person?.phone ?? person?.email ?? null;
+  const contact =
+    person?.phone !== null && person?.phone !== undefined
+      ? formatPhone(person.phone)
+      : (person?.email ?? null);
 
   /**
    * A guest's stored name is a placeholder, not a name.
@@ -186,8 +204,29 @@ export default function AccountScreen() {
           </Text>
           <Text variant="caption" tone="muted">
             {t('settings.vehiclesCount', {
-              count: formatCount(vehicles.data?.length ?? 0, i18n.language),
+              count: vehicles.data?.length ?? 0,
             })}
+          </Text>
+          <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
+        </Card>
+
+        <Card
+          testID="account-invoices"
+          elevation="none"
+          onPress={() => router.push('/invoices')}
+          accessibilityLabel={t('settings.myInvoices')}
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            alignItems: 'center',
+            gap: theme.spacing.md,
+            minHeight: theme.minTouchTarget,
+            borderColor: theme.colors.border,
+            borderWidth: 1,
+          }}
+        >
+          <Icon name="wallet" size={theme.iconSize.md} color={theme.colors.textMuted} />
+          <Text variant="bodySmall" style={{ flex: 1 }}>
+            {t('settings.myInvoices')}
           </Text>
           <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
         </Card>
@@ -258,8 +297,69 @@ export default function AccountScreen() {
         </Card>
       </View>
 
+      {hasSupport ? (
+        <View testID="support-section" style={{ gap: theme.spacing.md }}>
+          <SectionHeader title={t('settings.sectionSupport')} />
+          <Card elevation="none" style={{ borderColor: theme.colors.border, borderWidth: 1 }}>
+            {support.supportPhone !== '' ? (
+              <ListRow
+                title={t('settings.supportCall')}
+                value={support.supportPhone}
+                onPress={() => void Linking.openURL(`tel:${support.supportPhone}`)}
+              />
+            ) : null}
+            {support.supportWhatsapp !== '' ? (
+              <ListRow
+                title={t('settings.supportWhatsapp')}
+                value={support.supportWhatsapp}
+                onPress={() =>
+                  void Linking.openURL(
+                    `https://wa.me/${support.supportWhatsapp.replace(/[^0-9]/g, '')}`,
+                  )
+                }
+              />
+            ) : null}
+            {support.supportEmail !== '' ? (
+              <ListRow
+                title={t('settings.supportEmail')}
+                value={support.supportEmail}
+                onPress={() => void Linking.openURL(`mailto:${support.supportEmail}`)}
+              />
+            ) : null}
+          </Card>
+        </View>
+      ) : null}
+
       <View style={{ gap: theme.spacing.md }}>
         <SectionHeader title={t('settings.sectionAbout')} />
+
+        {/* The documents in force (0083), and the provider terms for anyone
+            who works with Habba. */}
+        <Card
+          testID="legal-section"
+          elevation="none"
+          style={{ borderColor: theme.colors.border, borderWidth: 1 }}
+        >
+          <ListRow
+            testID="legal-terms-row"
+            title={t('legal.terms')}
+            onPress={() => router.push({ pathname: '/legal', params: { kind: 'terms' } })}
+          />
+          <ListRow
+            testID="legal-privacy-row"
+            title={t('legal.privacy')}
+            onPress={() => router.push({ pathname: '/legal', params: { kind: 'privacy' } })}
+          />
+          {isProvider ? (
+            <ListRow
+              testID="legal-provider-terms-row"
+              title={t('legal.providerTerms')}
+              onPress={() =>
+                router.push({ pathname: '/legal', params: { kind: 'provider_terms' } })
+              }
+            />
+          ) : null}
+        </Card>
 
         <Card elevation="none" style={{ borderColor: theme.colors.border, borderWidth: 1 }}>
           <View
@@ -322,7 +422,10 @@ export default function AccountScreen() {
                 label={t('settings.signOutConfirm')}
                 variant="emergency"
                 size="medium"
-                onPress={() => {
+                onPress={async () => {
+                  // Before the session ends: only a signed-in person can take
+                  // their own phone off the list.
+                  await unregisterThisDevice();
                   signOut();
                   router.replace('/');
                 }}
@@ -338,6 +441,8 @@ export default function AccountScreen() {
           onPress={() => setConfirmingSignOut(true)}
         />
       )}
+
+      <DeleteAccountCard />
     </Screen>
   );
 }

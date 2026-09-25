@@ -22,17 +22,26 @@
 import { Redirect, Stack } from 'expo-router';
 import { ThemeProvider } from '@habba/ui';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
+import { FeatureUnavailable } from '@/features/shared/components/FeatureUnavailable';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 
 export default function EmergencyLayout() {
   const locale = useSession((state) => state.locale);
   const isAuthenticated = useIsAuthenticated();
   const preference = useSession((state) => state.themePreference);
+  const features = useFeatures();
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
   return (
     <ThemeProvider locale={locale} preference={preference === 'light' ? 'light' : 'dark'}>
-      <Stack screenOptions={{ headerShown: false }} />
+      {/* Switched off from the console (0081): reached only from a stale
+          screen or a link, since the ways in are hidden. */}
+      {features.emergency ? (
+        <Stack screenOptions={{ headerShown: false }} />
+      ) : (
+        <FeatureUnavailable testID="emergency-unavailable" />
+      )}
     </ThemeProvider>
   );
 }

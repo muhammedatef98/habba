@@ -34,6 +34,7 @@ function toneFor(status: OrderStatus): StatusTone {
 
 export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) {
   const { t, i18n } = useTranslation();
+  const serviceName = i18n.language.startsWith('ar') ? order.serviceNameAr : order.serviceNameEn;
   const theme = useTheme();
 
   const when = formatShortDate(order.createdAt, i18n.language);
@@ -43,7 +44,7 @@ export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) 
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${order.serviceNameAr} — ${t(`job.status.${order.status}`)}`}
+      accessibilityLabel={`${serviceName} — ${t(`job.status.${order.status}`)}`}
       style={({ pressed }) => [
         {
           flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
@@ -63,7 +64,7 @@ export function RecentOrderRow({ order, onPress, testID }: RecentOrderRowProps) 
 
       <View style={{ flex: 1 }}>
         <Text variant="bodySmall" numberOfLines={1}>
-          {order.serviceNameAr}
+          {serviceName}
         </Text>
         <Text variant="caption" tone="subtle">
           {when}

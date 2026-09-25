@@ -12,8 +12,8 @@
  */
 
 import { useRef } from 'react';
-import { I18nManager, Pressable, ScrollView, View } from 'react-native';
-import { Text, useTheme } from '@habba/ui';
+import { Pressable, ScrollView, View } from 'react-native';
+import { Text, rowDirectionFor, useTheme } from '@habba/ui';
 
 export interface ChipOption {
   readonly key: string;
@@ -49,9 +49,14 @@ export function ChipRow({ label, options, selected, onSelect, testIdPrefix }: Ch
    *
    * Unanimated, because this is where the row should have been all along
    * rather than somewhere it slides from.
+   *
+   * The reading direction is the locale's, not `I18nManager.isRTL`: on the
+   * first Arabic launch the platform still says left-to-right, the chips are
+   * reversed below to read right-to-left anyway, and their start is still the
+   * far end.
    */
   const parkAtStart = () => {
-    if (I18nManager.isRTL) {
+    if (theme.direction === 'rtl') {
       scroller.current?.scrollToEnd({ animated: false });
     } else {
       scroller.current?.scrollTo({ x: 0, y: 0, animated: false });
@@ -71,7 +76,14 @@ export function ChipRow({ label, options, selected, onSelect, testIdPrefix }: Ch
         accessibilityRole="radiogroup"
         onContentSizeChange={parkAtStart}
         onLayout={parkAtStart}
-        contentContainerStyle={{ gap: theme.spacing.sm, paddingVertical: theme.spacing.xs }}
+        // `flexGrow: 1` makes a short row (four models) span the width, so
+        // it starts at the reading start instead of hugging the left edge.
+        contentContainerStyle={{
+          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+          flexGrow: 1,
+          gap: theme.spacing.sm,
+          paddingVertical: theme.spacing.xs,
+        }}
       >
         {options.map((option) => {
           const isSelected = option.key === selected;

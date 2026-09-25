@@ -96,7 +96,7 @@ describe('maintenanceLine — ADR-0022, what the section may claim', () => {
     const line = maintenanceLine(item({ daysRemaining: CARE_LEAD_DAYS - 1, kmRemaining: 5000 }));
     expect(line.key).toBe('care.item.inDays');
     expect(line.certain).toBe(true);
-    expect(line.values['days']).toBe(CARE_LEAD_DAYS - 1);
+    expect(line.values['count']).toBe(CARE_LEAD_DAYS - 1);
   });
 
   test('an item we were never told about says so, rather than saying it is fine', () => {
@@ -133,7 +133,7 @@ describe('documentLine — the certain half of القادم', () => {
   test('an expired document counts the days it has been expired, as a positive', () => {
     const line = documentLine(doc({ daysRemaining: -3, isExpired: true }));
     expect(line.key).toBe('care.doc.expired');
-    expect(line.values['days']).toBe(3);
+    expect(line.values['count']).toBe(3);
     expect(line.urgency).toBe('overdue');
   });
 

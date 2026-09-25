@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  canQuoteParts,
   canRecordEvidence,
   checkMileage,
   isActiveJob,
@@ -164,5 +165,15 @@ describe('checkMileage', () => {
   test('tolerates a same-day reading', () => {
     // daysSince 0 must not collapse the ceiling to the last reading itself.
     expect(checkMileage(51200, 51000, 0)).toBeNull();
+  });
+});
+
+describe('canQuoteParts', () => {
+  test('is open from acceptance until hand-back, and closed after', () => {
+    expect(canQuoteParts('accepted')).toBe(true);
+    expect(canQuoteParts('in_progress')).toBe(true);
+    expect(canQuoteParts('searching')).toBe(false);
+    expect(canQuoteParts('awaiting_approval')).toBe(false);
+    expect(canQuoteParts('completed')).toBe(false);
   });
 });

@@ -1,22 +1,26 @@
 /**
- * Who is operating the console.
+ * Who is operating the console, and how far through signing in they are.
  *
  * ⚠️ READ THIS BEFORE TRUSTING ANYTHING HERE. This module decides what the UI
  * shows. It is NOT the security boundary and must never be treated as one.
  *
- * The boundary is `is_ops()` (0013), evaluated inside the database on every
- * policy and every ops-only function. A person who bypasses this screen
- * entirely — devtools, a crafted request, a stale bundle — reaches a database
- * that will not return them a single provider row or accept a single decision.
- * That is the design: the console is a convenience over an API that is already
- * safe without it.
+ * The boundary is `is_ops()` in the database (0068): an operator role, AND a
+ * second factor verified in this session, AND within the last eight hours.
+ * Someone who skips these screens reaches an API that returns them nothing
+ * and accepts nothing. What this module is for is walking a real operator
+ * through the same three conditions the server checks, in order, so they are
+ * never shown controls that would fail:
  *
- * What this module is for is not showing an operator a queue of controls that
- * will fail when they use them, and not leaving a signed-in technician staring
- * at a console they have no business seeing.
+ *   signed_out → password → enrol (first time) or verify → ready
+ *
+ * CLAUDE.md §5.1.6: 2FA is mandatory, sessions last eight hours, and there is
+ * no "remember me". The session lives in sessionStorage, so closing the
+ * browser ends it, and the server's eight hours run from the second factor —
+ * after which is_ops() is false and this module sends the operator back to
+ * verify.
  */
 
-import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export type OpsRole = 'ops' | 'super_admin';
 
@@ -25,19 +29,44 @@ export interface Operator {
   readonly email: string | null;
   readonly fullName: string;
   readonly role: OpsRole;
+  /** When the server stops treating this session as ops (0068). */
+  readonly expiresAt: Date;
 }
 
+export interface TotpEnrolment {
+  readonly factorId: string;
+  /** An `image/svg+xml` data URI, ready for an <img>. */
+  readonly qrCode: string | null;
+  /** For typing in by hand when the camera is not an option. */
+  readonly secret: string;
+}
+
+export type OpsState =
+  | { readonly stage: 'signed_out' }
+  | { readonly stage: 'enrol'; readonly enrolment: TotpEnrolment }
+  | { readonly stage: 'verify'; readonly factorId: string }
+  | { readonly stage: 'ready'; readonly operator: Operator };
+
 export type SignInResult =
-  | { readonly ok: true; readonly operator: Operator }
-  | {
-      readonly ok: false;
-      readonly reason: 'bad_credentials' | 'not_ops' | 'transport_failed';
-    };
+  | { readonly ok: true; readonly state: OpsState }
+  | { readonly ok: false; readonly reason: 'bad_credentials' | 'not_ops' | 'transport_failed' };
+
+export type VerifyResult =
+  | { readonly ok: true; readonly state: OpsState }
+  | { readonly ok: false; readonly reason: 'bad_code' | 'transport_failed' };
 
 export interface OpsAuth {
   signIn(email: string, password: string): Promise<SignInResult>;
-  currentOperator(): Promise<Operator | null>;
+  /** Where an already-open tab stands, re-read from the server. */
+  current(): Promise<OpsState>;
+  verify(factorId: string, code: string): Promise<VerifyResult>;
   signOut(): Promise<void>;
+}
+
+interface WhoAmI {
+  readonly role: OpsRole | null;
+  readonly session_ok: boolean;
+  readonly expires_at: string | null;
 }
 
 class SupabaseOpsAuth implements OpsAuth {
@@ -45,29 +74,51 @@ class SupabaseOpsAuth implements OpsAuth {
 
   async signIn(email: string, password: string): Promise<SignInResult> {
     const { data, error } = await this.client.auth.signInWithPassword({ email, password });
+    if (error !== null || data.session === null) return { ok: false, reason: 'bad_credentials' };
 
-    if (error !== null || data.session === null) {
-      return { ok: false, reason: 'bad_credentials' };
+    try {
+      const state = await this.resolve();
+      if (state === 'not_ops') {
+        // ⚠️ Sign the session out again. A non-ops user who authenticates is
+        // still authenticated; leaving the session would hand the console's
+        // own fetches a customer's token, and every refusal would look like a
+        // bug rather than a refusal.
+        await this.client.auth.signOut();
+        return { ok: false, reason: 'not_ops' };
+      }
+      return { ok: true, state };
+    } catch {
+      return { ok: false, reason: 'transport_failed' };
     }
-
-    const operator = await this.operatorFor(data.session);
-    if (operator === null) {
-      // ⚠️ Sign the session out again. A non-ops user who authenticates
-      // successfully is still authenticated — leaving the session in place
-      // would hand the console's own fetches a valid token belonging to a
-      // customer, and every subsequent failure would look like a bug rather
-      // than a refusal.
-      await this.client.auth.signOut();
-      return { ok: false, reason: 'not_ops' };
-    }
-
-    return { ok: true, operator };
   }
 
-  async currentOperator(): Promise<Operator | null> {
+  async current(): Promise<OpsState> {
     const { data } = await this.client.auth.getSession();
-    if (data.session === null) return null;
-    return this.operatorFor(data.session);
+    if (data.session === null) return { stage: 'signed_out' };
+    try {
+      const state = await this.resolve();
+      if (state === 'not_ops') {
+        await this.client.auth.signOut();
+        return { stage: 'signed_out' };
+      }
+      return state;
+    } catch {
+      return { stage: 'signed_out' };
+    }
+  }
+
+  async verify(factorId: string, code: string): Promise<VerifyResult> {
+    const { error } = await this.client.auth.mfa.challengeAndVerify({
+      factorId,
+      code: code.trim(),
+    });
+    if (error !== null) return { ok: false, reason: 'bad_code' };
+    try {
+      const state = await this.resolve();
+      return state === 'not_ops' ? { ok: false, reason: 'transport_failed' } : { ok: true, state };
+    } catch {
+      return { ok: false, reason: 'transport_failed' };
+    }
   }
 
   async signOut(): Promise<void> {
@@ -75,74 +126,138 @@ class SupabaseOpsAuth implements OpsAuth {
   }
 
   /**
-   * Reads the role from `profiles`, not from the JWT.
-   *
-   * A role baked into a token at sign-in stays true until the token expires,
-   * so revoking someone's access would not take effect until then. Reading the
-   * row means a revoked operator loses the console on their next action, which
-   * is the behaviour anyone revoking access assumes they are getting.
+   * The server says whether this is an operator and whether the session
+   * counts yet (ops_whoami, 0068). The role comes from `user_roles` on every
+   * call, not from the token, so revoking someone takes effect on their next
+   * action rather than at token expiry.
    */
-  private async operatorFor(session: Session): Promise<Operator | null> {
-    const { data, error } = await this.client
-      .from('profiles')
-      .select('id, full_name, email, role')
-      .eq('id', session.user.id)
-      .maybeSingle();
+  private async resolve(): Promise<OpsState | 'not_ops'> {
+    const who = await this.client.rpc('ops_whoami').single<WhoAmI>();
+    if (who.error !== null) throw new Error(who.error.message);
+    if (who.data.role === null) return 'not_ops';
 
-    if (error !== null || data === null) return null;
+    if (who.data.session_ok && who.data.expires_at !== null) {
+      return { stage: 'ready', operator: await this.operator(who.data.role, who.data.expires_at) };
+    }
 
-    const row = data as { id: string; full_name: string; email: string | null; role: string };
-    if (row.role !== 'ops' && row.role !== 'super_admin') return null;
+    const factors = await this.client.auth.mfa.listFactors();
+    if (factors.error !== null) throw new Error(factors.error.message);
+
+    const verified = factors.data.totp.find((factor) => factor.status === 'verified');
+    if (verified !== undefined) return { stage: 'verify', factorId: verified.id };
+
+    // First sign-in: set up the authenticator. Half-finished enrolments from
+    // an abandoned attempt are cleared first, or they accumulate and the next
+    // enrolment is refused.
+    for (const factor of factors.data.all) {
+      if (factor.status !== 'verified')
+        await this.client.auth.mfa.unenroll({ factorId: factor.id });
+    }
+    const enrolled = await this.client.auth.mfa.enroll({
+      factorType: 'totp',
+      friendlyName: 'Habba ops console',
+    });
+    if (enrolled.error !== null) throw new Error(enrolled.error.message);
 
     return {
-      id: row.id,
-      email: row.email,
-      fullName: row.full_name,
-      role: row.role,
+      stage: 'enrol',
+      enrolment: {
+        factorId: enrolled.data.id,
+        qrCode: enrolled.data.totp.qr_code ?? null,
+        secret: enrolled.data.totp.secret,
+      },
+    };
+  }
+
+  private async operator(role: OpsRole, expiresAt: string): Promise<Operator> {
+    const { data: session } = await this.client.auth.getSession();
+    const user = session.session?.user;
+    const profile = await this.client
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user?.id ?? '')
+      .maybeSingle<{ full_name: string }>();
+
+    return {
+      id: user?.id ?? '',
+      email: user?.email ?? null,
+      fullName: profile.data?.full_name ?? user?.email ?? '',
+      role,
+      expiresAt: new Date(expiresAt),
     };
   }
 }
 
 /**
- * Development stand-in.
- *
- * Accepts one fixed operator so the console is usable before a project exists,
- * and refuses everything else — including a plausible-looking technician
- * address, so the `not_ops` path is exercised rather than assumed.
+ * Development stand-in, walking the same steps with fixed answers: the
+ * operator is ops@habba.sa with any password of eight or more characters, and
+ * the authenticator code is 123456. The first sign-in in a tab enrols; later
+ * ones verify — so both screens are reachable before a project exists.
  */
 class DevOpsAuth implements OpsAuth {
-  private static readonly OPERATOR: Operator = {
-    id: 'ops-dev-1',
-    email: 'ops@habba.sa',
-    fullName: 'مشغّل التطوير',
-    role: 'ops',
-  };
-
-  private signedIn = false;
+  private static readonly EMAIL = 'ops@habba.sa';
+  private static readonly CODE = '123456';
+  private enrolled = false;
+  private state: OpsState = { stage: 'signed_out' };
 
   async signIn(email: string, password: string): Promise<SignInResult> {
-    if (email.trim().toLowerCase() !== DevOpsAuth.OPERATOR.email) {
-      // Anything else is treated as a real account without the role, so the
-      // screen's "not ops" branch is reachable in development.
-      return { ok: false, reason: 'not_ops' };
-    }
+    if (email.trim().toLowerCase() !== DevOpsAuth.EMAIL) return { ok: false, reason: 'not_ops' };
     if (password.length < 8) return { ok: false, reason: 'bad_credentials' };
 
-    this.signedIn = true;
-    return { ok: true, operator: DevOpsAuth.OPERATOR };
+    this.state = this.enrolled
+      ? { stage: 'verify', factorId: 'dev-factor' }
+      : {
+          stage: 'enrol',
+          enrolment: { factorId: 'dev-factor', qrCode: null, secret: 'JBSWY3DPEHPK3PXP' },
+        };
+    return { ok: true, state: this.state };
   }
 
-  async currentOperator(): Promise<Operator | null> {
-    return this.signedIn ? DevOpsAuth.OPERATOR : null;
+  async current(): Promise<OpsState> {
+    if (this.state.stage === 'ready' && this.state.operator.expiresAt.getTime() <= Date.now()) {
+      this.state = { stage: 'verify', factorId: 'dev-factor' };
+    }
+    return this.state;
+  }
+
+  async verify(_factorId: string, code: string): Promise<VerifyResult> {
+    if (code.trim() !== DevOpsAuth.CODE) return { ok: false, reason: 'bad_code' };
+    this.enrolled = true;
+    this.state = {
+      stage: 'ready',
+      operator: {
+        id: 'ops-dev-1',
+        email: DevOpsAuth.EMAIL,
+        fullName: 'مشغّل التطوير',
+        role: 'ops',
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
+      },
+    };
+    return { ok: true, state: this.state };
   }
 
   async signOut(): Promise<void> {
-    this.signedIn = false;
+    this.state = { stage: 'signed_out' };
   }
 }
 
 const url = process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? '';
 const key = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] ?? '';
 
+function browserClient(): SupabaseClient {
+  return createClient(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      // No "remember me" (§5.1.6): the session ends with the browser tab's
+      // session, not whenever a refresh token finally lapses.
+      ...(typeof window === 'undefined' ? {} : { storage: window.sessionStorage }),
+    },
+  });
+}
+
+/** The same client the data layer uses, so its requests carry this session. */
+export const opsClient: SupabaseClient | null = url !== '' && key !== '' ? browserClient() : null;
+
 export const opsAuth: OpsAuth =
-  url !== '' && key !== '' ? new SupabaseOpsAuth(createClient(url, key)) : new DevOpsAuth();
+  opsClient !== null ? new SupabaseOpsAuth(opsClient) : new DevOpsAuth();

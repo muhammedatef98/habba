@@ -17,13 +17,16 @@
  * stubbed with invented numbers.
  */
 
+import { useState } from 'react';
 import { Share, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { isZeroSar } from '@habba/core';
 import {
   Button,
   Card,
+  Row,
   Screen,
   Skeleton,
   SkeletonCard,
@@ -32,23 +35,38 @@ import {
   useTheme,
 } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
+import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { Arrived } from '@/features/customer/components/tracking/Arrived';
+import { Booked } from '@/features/customer/components/tracking/Booked';
 import { Completed } from '@/features/customer/components/tracking/Completed';
 import { InProgress } from '@/features/customer/components/tracking/InProgress';
 import { LiveTracking } from '@/features/customer/components/tracking/LiveTracking';
 import { Matched } from '@/features/customer/components/tracking/Matched';
+import { PriceBreakdown } from '@/features/customer/components/tracking/PriceBreakdown';
+import { ReportProblem } from '@/features/customer/components/tracking/ReportProblem';
+import { InspectionReportCard } from '@/features/customer/components/tracking/InspectionReportCard';
 import { Searching } from '@/features/customer/components/tracking/Searching';
 import type { OrderStatus } from '@/features/shared/data/types';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { agreedTotal } from '@/features/shared/lib/order-price';
 
 const TERMINAL: readonly OrderStatus[] = ['completed', 'cancelled', 'disputed'];
-const SEARCHING: readonly OrderStatus[] = ['draft', 'searching'];
+const SEARCHING: readonly OrderStatus[] = ['searching'];
 
 function TrackingBody() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  // The same query the service screen ran a moment ago, so a cache hit: it
+  // names the service on the searching screen.
+  const services = useQuery({
+    queryKey: ['emergency-services'],
+    queryFn: () => repository.listEmergencyServices(),
+  });
 
   const order = useQuery({
     queryKey: ['order', id],
@@ -98,23 +116,116 @@ function TrackingBody() {
   });
 
   const cancel = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
     mutationFn: () => repository.cancelOrder(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
 
-  const confirmCompletion = useMutation({
-    mutationFn: () => repository.confirmOrderCompletion(id ?? ''),
+  // Sends an order that was created but never sent — the app closed, or the
+  // payment hold failed, between the two steps. Idempotent server-side.
+  const send = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
+    mutationFn: () => repository.submitOrder(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
 
+  // Approved parts can take the final bill past what the card holds; the
+  // difference is held before the confirmation, in the same tap (0078).
+  const topUpDue = useQuery({
+    queryKey: ['order-top-up', id],
+    queryFn: () => repository.getTopUpDue(id ?? ''),
+    enabled: id !== undefined && order.data?.status === 'awaiting_approval',
+  });
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  const confirmCompletion = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
+    mutationFn: async () => {
+      if (topUpDue.data !== undefined && !isZeroSar(topUpDue.data)) {
+        await repository.payTopUp(id ?? '');
+      }
+      await repository.confirmOrderCompletion(id ?? '');
+    },
+    onMutate: () => setConfirmError(null),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['order', id] });
+      await queryClient.invalidateQueries({ queryKey: ['order-top-up', id] });
+    },
+    onError: async (error: Error) => {
+      await queryClient.invalidateQueries({ queryKey: ['order-top-up', id] });
+      // Closing the card form is a decision, not a failure.
+      if (error.message === 'payTopUp/payment: cancelled') return;
+      setConfirmError(
+        error.message.startsWith('payTopUp')
+          ? t('tracking.errors.topUpFailed')
+          : t('tracking.errors.confirmFailed'),
+      );
+    },
+  });
+
+  // How long before an unconfirmed job closes by itself — the operators'
+  // setting (0071), shown so the customer is not surprised by it.
+  // An inspection order's report, once filed (0026). Asked for only when the
+  // work is done; most orders have none, and the answer is then null.
+  const inspection = useQuery({
+    queryKey: ['order-inspection', id],
+    queryFn: () => repository.getOrderInspection(id ?? ''),
+    enabled:
+      id !== undefined &&
+      (order.data?.status === 'awaiting_approval' || order.data?.status === 'completed'),
+  });
+
+  // The tax invoice, issued with completion (0074). Asked for only then.
+  const invoice = useQuery({
+    queryKey: ['order-invoice', id],
+    queryFn: () => repository.getOrderInvoice(id ?? ''),
+    enabled: id !== undefined && order.data?.status === 'completed',
+  });
+
+  // Whether this order was rated already — it is opened again from the
+  // history long after the job, and must not ask twice.
+  const givenRating = useQuery({
+    queryKey: ['order-rating', id],
+    queryFn: () => repository.getOrderRating(id ?? ''),
+    enabled: id !== undefined && order.data?.status === 'completed',
+  });
+
+  const platform = useQuery({
+    queryKey: ['platform-status'],
+    queryFn: () => repository.getPlatformStatus(),
+    staleTime: 60_000,
+  });
+
   const rate = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
     mutationFn: (stars: number) =>
       repository.rateOrder({
         orderId: id ?? '',
         providerId: order.data?.providerId ?? '',
         stars,
       }),
+    onSuccess: (_, stars) => queryClient.setQueryData(['order-rating', id], stars),
   });
+
+  // The status, the parts and the technician's approach the moment they
+  // change, not a poll later (lib/live.ts).
+  useLiveRefresh(
+    [
+      { table: 'orders', filter: `id=eq.${id ?? ''}` },
+      { table: 'order_parts', filter: `order_id=eq.${id ?? ''}` },
+    ],
+    [
+      ['order', id],
+      ['order-parts', id],
+      ['order-progress', id],
+      ['order-top-up', id],
+    ],
+    id !== undefined,
+  );
 
   if (order.isLoading) {
     return (
@@ -147,10 +258,61 @@ function TrackingBody() {
   const current = order.data;
   const { status } = current;
   const providerData = provider.data ?? null;
-  const hasUnapprovedParts = (parts.data ?? []).some((line) => !line.approvedByCustomer);
+  const hasUnapprovedParts = (parts.data ?? []).some(
+    (line) => !line.approvedByCustomer && line.declinedAt === null,
+  );
 
   const telemetry = dispatch.data ?? undefined;
   const progress = liveProgress.data ?? undefined;
+
+  // Created but not sent. Nobody can see it yet, so this must not look like a
+  // search — it says so, and offers the one tap that finishes it.
+  if (status === 'draft') {
+    return (
+      <Screen scrollable>
+        <Card testID="tracking-not-sent">
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="heading">{t('tracking.notSentTitle')}</Text>
+            <Text variant="body" tone="muted">
+              {t('tracking.notSentBody')}
+            </Text>
+            <Button
+              testID="tracking-send"
+              label={t('tracking.notSentAction')}
+              onPress={() => send.mutate()}
+              loading={send.isPending}
+            />
+            {send.isError ? (
+              <Text variant="caption" tone="emergency">
+                {t('tracking.notSentFailed')}
+              </Text>
+            ) : null}
+          </View>
+        </Card>
+        <Button
+          label={t('tracking.cancelAction')}
+          variant="ghost"
+          onPress={() => cancel.mutate()}
+          loading={cancel.isPending}
+        />
+      </Screen>
+    );
+  }
+
+  const booked = current.fulfilmentMode !== 'mobile_ondemand';
+
+  if (booked && status === 'accepted') {
+    return (
+      <Screen scrollable>
+        <Booked
+          order={current}
+          provider={providerData}
+          onCancel={() => cancel.mutate()}
+          cancelPending={cancel.isPending}
+        />
+      </Screen>
+    );
+  }
 
   if (SEARCHING.includes(status)) {
     return (
@@ -160,6 +322,20 @@ function TrackingBody() {
           onCancel={() => cancel.mutate()}
           cancelPending={cancel.isPending}
           cancelFailed={cancel.isError}
+          summary={{
+            service: (() => {
+              const service = services.data?.find(
+                (candidate) => candidate.id === current.serviceId,
+              );
+              if (service === undefined) return null;
+              return i18n.language.startsWith('ar') ? service.nameAr : service.nameEn;
+            })(),
+            address: current.serviceAddressAr,
+            held: (() => {
+              const total = agreedTotal(current);
+              return total === null ? null : formatSarDisplay(total);
+            })(),
+          }}
         />
       </Screen>
     );
@@ -178,7 +354,7 @@ function TrackingBody() {
     );
   }
 
-  if (status === 'accepted' || status === 'en_route' || status === 'checked_in') {
+  if (status === 'accepted' || status === 'en_route') {
     return (
       <Screen scrollable>
         <LiveTracking
@@ -201,7 +377,9 @@ function TrackingBody() {
     );
   }
 
-  if (status === 'in_progress') {
+  // A car checked in at the workshop is with the provider now: the same
+  // "work underway" view, not a live map of a drive that is not happening.
+  if (status === 'in_progress' || status === 'checked_in') {
     return (
       <Screen scrollable>
         <InProgress
@@ -226,15 +404,74 @@ function TrackingBody() {
             <Text variant="body" tone="muted">
               {t('tracking.confirmCompletionBody')}
             </Text>
+
+            {/* What they are approving, before they approve it: the photos
+                of the work, what it costs, and what is guaranteed. */}
+            {current.completionMedia.length > 0 ? (
+              <Row gap="sm" wrap>
+                {current.completionMedia.map((photo) => (
+                  <EvidencePhoto
+                    key={photo.url}
+                    reference={photo.url}
+                    size={72}
+                    accessibilityLabel={photo.caption ?? t('tracking.evidenceTitle')}
+                  />
+                ))}
+              </Row>
+            ) : null}
+
+            {inspection.data !== null && inspection.data !== undefined ? (
+              <InspectionReportCard inspection={inspection.data} orderCompleted={false} />
+            ) : null}
+
+            <PriceBreakdown testID="approval-breakdown" order={current} />
+
+            {current.warrantyDays !== null && current.warrantyDays > 0 ? (
+              <Text testID="approval-warranty" variant="bodySmall" tone="success">
+                {t('tracking.warrantyLine', { count: current.warrantyDays })}
+              </Text>
+            ) : null}
+
+            {platform.data !== undefined ? (
+              <Text testID="auto-complete-note" variant="caption" tone="muted">
+                {t('tracking.autoCompleteNote', { count: platform.data.autoCompleteHours })}
+              </Text>
+            ) : null}
+
+            {topUpDue.data !== undefined && !isZeroSar(topUpDue.data) ? (
+              <Card
+                testID="approval-top-up"
+                elevation="none"
+                style={{
+                  gap: theme.spacing.xs,
+                  backgroundColor: theme.colors.accentSubtle,
+                  borderColor: theme.colors.accent,
+                  borderWidth: 1,
+                }}
+              >
+                <Text variant="bodyStrong" tone="accent">
+                  {t('tracking.topUpTitle')}
+                </Text>
+                <Text variant="bodySmall" tone="muted">
+                  {t('tracking.topUpBody', { amount: formatSarDisplay(topUpDue.data) })}
+                </Text>
+              </Card>
+            ) : null}
+
             <Button
               testID="confirm-completion"
-              label={t('tracking.confirmCompletionAction')}
+              label={
+                topUpDue.data !== undefined && !isZeroSar(topUpDue.data)
+                  ? t('tracking.topUpAction', { amount: formatSarDisplay(topUpDue.data) })
+                  : t('tracking.confirmCompletionAction')
+              }
               onPress={() => confirmCompletion.mutate()}
               loading={confirmCompletion.isPending}
+              disabled={topUpDue.isPending && topUpDue.fetchStatus !== 'idle'}
             />
-            {confirmCompletion.isError ? (
+            {confirmError !== null ? (
               <Text variant="caption" tone="emergency">
-                {t('tracking.errors.confirmFailed')}
+                {confirmError}
               </Text>
             ) : null}
           </View>
@@ -257,7 +494,32 @@ function TrackingBody() {
             router.push({ pathname: '/logbook', params: { id: current.vehicleId ?? '' } })
           }
           onDismiss={() => router.replace('/')}
+          invoice={invoice.data ?? null}
+          // Unknown reads as "not rated": a failed read must not hide the stars.
+          givenRating={givenRating.isError ? null : givenRating.data}
         />
+        {inspection.data !== null && inspection.data !== undefined ? (
+          <InspectionReportCard inspection={inspection.data} orderCompleted />
+        ) : null}
+        <ReportProblem orderId={current.id} />
+      </Screen>
+    );
+  }
+
+  // A complaint is not a cancellation. This used to fall through to the
+  // cancelled card below, telling a customer whose complaint was being
+  // reviewed that their order had been cancelled.
+  if (status === 'disputed') {
+    return (
+      <Screen scrollable>
+        <Card testID="order-disputed" elevation="sm" style={{ gap: theme.spacing.sm }}>
+          <Text variant="heading">{t('tracking.disputedTitle')}</Text>
+          <Text variant="bodySmall" tone="muted">
+            {t('tracking.disputedBody')}
+          </Text>
+        </Card>
+        <PriceBreakdown order={current} />
+        <Button label={t('common.back')} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
   }

@@ -15,23 +15,36 @@
  * shape of this interface reflects the shape of the security model.
  */
 
-import type { HabbaReport } from '@habba/core';
+import type { HabbaReport, InvoiceDocument, LegalDocumentKind } from '@habba/core';
 import {
   addSar,
   applyRate,
+  compareSar,
+  isZeroSar,
   multiplySar,
   normalisePlate,
   sarOrThrow,
   SAUDI_VAT_RATE,
+  subtractSar,
+  type SarAmount,
 } from '@habba/core';
+import { priceWithVat } from '@/features/shared/lib/order-price.js';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-language.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
+import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
+import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
+import { createPaymentProvider } from '@/features/shared/lib/payment-provider';
 import { useSession } from '@/features/shared/state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
+import { DEFAULT_PLATFORM_STATUS } from './platform-status.js';
 import type {
   AppointmentSlot,
+  OrderInspection,
+  LegalDocument,
+  PendingLegalDocument,
+  PlatformStatus,
   BookingMode,
   BookingProvider,
   City,
@@ -40,12 +53,14 @@ import type {
   MaintenanceAlert,
   MaintenanceItem,
   OrderSummary,
+  InvoiceSummary,
   NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
   NewVehicleInput,
   Order,
   OrderPart,
+  OrderStatus,
   IncomingTransfer,
   MintedTransfer,
   OwnershipTransfer,
@@ -170,8 +185,32 @@ export interface Repository {
    * A clip is an aid to the technician, never a precondition for rescue.
    */
   attachTriageClip(orderId: string, clip: { uri: string; seconds: number }): Promise<boolean>;
+  /**
+   * Something an <Image> can load for a stored media reference.
+   *
+   * A `storage://` reference (0064) becomes a short-lived signed URL; anything
+   * else is already displayable and is returned as it is. Null when the
+   * reference cannot be read by this user — the caller shows a placeholder,
+   * never the raw reference.
+   */
+  resolveMediaUrl(ref: string): Promise<string | null>;
+  /**
+   * Where to reach this person when the app is closed (0066). The token moves
+   * to whoever is signed in on the phone; sign-out removes it.
+   */
+  registerPushDevice(token: string, platform: 'ios' | 'android', locale: string): Promise<void>;
+  unregisterPushDevice(token: string): Promise<void>;
   listEmergencyServices(): Promise<readonly Service[]>;
   createEmergencyOrder(input: NewEmergencyOrderInput): Promise<string>;
+  /**
+   * Sends a created order: holds the payment, then broadcasts an emergency to
+   * nearby technicians or confirms a booking with the provider the customer
+   * chose (0065). Until this runs the order is a `draft` nobody can see.
+   *
+   * Safe to call again after a failure or a dropped response — a held
+   * payment is not held twice, and an order already sent stays sent.
+   */
+  submitOrder(orderId: string): Promise<OrderStatus>;
 
   // Phase 4 — booking ahead. The server side has existed since 0024; these are
   // the calls the customer app was missing, which is why حجز موعد led to a
@@ -207,10 +246,65 @@ export interface Repository {
   getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null>;
   listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
   approveOrderPart(partId: string): Promise<void>;
+  /** The customer's "no" to a quoted part. Recorded, never billed (0067). */
+  declineOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
+  /**
+   * The customer's complaint about a finished job (0070). Freezes the
+   * provider's payout for this order until Habba resolves it.
+   */
+  openOrderDispute(orderId: string, reason: string): Promise<void>;
+  /** The inspection report filed on this order, if one was (0026). */
+  getOrderInspection(orderId: string): Promise<OrderInspection | null>;
+  /**
+   * The tax invoice issued when this order completed (0074), with the seller
+   * and the billed lines — or null: not completed yet, nothing charged, or
+   * no seller configured.
+   */
+  getOrderInvoice(orderId: string): Promise<InvoiceDocument | null>;
+  /**
+   * The buyer bought the car: it joins their vehicles with the inspection as
+   * the first entry in its logbook (0027). Returns the new vehicle's id.
+   */
+  convertInspectionToVehicle(
+    reportId: string,
+    makeId: string,
+    modelId: string,
+    nickname: string | null,
+  ): Promise<string>;
+  /** The operators' switches and this account's standing (0069, 0070). */
+  getPlatformStatus(): Promise<PlatformStatus>;
+  /** The version in force of a legal document, its placeholders filled (0083). */
+  getLegalDocument(kind: LegalDocumentKind): Promise<LegalDocument>;
+  /** What this account has yet to accept; empty when signed out (0083). */
+  listPendingLegalDocuments(): Promise<readonly PendingLegalDocument[]>;
+  /** Records acceptance of these versions, which must be the ones in force. */
+  acceptLegalDocuments(documentIds: readonly string[]): Promise<void>;
+  /**
+   * Erases this account (0086). Throws `open_order`, `pending_payout` or
+   * `staff_account` when the server refuses, so the screen can say why.
+   */
+  deleteMyAccount(): Promise<void>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
+  /**
+   * What the customer still has to authorise before confirming: the final
+   * bill less what is already held (0078). Zero for most jobs; approved parts
+   * are what make it more.
+   */
+  getTopUpDue(orderId: string): Promise<SarAmount>;
+  /** Holds exactly that difference, through the same provider as the first hold. */
+  payTopUp(orderId: string): Promise<void>;
   rateOrder(input: NewRatingInput): Promise<void>;
+  /**
+   * The stars this customer gave the order, or null if they have not rated
+   * it. A completed order is opened again from the history; without this it
+   * asked to be rated a second time, and the second rating failed (0019 keeps
+   * one rating per order).
+   */
+  getOrderRating(orderId: string): Promise<number | null>;
+  /** The customer's tax invoices, newest first (0074). */
+  listInvoices(): Promise<readonly InvoiceSummary[]>;
 
   // نقل الملكية — the handover (0011, completed in 0054).
   //
@@ -654,7 +748,7 @@ const BOOKABLE_SERVICES: readonly Service[] = [
     category: 'inspection',
     nameAr: 'فحص ما قبل الشراء',
     nameEn: 'Pre-purchase inspection',
-    descriptionAr: 'تقرير مفصّل قبل ما تشتري — ١٢٠ نقطة فحص',
+    descriptionAr: 'تقرير مفصّل قبل الشراء — 120 نقطة فحص',
     icon: 'inspection',
     basePrice: sarOrThrow('450.00'),
     // §7.3: the car being inspected is not the customer's yet. This is the one
@@ -801,11 +895,11 @@ const DEV_PROVIDER: ProviderSummary = {
 };
 
 /** The Arabic name of any catalogue entry, emergency or bookable. */
-function serviceNameFor(serviceId: string): string {
+function serviceNamesFor(serviceId: string): { readonly ar: string; readonly en: string } {
   const match = [...EMERGENCY_SERVICES, ...BOOKABLE_SERVICES].find(
     (candidate) => candidate.id === serviceId,
   );
-  return match?.nameAr ?? serviceId;
+  return { ar: match?.nameAr ?? serviceId, en: match?.nameEn ?? serviceId };
 }
 
 /**
@@ -832,7 +926,7 @@ class DevOrderSimulator {
 
     const order: Order = {
       id,
-      status: 'searching',
+      status: 'draft',
       fulfilmentMode: 'mobile_ondemand',
       vehicleId: input.vehicleId ?? null,
       serviceId: input.serviceId,
@@ -844,14 +938,41 @@ class DevOrderSimulator {
       labourAmount: null,
       vatAmount: null,
       totalAmount: null,
-      escrowStatus: 'authorised',
+      escrowStatus: 'none',
       // The dev simulator has no technician taking photographs.
       completionMedia: [],
+      warrantyDays: null,
+      scheduledFor: null,
     };
     this.orders.set(id, order);
 
-    // Advances through the same statuses a real dispatch would, so the
-    // tracking screen has something to show without a second device.
+    return id;
+  }
+
+  /**
+   * The same commit the server makes (0065): nothing moves until the customer
+   * sends the order. Mirrored rather than skipped, so the dev build walks the
+   * screens through the same states a real order passes — including `draft`,
+   * which the tracking screen now shows as "not sent yet".
+   */
+  submit(id: string): OrderStatus {
+    const current = this.orders.get(id);
+    if (current === undefined) throw new Error('submitOrder: order not found');
+    if (current.status !== 'draft') return current.status;
+
+    const next: OrderStatus =
+      current.fulfilmentMode === 'mobile_ondemand' ? 'searching' : 'accepted';
+    this.orders.set(id, { ...current, status: next, escrowStatus: 'authorised' });
+
+    if (next === 'searching') this.simulateDispatch(id);
+    return next;
+  }
+
+  /**
+   * Advances through the same statuses a real dispatch would, so the
+   * tracking screen has something to show without a second device.
+   */
+  private simulateDispatch(id: string) {
     this.advanceAfter(id, 2500, (current) => ({
       ...current,
       status: 'accepted',
@@ -866,30 +987,35 @@ class DevOrderSimulator {
         {
           id: `${id}-part-1`,
           orderId: id,
-          nameAr: 'بطارية ٧٠ أمبير',
+          nameAr: 'بطارية 70 أمبير',
           partNumber: 'BAT-70A',
           isOem: false,
           quantity: 1,
           unitPrice: sarOrThrow('320.00'),
           warrantyDays: 180,
           approvedByCustomer: false,
+          declinedAt: null,
         },
       ]);
       return { ...current, status: 'in_progress' };
     });
-
-    return id;
   }
 
   /**
    * A booked appointment, which is a different animal from an emergency: the
-   * provider is known at creation because the customer chose them, so the
-   * order opens at `accepted` and never passes through `searching`. Nothing
+   * provider is known at creation because the customer chose them, so once
+   * submitted it goes straight to `accepted` and never passes through
+   * `searching`. Nothing
    * advances on a timer either — the job is days away, and a dev simulator
    * that marched a Tuesday appointment to `completed` in ten seconds would
    * teach the UI a lie.
    */
-  book(input: NewBookingInput, mode: BookingMode, providerId: string): string {
+  book(
+    input: NewBookingInput,
+    mode: BookingMode,
+    providerId: string,
+    scheduledFor: string | null,
+  ): string {
     this.counter += 1;
     const id = `order-${this.counter}`;
     this.createdAt.set(id, new Date().toISOString());
@@ -897,7 +1023,7 @@ class DevOrderSimulator {
 
     this.orders.set(id, {
       id,
-      status: 'accepted',
+      status: 'draft',
       fulfilmentMode: mode,
       vehicleId: input.vehicleId ?? null,
       serviceId: input.serviceId,
@@ -909,8 +1035,10 @@ class DevOrderSimulator {
       labourAmount: null,
       vatAmount: null,
       totalAmount: null,
-      escrowStatus: 'authorised',
+      escrowStatus: 'none',
       completionMedia: [],
+      warrantyDays: null,
+      scheduledFor,
     });
 
     return id;
@@ -933,16 +1061,32 @@ class DevOrderSimulator {
   }
 
   approvePart(partId: string): void {
+    this.answerPart(partId, (line) => ({ ...line, approvedByCustomer: true, declinedAt: null }));
+  }
+
+  declinePart(partId: string): void {
+    this.answerPart(partId, (line) => ({
+      ...line,
+      approvedByCustomer: false,
+      declinedAt: new Date().toISOString(),
+    }));
+  }
+
+  /**
+   * Once every line has an answer, the simulated technician hands back — the
+   * same rule the server holds hand-back to (0067), with only the approved
+   * lines on the bill.
+   */
+  private answerPart(partId: string, answer: (line: OrderPart) => OrderPart): void {
     for (const [orderId, lines] of this.parts) {
       const index = lines.findIndex((line) => line.id === partId);
       if (index === -1) continue;
 
-      const approved = lines.map((line, i) =>
-        i === index ? { ...line, approvedByCustomer: true } : line,
-      );
-      this.parts.set(orderId, approved);
+      const answered = lines.map((line, i) => (i === index ? answer(line) : line));
+      this.parts.set(orderId, answered);
 
-      if (approved.every((line) => line.approvedByCustomer)) {
+      if (answered.every((line) => line.approvedByCustomer || line.declinedAt !== null)) {
+        const approved = answered.filter((line) => line.approvedByCustomer);
         const order = this.orders.get(orderId);
         if (order !== undefined) {
           const partsAmount = approved.reduce(
@@ -977,7 +1121,8 @@ class DevOrderSimulator {
         // Both halves of the catalogue: a booked oil change would otherwise
         // show its raw id in the history, which is what the emergency-only
         // lookup did the moment booking started creating orders.
-        serviceNameAr: serviceNameFor(order.serviceId),
+        serviceNameAr: serviceNamesFor(order.serviceId).ar,
+        serviceNameEn: serviceNamesFor(order.serviceId).en,
         totalAmount: order.totalAmount,
         createdAt: this.createdAt.get(order.id) ?? new Date().toISOString(),
       }));
@@ -986,7 +1131,18 @@ class DevOrderSimulator {
   cancel(id: string): void {
     const order = this.orders.get(id);
     if (order === undefined) return;
-    this.orders.set(id, { ...order, status: 'cancelled' });
+    this.orders.set(id, {
+      ...order,
+      status: 'cancelled',
+      escrowStatus: order.escrowStatus === 'authorised' ? 'released' : order.escrowStatus,
+    });
+  }
+
+  dispute(id: string): void {
+    const order = this.orders.get(id);
+    if (order === undefined) return;
+    if (order.status !== 'completed') throw new Error('not_completed');
+    this.orders.set(id, { ...order, status: 'disputed' });
   }
 
   confirmCompletion(id: string): void {
@@ -1070,8 +1226,12 @@ export class InMemoryRepository implements Repository {
     this.counter += 1;
     const id = `veh-${this.counter}`;
 
-    const plateNormalised =
-      input.plate !== undefined && input.plate.length > 0 ? normalisePlate(input.plate) : null;
+    // The server refuses a car it cannot identify (0008); so does this, or the
+    // dev build hides the failure the real one shows.
+    const plateNormalised = normalisePlate(input.plate);
+    if (plateNormalised === null) {
+      throw new Error('addVehicle: violates check constraint "vehicles_plate_or_vin"');
+    }
 
     const vehicle: Vehicle = {
       id,
@@ -1080,7 +1240,7 @@ export class InMemoryRepository implements Repository {
       modelId: input.modelId,
       year: input.year,
       plateEn: plateNormalised,
-      plateAr: input.plate ?? null,
+      plateAr: input.plate,
       plateNormalised,
       vin: null,
       nickname: input.nickname ?? null,
@@ -1238,10 +1398,12 @@ export class InMemoryRepository implements Repository {
       report_version: 2,
       generated_at: new Date().toISOString(),
       vehicle: {
-        make_ar: vehicle.makeId,
-        make_en: vehicle.makeId,
-        model_ar: vehicle.modelId,
-        model_en: vehicle.modelId,
+        // Names, as the database joins them — the ids printed as
+        // «make-toyota m-camry» across the top of the dev report.
+        make_ar: MAKES.find((make) => make.id === vehicle.makeId)?.nameAr ?? vehicle.makeId,
+        make_en: MAKES.find((make) => make.id === vehicle.makeId)?.nameEn ?? vehicle.makeId,
+        model_ar: MODELS.find((model) => model.id === vehicle.modelId)?.nameAr ?? vehicle.modelId,
+        model_en: MODELS.find((model) => model.id === vehicle.modelId)?.nameEn ?? vehicle.modelId,
         year: vehicle.year,
         plate: vehicle.plateNormalised,
         vin: vehicle.vin,
@@ -1290,6 +1452,34 @@ export class InMemoryRepository implements Repository {
     return this.orders.create(input);
   }
 
+  async submitOrder(orderId: string): Promise<OrderStatus> {
+    const order = this.orders.get(orderId);
+    // The dev hold, as the server records it: the quoted price with VAT.
+    if (order !== null && order.status === 'draft' && order.quotedAmount !== null) {
+      this.held.set(orderId, priceWithVat(order.quotedAmount));
+    }
+    return this.orders.submit(orderId);
+  }
+
+  private readonly held = new Map<string, SarAmount>();
+
+  async getTopUpDue(orderId: string): Promise<SarAmount> {
+    const order = this.orders.get(orderId);
+    if (order === null || order.status !== 'awaiting_approval' || order.totalAmount === null) {
+      return sarOrThrow('0.00');
+    }
+    const held = this.held.get(orderId) ?? sarOrThrow('0.00');
+    return compareSar(order.totalAmount, held) > 0
+      ? subtractSar(order.totalAmount, held)
+      : sarOrThrow('0.00');
+  }
+
+  async payTopUp(orderId: string): Promise<void> {
+    const due = await this.getTopUpDue(orderId);
+    if (isZeroSar(due)) return;
+    this.held.set(orderId, addSar(this.held.get(orderId) ?? sarOrThrow('0.00'), due));
+  }
+
   async listBookableServices(): Promise<readonly Service[]> {
     return BOOKABLE_SERVICES;
   }
@@ -1328,7 +1518,11 @@ export class InMemoryRepository implements Repository {
     const mode: BookingMode =
       provider.providerType === 'workshop' ? 'workshop' : 'mobile_scheduled';
 
-    return this.orders.book(input, mode, provider.id);
+    const slotStart =
+      devSlotsFor(provider.id, new Date()).find((candidate) => candidate.id === slot)?.startsAt ??
+      null;
+
+    return this.orders.book(input, mode, provider.id, slotStart);
   }
 
   async getOrder(orderId: string) {
@@ -1369,6 +1563,21 @@ export class InMemoryRepository implements Repository {
     return false;
   }
 
+  // The dev build has no server to send from, so there is nothing to register.
+  async registerPushDevice(): Promise<void> {
+    return;
+  }
+
+  async unregisterPushDevice(): Promise<void> {
+    return;
+  }
+
+  // Nothing here is ever a storage reference: the in-memory provider keeps
+  // the photo's local file, which is displayable as it is.
+  async resolveMediaUrl(ref: string): Promise<string | null> {
+    return parseStorageRef(ref) === null ? ref : null;
+  }
+
   // The dev build has no matcher and no providers to offer anything to, so
   // there is genuinely nothing to report. Null, not zeroes: "0 contacted"
   // would be a claim, and a false one.
@@ -1392,11 +1601,113 @@ export class InMemoryRepository implements Repository {
     this.orders.approvePart(partId);
   }
 
+  async declineOrderPart(partId: string): Promise<void> {
+    this.orders.declinePart(partId);
+  }
+
   async cancelOrder(orderId: string): Promise<void> {
     this.orders.cancel(orderId);
   }
 
+  async openOrderDispute(orderId: string, reason: string): Promise<void> {
+    if (reason.trim().length < 3) throw new Error('reason_required');
+    this.orders.dispute(orderId);
+  }
+
+  // The dev build files no inspections, so there is never a report to show.
+  async getOrderInspection(): Promise<OrderInspection | null> {
+    return null;
+  }
+
+  /**
+   * An invoice for a completed dev order, shaped as 0074 issues one — with a
+   * genuine ZATCA TLV in its QR, so the viewer shows a code that scans.
+   */
+  async getOrderInvoice(orderId: string): Promise<InvoiceDocument | null> {
+    const order = this.orders.get(orderId);
+    if (order === null || order.status !== 'completed') return null;
+    if (order.totalAmount === null || order.vatAmount === null) return null;
+
+    const services = [
+      ...(await this.listEmergencyServices()),
+      ...(await this.listBookableServices()),
+    ];
+    const service = services.find((candidate) => candidate.id === order.serviceId);
+    const parts = this.orders.listParts(orderId);
+    const lines = invoiceLines(
+      `أجرة الخدمة — ${service?.nameAr ?? 'خدمة'}`,
+      order.labourAmount,
+      parts.map((part) => ({
+        nameAr: part.nameAr,
+        quantity: part.quantity,
+        unitPrice: part.unitPrice,
+        approved: part.approvedByCustomer && part.declinedAt === null,
+      })),
+    );
+
+    const issuedAt = new Date().toISOString();
+    const seller = {
+      legalNameAr: 'شركة هبّة للتقنية',
+      vatNumber: '300000000000003',
+      crNumber: '1010000000',
+    };
+    const net = (Number(order.totalAmount) - Number(order.vatAmount)).toFixed(2);
+
+    return {
+      invoiceNumber: `HB-INV-DEV-${orderId.replace(/\D/g, '').padStart(6, '0')}`,
+      issuedAt,
+      invoiceType: 'simplified',
+      seller,
+      orderNumber: null,
+      lines,
+      net,
+      vat: order.vatAmount,
+      vatRate: 0.15,
+      total: order.totalAmount,
+      qrBase64: devZatcaQr([
+        seller.legalNameAr,
+        seller.vatNumber,
+        `${issuedAt.slice(0, 19)}Z`,
+        Number(order.totalAmount).toFixed(2),
+        Number(order.vatAmount).toFixed(2),
+      ]),
+    };
+  }
+
+  async convertInspectionToVehicle(): Promise<string> {
+    throw new Error('convertInspectionToVehicle: not available in the dev build');
+  }
+
+  // Development has no operators: nothing paused, nothing announced.
+  async getPlatformStatus(): Promise<PlatformStatus> {
+    return DEFAULT_PLATFORM_STATUS;
+  }
+
+  // Without a server there is nothing published and nothing to agree to: the
+  // demo shows where the documents appear, and says the real text is not here.
+  async getLegalDocument(kind: LegalDocumentKind): Promise<LegalDocument> {
+    return {
+      id: `demo-${kind}`,
+      kind,
+      version: 1,
+      publishedAt: new Date().toISOString(),
+      bodyAr: '# نسخة تجريبية\n\nالنص المعتمد يُنشر من لوحة التشغيل ويظهر هنا عند الاتصال بالخادم.',
+      bodyEn:
+        '# Demo copy\n\nThe published text comes from the console and appears here once connected.',
+    };
+  }
+
+  async listPendingLegalDocuments(): Promise<readonly PendingLegalDocument[]> {
+    return [];
+  }
+
+  async acceptLegalDocuments(): Promise<void> {}
+
+  async deleteMyAccount(): Promise<void> {}
+
   async confirmOrderCompletion(orderId: string): Promise<void> {
+    // As the server refuses it (0078): the difference first.
+    if (!isZeroSar(await this.getTopUpDue(orderId))) throw new Error('top_up_required');
     this.orders.confirmCompletion(orderId);
 
     // Phase 3's acceptance criterion (build prompt §10): a completed job
@@ -1427,9 +1738,37 @@ export class InMemoryRepository implements Repository {
     this.absorbOrderIntoCare(order.vehicleId, order.serviceId);
   }
 
-  async rateOrder(): Promise<void> {
-    // No read surface depends on the dev rating yet — accepting and
-    // discarding it is enough to exercise the flow offline.
+  private readonly ratings = new Map<string, number>();
+
+  async rateOrder(input: NewRatingInput): Promise<void> {
+    if (this.ratings.has(input.orderId)) throw new Error('rateOrder: already rated');
+    this.ratings.set(input.orderId, input.stars);
+  }
+
+  async getOrderRating(orderId: string): Promise<number | null> {
+    return this.ratings.get(orderId) ?? null;
+  }
+
+  async listInvoices(): Promise<readonly InvoiceSummary[]> {
+    const completed = this.orders
+      .recent(Number.MAX_SAFE_INTEGER)
+      .filter((order) => order.status === 'completed' && order.totalAmount !== null);
+    const invoices = await Promise.all(
+      completed.map(async (order) => {
+        const invoice = await this.getOrderInvoice(order.id);
+        return invoice === null
+          ? null
+          : {
+              orderId: order.id,
+              invoiceNumber: invoice.invoiceNumber,
+              issuedAt: order.createdAt,
+              total: invoice.total,
+              serviceNameAr: order.serviceNameAr,
+              serviceNameEn: order.serviceNameEn,
+            };
+      }),
+    );
+    return invoices.filter((invoice): invoice is InvoiceSummary => invoice !== null);
   }
 
   // نقل الملكية --------------------------------------------------------------
@@ -1853,7 +2192,36 @@ export class InMemoryRepository implements Repository {
 function createRepository(): Repository {
   const client = getSupabaseClient();
   if (client === null) return new InMemoryRepository();
-  return new SupabaseRepository(client, () => useSession.getState().userId);
+  // Who the database will see is whoever the Supabase session belongs to —
+  // that, not the app's own session store, is what RLS checks. The store is
+  // only written after sign-in completes, and sign-in's last step (saving the
+  // profile) needs the id before then: reading the store alone made every
+  // real phone sign-in fail with "not authenticated" at the final step.
+  let authUserId: string | null = null;
+  void client.auth.getSession().then(({ data }) => {
+    authUserId = data.session?.user.id ?? null;
+  });
+  client.auth.onAuthStateChange((_event, session) => {
+    authUserId = session?.user.id ?? null;
+  });
+
+  return new SupabaseRepository(
+    client,
+    () => authUserId ?? useSession.getState().userId,
+    createPaymentProvider(client),
+  );
 }
 
 export const repository: Repository = createRepository();
+
+/** ZATCA Phase 1 TLV (tags 1–5, UTF-8 lengths), base64 — as zatca_qr (0030) builds it. */
+function devZatcaQr(values: readonly string[]): string {
+  const bytes: number[] = [];
+  values.forEach((value, index) => {
+    const encoded = [...new TextEncoder().encode(value)];
+    bytes.push(index + 1, encoded.length, ...encoded);
+  });
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}

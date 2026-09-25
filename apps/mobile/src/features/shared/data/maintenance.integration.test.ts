@@ -9,6 +9,8 @@
  * square — the failure is invisible until a tax audit.
  */
 
+// Payment ids are unique across holds (0078): a fixed one fails on a reused database.
+import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { mintTestJwt } from './test-jwt.js';
@@ -46,8 +48,26 @@ function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
   return fetch(raw.replace('/rest/v1/', '/'), init);
 }
 
+/** The server's own role — for internal functions no client may call (0075). */
+function serviceClient(): SupabaseClient {
+  const token = mintTestJwt(JWT_SECRET, {
+    sub: '00000000-0000-4000-8000-000000000000',
+    role: 'service_role',
+  });
+  return createClient(POSTGREST_URL, token, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+  });
+}
+
 function clientFor(userId: string): SupabaseClient {
-  const token = mintTestJwt(JWT_SECRET, { sub: userId, role: 'authenticated' });
+  // The operator has passed their second factor, as the console requires
+  // (0068); for everyone else the claim is inert.
+  const token = mintTestJwt(JWT_SECRET, {
+    sub: userId,
+    role: 'authenticated',
+    ...(userId === OPS_ID ? { secondFactorAt: new Date() } : {}),
+  });
   return createClient(POSTGREST_URL, token, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
@@ -207,7 +227,9 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
       expect(error).toBeNull();
     }
 
-    const { data, error } = await owner.rpc('estimate_current_mileage', {
+    // Internal since 0075 — the estimator reads any car's history, so only
+    // the server's own role may call it directly.
+    const { data, error } = await serviceClient().rpc('estimate_current_mileage', {
       p_vehicle_id: vehicleId,
     });
     expect(error).toBeNull();
@@ -252,7 +274,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     // declaring its own order paid was the vulnerability that closed.
     await owner.rpc('authorise_order_payment', {
       p_order_id: priorId,
-      p_payment_intent_id: 'intel_prior',
+      p_payment_intent_id: `intel_prior_${randomUUID()}`,
     });
     await owner.from('orders').update({ status: 'accepted' }).eq('id', priorId);
     await shop.rpc('check_in_vehicle', { p_order_id: priorId });
@@ -260,10 +282,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     await shop.rpc('record_completion_evidence', {
       p_order_id: priorId,
       p_mileage: 62000,
-      p_media: [
-        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
-        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
-      ],
+      p_media: (await shop.rpc('test_upload_completion_photos', { p_order_id: priorId })).data,
     });
     await shop
       .from('orders')
@@ -336,7 +355,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     // declaring its own order paid was the vulnerability that closed.
     await owner.rpc('authorise_order_payment', {
       p_order_id: orderId,
-      p_payment_intent_id: 'intel_http_1',
+      p_payment_intent_id: `intel_http_${randomUUID()}`,
     });
     await owner.from('orders').update({ status: 'accepted' }).eq('id', orderId);
     await shop.rpc('check_in_vehicle', { p_order_id: orderId });
@@ -344,10 +363,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     await shop.rpc('record_completion_evidence', {
       p_order_id: orderId,
       p_mileage: 86000,
-      p_media: [
-        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
-        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
-      ],
+      p_media: (await shop.rpc('test_upload_completion_photos', { p_order_id: orderId })).data,
     });
     await shop
       .from('orders')
@@ -362,8 +378,9 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     const completed = await owner.from('orders').update({ status: 'completed' }).eq('id', orderId);
     expect(completed.error).toBeNull();
 
-    const issued = await owner.rpc('issue_zatca_invoice', { p_order_id: orderId });
-    expect(issued.error).toBeNull();
+    // Issued by completing the order (0074); no client may issue one itself.
+    const refused = await owner.rpc('issue_zatca_invoice', { p_order_id: orderId });
+    expect(refused.error).not.toBeNull();
 
     const invoice = await owner
       .from('zatca_invoices')

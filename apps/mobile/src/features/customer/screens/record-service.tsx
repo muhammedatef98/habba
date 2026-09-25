@@ -26,6 +26,7 @@ import { BottomSheet, Button, Card, Field, ListRow, Screen, Text, useTheme } fro
 import { repository } from '@/features/shared/data/repository';
 import type { PastServicePart, TimelineAttachment } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { DateChips } from '@/features/customer/components/form/DateChips';
 
 interface FieldErrors {
   summary?: string | undefined;
@@ -113,7 +114,9 @@ export default function RecordServiceScreen() {
     onError: (error: Error) => {
       // CLAUDE.md §12: plain Arabic, with a next action — never a raw
       // Postgres message.
-      if (error.message.includes('future')) {
+      if (error.message === 'bad_date') {
+        setErrors({ when: t('logbook.errors.dateRequired') });
+      } else if (error.message.includes('future')) {
         setErrors({ when: t('logbook.errors.futureDate') });
       } else if (error.message.includes('lower than the recorded')) {
         setErrors({ mileage: t('logbook.errors.mileageTooLow', { current: '' }) });
@@ -221,19 +224,21 @@ export default function RecordServiceScreen() {
         multiline
       />
 
-      <Field
-        testID="service-date"
-        label={t('logbook.recordWhen')}
-        value={when}
-        onChangeText={(value) => {
-          setWhen(value);
-          setErrors((prev) => ({ ...prev, when: undefined }));
-        }}
-        placeholder="2025-05-14"
-        error={errors.when}
-        keyboardType="numbers-and-punctuation"
-        forceLtrInput
-      />
+      <View testID="service-date" style={{ gap: theme.spacing.xs }}>
+        <Text variant="label">{t('logbook.recordWhen')}</Text>
+        <DateChips
+          value={when}
+          onChange={(value) => {
+            setWhen(value);
+            setErrors((prev) => ({ ...prev, when: undefined }));
+          }}
+        />
+        {errors.when !== undefined ? (
+          <Text variant="caption" tone="emergency">
+            {errors.when}
+          </Text>
+        ) : null}
+      </View>
 
       <Field
         testID="service-mileage"

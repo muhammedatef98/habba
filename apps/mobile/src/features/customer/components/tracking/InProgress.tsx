@@ -12,19 +12,21 @@
  * skipped a step the database in fact requires.
  */
 
-import { Image, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
+  FadeIn,
+  rowDirectionFor,
   StatusPill,
   Text,
   TimelineList,
-  rowDirectionFor,
-  type TimelineItem,
   useTheme,
+  type TimelineItem,
 } from '@habba/ui';
-import { agreedTotal } from '@/features/shared/lib/order-price';
+import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
+import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/features/shared/data/types';
 
@@ -67,16 +69,11 @@ export function InProgress({
                 }}
               >
                 {photos.slice(0, 3).map((photo) => (
-                  <Image
+                  <EvidencePhoto
                     key={photo.url}
-                    source={{ uri: photo.url }}
+                    reference={photo.url}
+                    size={64}
                     accessibilityLabel={photo.caption ?? t('tracking.evidenceTitle')}
-                    style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: theme.radius.md,
-                      backgroundColor: theme.colors.surfaceSunken,
-                    }}
                   />
                 ))}
                 {photos.length > 3 ? (
@@ -103,7 +100,8 @@ export function InProgress({
   ];
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <StatusPill testID="in-progress-pill" tone="active" label={t('tracking.inProgressPill')} />
 
       <View style={{ gap: theme.spacing.xs }}>
@@ -146,22 +144,7 @@ export function InProgress({
         </Card>
       ) : null}
 
-      <View
-        style={{
-          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-          justifyContent: 'space-between',
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border,
-          paddingTop: theme.spacing.base,
-        }}
-      >
-        <Text variant="body" tone="muted">
-          {t('tracking.agreedTotalLong')}
-        </Text>
-        <Text variant="bodyStrong" numeric>
-          {t('emergency.priceFixed', { amount: agreedTotal(order) ?? '—' })}
-        </Text>
-      </View>
-    </View>
+      <AgreedTotalRow order={order} label={t('tracking.agreedTotalLong')} divided />
+    </FadeIn>
   );
 }
