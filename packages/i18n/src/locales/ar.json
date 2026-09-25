@@ -1068,8 +1068,18 @@
   "legal": {
     "terms": "الشروط والأحكام",
     "privacy": "سياسة الخصوصية",
+    "providerTerms": "شروط مقدّمي الخدمة",
     "consentBoth": "بالمتابعة فإنك توافق على <terms>الشروط والأحكام</terms> و<privacy>سياسة الخصوصية</privacy>.",
-    "consentTerms": "بالمتابعة فإنك توافق على <terms>الشروط والأحكام</terms>.",
-    "consentPrivacy": "بالمتابعة فإنك توافق على <privacy>سياسة الخصوصية</privacy>."
+    "loadFailed": "تعذّر تحميل المستند. تحقّق من الاتصال وحاول مرة أخرى.",
+    "gateTitleFirst": "قبل أن نبدأ",
+    "gateTitleUpdated": "حدّثنا شروطنا",
+    "gateBodyFirst": "اقرأ الشروط والأحكام وسياسة الخصوصية، ثم وافق عليها لتتابع.",
+    "gateBodyUpdated": "نشرنا إصداراً جديداً. اقرأ ما تغيّر ثم وافق عليه لتتابع.",
+    "gateRead": "اقرأ",
+    "gateVersion": "الإصدار {{version}}",
+    "gateAccept": "أوافق وأتابع",
+    "gateAcceptFailed": "تعذّر تسجيل موافقتك. حاول مرة أخرى.",
+    "providerConsent": "قرأت <provider_terms>شروط مقدّمي الخدمة</provider_terms> وأوافق عليها.",
+    "providerConsentRequired": "وافق على شروط مقدّمي الخدمة لإرسال الطلب."
   }
 }

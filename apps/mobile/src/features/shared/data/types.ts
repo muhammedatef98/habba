@@ -6,7 +6,13 @@
  * from the migrations and removes the risk of drift.
  */
 
-import type { FulfilmentMode, InspectionReport, OrderStatus, SarAmount } from '@habba/core';
+import type {
+  FulfilmentMode,
+  InspectionReport,
+  LegalDocumentKind,
+  OrderStatus,
+  SarAmount,
+} from '@habba/core';
 
 export type Provenance = 'self_reported' | 'self_documented' | 'habba_verified' | 'third_party';
 
@@ -358,9 +364,6 @@ export interface PlatformStatus {
   readonly minAppVersion: string;
   readonly appStoreUrl: string;
   readonly playStoreUrl: string;
-  /** Set in the console (0082); empty until the documents are published. */
-  readonly termsUrl: string;
-  readonly privacyUrl: string;
 }
 
 export interface AppFeatures {
@@ -613,3 +616,22 @@ export interface VehicleCareBaseline {
 // Re-exported here (not just from @habba/core) so every screen imports domain
 // types from one place — data/types.ts — rather than mixing import sources.
 export type { FulfilmentMode, OrderStatus };
+
+/** A version of the terms, privacy policy or provider terms (0083), filled in. */
+export interface LegalDocument {
+  readonly id: string;
+  readonly kind: LegalDocumentKind;
+  readonly version: number;
+  readonly publishedAt: string;
+  /** Arabic is authoritative; English is its translation. */
+  readonly bodyAr: string;
+  readonly bodyEn: string;
+}
+
+/** A document this person has yet to accept (0083). */
+export interface PendingLegalDocument {
+  readonly id: string;
+  readonly kind: LegalDocumentKind;
+  readonly version: number;
+  readonly summaryAr: string | null;
+}

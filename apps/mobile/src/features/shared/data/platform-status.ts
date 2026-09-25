@@ -29,6 +29,4 @@ export const DEFAULT_PLATFORM_STATUS: PlatformStatus = {
   minAppVersion: '',
   appStoreUrl: '',
   playStoreUrl: '',
-  termsUrl: '',
-  privacyUrl: '',
 };

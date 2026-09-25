@@ -17,3 +17,4 @@ export * from './report/invoice.js';
 export * from './orders/job-flow.js';
 export * from './sms/unifonic.js';
 export * from './supabase/api-keys.js';
+export * from './legal/document.js';

@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, HabbaMark, Screen, Text, useTheme } from '@habba/ui';
 import { usePlatformStatus } from '@/features/shared/hooks/use-platform';
 import { isBelowMinimumVersion } from '@/features/shared/lib/app-version';
+import { openableLink } from '@/features/shared/lib/links';
 
 export function VersionGate({ children }: { readonly children: ReactNode }) {
   const { t } = useTranslation();
@@ -24,7 +25,8 @@ export function VersionGate({ children }: { readonly children: ReactNode }) {
 
   if (!isBelowMinimumVersion(current, status.minAppVersion)) return <>{children}</>;
 
-  const storeUrl = Platform.OS === 'ios' ? status.appStoreUrl : status.playStoreUrl;
+  // Only an https link is handed to the OS (lib/links.ts).
+  const storeUrl = openableLink(Platform.OS === 'ios' ? status.appStoreUrl : status.playStoreUrl);
 
   return (
     <Screen>
@@ -44,7 +46,7 @@ export function VersionGate({ children }: { readonly children: ReactNode }) {
             {current}
           </Text>
         </View>
-        {storeUrl !== '' ? (
+        {storeUrl !== null ? (
           <Button
             testID="update-open-store"
             label={t('update.action')}

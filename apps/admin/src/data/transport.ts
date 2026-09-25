@@ -117,6 +117,10 @@ export function explain(error: unknown): string {
     [/Nothing was captured/i, 'لم يُحصَّل أي مبلغ على هذا الطلب ليُسترد.'],
     [/reference/i, 'سجّل الرقم المرجعي من مزوّد الدفع أو البنك.'],
     [
+      /cannot be published in the past/i,
+      'لا يسري إصدار من تاريخ مضى — اختر الآن أو تاريخاً لاحقاً.',
+    ],
+    [
       /must be an https:\/\/ link/i,
       'الرابط يجب أن يبدأ بـ https:// — مثل https://habba.sa/privacy',
     ],

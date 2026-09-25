@@ -45,6 +45,7 @@ import { PlatformNotice } from '@/features/shared/components/PlatformNotice';
 import { PushBridge } from '@/features/shared/components/PushBridge';
 import { Toast } from '@/features/shared/components/Toast';
 import { VersionGate } from '@/features/shared/components/VersionGate';
+import { LegalGate } from '@/features/shared/components/LegalGate';
 import { useToast } from '@/features/shared/state/toast';
 import { i18next } from '@/features/shared/lib/i18n';
 import { configureNotificationPresentation } from '@/features/shared/lib/push';
@@ -190,7 +191,9 @@ export default function RootLayout() {
             <PlatformNotice />
             <View style={{ flex: 1 }}>
               <VersionGate>
-                <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+                <LegalGate>
+                  <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+                </LegalGate>
               </VersionGate>
             </View>
             <Toast />

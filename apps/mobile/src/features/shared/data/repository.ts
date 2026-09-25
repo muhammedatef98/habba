@@ -15,7 +15,7 @@
  * shape of this interface reflects the shape of the security model.
  */
 
-import type { HabbaReport, InvoiceDocument } from '@habba/core';
+import type { HabbaReport, InvoiceDocument, LegalDocumentKind } from '@habba/core';
 import {
   addSar,
   applyRate,
@@ -42,6 +42,8 @@ import { DEFAULT_PLATFORM_STATUS } from './platform-status.js';
 import type {
   AppointmentSlot,
   OrderInspection,
+  LegalDocument,
+  PendingLegalDocument,
   PlatformStatus,
   BookingMode,
   BookingProvider,
@@ -272,6 +274,12 @@ export interface Repository {
   ): Promise<string>;
   /** The operators' switches and this account's standing (0069, 0070). */
   getPlatformStatus(): Promise<PlatformStatus>;
+  /** The version in force of a legal document, its placeholders filled (0083). */
+  getLegalDocument(kind: LegalDocumentKind): Promise<LegalDocument>;
+  /** What this account has yet to accept; empty when signed out (0083). */
+  listPendingLegalDocuments(): Promise<readonly PendingLegalDocument[]>;
+  /** Records acceptance of these versions, which must be the ones in force. */
+  acceptLegalDocuments(documentIds: readonly string[]): Promise<void>;
   /** Sets status to `completed`, then captures the escrowed payment (§1). */
   confirmOrderCompletion(orderId: string): Promise<void>;
   /**
@@ -1669,6 +1677,26 @@ export class InMemoryRepository implements Repository {
   async getPlatformStatus(): Promise<PlatformStatus> {
     return DEFAULT_PLATFORM_STATUS;
   }
+
+  // Without a server there is nothing published and nothing to agree to: the
+  // demo shows where the documents appear, and says the real text is not here.
+  async getLegalDocument(kind: LegalDocumentKind): Promise<LegalDocument> {
+    return {
+      id: `demo-${kind}`,
+      kind,
+      version: 1,
+      publishedAt: new Date().toISOString(),
+      bodyAr: '# نسخة تجريبية\n\nالنص المعتمد يُنشر من لوحة التشغيل ويظهر هنا عند الاتصال بالخادم.',
+      bodyEn:
+        '# Demo copy\n\nThe published text comes from the console and appears here once connected.',
+    };
+  }
+
+  async listPendingLegalDocuments(): Promise<readonly PendingLegalDocument[]> {
+    return [];
+  }
+
+  async acceptLegalDocuments(): Promise<void> {}
 
   async confirmOrderCompletion(orderId: string): Promise<void> {
     // As the server refuses it (0078): the difference first.

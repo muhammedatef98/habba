@@ -14,11 +14,14 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  fillLegalTemplate,
   isZeroSar,
+  legalTemplateValues,
   sarOrThrow,
   type HabbaReport,
   type InspectionReport,
   type InvoiceDocument,
+  type LegalDocumentKind,
   type SarAmount,
 } from '@habba/core';
 import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
@@ -49,6 +52,8 @@ import type {
   OwnershipTransferStatus,
   OrderInspection,
   PlatformStatus,
+  LegalDocument,
+  PendingLegalDocument,
   NewBookingInput,
   NewEmergencyOrderInput,
   NewRatingInput,
@@ -1444,6 +1449,62 @@ export class SupabaseRepository implements Repository {
     return data as string;
   }
 
+  async getLegalDocument(kind: LegalDocumentKind): Promise<LegalDocument> {
+    const [document, settings] = await Promise.all([
+      this.client
+        .from('legal_documents')
+        .select('id, kind, version, published_at, body_ar, body_en')
+        .eq('kind', kind)
+        .lte('published_at', new Date().toISOString())
+        .order('version', { ascending: false })
+        .limit(1)
+        .single(),
+      this.client.rpc('get_public_settings'),
+    ]);
+    if (document.error !== null) throw new Error(`getLegalDocument: ${document.error.message}`);
+    const row = document.data as {
+      id: string;
+      kind: LegalDocumentKind;
+      version: number;
+      published_at: string;
+      body_ar: string;
+      body_en: string;
+    };
+    // The company's name, the complaint window…: whatever the settings say
+    // now, so the text never disagrees with the app (0083).
+    const values = (settings.error === null ? settings.data : {}) as Record<string, unknown>;
+    const version = { version: row.version, publishedAt: row.published_at };
+    return {
+      id: row.id,
+      kind: row.kind,
+      version: row.version,
+      publishedAt: row.published_at,
+      bodyAr: fillLegalTemplate(row.body_ar, legalTemplateValues(values, version, 'ar')),
+      bodyEn: fillLegalTemplate(row.body_en, legalTemplateValues(values, version, 'en')),
+    };
+  }
+
+  async listPendingLegalDocuments(): Promise<readonly PendingLegalDocument[]> {
+    if (this.userId() === null) return [];
+    const { data, error } = await this.client.rpc('my_pending_legal_documents');
+    if (error !== null) throw new Error(`listPendingLegalDocuments: ${error.message}`);
+    return (
+      data as { id: string; kind: LegalDocumentKind; version: number; summary_ar: string | null }[]
+    ).map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      version: row.version,
+      summaryAr: row.summary_ar,
+    }));
+  }
+
+  async acceptLegalDocuments(documentIds: readonly string[]): Promise<void> {
+    const { error } = await this.client.rpc('accept_legal_documents', {
+      p_document_ids: [...documentIds],
+    });
+    if (error !== null) throw new Error(`acceptLegalDocuments: ${error.message}`);
+  }
+
   async getPlatformStatus(): Promise<PlatformStatus> {
     const settings = await this.client.rpc('get_public_settings');
     const values = (settings.error === null ? settings.data : {}) as Record<string, unknown>;
@@ -1490,8 +1551,6 @@ export class SupabaseRepository implements Repository {
       minAppVersion: text('min_app_version'),
       appStoreUrl: text('app_store_url'),
       playStoreUrl: text('play_store_url'),
-      termsUrl: text('terms_url'),
-      privacyUrl: text('privacy_url'),
     };
   }
 

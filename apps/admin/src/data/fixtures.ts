@@ -808,6 +808,16 @@ function seed(): State {
     ],
     tables: {
       platform_settings: settings,
+      legal_documents: (['terms', 'privacy', 'provider_terms'] as const).map((kind) => ({
+        id: `legal-${kind}-1`,
+        kind,
+        body_ar: `# ${LEGAL_TITLE[kind]}\n\nالإصدار {{version}} — يسري اعتباراً من {{effective_date}}\n\n## 1. نسخة تجريبية\n\n- النص المعتمد في قاعدة البيانات، ويظهر هنا عند ربط اللوحة بالمشروع.`,
+        body_en: `# ${kind}\n\nVersion {{version}}\n\n## 1. Demo copy\n\n- The published text lives in the database.`,
+        summary_ar: 'الإصدار الأول',
+        requires_acceptance: true,
+        published_at: ago(20 * 24 * 60),
+        created_at: ago(20 * 24 * 60),
+      })),
       services: [
         catalogue('svc-battery', {
           supported_modes: ['mobile_ondemand', 'mobile_scheduled'],
@@ -1026,6 +1036,12 @@ function includes(value: string | null | undefined, query: unknown): boolean {
   if (typeof query !== 'string' || query.trim() === '') return true;
   return (value ?? '').toLowerCase().includes(query.trim().toLowerCase());
 }
+
+const LEGAL_TITLE = {
+  terms: 'شروط وأحكام استخدام تطبيق هبّة',
+  privacy: 'سياسة الخصوصية',
+  provider_terms: 'شروط مقدّمي الخدمة',
+} as const;
 
 export class FixtureTransport implements Transport {
   private readonly state: State = seed();
@@ -1780,6 +1796,27 @@ export class FixtureTransport implements Transport {
         return row.recipients;
       }
 
+      case 'ops_legal_documents': {
+        const rows = (s.tables['legal_documents'] ?? []) as Row[];
+        return rows
+          .map((row) => {
+            const sameKind = rows.filter((other) => other['kind'] === row['kind']);
+            const version = sameKind.indexOf(row) + 1;
+            return {
+              id: row['id'],
+              kind: row['kind'],
+              version,
+              summary_ar: row['summary_ar'] ?? null,
+              requires_acceptance: row['requires_acceptance'] ?? true,
+              published_at: row['published_at'] ?? new Date().toISOString(),
+              created_at: row['created_at'] ?? new Date().toISOString(),
+              created_by_name: row['created_at'] === undefined ? 'أنت' : null,
+              acceptances: version === 1 ? 1_284 : 0,
+              is_current: version === sameKind.length,
+            };
+          })
+          .sort((a, b) => String(a.kind).localeCompare(String(b.kind)) || b.version - a.version);
+      }
       case 'ops_list_records':
         return s.records[String(args['p_kind'])] ?? [];
     }

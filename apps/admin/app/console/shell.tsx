@@ -25,6 +25,7 @@ import { CatalogueSection } from './sections/catalogue';
 import { NotificationsSection } from './sections/notifications';
 import { SettingsSection } from './sections/settings';
 import { ComplianceSection } from './sections/compliance';
+import { LegalSection } from './sections/legal';
 import { StaffSection } from './sections/staff';
 import { AuditSection } from './sections/audit';
 
@@ -81,6 +82,7 @@ const NAV: readonly {
     group: 'الحوكمة',
     items: [
       { section: 'compliance', label: 'الخصوصية والامتثال' },
+      { section: 'legal', label: 'الشروط والسياسات' },
       { section: 'staff', label: 'الفريق' },
       { section: 'audit', label: 'سجلّ التدقيق' },
     ],
@@ -210,6 +212,8 @@ function SectionView({ section, id }: { readonly section: Section; readonly id: 
       return <SettingsSection />;
     case 'compliance':
       return <ComplianceSection />;
+    case 'legal':
+      return <LegalSection />;
     case 'staff':
       return <StaffSection />;
     case 'audit':

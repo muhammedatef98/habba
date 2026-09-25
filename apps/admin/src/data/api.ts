@@ -17,6 +17,8 @@ import type {
   Dashboard,
   DisputeRow,
   FinanceSummary,
+  LegalDocumentRow,
+  NewLegalDocument,
   OrderFile,
   OrderRow,
   PaymentOperation,
@@ -323,6 +325,29 @@ export function createApi(transport: Transport) {
     insertRow: (table: string, row: Row) => transport.insert(table, row),
     updateRow: (table: string, match: Row, patch: Row) => transport.update(table, match, patch),
     deleteRow: (table: string, match: Row) => transport.remove(table, match),
+
+    // -- Legal documents (0083) ------------------------------------------------------------------------------
+    legalDocuments: () => transport.rpc<LegalDocumentRow[]>('ops_legal_documents'),
+
+    async legalDocumentText(id: string): Promise<{ bodyAr: string; bodyEn: string }> {
+      const [row] = await transport.list<{ body_ar: string; body_en: string } & Row>(
+        'legal_documents',
+        { columns: 'body_ar, body_en', eq: { id }, limit: 1 },
+      );
+      if (row === undefined) throw new Error('Document not found');
+      return { bodyAr: row.body_ar, bodyEn: row.body_en };
+    },
+
+    // The version number, author and time are the database's to set.
+    publishLegalDocument: (input: NewLegalDocument) =>
+      transport.insert('legal_documents', {
+        kind: input.kind,
+        body_ar: input.bodyAr,
+        body_en: input.bodyEn,
+        summary_ar: input.summaryAr.trim() === '' ? null : input.summaryAr.trim(),
+        requires_acceptance: input.requiresAcceptance,
+        ...(input.publishedAt !== null ? { published_at: input.publishedAt } : {}),
+      }),
 
     // -- Accountability ------------------------------------------------------------------------------------------
     async auditLog(limit: number, table?: string): Promise<readonly AuditEntry[]> {

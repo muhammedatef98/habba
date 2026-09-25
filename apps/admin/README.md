@@ -54,6 +54,7 @@ lands in the audit log, and so does every opening of a person's file.
 | الإشعارات          | Broadcast to everyone, customers, providers, or one city; log of every notification sent                                                                                                                                                         |
 | الإعدادات          | Pause new orders, the announcement, support contacts, dispatch rounds and radii, OTP and transfer limits, board thresholds, care reminders, all within bounds set in the migration                                                               |
 | الخصوصية والامتثال | Data-request log, transfers, reports, and what the console deliberately cannot reach                                                                                                                                                             |
+| الشروط والسياسات   | Every version of the terms, privacy policy and provider terms with its acceptance count; read any version; publish a new one (now or dated ahead, asking everyone to accept again or not). Versions are never edited                             |
 | الفريق             | Staff list; a super admin grants and removes staff roles                                                                                                                                                                                         |
 | سجلّ التدقيق       | Every change and every file opened, filterable by table                                                                                                                                                                                          |
 
@@ -61,11 +62,20 @@ Deliberately out of reach, even for a super admin:
 
 - editing or deleting logbook entries (corrections are appended);
 - editing the audit log;
+- editing or deleting a published version of the terms, or anyone's acceptance of it;
 - KYC ciphertext, card numbers, passwords and OTPs;
 - signing in as a user;
 - setting payment state directly.
 
 The **خصوصية والامتثال → ما لا تصل إليه اللوحة** tab explains each of these on screen.
+
+## Public pages
+
+`/legal/terms`, `/legal/privacy` and `/legal/provider_terms` (add `?lang=en`)
+are public: the version in force, rendered on the server with the publishable
+key, the way the app shows it. They are the addresses for the App Store and
+Google Play listings and for the `terms_url` / `privacy_url` settings. No
+console code runs on them.
 
 ## Environment variables
 

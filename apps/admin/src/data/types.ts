@@ -589,3 +589,27 @@ export interface BoardOrder {
   readonly offersOpen: number;
   readonly attention: Attention;
 }
+
+/** A version of a legal document, as the console lists it (ops_legal_documents, 0083). */
+export interface LegalDocumentRow {
+  readonly id: string;
+  readonly kind: 'terms' | 'privacy' | 'provider_terms';
+  readonly version: number;
+  readonly summary_ar: string | null;
+  readonly requires_acceptance: boolean;
+  readonly published_at: string;
+  readonly created_at: string;
+  readonly created_by_name: string | null;
+  readonly acceptances: number;
+  readonly is_current: boolean;
+}
+
+export interface NewLegalDocument {
+  readonly kind: LegalDocumentRow['kind'];
+  readonly bodyAr: string;
+  readonly bodyEn: string;
+  readonly summaryAr: string;
+  readonly requiresAcceptance: boolean;
+  /** ISO time it takes effect; null for now. */
+  readonly publishedAt: string | null;
+}

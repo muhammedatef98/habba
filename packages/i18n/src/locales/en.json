@@ -940,8 +940,18 @@
   "legal": {
     "terms": "Terms of use",
     "privacy": "Privacy policy",
+    "providerTerms": "Provider terms",
     "consentBoth": "By continuing you agree to the <terms>Terms of use</terms> and the <privacy>Privacy policy</privacy>.",
-    "consentTerms": "By continuing you agree to the <terms>Terms of use</terms>.",
-    "consentPrivacy": "By continuing you agree to the <privacy>Privacy policy</privacy>."
+    "loadFailed": "Couldn't load the document. Check your connection and try again.",
+    "gateTitleFirst": "Before we start",
+    "gateTitleUpdated": "We've updated our terms",
+    "gateBodyFirst": "Read the terms of use and the privacy policy, then accept them to continue.",
+    "gateBodyUpdated": "We've published a new version. Read what changed, then accept it to continue.",
+    "gateRead": "Read",
+    "gateVersion": "Version {{version}}",
+    "gateAccept": "Accept and continue",
+    "gateAcceptFailed": "Couldn't record your acceptance. Try again.",
+    "providerConsent": "I have read and accept the <provider_terms>Provider terms</provider_terms>.",
+    "providerConsentRequired": "Accept the provider terms to send your application."
   }
 }

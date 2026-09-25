@@ -200,6 +200,48 @@ describe.skipIf(!harnessUp)('the console, against the database', () => {
     await ops.updateSetting('dispatch_max_round', 3);
   });
 
+  test('a legal document gets a new version, dated ahead, and never one in the past', async () => {
+    const before = await ops.legalDocuments();
+    const current = before.find((row) => row.kind === 'privacy' && row.is_current);
+    expect(current).toBeDefined();
+    const latest = Math.max(
+      ...before.filter((row) => row.kind === 'privacy').map((row) => row.version),
+    );
+
+    const text = await ops.legalDocumentText(current?.id ?? '');
+    expect(text.bodyAr).toContain('{{company}}');
+
+    const nextWeek = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    await ops.publishLegalDocument({
+      kind: 'privacy',
+      bodyAr: `${text.bodyAr}\n\nبند إضافي.`,
+      bodyEn: `${text.bodyEn}\n\nAn added clause.`,
+      summaryAr: 'بند إضافي',
+      requiresAcceptance: true,
+      publishedAt: nextWeek,
+    });
+    const after = await ops.legalDocuments();
+    const published = after.find((row) => row.kind === 'privacy' && row.version === latest + 1);
+    expect(published).toMatchObject({ is_current: false, acceptances: 0 });
+    expect(after.find((row) => row.id === current?.id)?.is_current).toBe(true);
+
+    const refused = await ops
+      .publishLegalDocument({
+        kind: 'privacy',
+        bodyAr: text.bodyAr,
+        bodyEn: text.bodyEn,
+        summaryAr: 'قديم',
+        requiresAcceptance: true,
+        publishedAt: new Date(Date.now() - 86_400_000).toISOString(),
+      })
+      .then(
+        () => null,
+        (cause: unknown) => cause,
+      );
+    expect(refused).toMatchObject({ code: '23514' });
+    expect(explain(refused)).toContain('تاريخ مضى');
+  });
+
   test('a link setting takes https and nothing else, and says so in Arabic', async () => {
     await ops.updateSetting('privacy_url', 'https://habba.sa/privacy');
     const after = await ops.settings();

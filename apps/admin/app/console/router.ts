@@ -26,6 +26,7 @@ export type Section =
   | 'notifications'
   | 'settings'
   | 'compliance'
+  | 'legal'
   | 'staff'
   | 'audit';
 
@@ -43,6 +44,7 @@ const SECTIONS: readonly Section[] = [
   'notifications',
   'settings',
   'compliance',
+  'legal',
   'staff',
   'audit',
 ];
