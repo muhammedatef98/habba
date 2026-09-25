@@ -205,9 +205,9 @@ as a user would. The fixes that matter beyond one screen:
 ## 6b. The hosted project, as of 2026-09-25
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
-  0001–0086 applied. 0001–0053 were applied on 2026-09-05 by
+  0001–0087 applied. 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
-  0054–0086 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
+  0054–0087 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
   policy files are applied. The four `rls-…@habba.test` users are the RLS
   suite's fixtures, not people.
@@ -215,15 +215,18 @@ as a user would. The fixes that matter beyond one screen:
   `NEXT_PUBLIC_SUPABASE_ANON_KEY` set for all environments; production
   (`habba-admin.vercel.app`) serves the console against the live project.
 - **Operators:** one super admin (the owner's email), created 2026-09-25.
-- **Scheduled work:** `habba-dispatch-tick` runs in the database itself
-  (pg_cron, every 15 s: `expand_stale_searches()` then
-  `auto_complete_awaiting_orders()`), so it needs neither the Edge Function nor
-  its secret. The three jobs 0056/0062 schedule are active.
+- **Scheduled work** (`supabase/hosted/*.sql`, applied): `habba-dispatch-tick`
+  runs in the database (pg_cron, every 15 s: `expand_stale_searches()` then
+  `auto_complete_awaiting_orders()`), no Edge Function needed. `push-tick` is
+  deployed and called by a trigger on every `notification_outbox` insert plus
+  a one-minute pg_cron safety net; its secret is only in Vault
+  (`push_tick_secret`, read through 0087). The three jobs 0056/0062 schedule
+  are active.
 - **Switched off until configured:** guest sign-in (`feature_guest_login` =
   false; turn on Anonymous sign-ins in Supabase first).
-- **Not yet done on the project:** the SMS hook (phone sign-in), `push-tick`
-  and `payments` Edge Functions with their secrets (§7a/§7b of
-  `docs/supabase-setup.md`), leaked-password protection.
+- **Not yet done on the project:** the SMS hook (phone sign-in, needs a
+  Unifonic account), the `payments` function (needs a Moyasar key; the
+  gateway setting is still `dev`), leaked-password protection.
 
 ## 7. Open decisions — these block launch, and none is a coding task
 
