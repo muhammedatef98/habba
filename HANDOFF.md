@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-79 migrations · 50 SQL suites (all pass) · tests/rls.spec.ts
+80 migrations · 50 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0079, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0080, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -137,7 +137,7 @@ them no search widens, no order auto-closes and nobody is notified.
 
 ---
 
-## 6. What was built across the last sessions (0064–0079)
+## 6. What was built across the last sessions (0064–0080)
 
 | Area                                | Migrations | What it gave                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ----------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -153,6 +153,7 @@ them no search widens, no order auto-closes and nobody is notified.
 | Live screens, motion, failures said | 0076       | Supabase Realtime refreshes tracking, the quote, home, orders and the technician's offers/job the moment a row changes (polling kept as fallback); refetch on return to foreground; a toast for any action that failed with nothing on screen to say so; press springs, staggered entry, state transitions, all off under Reduce Motion (`packages/ui/src/motion.tsx`).                                                                               |
 | Ready for the real gateway and OTP  | 0077       | `payments_gateway` switch: once `moyasar`, a hold is recorded only by the `payments` Edge Function after checking it with Moyasar's secret key (exact amount, SAR, this order); capture/void/refund run from a queue it drains. The phone's card form is the one plug point (`lib/moyasar-card-form.ts`). Real phone sign-in could not complete (profile save read a user id the app had not stored yet) — fixed. `docs/GO-LIVE.md` is the checklist. |
 | The bill outgrows the hold          | 0078       | Approved parts routinely took the bill past the card hold, which cannot be captured for more. `payment_holds` records every hold; the confirm screen shows `order_top_up_due()` and holds it in the same tap; the customer's own confirmation is refused without it (ops and auto-close are not — the shortfall goes on the finance page). Captures per hold; voids and refunds split across holds. Suite 50.                                         |
+| Lapsed holds                        | 0080       | A card hold lives ~7 days; holds older than `payment_hold_validity_days` (6) stop counting, so a long-booked job asks for the amount again at confirmation (the 0078 top-up), and capture marks lapsed holds `expired` instead of sending them to the gateway.                                                                                                                                                                                        |
 | UI/UX passes (3 rounds)             | —          | Every screen screenshotted in Arabic, English and dark; fixes listed below                                                                                                                                                                                                                                                                                                                                                                            |
 
 Real bugs found and fixed along the way, all with tests: orders were never

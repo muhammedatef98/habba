@@ -230,7 +230,7 @@ export interface OrderFile {
     readonly payment_id: string;
     readonly amount: number;
     readonly kind: 'initial' | 'top_up';
-    readonly status: 'authorised' | 'captured' | 'voided';
+    readonly status: 'authorised' | 'captured' | 'voided' | 'expired';
     readonly created_at: string;
   }[];
   readonly payout: { readonly payout_id: string; readonly status: PayoutStatus } | null;

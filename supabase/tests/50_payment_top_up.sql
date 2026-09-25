@@ -189,6 +189,55 @@ select test.assert_eq(
   (select total_amount from public.orders where id = :'ord'),
   'for exactly the total, no more');
 
+
+-- A booking hold that lapsed before the job (0080) ---------------------------------
+update public.platform_settings set value = '"dev"' where key = 'payments_gateway';
+set role authenticated;
+select test.become('11111111-0000-4000-5050-000000000001');
+select public.create_emergency_order(
+  :'svc', 50.2084, 26.2173, 'd0000000-0000-4000-5050-000000000001',
+  'الخبر', 'موعد بعيد', 50300, '[]'::jsonb) as ord3 \gset
+select public.authorise_order_payment(:'ord3', 'pay_initial_5053');
+select public.submit_order(:'ord3');
+select test.become('22222222-0000-4000-5050-000000000002');
+select public.accept_order(:'ord3');
+update public.orders set status = 'en_route' where id = :'ord3';
+update public.orders set status = 'arrived' where id = :'ord3';
+update public.orders set status = 'in_progress' where id = :'ord3';
+select public.record_completion_evidence(:'ord3', 50350, test.completion_photos(:'ord3'), 30);
+update public.orders set status = 'awaiting_approval' where id = :'ord3';
+reset role;
+
+-- The card network let the booking hold go eight days ago.
+update public.payment_holds set created_at = now() - interval '8 days' where order_id = :'ord3';
+
+set role authenticated;
+select test.become('11111111-0000-4000-5050-000000000001');
+select test.assert_eq(
+  public.order_top_up_due(:'ord3'),
+  (select total_amount from public.orders where id = :'ord3'),
+  'a lapsed hold does not count: the whole bill is due again, with no parts at all');
+select test.assert_raises(
+  format($$update public.orders set status = 'completed' where id = %L$$, :'ord3'),
+  'and the customer is asked for it before confirming', '23514');
+select public.authorise_order_top_up(:'ord3', 'pay_renewed_5053', public.order_top_up_due(:'ord3'));
+update public.orders set status = 'completed' where id = :'ord3';
+reset role;
+
+update public.platform_settings set value = '"moyasar"' where key = 'payments_gateway';
+set role authenticated;
+select test.become('11111111-0000-4000-5050-000000000001');
+select public.capture_order_payment(:'ord3');
+reset role;
+
+select test.assert_eq(
+  (select string_agg(payment_id, ',') from public.payment_operations
+    where order_id = :'ord3' and kind = 'capture'),
+  'pay_renewed_5053', 'only the live hold is sent to the gateway');
+select test.assert_eq(
+  (select status from public.payment_holds where payment_id = 'pay_initial_5053'), 'expired',
+  'the lapsed one is marked expired, not captured and not voided');
+
 rollback;
 
 \echo '   payment top-up OK'

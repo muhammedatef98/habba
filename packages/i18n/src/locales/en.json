@@ -510,9 +510,9 @@
     "autoCompleteNote_other": "If you neither approve nor report a problem within {{count}} hours of hand-back, the order closes by itself. You can still complain afterwards.",
     "rateStars_one": "1 star of 5",
     "rateStars_other": "{{count}} stars of 5",
-    "topUpTitle": "The final bill is more than the amount held",
-    "topUpBody": "The parts you approved took the total past what was held when you ordered. The difference ({{amount}} SAR) is held on your card when you confirm, and taken with the rest.",
-    "topUpAction": "Hold the difference ({{amount}} SAR) and confirm"
+    "topUpTitle": "The amount held doesn't cover the final bill",
+    "topUpBody": "Because of parts you approved, or because the hold on your card lapsed since you ordered. {{amount}} SAR is held on your card when you confirm, and taken with the rest.",
+    "topUpAction": "Hold {{amount}} SAR and confirm"
   },
   "quote": {
     "title": "Parts quote",

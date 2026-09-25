@@ -106,6 +106,7 @@ export const HOLD_STATUS: Readonly<Record<string, Label>> = {
   authorised: { text: 'محجوز', tone: 'warn' },
   captured: { text: 'محصَّل', tone: 'good' },
   voided: { text: 'مُلغى', tone: 'neutral' },
+  expired: { text: 'منتهي', tone: 'neutral' },
 };
 
 export const PAYOUT_STATUS: Readonly<Record<string, Label>> = {
