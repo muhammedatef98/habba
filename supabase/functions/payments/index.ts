@@ -45,6 +45,7 @@ import {
   fetchPaymentRequest,
   interpretOperation,
   isPaymentId,
+  MOYASAR_API,
   operationRequest,
   toHalalas,
   type MoyasarPayment,
@@ -58,6 +59,15 @@ const SERVICE_KEY = resolveSecretKey({
 });
 const MOYASAR_SECRET_KEY = Deno.env.get('MOYASAR_SECRET_KEY') ?? '';
 const TICK_SECRET = Deno.env.get('HABBA_PAYMENTS_TICK_SECRET') ?? '';
+/**
+ * For a local run against a stand-in gateway only. Unset in every deployed
+ * environment, where requests go to MOYASAR_API as built in _shared.
+ */
+const MOYASAR_BASE_OVERRIDE = Deno.env.get('MOYASAR_API_BASE_OVERRIDE') ?? '';
+
+function gatewayUrl(url: string): string {
+  return MOYASAR_BASE_OVERRIDE === '' ? url : url.replace(MOYASAR_API, MOYASAR_BASE_OVERRIDE);
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -128,7 +138,7 @@ async function confirm(
   const fetchRequest = fetchPaymentRequest(MOYASAR_SECRET_KEY, paymentId);
   let payment: MoyasarPayment;
   try {
-    const response = await fetch(fetchRequest.url, fetchRequest.init);
+    const response = await fetch(gatewayUrl(fetchRequest.url), fetchRequest.init);
     if (!response.ok) return json({ error: 'payment_not_found' }, 402);
     payment = (await response.json()) as MoyasarPayment;
   } catch {
@@ -175,7 +185,7 @@ async function tick(db: SupabaseClient): Promise<Response> {
         operation.payment_id,
         Number(operation.amount).toFixed(2),
       );
-      const response = await fetch(call.url, call.init);
+      const response = await fetch(gatewayUrl(call.url), call.init);
       const answer = interpretOperation(operation.kind, response.status, await response.json());
       outcome = answer.ok
         ? { ok: true, reference: answer.reference, error: null }

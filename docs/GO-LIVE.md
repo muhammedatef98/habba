@@ -72,6 +72,8 @@ supabase secrets set MOYASAR_SECRET_KEY=sk_live_… HABBA_PAYMENTS_TICK_SECRET=�
 ```
 
 - جدولة الطابور كل 30 ثانية: `supabase-setup.md` §7b.
+- قبل التفعيل وبعد أي تعديل على الدالة: `pnpm api:start && pnpm test:payments-e2e` يشغّلها فعلياً
+  (Deno) أمام قاعدة البيانات المحلية وMoyasar وهمي — 16 فحصاً للحجز والرفض والتحصيل.
 - في التطبيق: `EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY=pk_live_…` ثم build جديد
   (`pnpm --filter @habba/mobile build:preview`).
 - **آخر خطوة:** في لوحة التشغيل ← الإعدادات ← الدفع، غيّر «بوابة الدفع» من `dev`
