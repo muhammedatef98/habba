@@ -116,6 +116,10 @@ export function explain(error: unknown): string {
     [/partial refund/i, 'الاسترداد الجزئي أكبر من صفر وأقل من المبلغ المدفوع.'],
     [/Nothing was captured/i, 'لم يُحصَّل أي مبلغ على هذا الطلب ليُسترد.'],
     [/reference/i, 'سجّل الرقم المرجعي من مزوّد الدفع أو البنك.'],
+    [
+      /must be an https:\/\/ link/i,
+      'الرابط يجب أن يبدأ بـ https:// — مثل https://habba.sa/privacy',
+    ],
     [/must be at least|must be at most/i, 'القيمة خارج الحدود المسموحة.'],
     [/must be a/i, 'نوع القيمة غير صحيح.'],
     [/in progress or in dispute/i, 'لديه طلب جارٍ أو شكوى مفتوحة — أنهِها أولاً.'],

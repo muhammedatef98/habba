@@ -12,7 +12,7 @@ import { createHmac } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { createApi, type ConsoleApi } from './api';
-import { ApiError, SupabaseTransport } from './transport';
+import { ApiError, SupabaseTransport, explain } from './transport';
 
 const POSTGREST_URL = process.env['HABBA_POSTGREST_URL'] ?? 'http://127.0.0.1:54321';
 const JWT_SECRET =
@@ -198,6 +198,23 @@ describe.skipIf(!harnessUp)('the console, against the database', () => {
       code: '23514',
     });
     await ops.updateSetting('dispatch_max_round', 3);
+  });
+
+  test('a link setting takes https and nothing else, and says so in Arabic', async () => {
+    await ops.updateSetting('privacy_url', 'https://habba.sa/privacy');
+    const after = await ops.settings();
+    expect(after.find((setting) => setting.key === 'privacy_url')?.value).toBe(
+      'https://habba.sa/privacy',
+    );
+
+    const refused = await ops.updateSetting('privacy_url', 'http://habba.sa/privacy').then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+    expect(refused).toMatchObject({ code: '23514' });
+    expect(explain(refused)).toContain('https://');
+
+    await ops.updateSetting('privacy_url', '');
   });
 
   test('the catalogue is edited through the same client', async () => {

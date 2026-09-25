@@ -936,5 +936,12 @@
     "title": "A newer version of Habba is available",
     "body": "This version is no longer supported. Update the app to continue.",
     "action": "Update the app"
+  },
+  "legal": {
+    "terms": "Terms of use",
+    "privacy": "Privacy policy",
+    "consentBoth": "By continuing you agree to the <terms>Terms of use</terms> and the <privacy>Privacy policy</privacy>.",
+    "consentTerms": "By continuing you agree to the <terms>Terms of use</terms>.",
+    "consentPrivacy": "By continuing you agree to the <privacy>Privacy policy</privacy>."
   }
 }

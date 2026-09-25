@@ -358,6 +358,9 @@ export interface PlatformStatus {
   readonly minAppVersion: string;
   readonly appStoreUrl: string;
   readonly playStoreUrl: string;
+  /** Set in the console (0082); empty until the documents are published. */
+  readonly termsUrl: string;
+  readonly privacyUrl: string;
 }
 
 export interface AppFeatures {

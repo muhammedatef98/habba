@@ -20,6 +20,7 @@ import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
 import { Button, Field, HabbaWordmark, Row, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/features/shared/lib/otp';
 import { repository } from '@/features/shared/data/repository';
+import { LegalConsent } from '@/features/shared/components/LegalConsent';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
 import { useMode } from '@/features/shared/state/mode';
@@ -171,6 +172,8 @@ export default function PhoneScreen() {
             </Text>
           </View>
         ) : null}
+
+        <LegalConsent />
       </View>
     </Screen>
   );

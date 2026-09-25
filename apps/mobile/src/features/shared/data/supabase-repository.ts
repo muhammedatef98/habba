@@ -1490,6 +1490,8 @@ export class SupabaseRepository implements Repository {
       minAppVersion: text('min_app_version'),
       appStoreUrl: text('app_store_url'),
       playStoreUrl: text('play_store_url'),
+      termsUrl: text('terms_url'),
+      privacyUrl: text('privacy_url'),
     };
   }
 

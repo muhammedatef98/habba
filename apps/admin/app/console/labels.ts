@@ -138,6 +138,7 @@ export const SETTING_CATEGORY: Readonly<Record<string, string>> = {
   care: 'العناية بالسيارة',
   payments: 'الدفع',
   features: 'ميزات التطبيق',
+  legal: 'الشروط والخصوصية',
 };
 
 export const AUDIT_ACTION: Readonly<Record<string, string>> = {

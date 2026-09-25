@@ -30,6 +30,7 @@ import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
 import { formatPhone } from '@/features/shared/lib/format-phone';
+import { openableLink } from '@/features/shared/lib/links';
 import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
 import { unregisterThisDevice } from '@/features/shared/lib/push';
@@ -89,6 +90,9 @@ export default function AccountScreen() {
   const hasSupport =
     support !== undefined &&
     (support.supportPhone !== '' || support.supportWhatsapp !== '' || support.supportEmail !== '');
+  // The published terms and privacy policy (0082), only as https links.
+  const termsLink = openableLink(support?.termsUrl ?? '');
+  const privacyLink = openableLink(support?.privacyUrl ?? '');
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
@@ -329,6 +333,29 @@ export default function AccountScreen() {
 
       <View style={{ gap: theme.spacing.md }}>
         <SectionHeader title={t('settings.sectionAbout')} />
+
+        {termsLink !== null || privacyLink !== null ? (
+          <Card
+            testID="legal-section"
+            elevation="none"
+            style={{ borderColor: theme.colors.border, borderWidth: 1 }}
+          >
+            {termsLink !== null ? (
+              <ListRow
+                testID="legal-terms-row"
+                title={t('legal.terms')}
+                onPress={() => void Linking.openURL(termsLink)}
+              />
+            ) : null}
+            {privacyLink !== null ? (
+              <ListRow
+                testID="legal-privacy-row"
+                title={t('legal.privacy')}
+                onPress={() => void Linking.openURL(privacyLink)}
+              />
+            ) : null}
+          </Card>
+        ) : null}
 
         <Card elevation="none" style={{ borderColor: theme.colors.border, borderWidth: 1 }}>
           <View
