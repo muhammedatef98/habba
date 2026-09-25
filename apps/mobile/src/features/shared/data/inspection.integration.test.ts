@@ -12,6 +12,8 @@
 
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+// Payment ids are unique across holds (0078): a fixed one fails on a reused database.
+import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { renderInspectionReport, type InspectionReport } from '@habba/core';
@@ -204,7 +206,7 @@ describe.skipIf(!harnessUp)('Phase 5 acceptance — pre-purchase inspection', ()
     // declaring its own order paid was the vulnerability that closed.
     await buyer.rpc('authorise_order_payment', {
       p_order_id: orderId,
-      p_payment_intent_id: 'insp_intent_int',
+      p_payment_intent_id: `insp_intent_${randomUUID()}`,
     });
     await buyer.from('orders').update({ status: 'accepted' }).eq('id', orderId);
 

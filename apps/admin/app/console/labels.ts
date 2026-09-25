@@ -137,6 +137,7 @@ export const SETTING_CATEGORY: Readonly<Record<string, string>> = {
   transfer: 'نقل الملكية',
   care: 'العناية بالسيارة',
   payments: 'الدفع',
+  features: 'ميزات التطبيق',
 };
 
 export const AUDIT_ACTION: Readonly<Record<string, string>> = {

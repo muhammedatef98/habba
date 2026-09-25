@@ -44,6 +44,7 @@ import { OfflineNotice } from '@/features/shared/components/OfflineNotice';
 import { PlatformNotice } from '@/features/shared/components/PlatformNotice';
 import { PushBridge } from '@/features/shared/components/PushBridge';
 import { Toast } from '@/features/shared/components/Toast';
+import { VersionGate } from '@/features/shared/components/VersionGate';
 import { useToast } from '@/features/shared/state/toast';
 import { i18next } from '@/features/shared/lib/i18n';
 import { configureNotificationPresentation } from '@/features/shared/lib/push';
@@ -188,7 +189,9 @@ export default function RootLayout() {
             <OfflineNotice testID="offline-notice" />
             <PlatformNotice />
             <View style={{ flex: 1 }}>
-              <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+              <VersionGate>
+                <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+              </VersionGate>
             </View>
             <Toast />
           </View>

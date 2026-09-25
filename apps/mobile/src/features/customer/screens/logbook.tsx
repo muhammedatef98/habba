@@ -52,6 +52,7 @@ import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCar
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { habbaReportDocument } from '@/features/shared/lib/report-pdf';
 import { DocumentActions } from '@/features/shared/components/DocumentActions';
 import { formatCount } from '@/features/shared/lib/format-number';
@@ -86,6 +87,7 @@ export default function LogbookScreen() {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
+  const features = useFeatures();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isArabic = i18n.language.startsWith('ar');
 
@@ -332,17 +334,19 @@ export default function LogbookScreen() {
               selfReported={selfReportedCount}
             />
 
-            <DocumentActions
-              testID="generate-report"
-              load={loadReport}
-              viewLabel={t('documents.viewReport')}
-              viewVariant="accent"
-              onPrepared={() => {
-                setReportReady(true);
-                setReportError(null);
-              }}
-              onLoadError={onReportFailed}
-            />
+            {features.habbaReport ? (
+              <DocumentActions
+                testID="generate-report"
+                load={loadReport}
+                viewLabel={t('documents.viewReport')}
+                viewVariant="accent"
+                onPrepared={() => {
+                  setReportReady(true);
+                  setReportError(null);
+                }}
+                onLoadError={onReportFailed}
+              />
+            ) : null}
 
             {reportReady ? (
               <View
@@ -481,16 +485,20 @@ export default function LogbookScreen() {
                 size="medium"
                 onPress={() => router.push({ pathname: '/mileage', params: { id } })}
               />
-              <Button
-                testID="logbook-transfer"
-                label={t('transfer.entry')}
-                variant="ghost"
-                size="medium"
-                onPress={() => router.push({ pathname: '/transfer', params: { id } })}
-              />
-              <Text variant="caption" tone="subtle">
-                {t('transfer.entryHint')}
-              </Text>
+              {features.ownershipTransfer ? (
+                <>
+                  <Button
+                    testID="logbook-transfer"
+                    label={t('transfer.entry')}
+                    variant="ghost"
+                    size="medium"
+                    onPress={() => router.push({ pathname: '/transfer', params: { id } })}
+                  />
+                  <Text variant="caption" tone="subtle">
+                    {t('transfer.entryHint')}
+                  </Text>
+                </>
+              ) : null}
             </Card>
           </View>
         </>

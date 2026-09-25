@@ -1476,6 +1476,20 @@ export class SupabaseRepository implements Repository {
           : DEFAULT_PLATFORM_STATUS.autoCompleteHours,
       suspended: standing?.suspended === true,
       suspensionReason: standing?.reason ?? null,
+      // Only an explicit `false` switches a part off (see platform-status.ts).
+      features: {
+        emergency: values['feature_emergency'] !== false,
+        booking: values['feature_booking'] !== false,
+        videoTriage: values['feature_video_triage'] !== false,
+        ownershipTransfer: values['feature_ownership_transfer'] !== false,
+        habbaReport: values['feature_habba_report'] !== false,
+        providerApplications: values['feature_provider_applications'] !== false,
+        guestLogin: values['feature_guest_login'] !== false,
+        emailLogin: values['feature_email_login'] !== false,
+      },
+      minAppVersion: text('min_app_version'),
+      appStoreUrl: text('app_store_url'),
+      playStoreUrl: text('play_store_url'),
     };
   }
 

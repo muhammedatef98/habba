@@ -35,6 +35,7 @@ import { ActiveOrderCard } from '@/features/customer/components/home/ActiveOrder
 import { RecentOrderRow } from '@/features/customer/components/home/RecentOrderRow';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useLiveRefresh } from '@/features/shared/lib/live';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
@@ -44,6 +45,7 @@ export default function OrdersScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
+  const features = useFeatures();
   const userId = useSession((state) => state.userId);
 
   const orders = useQuery({
@@ -141,17 +143,21 @@ export default function OrdersScreen() {
           </View>
 
           <View style={{ gap: theme.spacing.sm }}>
-            <Button
-              testID="orders-empty-emergency"
-              label={t('home.emergencyCta')}
-              onPress={() => router.push('/emergency/service')}
-            />
-            <Button
-              testID="orders-empty-booking"
-              label={t('home.bookAppointment')}
-              variant="secondary"
-              onPress={() => router.push('/booking')}
-            />
+            {features.emergency ? (
+              <Button
+                testID="orders-empty-emergency"
+                label={t('home.emergencyCta')}
+                onPress={() => router.push('/emergency/service')}
+              />
+            ) : null}
+            {features.booking ? (
+              <Button
+                testID="orders-empty-booking"
+                label={t('home.bookAppointment')}
+                variant="secondary"
+                onPress={() => router.push('/booking')}
+              />
+            ) : null}
           </View>
         </View>
       </Screen>

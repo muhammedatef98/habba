@@ -9,6 +9,8 @@
  * square — the failure is invisible until a tax audit.
  */
 
+// Payment ids are unique across holds (0078): a fixed one fails on a reused database.
+import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { mintTestJwt } from './test-jwt.js';
@@ -272,7 +274,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     // declaring its own order paid was the vulnerability that closed.
     await owner.rpc('authorise_order_payment', {
       p_order_id: priorId,
-      p_payment_intent_id: 'intel_prior',
+      p_payment_intent_id: `intel_prior_${randomUUID()}`,
     });
     await owner.from('orders').update({ status: 'accepted' }).eq('id', priorId);
     await shop.rpc('check_in_vehicle', { p_order_id: priorId });
@@ -353,7 +355,7 @@ describe.skipIf(!harnessUp)('Phase 6 acceptance — intelligence and compliance'
     // declaring its own order paid was the vulnerability that closed.
     await owner.rpc('authorise_order_payment', {
       p_order_id: orderId,
-      p_payment_intent_id: 'intel_http_1',
+      p_payment_intent_id: `intel_http_${randomUUID()}`,
     });
     await owner.from('orders').update({ status: 'accepted' }).eq('id', orderId);
     await shop.rpc('check_in_vehicle', { p_order_id: orderId });

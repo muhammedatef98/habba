@@ -19,6 +19,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, Field, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { locationProvider } from '@/features/shared/lib/location';
 import {
   MAP_FALLBACK_LOCATION,
@@ -36,6 +37,7 @@ export default function LocationConfirmScreen() {
   const theme = useTheme();
 
   const draft = useEmergencyDraft();
+  const features = useFeatures();
   const [locationDenied, setLocationDenied] = useState(false);
   const [pinMoved, setPinMoved] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -105,11 +107,21 @@ export default function LocationConfirmScreen() {
       // The draft is finished the moment the server owns the order. Leaving it
       // populated would pre-fill the next emergency with this one's answers.
       draft.reset();
-      router.replace({ pathname: '/emergency/triage', params: { id: orderId } });
+      // The clip step is an operators' switch (0081); off, straight to tracking.
+      if (features.videoTriage) {
+        router.replace({ pathname: '/emergency/triage', params: { id: orderId } });
+      } else {
+        router.replace({ pathname: '/tracking', params: { id: orderId } });
+      }
     },
     onError: (mutationError: Error) => {
       // Closing the card form is a decision, not a failure: no message.
       if (mutationError.message === 'submitOrder/payment: cancelled') return;
+      // Switched off while this screen was open (0081).
+      if (mutationError.message.includes('switched off')) {
+        setError(t('features.unavailableTitle'));
+        return;
+      }
       setError(
         mutationError.message === 'no_location'
           ? t('emergency.errors.noLocation')

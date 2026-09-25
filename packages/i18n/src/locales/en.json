@@ -927,5 +927,14 @@
     "empty": "No invoices yet",
     "emptyBody": "Every completed order gets a tax invoice. You will find it here to view or share.",
     "openFailed": "Couldn't open the invoice. Try again."
+  },
+  "features": {
+    "unavailableTitle": "This service is paused for now",
+    "unavailableBody": "We're working on bringing it back. If you need urgent help, contact support."
+  },
+  "update": {
+    "title": "A newer version of Habba is available",
+    "body": "This version is no longer supported. Update the app to continue.",
+    "action": "Update the app"
   }
 }

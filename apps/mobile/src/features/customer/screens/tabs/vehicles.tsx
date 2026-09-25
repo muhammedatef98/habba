@@ -47,6 +47,7 @@ import { RecentOrderRow } from '@/features/customer/components/home/RecentOrderR
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { VehicleHeroCard } from '@/features/customer/components/home/VehicleHeroCard';
 import { repository } from '@/features/shared/data/repository';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useLiveRefresh } from '@/features/shared/lib/live';
 import { formatCount, formatShortDate } from '@/features/shared/lib/format-number';
 import { summariseLogbook } from '@/features/shared/lib/logbook-summary';
@@ -63,6 +64,7 @@ export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
+  const features = useFeatures();
   const isGuest = useIsGuest();
   const isArabic = i18n.language.startsWith('ar');
 
@@ -245,18 +247,21 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      <FadeIn delay={0}>
-        <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
-          <EmergencyHero testID="home-emergency" onPress={openEmergency} />
+      {/* Each switchable from the console (0081). */}
+      {features.emergency ? (
+        <FadeIn delay={0}>
+          <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+            <EmergencyHero testID="home-emergency" onPress={openEmergency} />
 
-          <QuickServices
-            testID="home-quick-services"
-            services={services.data ?? []}
-            isArabic={isArabic}
-            onSelect={startQuickService}
-          />
-        </View>
-      </FadeIn>
+            <QuickServices
+              testID="home-quick-services"
+              services={services.data ?? []}
+              isArabic={isArabic}
+              onSelect={startQuickService}
+            />
+          </View>
+        </FadeIn>
+      ) : null}
 
       {/* Above the car and below the live job: someone is standing next to
           this person waiting to hand over a car, which outranks a maintenance
@@ -355,7 +360,7 @@ export default function HomeScreen() {
         </View>
       </FadeIn>
 
-      {(bookable.data?.length ?? 0) > 0 ? (
+      {features.booking && (bookable.data?.length ?? 0) > 0 ? (
         <FadeIn delay={staggerDelay(2)}>
           <View
             testID="home-booking"

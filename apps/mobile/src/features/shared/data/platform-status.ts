@@ -13,4 +13,20 @@ export const DEFAULT_PLATFORM_STATUS: PlatformStatus = {
   autoCompleteHours: 24,
   suspended: false,
   suspensionReason: null,
+  // On until the server says otherwise: a switch that cannot be read (offline,
+  // a first launch) must not hide the emergency button. The server refuses a
+  // switched-off request regardless (0081).
+  features: {
+    emergency: true,
+    booking: true,
+    videoTriage: true,
+    ownershipTransfer: true,
+    habbaReport: true,
+    providerApplications: true,
+    guestLogin: true,
+    emailLogin: true,
+  },
+  minAppVersion: '',
+  appStoreUrl: '',
+  playStoreUrl: '',
 };

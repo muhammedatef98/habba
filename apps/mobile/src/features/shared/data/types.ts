@@ -352,6 +352,23 @@ export interface PlatformStatus {
   readonly autoCompleteHours: number;
   readonly suspended: boolean;
   readonly suspensionReason: string | null;
+  /** The parts of the app operators can switch off (0081). */
+  readonly features: AppFeatures;
+  /** Builds below this are asked to update before anything else (0081). */
+  readonly minAppVersion: string;
+  readonly appStoreUrl: string;
+  readonly playStoreUrl: string;
+}
+
+export interface AppFeatures {
+  readonly emergency: boolean;
+  readonly booking: boolean;
+  readonly videoTriage: boolean;
+  readonly ownershipTransfer: boolean;
+  readonly habbaReport: boolean;
+  readonly providerApplications: boolean;
+  readonly guestLogin: boolean;
+  readonly emailLogin: boolean;
 }
 
 export interface OrderPart {
