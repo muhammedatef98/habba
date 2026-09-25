@@ -202,6 +202,23 @@ as a user would. The fixes that matter beyond one screen:
 - **Register.** The dialect test also catches spoken negation and future
   («ما عندك», «ما فيه», «بيظهر», «تسوي شي», «يشتغل»…).
 
+## 6b. The hosted project, as of 2026-09-25
+
+- **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
+  0001–0086 applied. 0001–0053 were applied on 2026-09-05 by
+  `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
+  0054–0086 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
+  idempotent: re-running them duplicates cities and services). Both storage
+  policy files are applied. The four `rls-…@habba.test` users are the RLS
+  suite's fixtures, not people.
+- **Vercel** `habba-admin`: `NEXT_PUBLIC_SUPABASE_URL` and
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` set for all environments; production
+  (`habba-admin.vercel.app`) serves the console against the live project.
+- **Not yet done on the project:** the first operator (see
+  `apps/admin/README.md`), the SMS hook (phone sign-in), Anonymous sign-ins
+  (guest), leaked-password protection, and the scheduled functions (§7a/§7b of
+  `docs/supabase-setup.md`).
+
 ## 7. Open decisions — these block launch, and none is a coding task
 
 | #   | Decision                                                        | Blocks                                                                                                                                                                                                              |
