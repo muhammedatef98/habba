@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { apiKeyOnlyFetch, isJwtApiKey, resolveSecretKey } from './api-keys.js';
+import { apiKeyOnlyFetch, isJwtApiKey, resolveSecretKey, secretsMatch } from './api-keys.js';
 
 /** A real-shaped legacy key: three base64url segments, header first. */
 const LEGACY_JWT =
@@ -116,5 +116,21 @@ describe('apiKeyOnlyFetch', () => {
     const { calls, fetch } = capture();
     await apiKeyOnlyFetch('sb_secret_xyz', fetch)('https://example.supabase.co/');
     expect(calls[0]?.get('apikey')).toBe('sb_secret_xyz');
+  });
+});
+
+describe('secretsMatch', () => {
+  test('only the exact secret matches', () => {
+    expect(secretsMatch('s3cret-tick', 's3cret-tick')).toBe(true);
+    expect(secretsMatch('s3cret-tic', 's3cret-tick')).toBe(false);
+    expect(secretsMatch('s3cret-tickk', 's3cret-tick')).toBe(false);
+    expect(secretsMatch('S3cret-tick', 's3cret-tick')).toBe(false);
+    expect(secretsMatch('', 's3cret-tick')).toBe(false);
+    expect(secretsMatch(null, 's3cret-tick')).toBe(false);
+  });
+
+  test('an unset secret matches nothing, not even an empty header', () => {
+    expect(secretsMatch('', '')).toBe(false);
+    expect(secretsMatch('anything', '')).toBe(false);
   });
 });

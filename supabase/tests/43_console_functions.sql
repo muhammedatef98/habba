@@ -205,8 +205,10 @@ select test.assert_raises(
 
 select test.become('44444444-0000-4000-ed00-000000000004');
 select public.ops_set_staff_role('55555555-0000-4000-ed00-000000000005', 'ops', true);
+reset role;
 select test.assert(public.has_role('55555555-0000-4000-ed00-000000000005', 'ops'),
   'a super admin can');
+set role authenticated;
 
 select test.assert_raises(
   $$select public.ops_set_staff_role('44444444-0000-4000-ed00-000000000004', 'super_admin', false)$$,
@@ -217,8 +219,10 @@ select test.assert_raises(
   'and provider roles are never handed out by hand', '22023');
 
 select public.ops_set_staff_role('55555555-0000-4000-ed00-000000000005', 'ops', false);
+reset role;
 select test.assert(not public.has_role('55555555-0000-4000-ed00-000000000005', 'ops'),
   'a staff role is revoked as easily');
+set role authenticated;
 
 
 -- The logbook: corrected by addition, never by edit ------------------------------------------------------
@@ -271,8 +275,10 @@ select test.assert(
   (select full_name = 'مستخدم محذوف' and phone is null and email is null
      from public.profiles where id = '66666666-0000-4000-ed00-000000000006'),
   'erasure removes who the person was');
+reset role;
 select test.assert(public.is_suspended('66666666-0000-4000-ed00-000000000006'),
   'and the account can no longer act');
+set role authenticated;
 select test.assert(
   (select is_valid from public.verify_vehicle_timeline('d0000000-0000-4000-ed00-000000000006')),
   'while the car''s logbook — the car''s, not the person''s — still verifies');

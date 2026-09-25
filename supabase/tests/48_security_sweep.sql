@@ -118,6 +118,25 @@ select test.assert_eq(
   'get_habba_report, get_inspection_report, get_public_settings, is_ops, vat_rate_on, verify_vehicle_timeline',
   'a signed-out caller can run exactly the public list');
 
+-- 0084: the internal readers answer server functions, never a client.
+select test.assert_eq(
+  (select coalesce(string_agg(distinct p.proname, ', ' order by p.proname), '')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in (
+        'setting_number', 'setting_bool', 'setting_text', 'has_role', 'is_provider',
+        'is_suspended', 'commission_rate_for', 'payments_live', 'feature_on',
+        'auto_complete_window', 'care_default_snooze_days', 'care_lead_days', 'care_lead_km',
+        'care_reminder_repeat_days', 'dispatch_max_round', 'dispatch_silence_window',
+        'handover_max_attempts', 'location_freshness_limit', 'maintenance_alert_window_days',
+        'maintenance_alert_window_km', 'match_radius_for_round', 'ops_stuck_search_after',
+        'ops_unconfirmed_after', 'otp_send_limit', 'otp_send_window', 'ownership_transfer_window',
+        'route_detour_factor', 'transfer_accept_limit', 'transfer_accept_window',
+        'transfer_attempt_limit', 'urban_speed_kmh')
+      and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+      and has_function_privilege('authenticated', p.oid, 'execute')),
+  '', 'a signed-in caller cannot read internal settings, limits or anyone''s roles');
+
 select test.assert_eq(
   (select count(*)::int from information_schema.role_table_grants
     where table_schema = 'public' and grantee in ('anon', 'authenticated')

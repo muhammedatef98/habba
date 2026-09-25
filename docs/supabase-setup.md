@@ -326,6 +326,12 @@ refuses any photo that was not uploaded there.
 > the real policies rather than a weaker stand-in. Suite `31` asserts the
 > harness has not quietly given itself ownership it would not have here.
 
+**Size and type limits** are set by migration 0085 on a hosted project:
+`triage-media` takes `video/mp4` and `video/quicktime` up to 50 MB,
+`completion-media` takes images up to 10 MB. Check them under Storage →
+the bucket → Edit; if the migration ran before the buckets had those columns,
+set the same values there.
+
 ## 7a. Deploy and schedule the two ticking functions
 
 Two Edge Functions run on their own, and **neither does anything until it is

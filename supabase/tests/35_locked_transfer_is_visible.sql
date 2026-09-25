@@ -48,13 +48,16 @@ insert into public.vehicles (id, owner_id, make_id, model_id, year, plate_en) va
 
 -- Five wrong codes, as the addressed recipient. Wrapped so each section can
 -- lock a row without five copies of the same block.
+-- The limit is read here, as the owner: since 0084 a client cannot read it.
+select public.transfer_attempt_limit() as attempt_limit \gset
 create or replace function pg_temp.exhaust(p_actor uuid, p_transfer_id uuid)
 returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claim.sub', p_actor::text, true);
   perform public.accept_ownership_transfer(p_transfer_id, '000000')
-  from generate_series(1, public.transfer_attempt_limit());
+  from generate_series(1, current_setting('test.attempt_limit')::int);
 end $$;
+select set_config('test.attempt_limit', :'attempt_limit', false);
 
 
 -- ===========================================================================

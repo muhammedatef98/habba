@@ -22,9 +22,17 @@
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { apiKeyOnlyFetch, resolveSecretKey, secretsMatch } from '../_shared/api-keys.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+// The new secret keys (sb_secret_…) where the project has them, the legacy
+// service-role JWT otherwise — the same resolution as the other functions. A
+// project with legacy keys disabled would otherwise leave this empty, and
+// every search would stop widening without a word.
+const SERVICE_KEY = resolveSecretKey({
+  secretKeys: Deno.env.get('SUPABASE_SECRET_KEYS'),
+  legacy: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+});
 
 /**
  * Shared secret for the scheduler.
@@ -52,7 +60,7 @@ Deno.serve(async (request: Request) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  if (TICK_SECRET === '' || request.headers.get('x-habba-tick') !== TICK_SECRET) {
+  if (!secretsMatch(request.headers.get('x-habba-tick'), TICK_SECRET)) {
     // Deliberately identical for "no secret configured" and "wrong secret":
     // distinguishing them tells a prober whether the endpoint is live.
     return new Response('Not found', { status: 404 });
@@ -60,6 +68,7 @@ Deno.serve(async (request: Request) => {
 
   const client = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false },
+    global: { fetch: apiKeyOnlyFetch(SERVICE_KEY, fetch) },
   });
 
   const { data, error } = await client.rpc('expand_stale_searches');

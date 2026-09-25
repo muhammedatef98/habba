@@ -26,6 +26,7 @@ import { useEmergencyDraft } from '@/features/shared/state/emergency-draft';
 
 /** §9.1. Long enough to show a fault, short enough that nobody narrates. */
 const MAX_SECONDS = 20;
+const VIDEO_BITRATE = 4_000_000;
 
 export default function VideoTriageScreen() {
   const { t } = useTranslation();
@@ -88,7 +89,9 @@ export default function VideoTriageScreen() {
     setElapsed(0);
     setRecording(true);
     try {
-      const video = await camera.current.recordAsync({ maxDuration: MAX_SECONDS });
+      // H.264: the codec every provider's phone plays, and the one iOS needs
+      // named for the bitrate below to apply.
+      const video = await camera.current.recordAsync({ maxDuration: MAX_SECONDS, codec: 'avc1' });
       if (video !== undefined) {
         setClip({ uri: video.uri, seconds: Math.min(MAX_SECONDS, Math.round(elapsed)) });
       }
@@ -127,8 +130,19 @@ export default function VideoTriageScreen() {
           borderColor: theme.colors.border,
         }}
       >
+        {/* 720p at 4 Mb/s: about 10 MB for the full 20 s. Enough to see a
+            leak and hear a noise; the camera's default could be 4K, a
+            100 MB upload from a roadside on mobile data. The bucket refuses
+            anything over 50 MB (0085). */}
         {granted ? (
-          <CameraView ref={camera} style={{ flex: 1 }} mode="video" facing="back" />
+          <CameraView
+            ref={camera}
+            style={{ flex: 1 }}
+            mode="video"
+            facing="back"
+            videoQuality="720p"
+            videoBitrate={VIDEO_BITRATE}
+          />
         ) : (
           <View
             style={{

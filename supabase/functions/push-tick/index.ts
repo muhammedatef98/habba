@@ -19,7 +19,7 @@
  */
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
-import { apiKeyOnlyFetch, resolveSecretKey } from '../_shared/api-keys.ts';
+import { apiKeyOnlyFetch, resolveSecretKey, secretsMatch } from '../_shared/api-keys.ts';
 import {
   chunk,
   EXPO_PUSH_URL,
@@ -59,7 +59,7 @@ Deno.serve(async (request: Request) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  if (TICK_SECRET === '' || request.headers.get('x-habba-tick') !== TICK_SECRET) {
+  if (!secretsMatch(request.headers.get('x-habba-tick'), TICK_SECRET)) {
     return new Response('Not found', { status: 404 });
   }
 

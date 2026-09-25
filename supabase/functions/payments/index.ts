@@ -39,7 +39,7 @@
  */
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
-import { apiKeyOnlyFetch, resolveSecretKey } from '../_shared/api-keys.ts';
+import { apiKeyOnlyFetch, resolveSecretKey, secretsMatch } from '../_shared/api-keys.ts';
 import {
   checkAuthorisation,
   fetchPaymentRequest,
@@ -90,7 +90,7 @@ Deno.serve(async (request: Request) => {
   if (body['action'] === 'confirm') return confirm(request, body, db, 'initial');
   if (body['action'] === 'confirm_top_up') return confirm(request, body, db, 'top_up');
   if (body['action'] === 'tick') {
-    if (TICK_SECRET === '' || request.headers.get('x-habba-tick') !== TICK_SECRET) {
+    if (!secretsMatch(request.headers.get('x-habba-tick'), TICK_SECRET)) {
       return new Response('Not found', { status: 404 });
     }
     return tick(db);

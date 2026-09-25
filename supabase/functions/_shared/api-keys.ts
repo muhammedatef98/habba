@@ -111,3 +111,19 @@ export function apiKeyOnlyFetch(key: string, inner: FetchLike): FetchLike {
     return inner(input, { ...init, headers });
   };
 }
+
+/**
+ * Whether a presented secret (a tick header, a webhook secret) is the
+ * expected one, in time that does not depend on how much of it matched.
+ * `!==` stops at the first differing character, which lets a caller who can
+ * time enough requests find a secret one character at a time. An empty
+ * expected secret never matches: an unset secret means closed, not open.
+ */
+export function secretsMatch(presented: string | null, expected: string): boolean {
+  if (expected === '' || presented === null) return false;
+  let difference = presented.length ^ expected.length;
+  for (let index = 0; index < expected.length; index++) {
+    difference |= (presented.charCodeAt(index) || 0) ^ expected.charCodeAt(index);
+  }
+  return difference === 0;
+}

@@ -65,14 +65,20 @@ select test.assert(
   'the app reads the public switches, never the security limits');
 
 update public.platform_settings set value = '9' where key = 'dispatch_max_round';
+select test.assert_raises($$select public.dispatch_max_round()$$,
+  'nor can a customer read an operational number through its function (0084)', '42501');
+reset role;
 select test.assert_eq(public.dispatch_max_round(), 3,
   'a customer''s update changes nothing');
+set role authenticated;
 
 select test.become('33333333-0000-4000-ec00-000000000003');
 
 update public.platform_settings set value = '5' where key = 'dispatch_max_round';
+reset role;
 select test.assert_eq(public.dispatch_max_round(), 5,
   'an operator changes a number and every function that used the constant follows');
+set role authenticated;
 
 select test.assert_raises(
   $$update public.platform_settings set value = '50' where key = 'dispatch_max_round'$$,

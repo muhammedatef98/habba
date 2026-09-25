@@ -68,7 +68,12 @@ select test.assert_raises(
   'a customer cannot grant themselves any other role either',
   '42501');
 
-select test.assert(not public.is_provider(), 'is_provider() is still false');
+select test.assert_raises($$select public.is_provider('11111111-0000-4000-3333-000000000001')$$,
+  'whether someone is a provider is not a client''s question to ask (0084)', '42501');
+reset role;
+select test.assert(not public.is_provider('11111111-0000-4000-3333-000000000001'),
+  'is_provider() is still false');
+set role authenticated;
 
 -- Nor revoke someone else's, which would be a denial of service against a
 -- working technician.
