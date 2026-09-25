@@ -554,7 +554,7 @@ export class SupabaseRepository implements Repository {
           year: input.year,
           // plate_normalised is a generated column — the server computes the
           // search key from this, and the client never supplies it.
-          plate_en: input.plate ?? null,
+          plate_en: input.plate,
           nickname: input.nickname ?? null,
           current_mileage: input.currentMileage ?? 0,
           created_by: ownerId,

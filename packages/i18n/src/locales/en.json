@@ -76,7 +76,7 @@
     "modelLabel": "Model",
     "yearLabel": "Year",
     "plateLabel": "Plate number",
-    "plateHint": "Optional — you can add it later",
+    "plateHint": "3 letters and 4 digits, as on the plate. It's how the logbook and the Habba report know the car.",
     "vinLabel": "VIN",
     "nicknameLabel": "Nickname",
     "nicknamePlaceholder": "Work car",
@@ -92,7 +92,8 @@
       "vinInvalid": "A VIN is 17 characters and never contains I, O or Q.",
       "required": "This field is required.",
       "mileageImplausible": "Check that reading — the number doesn't look right.",
-      "saveFailed": "We couldn't save this vehicle. Check your connection and try again."
+      "saveFailed": "We couldn't save this vehicle. Check your connection and try again.",
+      "plateRequired": "Enter the plate number — it is how the logbook knows the car."
     },
     "mileageHint": "Helps us predict when the next service is due",
     "lastOilLabel": "Last oil change",

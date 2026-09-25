@@ -1199,8 +1199,12 @@ export class InMemoryRepository implements Repository {
     this.counter += 1;
     const id = `veh-${this.counter}`;
 
-    const plateNormalised =
-      input.plate !== undefined && input.plate.length > 0 ? normalisePlate(input.plate) : null;
+    // The server refuses a car it cannot identify (0008); so does this, or the
+    // dev build hides the failure the real one shows.
+    const plateNormalised = normalisePlate(input.plate);
+    if (plateNormalised === null) {
+      throw new Error('addVehicle: violates check constraint "vehicles_plate_or_vin"');
+    }
 
     const vehicle: Vehicle = {
       id,
@@ -1209,7 +1213,7 @@ export class InMemoryRepository implements Repository {
       modelId: input.modelId,
       year: input.year,
       plateEn: plateNormalised,
-      plateAr: input.plate ?? null,
+      plateAr: input.plate,
       plateNormalised,
       vin: null,
       nickname: input.nickname ?? null,

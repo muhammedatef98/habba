@@ -161,7 +161,12 @@ signed-in user could issue a tax invoice for any order, while nothing issued
 one for a finished job; the order history showed every service with an empty
 name against the real backend (a many-to-one embed read as an array); a
 completed order opened again asked to be rated a second time, and the second
-rating failed; an emergency with no car on file was a dead end.
+rating failed; an emergency with no car on file was a dead end; the add-car
+screen called the plate optional while the database refuses a car with
+neither plate nor VIN, so every owner who skipped it could not save the car.
+`customer-surfaces.integration.test.ts` now reads the customer's remaining
+screens back through `SupabaseRepository`, including the least each form
+allows.
 
 ---
 

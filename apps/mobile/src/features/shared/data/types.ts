@@ -135,7 +135,13 @@ export interface NewVehicleInput {
   readonly makeId: string;
   readonly modelId: string;
   readonly year: number;
-  readonly plate?: string | undefined;
+  /**
+   * Required. A car with neither plate nor VIN is refused by the database
+   * (0008's vehicles_plate_or_vin): the logbook, the report and a handover
+   * all identify the car by it. The screen once called it optional, and every
+   * owner who took it at its word got «تعذّر حفظ السيارة».
+   */
+  readonly plate: string;
   readonly nickname?: string | undefined;
   readonly currentMileage?: number | undefined;
 }

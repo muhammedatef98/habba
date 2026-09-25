@@ -88,7 +88,7 @@ export default function AddVehicleScreen() {
         makeId: makeId ?? '',
         modelId: modelId ?? '',
         year: year ?? CURRENT_YEAR,
-        plate: plate.length > 0 ? plate : undefined,
+        plate: plate.trim(),
         nickname: nickname.length > 0 ? nickname : undefined,
         currentMileage: mileage.length > 0 ? Number(mileage) : undefined,
       });
@@ -121,7 +121,11 @@ export default function AddVehicleScreen() {
   function handleSubmit() {
     // Validate the plate with the same function the database uses, so the user
     // is told here rather than by a failed write (ADR-0011).
-    if (plate.length > 0 && normalisePlate(plate) === null) {
+    if (plate.trim().length === 0) {
+      setPlateError(t('vehicle.errors.plateRequired'));
+      return;
+    }
+    if (normalisePlate(plate) === null) {
       setPlateError(t('vehicle.errors.plateUnparseable'));
       return;
     }
@@ -187,10 +191,11 @@ export default function AddVehicleScreen() {
         />
       ) : null}
 
-      {/* Optional, below the required three. */}
+      {/* Required with the three above: the database refuses a car with
+          neither plate nor VIN, and this screen asks for no VIN. */}
       <Field
         testID="plate-input"
-        label={`${t('vehicle.plateLabel')} — ${t('common.optional')}`}
+        label={t('vehicle.plateLabel')}
         value={plate}
         onChangeText={(value) => {
           setPlate(value);
