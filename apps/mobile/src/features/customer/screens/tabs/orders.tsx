@@ -19,12 +19,24 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, ErrorState, Icon, Screen, SkeletonCard, Text, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  ErrorState,
+  FadeIn,
+  Icon,
+  Screen,
+  SkeletonCard,
+  staggerDelay,
+  Text,
+  useTheme,
+} from '@habba/ui';
 import { ActiveOrderCard } from '@/features/customer/components/home/ActiveOrderCard';
 import { RecentOrderRow } from '@/features/customer/components/home/RecentOrderRow';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
-import { useIsAuthenticated } from '@/features/shared/state/session';
+import { useLiveRefresh } from '@/features/shared/lib/live';
+import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
 const HISTORY_LIMIT = 50;
 
@@ -32,6 +44,7 @@ export default function OrdersScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
+  const userId = useSession((state) => state.userId);
 
   const orders = useQuery({
     queryKey: ['orders', 'all'],
@@ -43,6 +56,12 @@ export default function OrdersScreen() {
     useCallback(() => {
       void refetch();
     }, [refetch]),
+  );
+
+  useLiveRefresh(
+    [{ table: 'orders', filter: `customer_id=eq.${userId ?? ''}` }],
+    [['orders'], ['recent-orders']],
+    userId !== null,
   );
 
   if (!isAuthenticated) return <Redirect href="/" />;
@@ -157,13 +176,14 @@ export default function OrdersScreen() {
         {live.length > 0 ? (
           <View style={{ gap: theme.spacing.md }}>
             <SectionHeader title={t('orders.liveTitle')} />
-            {live.map((order) => (
-              <ActiveOrderCard
-                key={order.id}
-                testID="orders-live"
-                order={order}
-                onPress={() => openOrder(order.id)}
-              />
+            {live.map((order, index) => (
+              <FadeIn key={order.id} delay={staggerDelay(index)}>
+                <ActiveOrderCard
+                  testID="orders-live"
+                  order={order}
+                  onPress={() => openOrder(order.id)}
+                />
+              </FadeIn>
             ))}
           </View>
         ) : null}
@@ -173,8 +193,9 @@ export default function OrdersScreen() {
             <SectionHeader title={t('orders.pastTitle')} />
             <Card elevation="none" style={{ paddingVertical: theme.spacing.xs }}>
               {past.map((order, index) => (
-                <View
+                <FadeIn
                   key={order.id}
+                  delay={staggerDelay(index + live.length)}
                   style={
                     index === 0
                       ? undefined
@@ -186,7 +207,7 @@ export default function OrdersScreen() {
                     order={order}
                     onPress={() => openOrder(order.id)}
                   />
-                </View>
+                </FadeIn>
               ))}
             </Card>
           </View>

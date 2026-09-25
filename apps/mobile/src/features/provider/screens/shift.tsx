@@ -18,6 +18,7 @@ import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@ha
 import { OpenJobCard } from '@/features/provider/components/OpenJobCard';
 import { ShiftStatusCard } from '@/features/provider/components/ShiftStatusCard';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { locationProvider } from '@/features/shared/lib/location';
 import { registerThisDevice, type PushRegistration } from '@/features/shared/lib/push';
 import { isBroadcastStale, LOCATION_INTERVAL_MS, useShift } from '@/features/provider/state/shift';
@@ -71,6 +72,11 @@ export default function ShiftScreen() {
       if (next) setPush(await registerThisDevice({ prompt: true, locale: i18n.language }));
     },
   });
+
+  // A new offer reaches an online technician the moment it is made — a
+  // 10-second poll is a long time in a race with other technicians. RLS
+  // delivers only this technician's own offers.
+  useLiveRefresh([{ table: 'order_offers' }], [['open-jobs']], isOnline);
 
   // Position broadcast, only while online.
   useEffect(() => {

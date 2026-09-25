@@ -37,6 +37,7 @@ import {
   type SarAmount,
 } from '@habba/core';
 import { repository } from '@/features/shared/data/repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { formatCount } from '@/features/shared/lib/format-number';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -65,14 +66,33 @@ export default function QuoteScreen() {
   };
 
   const approve = useMutation({
+    // Its failure is shown in place, not as a toast.
+
+    meta: { inlineError: true },
     mutationFn: (partId: string) => repository.approveOrderPart(partId),
     onSuccess: refresh,
   });
 
   const decline = useMutation({
+    // Its failure is shown in place, not as a toast.
+
+    meta: { inlineError: true },
     mutationFn: (partId: string) => repository.declineOrderPart(partId),
     onSuccess: refresh,
   });
+
+  // A line the technician adds appears while the customer is looking.
+  useLiveRefresh(
+    [
+      { table: 'order_parts', filter: `order_id=eq.${id ?? ''}` },
+      { table: 'orders', filter: `id=eq.${id ?? ''}` },
+    ],
+    [
+      ['order-parts', id],
+      ['order', id],
+    ],
+    id !== undefined,
+  );
 
   if (!isAuthenticated) return <Redirect href="/" />;
 

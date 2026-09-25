@@ -37,7 +37,7 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isActiveJob } from '@habba/core';
-import { Button, Card, ErrorState, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, ErrorState, Screen, Text, useTheme, FadeIn, staggerDelay } from '@habba/ui';
 import { ActiveOrderCard } from '@/features/customer/components/home/ActiveOrderCard';
 import { BookableServices } from '@/features/customer/components/home/BookableServices';
 import { EmergencyHero } from '@/features/customer/components/home/EmergencyHero';
@@ -47,6 +47,7 @@ import { RecentOrderRow } from '@/features/customer/components/home/RecentOrderR
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { VehicleHeroCard } from '@/features/customer/components/home/VehicleHeroCard';
 import { repository } from '@/features/shared/data/repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { formatCount, formatShortDate } from '@/features/shared/lib/format-number';
 import { summariseLogbook } from '@/features/shared/lib/logbook-summary';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
@@ -66,6 +67,7 @@ export default function HomeScreen() {
   const isArabic = i18n.language.startsWith('ar');
 
   const fullName = useSession((state) => state.fullName);
+  const liveUserId = useSession((state) => state.userId);
   const selectedVehicleId = useSession((state) => state.selectedVehicleId);
   const selectVehicle = useSession((state) => state.selectVehicle);
 
@@ -160,6 +162,14 @@ export default function HomeScreen() {
     enabled: primaryVehicleId !== undefined,
   });
 
+  // An order that moves on while الرئيسية is open shows it here too — the tab
+  // is never unmounted, so focus alone did not catch it.
+  useLiveRefresh(
+    [{ table: 'orders', filter: `customer_id=eq.${liveUserId ?? ''}` }],
+    [['recent-orders'], ['orders']],
+    liveUserId !== null,
+  );
+
   if (!isAuthenticated) return <Redirect href="/" />;
 
   const hasVehicles = (vehicles.data?.length ?? 0) > 0;
@@ -235,16 +245,18 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
-        <EmergencyHero testID="home-emergency" onPress={openEmergency} />
+      <FadeIn delay={0}>
+        <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+          <EmergencyHero testID="home-emergency" onPress={openEmergency} />
 
-        <QuickServices
-          testID="home-quick-services"
-          services={services.data ?? []}
-          isArabic={isArabic}
-          onSelect={startQuickService}
-        />
-      </View>
+          <QuickServices
+            testID="home-quick-services"
+            services={services.data ?? []}
+            isArabic={isArabic}
+            onSelect={startQuickService}
+          />
+        </View>
+      </FadeIn>
 
       {/* Above the car and below the live job: someone is standing next to
           this person waiting to hand over a car, which outranks a maintenance
@@ -272,121 +284,130 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      <View style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}>
-        <SectionHeader
-          title={hasVehicles ? t('home.vehicleTitle') : t('vehicle.myVehicles')}
-          {...(hasVehicles
-            ? {
-                actionLabel: t('vehicle.addAnother'),
-                onAction: () => router.push('/add-vehicle'),
-              }
-            : {})}
-        />
-
-        {/* A failed fetch renders as "your logbook starts here" otherwise, and
-            the customer is invited to add a car they already own — into a
-            product whose whole promise is that it remembers their cars. */}
-        {vehicles.isError ? (
-          <ErrorState
-            testID="home-vehicles-error"
-            message={t('errors.offline')}
-            retryLabel={t('common.retry')}
-            retrying={vehicles.isFetching}
-            onRetry={() => void vehicles.refetch()}
-          />
-        ) : selectedVehicle !== undefined ? (
-          <VehicleHeroCard
-            testID="home-vehicle"
-            vehicles={vehicles.data ?? []}
-            selected={selectedVehicle}
-            makes={makes.data}
-            models={allModels.data}
-            {...(logbook !== undefined ? { recordCount: logbook.recordCount } : {})}
-            {...(lastServiceLabel !== undefined ? { lastServiceLabel } : {})}
-            {...(alert !== undefined
+      <FadeIn delay={staggerDelay(1)}>
+        <View style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}>
+          <SectionHeader
+            title={hasVehicles ? t('home.vehicleTitle') : t('vehicle.myVehicles')}
+            {...(hasVehicles
               ? {
-                  alert: {
-                    message: isArabic ? alert.messageAr : alert.messageEn,
-                    ...(alert.estimatedKm !== null
-                      ? {
-                          detail: t('home.lastReading', {
-                            km: formatCount(alert.estimatedKm, i18n.language),
-                          }),
-                        }
-                      : {}),
-                  },
-                  onAlertPress: () =>
-                    bookService(bookable.data?.find((service) => service.id === alert.serviceId)),
+                  actionLabel: t('vehicle.addAnother'),
+                  onAction: () => router.push('/add-vehicle'),
                 }
               : {})}
-            onSelect={selectVehicle}
-            onOpenLogbook={() =>
-              router.push({ pathname: '/logbook', params: { id: selectedVehicle.id } })
-            }
           />
-        ) : (
-          <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
-            <View style={{ gap: theme.spacing.md }}>
-              <Text variant="heading">{t('logbook.emptyTitle')}</Text>
-              <Text variant="body" tone="muted">
-                {t('logbook.emptyBody')}
-              </Text>
-              <Button
-                testID="add-vehicle"
-                label={t('vehicle.addTitle')}
-                onPress={() => router.push('/add-vehicle')}
-              />
-            </View>
-          </Card>
-        )}
-      </View>
+
+          {/* A failed fetch renders as "your logbook starts here" otherwise, and
+            the customer is invited to add a car they already own — into a
+            product whose whole promise is that it remembers their cars. */}
+          {vehicles.isError ? (
+            <ErrorState
+              testID="home-vehicles-error"
+              message={t('errors.offline')}
+              retryLabel={t('common.retry')}
+              retrying={vehicles.isFetching}
+              onRetry={() => void vehicles.refetch()}
+            />
+          ) : selectedVehicle !== undefined ? (
+            <VehicleHeroCard
+              testID="home-vehicle"
+              vehicles={vehicles.data ?? []}
+              selected={selectedVehicle}
+              makes={makes.data}
+              models={allModels.data}
+              {...(logbook !== undefined ? { recordCount: logbook.recordCount } : {})}
+              {...(lastServiceLabel !== undefined ? { lastServiceLabel } : {})}
+              {...(alert !== undefined
+                ? {
+                    alert: {
+                      message: isArabic ? alert.messageAr : alert.messageEn,
+                      ...(alert.estimatedKm !== null
+                        ? {
+                            detail: t('home.lastReading', {
+                              km: formatCount(alert.estimatedKm, i18n.language),
+                            }),
+                          }
+                        : {}),
+                    },
+                    onAlertPress: () =>
+                      bookService(bookable.data?.find((service) => service.id === alert.serviceId)),
+                  }
+                : {})}
+              onSelect={selectVehicle}
+              onOpenLogbook={() =>
+                router.push({ pathname: '/logbook', params: { id: selectedVehicle.id } })
+              }
+            />
+          ) : (
+            <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
+              <View style={{ gap: theme.spacing.md }}>
+                <Text variant="heading">{t('logbook.emptyTitle')}</Text>
+                <Text variant="body" tone="muted">
+                  {t('logbook.emptyBody')}
+                </Text>
+                <Button
+                  testID="add-vehicle"
+                  label={t('vehicle.addTitle')}
+                  onPress={() => router.push('/add-vehicle')}
+                />
+              </View>
+            </Card>
+          )}
+        </View>
+      </FadeIn>
 
       {(bookable.data?.length ?? 0) > 0 ? (
-        <View testID="home-booking" style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}>
-          <SectionHeader
-            title={t('home.bookTitle')}
-            actionLabel={t('home.quickAll')}
-            onAction={() => bookService(undefined)}
-          />
-          <BookableServices
-            testID="home-bookable"
-            services={bookable.data ?? []}
-            onSelect={bookService}
-          />
-        </View>
+        <FadeIn delay={staggerDelay(2)}>
+          <View
+            testID="home-booking"
+            style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}
+          >
+            <SectionHeader
+              title={t('home.bookTitle')}
+              actionLabel={t('home.quickAll')}
+              onAction={() => bookService(undefined)}
+            />
+            <BookableServices
+              testID="home-bookable"
+              services={bookable.data ?? []}
+              onSelect={bookService}
+            />
+          </View>
+        </FadeIn>
       ) : null}
 
       {pastOrders.length > 0 ? (
-        <View style={{ marginTop: theme.spacing.xl }}>
-          <SectionHeader
-            title={t('home.recentTitle')}
-            actionLabel={t('home.quickAll')}
-            onAction={() => router.push('/orders')}
-          />
-          {/* In a card, as on the orders tab: the same rows on bare page
+        <FadeIn delay={staggerDelay(3)}>
+          <View style={{ marginTop: theme.spacing.xl }}>
+            <SectionHeader
+              title={t('home.recentTitle')}
+              actionLabel={t('home.quickAll')}
+              onAction={() => router.push('/orders')}
+            />
+            {/* In a card, as on the orders tab: the same rows on bare page
               background here read as a different, lesser list. */}
-          <Card
-            elevation="none"
-            style={{ marginTop: theme.spacing.md, paddingVertical: theme.spacing.xs }}
-          >
-            {pastOrders.map((order, index) => (
-              <View
-                key={order.id}
-                style={
-                  index === 0
-                    ? undefined
-                    : { borderTopWidth: 1, borderTopColor: theme.colors.border }
-                }
-              >
-                <RecentOrderRow
-                  testID="home-recent-order"
-                  order={order}
-                  onPress={() => router.push({ pathname: '/tracking', params: { id: order.id } })}
-                />
-              </View>
-            ))}
-          </Card>
-        </View>
+            <Card
+              elevation="none"
+              style={{ marginTop: theme.spacing.md, paddingVertical: theme.spacing.xs }}
+            >
+              {pastOrders.map((order, index) => (
+                <View
+                  key={order.id}
+                  style={
+                    index === 0
+                      ? undefined
+                      : { borderTopWidth: 1, borderTopColor: theme.colors.border }
+                  }
+                >
+                  <RecentOrderRow
+                    testID="home-recent-order"
+                    order={order}
+                    onPress={() => router.push({ pathname: '/tracking', params: { id: order.id } })}
+                  />
+                </View>
+              ))}
+            </Card>
+          </View>
+        </FadeIn>
       ) : null}
 
       {/* Demoted, on purpose. §11 says the logbook is never gated and the

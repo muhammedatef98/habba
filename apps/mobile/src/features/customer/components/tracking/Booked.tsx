@@ -10,7 +10,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, StatusPill, Text, useTheme } from '@habba/ui';
+import { Button, Card, FadeIn, StatusPill, Text, useTheme } from '@habba/ui';
 import { formatAppointment, formatHijriDate } from '@/features/shared/lib/dates';
 import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
@@ -33,7 +33,8 @@ export function Booked({ order, provider, onCancel, cancelPending }: BookedProps
     order.scheduledFor === null ? null : formatHijriDate(order.scheduledFor, i18n.language);
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <StatusPill testID="booked-pill" tone="active" label={t('tracking.bookedTitle')} />
 
       {when !== null ? (
@@ -77,6 +78,6 @@ export function Booked({ order, provider, onCancel, cancelPending }: BookedProps
         onPress={onCancel}
         loading={cancelPending}
       />
-    </View>
+    </FadeIn>
   );
 }

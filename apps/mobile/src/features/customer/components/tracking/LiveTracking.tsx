@@ -16,12 +16,13 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   Card,
+  FadeIn,
   ProgressStages,
+  rowDirectionFor,
   StatCluster,
   Text,
-  rowDirectionFor,
-  type ProgressStage,
   useTheme,
+  type ProgressStage,
 } from '@habba/ui';
 import { agreedTotal } from '@/features/shared/lib/order-price';
 import { ProviderRow } from './ProviderRow';
@@ -64,7 +65,8 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
   ];
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <Card testID="live-headline" elevation="md">
         <View
           style={{
@@ -157,6 +159,6 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
           {t('common.share')}
         </Text>
       </View>
-    </View>
+    </FadeIn>
   );
 }

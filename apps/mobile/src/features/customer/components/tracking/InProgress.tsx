@@ -17,12 +17,13 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
+  FadeIn,
+  rowDirectionFor,
   StatusPill,
   Text,
   TimelineList,
-  rowDirectionFor,
-  type TimelineItem,
   useTheme,
+  type TimelineItem,
 } from '@habba/ui';
 import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { AgreedTotalRow } from './AgreedTotalRow';
@@ -99,7 +100,8 @@ export function InProgress({
   ];
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <StatusPill testID="in-progress-pill" tone="active" label={t('tracking.inProgressPill')} />
 
       <View style={{ gap: theme.spacing.xs }}>
@@ -143,6 +145,6 @@ export function InProgress({
       ) : null}
 
       <AgreedTotalRow order={order} label={t('tracking.agreedTotalLong')} divided />
-    </View>
+    </FadeIn>
   );
 }

@@ -18,12 +18,13 @@ import { toLatinDigits } from '@habba/core';
 import {
   Button,
   Card,
+  FadeIn,
+  rowDirectionFor,
   StatusPill,
   Text,
   TimelineList,
-  rowDirectionFor,
-  type TimelineItem,
   useTheme,
+  type TimelineItem,
 } from '@habba/ui';
 import { SearchingPulse } from './SearchingPulse';
 import type { DispatchTelemetry } from '@/features/shared/data/types';
@@ -89,7 +90,8 @@ export function Searching({
   }));
 
   return (
-    <View style={{ gap: theme.spacing.lg, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.lg, flex: 1 }}>
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('tracking.searchingHeadline')}</Text>
         <Text variant="body" tone="muted">
@@ -208,6 +210,6 @@ export function Searching({
           </Text>
         )}
       </View>
-    </View>
+    </FadeIn>
   );
 }

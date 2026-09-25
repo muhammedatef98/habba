@@ -127,6 +127,9 @@ function AddBoughtCar({ reportId }: { readonly reportId: string }) {
   });
 
   const convert = useMutation({
+    // Its failure is shown in place, not as a toast.
+
+    meta: { inlineError: true },
     mutationFn: () =>
       repository.convertInspectionToVehicle(
         reportId,

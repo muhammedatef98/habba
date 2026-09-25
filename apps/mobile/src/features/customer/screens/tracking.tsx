@@ -33,6 +33,7 @@ import {
   useTheme,
 } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { Arrived } from '@/features/customer/components/tracking/Arrived';
@@ -113,6 +114,9 @@ function TrackingBody() {
   });
 
   const cancel = useMutation({
+    // Its failure is shown in place, not as a toast.
+
+    meta: { inlineError: true },
     mutationFn: () => repository.cancelOrder(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
@@ -120,11 +124,16 @@ function TrackingBody() {
   // Sends an order that was created but never sent — the app closed, or the
   // payment hold failed, between the two steps. Idempotent server-side.
   const send = useMutation({
+    // Its failure is shown in place, not as a toast.
+    meta: { inlineError: true },
     mutationFn: () => repository.submitOrder(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
 
   const confirmCompletion = useMutation({
+    // Its failure is shown in place, not as a toast.
+
+    meta: { inlineError: true },
     mutationFn: () => repository.confirmOrderCompletion(id ?? ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   });
@@ -163,6 +172,9 @@ function TrackingBody() {
   });
 
   const rate = useMutation({
+    // Its failure is shown in place, not as a toast.
+
+    meta: { inlineError: true },
     mutationFn: (stars: number) =>
       repository.rateOrder({
         orderId: id ?? '',
@@ -171,6 +183,21 @@ function TrackingBody() {
       }),
     onSuccess: (_, stars) => queryClient.setQueryData(['order-rating', id], stars),
   });
+
+  // The status, the parts and the technician's approach the moment they
+  // change, not a poll later (lib/live.ts).
+  useLiveRefresh(
+    [
+      { table: 'orders', filter: `id=eq.${id ?? ''}` },
+      { table: 'order_parts', filter: `order_id=eq.${id ?? ''}` },
+    ],
+    [
+      ['order', id],
+      ['order-parts', id],
+      ['order-progress', id],
+    ],
+    id !== undefined,
+  );
 
   if (order.isLoading) {
     return (

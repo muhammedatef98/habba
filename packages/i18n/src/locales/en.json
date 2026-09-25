@@ -269,7 +269,8 @@
     "notFound": "We couldn't find that.",
     "forbidden": "You don't have permission to do that.",
     "offlineTitle": "No internet connection",
-    "offlineBody": "What you see may be out of date. It will refresh on its own once you're back online."
+    "offlineBody": "What you see may be out of date. It will refresh on its own once you're back online.",
+    "actionFailed": "That didn't go through. Check your connection and try again."
   },
   "home": {
     "emergencyAction": "Emergency request",

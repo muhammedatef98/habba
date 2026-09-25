@@ -115,6 +115,9 @@ export default function EvidenceScreen() {
   });
 
   const save = useMutation({
+    // Its failure is shown in place, not as a toast.
+
+    meta: { inlineError: true },
     mutationFn: () =>
       providerRepository.recordEvidence(id ?? '', Number(mileageText), media, warrantyDays),
     onSuccess: async () => {

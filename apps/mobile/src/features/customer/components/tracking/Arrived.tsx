@@ -13,7 +13,7 @@
 
 import { I18nManager, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, Text, useTheme } from '@habba/ui';
+import { Card, FadeIn, Text, useTheme } from '@habba/ui';
 import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
 import type { JobProgress, Order, ProviderSummary } from '@/features/shared/data/types';
@@ -32,7 +32,8 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
   const providerName = provider?.businessNameAr ?? '';
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <Card
         testID="arrived-banner"
         elevation="none"
@@ -92,6 +93,6 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
       <View style={{ flex: 1 }} />
 
       <AgreedTotalRow order={order} label={t('tracking.agreedTotal')} />
-    </View>
+    </FadeIn>
   );
 }

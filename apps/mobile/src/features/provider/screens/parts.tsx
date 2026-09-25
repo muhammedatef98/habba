@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { canQuoteParts, multiplySar, sar } from '@habba/core';
 import { Button, Card, Field, Row, Screen, StatusPill, Text, useTheme } from '@habba/ui';
 import { providerRepository, type QuotedPart } from '@/features/provider/data/provider-repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 
 type FormError = 'name' | 'quantity' | 'price' | 'warranty';
@@ -118,6 +119,15 @@ export default function PartsScreen() {
     mutationFn: (partId: string) => providerRepository.removePart(partId),
     onSuccess: refresh,
   });
+
+  useLiveRefresh(
+    [{ table: 'order_parts', filter: `order_id=eq.${id ?? ''}` }],
+    [
+      ['job-parts', id],
+      ['job', id],
+    ],
+    id !== undefined,
+  );
 
   const open = job.data !== null && job.data !== undefined && canQuoteParts(job.data.status);
   const lines = parts.data ?? [];

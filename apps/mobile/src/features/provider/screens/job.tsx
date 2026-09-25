@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
 import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { useLiveRefresh } from '@/features/shared/lib/live';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
 import { formatAppointment } from '@/features/shared/lib/dates';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
@@ -97,6 +98,19 @@ export default function JobScreen() {
     },
     onError: () => setNotice(t('job.actionFailed')),
   });
+
+  // The customer's answer to a quoted part, or a cancellation, lands at once.
+  useLiveRefresh(
+    [
+      { table: 'orders', filter: `id=eq.${id ?? ''}` },
+      { table: 'order_parts', filter: `order_id=eq.${id ?? ''}` },
+    ],
+    [
+      ['job', id],
+      ['job-parts', id],
+    ],
+    id !== undefined,
+  );
 
   const data = job.data;
 

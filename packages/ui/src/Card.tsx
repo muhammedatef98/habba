@@ -7,7 +7,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
+import { AnimatedPressable, usePressScale } from './motion.js';
 import { useTheme } from './theme.js';
 
 export interface CardProps {
@@ -37,6 +38,7 @@ export function Card({
 }: CardProps) {
   const theme = useTheme();
   const shadow = theme.elevation[elevation];
+  const press = usePressScale(onPress === undefined);
 
   const base: ViewStyle = {
     backgroundColor: theme.colors.surface,
@@ -61,18 +63,16 @@ export function Card({
   }
 
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
       onPress={onPress}
+      {...press.handlers}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       {...(selected === undefined ? {} : { accessibilityState: { selected } })}
-      style={({ pressed }) => [
-        base,
-        pressed ? { opacity: 0.92, transform: [{ scale: 0.99 }] } : null,
-      ]}
+      style={[base, press.style]}
     >
       {children}
-    </Pressable>
+    </AnimatedPressable>
   );
 }

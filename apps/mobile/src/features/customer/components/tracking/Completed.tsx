@@ -11,7 +11,7 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { InvoiceDocument } from '@habba/core';
-import { Button, Card, Icon, Text, useTheme } from '@habba/ui';
+import { Button, Card, FadeIn, Icon, Pop, Text, useTheme } from '@habba/ui';
 import { RatingStars, RatingStarsValue } from '@/features/customer/components/RatingStars';
 import { PriceBreakdown } from './PriceBreakdown';
 import type { Order, ProviderSummary } from '@/features/shared/data/types';
@@ -57,24 +57,28 @@ export function Completed({
   const rated = rateSucceeded || (givenRating !== null && givenRating !== undefined);
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <View style={{ alignItems: 'center', gap: theme.spacing.base, paddingTop: theme.spacing.lg }}>
-        <View
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: theme.radius.full,
-            backgroundColor: theme.colors.successSubtle,
-            borderWidth: 1,
-            borderColor: theme.colors.successBorder,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {/* The icon, not a «✓» character: the Arabic display face has no
-              check glyph and fell back to one that read as «√». */}
-          <Icon name="check" size={theme.iconSize['2xl']} color={theme.colors.successFg} />
-        </View>
+        {/* The one moment in the app allowed to announce itself. */}
+        <Pop>
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: theme.radius.full,
+              backgroundColor: theme.colors.successSubtle,
+              borderWidth: 1,
+              borderColor: theme.colors.successBorder,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {/* The icon, not a «✓» character: the Arabic display face has no
+                check glyph and fell back to one that read as «√». */}
+            <Icon name="check" size={theme.iconSize['2xl']} color={theme.colors.successFg} />
+          </View>
+        </Pop>
         <View style={{ gap: theme.spacing.xs }}>
           <Text variant="title" align="center">
             {t('tracking.completedTitle')}
@@ -164,6 +168,6 @@ export function Completed({
         variant={rated ? 'secondary' : 'ghost'}
         onPress={onDismiss}
       />
-    </View>
+    </FadeIn>
   );
 }

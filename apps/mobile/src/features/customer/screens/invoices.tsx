@@ -19,9 +19,11 @@ import {
   Button,
   Card,
   ErrorState,
+  FadeIn,
   Icon,
   Screen,
   SkeletonCard,
+  staggerDelay,
   Text,
   rowDirectionFor,
   useTheme,
@@ -113,8 +115,9 @@ export default function InvoicesScreen() {
       ) : (
         <Card elevation="none" style={{ paddingVertical: theme.spacing.xs }}>
           {rows.map((invoice, index) => (
-            <View
+            <FadeIn
               key={invoice.orderId}
+              delay={staggerDelay(index)}
               style={
                 index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: theme.colors.border }
               }
@@ -127,7 +130,7 @@ export default function InvoicesScreen() {
                 disabled={open.isPending}
                 onPress={() => open.mutate(invoice.orderId)}
               />
-            </View>
+            </FadeIn>
           ))}
         </Card>
       )}
