@@ -166,6 +166,16 @@ function baseOrder(
     invoices: [],
     disputes: [],
     payment_operations: [],
+    // The hold made at booking, captured once the customer confirmed.
+    payment_holds: [
+      {
+        payment_id: `pi_demo_${number}`,
+        amount: total ?? 207,
+        kind: 'initial',
+        status: status === 'completed' || status === 'disputed' ? 'captured' : 'authorised',
+        created_at: ago(minutesAgo),
+      },
+    ],
     payout: null,
     parent_order: null,
     notes: [],

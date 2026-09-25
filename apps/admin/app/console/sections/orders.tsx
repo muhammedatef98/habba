@@ -16,6 +16,8 @@ import type { OrderFile, OrderRow } from '@/data/types';
 import { dateTime, hijri, money, phone } from '@/lib/format';
 import {
   ESCROW,
+  HOLD_KIND,
+  HOLD_STATUS,
   label,
   MODE,
   ORDER_STATUS,
@@ -547,6 +549,22 @@ function OrderFileView({
                       <div className="subtle">
                         {operation.reason} · {dateTime(operation.created_at)}
                         {operation.psp_reference !== null ? ` · ${operation.psp_reference}` : ''}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+            {file.payment_holds.length > 0 ? (
+              <>
+                <h3>الحجوزات على بطاقة العميل</h3>
+                <ul className="list">
+                  {file.payment_holds.map((hold) => (
+                    <li key={hold.payment_id} className="timeline-item">
+                      {HOLD_KIND[hold.kind]} {money(hold.amount)}{' '}
+                      <LabelBadge value={label(HOLD_STATUS, hold.status)} />
+                      <div className="subtle numeric">
+                        {hold.payment_id} · {dateTime(hold.created_at)}
                       </div>
                     </li>
                   ))}

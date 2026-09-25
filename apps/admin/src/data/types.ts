@@ -225,6 +225,14 @@ export interface OrderFile {
   }[];
   readonly disputes: readonly Dispute[];
   readonly payment_operations: readonly PaymentOperation[];
+  /** Every hold on the customer's card: from booking, and any top-up (0078). */
+  readonly payment_holds: readonly {
+    readonly payment_id: string;
+    readonly amount: number;
+    readonly kind: 'initial' | 'top_up';
+    readonly status: 'authorised' | 'captured' | 'voided';
+    readonly created_at: string;
+  }[];
   readonly payout: { readonly payout_id: string; readonly status: PayoutStatus } | null;
   readonly parent_order: { readonly id: string; readonly order_number: string } | null;
   readonly notes: readonly Note[];

@@ -513,6 +513,29 @@ describe.skipIf(!harnessUp)('what the customer reads back afterwards', () => {
     expect(await customer.getOrderRating(orderId)).toBe(5);
   });
 
+  test('the tracking screen names the technician and their rating', async () => {
+    const provider = await new SupabaseRepository(
+      clientFor(CUSTOMER_ID),
+      () => CUSTOMER_ID,
+    ).getOrderProvider(providerId);
+    expect(provider?.businessNameAr).toBe('خدمة بطاريات سريعة');
+    expect(typeof provider?.ratingAvg).toBe('number');
+    expect(provider?.ratingCount ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  test('roles are what the server says: a customer, and a technician who is both', async () => {
+    const customerRoles = await new SupabaseRepository(
+      clientFor(CUSTOMER_ID),
+      () => CUSTOMER_ID,
+    ).listRoles();
+    expect(customerRoles).toContain('customer');
+    expect(customerRoles).not.toContain('technician');
+
+    const tech = new SupabaseRepository(clientFor(TECH_ID), () => TECH_ID);
+    expect(await tech.listRoles()).toEqual(expect.arrayContaining(['customer', 'technician']));
+    expect((await tech.getProviderApplication()).status).toBe('approved');
+  });
+
   test("the completed order is in the customer's invoices, and opens", async () => {
     const customer = new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
     const invoices = await customer.listInvoices();

@@ -159,6 +159,10 @@ select test.grant_role('33333333-0000-4000-5050-000000000003', 'ops');
 set role authenticated;
 select test.become('33333333-0000-4000-5050-000000000003');
 select public.ops_confirm_completion(:'ord2', 'أكّد العميل الإنجاز هاتفياً');
+select test.assert_eq(
+  (select string_agg(h ->> 'kind', ',' order by h ->> 'created_at')
+     from jsonb_array_elements(public.ops_order_detail(:'ord') -> 'payment_holds') h),
+  'initial,top_up', 'the operator sees both holds on the order (0079)');
 reset role;
 
 select test.assert_eq(

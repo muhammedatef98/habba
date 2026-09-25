@@ -97,6 +97,17 @@ export const PAYMENT_KIND: Readonly<Record<string, string>> = {
   capture: 'تحصيل المبلغ',
 };
 
+export const HOLD_KIND: Readonly<Record<string, string>> = {
+  initial: 'حجز الطلب',
+  top_up: 'حجز فرق الفاتورة',
+};
+
+export const HOLD_STATUS: Readonly<Record<string, Label>> = {
+  authorised: { text: 'محجوز', tone: 'warn' },
+  captured: { text: 'محصَّل', tone: 'good' },
+  voided: { text: 'مُلغى', tone: 'neutral' },
+};
+
 export const PAYOUT_STATUS: Readonly<Record<string, Label>> = {
   pending: { text: 'بانتظار الاعتماد', tone: 'warn' },
   approved: { text: 'معتمدة للتحويل', tone: 'info' },
