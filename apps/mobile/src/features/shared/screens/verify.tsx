@@ -59,13 +59,22 @@ export default function VerifyScreen() {
       return;
     }
 
-    const profile = await repository.upsertProfile({
-      fullName: fullName.trim(),
-      phone: phoneE164,
-      email: null,
-      isGuest: false,
-      preferredLocale: locale,
-    });
+    // The code was right; saving the profile can still fail on a dropped
+    // connection. Left uncaught, the button spun forever with no way on.
+    let profile: Awaited<ReturnType<typeof repository.upsertProfile>>;
+    try {
+      profile = await repository.upsertProfile({
+        fullName: fullName.trim(),
+        phone: phoneE164,
+        email: null,
+        isGuest: false,
+        preferredLocale: locale,
+      });
+    } catch {
+      setBusy(false);
+      setError(t('auth.errors.network'));
+      return;
+    }
 
     setBusy(false);
     signIn(profile.id, profile.fullName);

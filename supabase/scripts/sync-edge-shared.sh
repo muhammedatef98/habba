@@ -47,13 +47,18 @@ generate_api_keys() {
   cat "$CORE/supabase/api-keys.ts"
 }
 
+generate_moyasar() {
+  header 'packages/core/src/payments/moyasar.ts'
+  cat "$CORE/payments/moyasar.ts"
+}
+
 generate_push() {
   header 'packages/core/src/push/expo.ts'
   cat "$CORE/push/expo.ts"
 }
 
 # name → generator
-MODULES=("sms:generate_sms" "api-keys:generate_api_keys" "push:generate_push")
+MODULES=("sms:generate_sms" "api-keys:generate_api_keys" "push:generate_push" "moyasar:generate_moyasar")
 
 mkdir -p "$SHARED"
 status=0

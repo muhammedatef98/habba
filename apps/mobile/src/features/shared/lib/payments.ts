@@ -26,8 +26,28 @@
 import type { SarAmount } from '@habba/core';
 
 export type AuthorisationResult =
-  | { readonly ok: true; readonly paymentIntentId: string; readonly expiresAt: Date }
-  | { readonly ok: false; readonly reason: 'declined' | 'insufficient_funds' | 'transport_failed' };
+  | {
+      readonly ok: true;
+      readonly paymentIntentId: string;
+      readonly expiresAt: Date;
+      /**
+       * The hold is already on the order: the gateway's server side verified
+       * it and recorded it (0077). False for the development provider, whose
+       * word the database takes through authorise_order_payment.
+       */
+      readonly recordedByServer: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | 'declined'
+        | 'insufficient_funds'
+        | 'transport_failed'
+        /** The customer closed the card form. */
+        | 'cancelled'
+        /** A live gateway is configured but no card form is installed. */
+        | 'card_form_unavailable';
+    };
 
 export type CaptureResult =
   | { readonly ok: true; readonly capturedAmount: SarAmount }
@@ -95,7 +115,7 @@ export class DevPaymentProvider implements PaymentProvider {
       refunded: false,
     });
 
-    return { ok: true, paymentIntentId, expiresAt };
+    return { ok: true, paymentIntentId, expiresAt, recordedByServer: false };
   }
 
   async capture(paymentIntentId: string, amount: SarAmount): Promise<CaptureResult> {
@@ -147,5 +167,3 @@ function compareAmounts(a: SarAmount, b: SarAmount): number {
   };
   return toHalalas(a) - toHalalas(b);
 }
-
-export const paymentProvider: PaymentProvider = new DevPaymentProvider();

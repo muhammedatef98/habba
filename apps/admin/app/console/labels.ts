@@ -94,6 +94,7 @@ export const PAYMENT_OPERATION: Readonly<Record<string, Label>> = {
 export const PAYMENT_KIND: Readonly<Record<string, string>> = {
   void: 'إلغاء حجز المبلغ',
   refund: 'استرداد',
+  capture: 'تحصيل المبلغ',
 };
 
 export const PAYOUT_STATUS: Readonly<Record<string, Label>> = {
@@ -123,6 +124,7 @@ export const SETTING_CATEGORY: Readonly<Record<string, string>> = {
   security: 'الأمان',
   transfer: 'نقل الملكية',
   care: 'العناية بالسيارة',
+  payments: 'الدفع',
 };
 
 export const AUDIT_ACTION: Readonly<Record<string, string>> = {

@@ -391,6 +391,31 @@ within a couple of seconds. If it does not,
 says why — `no_device` means the phone never registered (see §9, the EAS
 project id), `expired` means nothing called `push-tick` in time.
 
+### 7b. The payments function (only when payments go live)
+
+`payments` (0077) verifies a Moyasar authorisation with the secret key and
+carries out queued captures, voids and refunds. It is off the payment path
+until the `payments_gateway` setting says `moyasar`; deploy it before that.
+
+```bash
+supabase functions deploy payments          # JWT verified: customers call it
+supabase secrets set MOYASAR_SECRET_KEY=sk_live_… HABBA_PAYMENTS_TICK_SECRET=…
+```
+
+```sql
+select vault.create_secret('<HABBA_PAYMENTS_TICK_SECRET>', 'payments_tick_secret');
+
+select cron.schedule('habba-payments-tick', '30 seconds', $$
+  select net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/payments',
+    headers := jsonb_build_object('x-habba-tick',
+                 (select decrypted_secret from vault.decrypted_secrets where name = 'payments_tick_secret')),
+    body    := '{"action":"tick"}'::jsonb);
+$$);
+```
+
+`docs/GO-LIVE.md` has the full switch-over, app side included.
+
 ## 8. There is no report function to deploy
 
 تقرير هبّة used to be an Edge Function serving a public page at

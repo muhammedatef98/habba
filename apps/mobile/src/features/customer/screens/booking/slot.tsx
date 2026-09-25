@@ -114,6 +114,8 @@ export default function BookingSlotScreen() {
     },
     onError: (cause: unknown) => {
       const message = cause instanceof Error ? cause.message : '';
+      // Closing the card form is a decision, not a failure: no message.
+      if (message === 'submitOrder/payment: cancelled') return;
 
       // The slot is ours; only the confirmation failed. Keep the selection so
       // one more tap finishes it.

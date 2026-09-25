@@ -26,7 +26,7 @@ import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
 import { kycVault } from '@/features/shared/lib/kyc.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
-import { paymentProvider } from '@/features/shared/lib/payments.js';
+import { DevPaymentProvider, type PaymentProvider } from '@/features/shared/lib/payments.js';
 import type {
   AlertConfidence,
   AppointmentSlot,
@@ -457,6 +457,9 @@ export class SupabaseRepository implements Repository {
   constructor(
     private readonly client: SupabaseClient,
     private readonly userId: () => string | null,
+    // The app passes the provider its build is configured for
+    // (lib/payment-provider.ts); tests get the development one.
+    private readonly payments: PaymentProvider = new DevPaymentProvider(),
   ) {}
 
   async listMakes(): Promise<readonly VehicleMake[]> {
@@ -868,17 +871,22 @@ export class SupabaseRepository implements Repository {
     // also what the server bills at hand-back when no parts are added.
     const owed = order.quotedAmount !== null && !isZeroSar(order.quotedAmount);
     if (owed && order.status === 'draft' && order.escrowStatus === 'none') {
-      const held = await paymentProvider.authorise(
+      const held = await this.payments.authorise(
         orderId,
         priceWithVat(order.quotedAmount as SarAmount),
       );
       if (!held.ok) throw new Error(`submitOrder/payment: ${held.reason}`);
 
-      const { error } = await this.client.rpc('authorise_order_payment', {
-        p_order_id: orderId,
-        p_payment_intent_id: held.paymentIntentId,
-      });
-      if (error !== null) throw new Error(`submitOrder/payment: ${error.message}`);
+      // A live gateway has already recorded the hold, after checking it with
+      // the provider (0077). Only the development provider's word goes
+      // through the client path — which the database refuses once live.
+      if (!held.recordedByServer) {
+        const { error } = await this.client.rpc('authorise_order_payment', {
+          p_order_id: orderId,
+          p_payment_intent_id: held.paymentIntentId,
+        });
+        if (error !== null) throw new Error(`submitOrder/payment: ${error.message}`);
+      }
     }
 
     const { data, error } = await this.client.rpc('submit_order', { p_order_id: orderId });

@@ -30,6 +30,7 @@ import { kycVault } from '@/features/shared/lib/kyc.js';
 import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
+import { createPaymentProvider } from '@/features/shared/lib/payment-provider';
 import { useSession } from '@/features/shared/state/session.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import { DEFAULT_PLATFORM_STATUS } from './platform-status.js';
@@ -2117,7 +2118,24 @@ export class InMemoryRepository implements Repository {
 function createRepository(): Repository {
   const client = getSupabaseClient();
   if (client === null) return new InMemoryRepository();
-  return new SupabaseRepository(client, () => useSession.getState().userId);
+  // Who the database will see is whoever the Supabase session belongs to —
+  // that, not the app's own session store, is what RLS checks. The store is
+  // only written after sign-in completes, and sign-in's last step (saving the
+  // profile) needs the id before then: reading the store alone made every
+  // real phone sign-in fail with "not authenticated" at the final step.
+  let authUserId: string | null = null;
+  void client.auth.getSession().then(({ data }) => {
+    authUserId = data.session?.user.id ?? null;
+  });
+  client.auth.onAuthStateChange((_event, session) => {
+    authUserId = session?.user.id ?? null;
+  });
+
+  return new SupabaseRepository(
+    client,
+    () => authUserId ?? useSession.getState().userId,
+    createPaymentProvider(client),
+  );
 }
 
 export const repository: Repository = createRepository();

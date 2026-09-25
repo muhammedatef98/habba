@@ -57,6 +57,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // opening a KYC form we cannot yet protect.
     enableProviderMode: env('EXPO_PUBLIC_ENABLE_PROVIDER_MODE') === 'true',
 
+    // Moyasar's publishable key — public by design, it can only start a
+    // payment, never move money. Absent, the app uses the development payment
+    // provider. Present, card payments go through Moyasar's form and the
+    // `payments` Edge Function (lib/payment-provider.ts).
+    moyasarPublishableKey: env('EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY'),
+
     // Where push tokens come from (expo-notifications reads it here). Not a
     // secret — it identifies the project, it does not authorise anything.
     // Absent, the app runs unchanged and simply registers for no pushes.

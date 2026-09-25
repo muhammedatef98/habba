@@ -108,6 +108,8 @@ export default function LocationConfirmScreen() {
       router.replace({ pathname: '/emergency/triage', params: { id: orderId } });
     },
     onError: (mutationError: Error) => {
+      // Closing the card form is a decision, not a failure: no message.
+      if (mutationError.message === 'submitOrder/payment: cancelled') return;
       setError(
         mutationError.message === 'no_location'
           ? t('emergency.errors.noLocation')

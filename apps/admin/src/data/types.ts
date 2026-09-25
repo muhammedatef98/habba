@@ -118,7 +118,7 @@ export interface Dispute {
 export interface PaymentOperation {
   readonly id: string;
   readonly order_id: string;
-  readonly kind: 'void' | 'refund';
+  readonly kind: 'void' | 'refund' | 'capture';
   readonly amount: number;
   readonly status: 'pending' | 'succeeded' | 'failed';
   readonly reason: string;
