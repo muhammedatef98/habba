@@ -469,7 +469,6 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
-EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false
 EAS_PROJECT_ID=<from `eas init`, or expo.dev → project → ID>
 ```
 
@@ -484,8 +483,10 @@ to Supabase and from the dev OTP to real SMS — the same switch, in one place
 For builds, put the same values in EAS: `eas secret:create --name
 EXPO_PUBLIC_SUPABASE_URL --value ...`.
 
-**Leave `EXPO_PUBLIC_ENABLE_PROVIDER_MODE=false`** until the KYC vault is real
-and an ops console exists to approve applications (ADR-0017).
+Provider applications are opened and closed from the console (الإعدادات →
+الميزات → `feature_provider_applications`). There is no build flag: the ID and
+IBAN are sealed in Vault on the server (0089), and an operator approves
+applications in the console.
 
 ## 10. Before real users
 

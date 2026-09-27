@@ -29,6 +29,7 @@ import { SupabaseRepository } from '@/features/shared/data/supabase-repository.j
 import { mintTestJwt } from '@/features/shared/data/test-jwt.js';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
 import { SupabaseProviderRepository } from './provider-repository.js';
+import { applyAsTestProvider } from '@/features/shared/data/test-provider.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
@@ -135,19 +136,15 @@ async function approvedProvider(
   let providerId = (existing.data as { id: string }[] | null)?.[0]?.id;
 
   if (providerId === undefined) {
-    const created = await owner
-      .from('providers')
-      .insert({
-        owner_profile_id: ownerId,
-        provider_type: type,
-        business_name_ar: name,
-        city_id: cityId,
-        ...(type === 'workshop' ? { cr_number: '6060606060' } : {}),
+    providerId = (
+      await applyAsTestProvider(owner, {
+        ownerId,
+        providerType: type,
+        businessNameAr: name,
+        cityId,
+        ...(type === 'workshop' ? { crNumber: '6060606060' } : {}),
       })
-      .select('id')
-      .single();
-    if (created.error !== null) throw new Error(`fixture provider: ${created.error.message}`);
-    providerId = (created.data as { id: string }).id;
+    ).id;
   }
 
   // Ops approval — the admin console's job; the shim stands in for it.

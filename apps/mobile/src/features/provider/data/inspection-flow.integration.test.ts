@@ -20,6 +20,7 @@ import {
 import { SupabaseRepository } from '@/features/shared/data/supabase-repository.js';
 import { mintTestJwt } from '@/features/shared/data/test-jwt.js';
 import { SupabaseProviderRepository } from './provider-repository.js';
+import { applyAsTestProvider } from '@/features/shared/data/test-provider.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
@@ -96,18 +97,14 @@ beforeAll(async () => {
   const existing = await own.from('providers').select('id').eq('owner_profile_id', INSPECTOR_ID);
   providerId = (existing.data as { id: string }[] | null)?.[0]?.id ?? '';
   if (providerId === '') {
-    const created = await own
-      .from('providers')
-      .insert({
-        owner_profile_id: INSPECTOR_ID,
-        provider_type: 'individual',
-        business_name_ar: 'فحص قبل الشراء عبر التطبيق',
-        city_id: cityId,
+    providerId = (
+      await applyAsTestProvider(own, {
+        ownerId: INSPECTOR_ID,
+        providerType: 'individual',
+        businessNameAr: 'فحص قبل الشراء عبر التطبيق',
+        cityId,
       })
-      .select('id')
-      .single();
-    if (created.error !== null) throw new Error(`fixture provider: ${created.error.message}`);
-    providerId = (created.data as { id: string }).id;
+    ).id;
   }
   await own.rpc('test_approve_provider', { p_provider_id: providerId });
 

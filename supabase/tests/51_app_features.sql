@@ -58,9 +58,8 @@ select test.assert_raises(
 
 select test.become('22222222-0000-4000-5151-000000000002');
 select test.assert_raises(
-  $$insert into public.providers (owner_profile_id, provider_type, business_name_ar, city_id)
-    values ('22222222-0000-4000-5151-000000000002', 'individual', 'ورشة جديدة',
-            'c0000000-0000-4000-5151-000000000001')$$,
+  $$select public.submit_provider_application('individual', 'ورشة جديدة',
+      'c0000000-0000-4000-5151-000000000001', '1000000008', 'SA0380000000608010167519')$$,
   'an application is refused while applications are closed', '23514');
 
 reset role;

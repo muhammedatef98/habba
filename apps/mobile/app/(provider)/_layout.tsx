@@ -7,10 +7,8 @@
  * (§5.1.3). If this check were deleted tomorrow, a customer navigating here by
  * hand would get empty screens and refused requests — not a job feed.
  *
- * `useIsApprovedProvider()` answers two questions at once: does the server say
- * this user holds a provider role, and is ENABLE_PROVIDER_MODE on. Both must be
- * true — the flag is off for the logbook launch (ADR-0017), so this whole group
- * is unreachable regardless of role.
+ * `useIsApprovedProvider()` asks one question: does the server say this user
+ * holds an approved provider role.
  *
  * It fails closed in both directions: while the roles query is loading, and if
  * it errors, `useIsApprovedProvider()` is false and the group is unreachable.

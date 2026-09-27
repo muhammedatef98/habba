@@ -126,9 +126,11 @@ export interface ProviderApplicationInput {
   readonly businessNameAr: string;
   readonly providerType: 'individual' | 'workshop';
   readonly cityId: string;
-  /** هوية/إقامة. Encrypted before it is written — never stored as typed. */
+  /** هوية/إقامة. Sealed in Vault by the server (0089); never stored on the device. */
   readonly nationalId: string;
   readonly iban: string;
+  /** السجل التجاري, 10 digits. Required for a workshop. */
+  readonly crNumber?: string;
 }
 
 export interface City {

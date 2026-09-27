@@ -95,8 +95,7 @@ export default function ProfileScreen() {
 
       {/* «اشتغل معنا كفنّي». Hidden once the role is held — there is nothing
           left to apply for — replaced by status while one is in flight, and
-          absent entirely while ENABLE_PROVIDER_MODE is off: the launch does not
-          collect an ID or an IBAN it cannot yet protect (ADR-0017). */}
+          absent while operators have applications closed (0081). */}
       {canApply ? (
         <Card testID="provider-upgrade">
           <View style={{ gap: theme.spacing.sm }}>

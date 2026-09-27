@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { mintTestJwt } from './test-jwt.js';
+import { applyAsTestProvider } from './test-provider.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
@@ -175,18 +176,14 @@ beforeAll(async () => {
   if ((existing.data ?? []).length > 0) {
     providerId = (existing.data as { id: string }[])[0]!.id;
   } else {
-    const created = await shop
-      .from('providers')
-      .insert({
-        owner_profile_id: SHOP_ID,
-        provider_type: 'workshop',
-        business_name_ar: 'ورشة الصيانة الدورية',
-        cr_number: '1010404040',
-        city_id: cityId,
-      })
-      .select('id')
-      .single();
-    providerId = (created.data as { id: string }).id;
+    const created = await applyAsTestProvider(shop, {
+      ownerId: SHOP_ID,
+      providerType: 'workshop',
+      businessNameAr: 'ورشة الصيانة الدورية',
+      crNumber: '1010404040',
+      cityId,
+    });
+    providerId = created.id;
   }
 
   await owner.rpc('test_approve_provider', { p_provider_id: providerId });

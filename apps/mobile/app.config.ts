@@ -52,11 +52,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supabaseAnonKey:
       env('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ?? env('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
 
-    // Off unless explicitly enabled (ADR-0017). Parsed as a strict equality
-    // against 'true' so a typo, `1`, or `yes` leaves the flow off rather than
-    // opening a KYC form we cannot yet protect.
-    enableProviderMode: env('EXPO_PUBLIC_ENABLE_PROVIDER_MODE') === 'true',
-
     // Moyasar's publishable key — public by design, it can only start a
     // payment, never move money. Absent, the app uses the development payment
     // provider. Present, card payments go through Moyasar's form and the

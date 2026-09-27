@@ -429,3 +429,65 @@ alter schema storage owner to supabase_storage_admin;
 alter table storage.buckets owner to supabase_storage_admin;
 alter table storage.objects owner to supabase_storage_admin;
 alter function storage.foldername(text) owner to supabase_storage_admin;
+
+-- ---------------------------------------------------------------------------
+-- vault — Supabase Vault's interface, WITHOUT its encryption.
+--
+-- The hosted `vault.secrets` stores ciphertext and `decrypted_secrets`
+-- decrypts it with a key that is not in the database. Here the value is kept
+-- as it is: this cluster is throwaway test data. What the shim preserves is
+-- the shape the migrations call (create_secret, update_secret, the
+-- decrypted_secrets view, a unique name) and the privileges: the migrator
+-- may use it, as `postgres` may on a hosted project; clients may not.
+-- ---------------------------------------------------------------------------
+
+create schema if not exists vault;
+
+create table if not exists vault.secrets (
+  id          uuid primary key default gen_random_uuid(),
+  name        text unique,
+  description text not null default '',
+  secret      text not null,
+  key_id      uuid,
+  nonce       bytea,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create or replace view vault.decrypted_secrets as
+  select id, name, description, secret, secret as decrypted_secret, key_id, nonce, created_at, updated_at
+    from vault.secrets;
+
+create or replace function vault.create_secret(
+  new_secret text, new_name text default null, new_description text default '', new_key_id uuid default null)
+returns uuid
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into vault.secrets (secret, name, description, key_id)
+  values (new_secret, new_name, coalesce(new_description, ''), new_key_id)
+  returning id;
+$$;
+
+create or replace function vault.update_secret(
+  secret_id uuid, new_secret text default null, new_name text default null,
+  new_description text default null, new_key_id uuid default null)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update vault.secrets
+     set secret = coalesce(new_secret, secret), name = coalesce(new_name, name),
+         description = coalesce(new_description, description), updated_at = now()
+   where id = secret_id;
+$$;
+
+revoke all on schema vault from public;
+revoke all on all tables in schema vault from public;
+revoke all on all functions in schema vault from public;
+grant usage on schema vault to habba_migrator;
+grant select, delete on vault.secrets, vault.decrypted_secrets to habba_migrator;
+grant execute on function vault.create_secret(text, text, text, uuid),
+                          vault.update_secret(uuid, text, text, text, uuid) to habba_migrator;

@@ -8,7 +8,7 @@
  *
  * Identifiers are validated here for the user's sake (a typo caught now beats
  * a rejection in three days) and again on the server, which is the one that
- * counts. They are sealed before they leave the device (§11).
+ * counts. The server seals them in Vault (0089); the device keeps nothing.
  */
 
 import { useState } from 'react';
@@ -16,7 +16,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { isValidNationalId, isValidSaudiIban, normaliseIban } from '@habba/core';
+import { isValidNationalId, isValidSaudiIban, normaliseIban, toLatinDigits } from '@habba/core';
 import { Button, Card, Field, ListRow, Row, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { ConsentCheck } from '@/features/shared/components/ConsentCheck';
@@ -25,6 +25,22 @@ import { useCanApplyAsProvider } from '@/features/shared/hooks/use-roles';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
 type ProviderType = 'individual' | 'workshop';
+
+/** The server's refusals (0089), each to the sentence that tells the person what to fix. */
+const REFUSALS: Readonly<Record<string, string>> = {
+  already_applied: 'provider.upgrade.errors.alreadyApplied',
+  identity_in_use: 'provider.upgrade.errors.identityInUse',
+  invalid_national_id: 'provider.upgrade.errors.nationalId',
+  invalid_iban: 'provider.upgrade.errors.iban',
+  invalid_cr_number: 'provider.upgrade.errors.cr',
+  invalid_business_name: 'provider.upgrade.errors.name',
+  applications_closed: 'provider.upgrade.errors.closed',
+  account_suspended: 'provider.upgrade.errors.suspended',
+};
+
+function refusalKey(message: string): string {
+  return REFUSALS[message] ?? 'provider.upgrade.errors.submit';
+}
 
 export default function BecomeProviderScreen() {
   const { t, i18n } = useTranslation();
@@ -40,6 +56,7 @@ export default function BecomeProviderScreen() {
   const [cityId, setCityId] = useState<string | null>(null);
   const [nationalId, setNationalId] = useState('');
   const [iban, setIban] = useState('');
+  const [crNumber, setCrNumber] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -48,10 +65,10 @@ export default function BecomeProviderScreen() {
   const providerTerms = useLegalDocument('provider_terms');
 
   if (!isAuthenticated) return <Redirect href="/" />;
-  // Covers both cases in one check: ENABLE_PROVIDER_MODE is off, or the role is
+  // Covers both cases in one check: applications are closed, or the role is
   // already held and there is nothing here to apply for. The redirect happens
-  // before render, so with the flag off no field that asks for a national ID or
-  // an IBAN is ever mounted — not disabled, not hidden, not mounted.
+  // before render, so no field that asks for a national ID or an IBAN is ever
+  // mounted for someone who cannot apply — not disabled, not hidden, not mounted.
   if (!canApply) return <Redirect href="/profile" />;
 
   async function handleSubmit() {
@@ -61,6 +78,9 @@ export default function BecomeProviderScreen() {
     if (cityId === null) return setError(t('provider.upgrade.errors.city'));
     if (!isValidNationalId(nationalId)) return setError(t('provider.upgrade.errors.nationalId'));
     if (!isValidSaudiIban(iban)) return setError(t('provider.upgrade.errors.iban'));
+    if (providerType === 'workshop' && !/^[0-9]{10}$/.test(toLatinDigits(crNumber).trim())) {
+      return setError(t('provider.upgrade.errors.cr'));
+    }
     if (!agreed) return setError(t('legal.providerConsentRequired'));
     if (providerTerms.data === undefined) return setError(t('legal.loadFailed'));
 
@@ -75,14 +95,11 @@ export default function BecomeProviderScreen() {
         cityId,
         nationalId,
         iban: normaliseIban(iban),
+        ...(providerType === 'workshop' ? { crNumber: toLatinDigits(crNumber).trim() } : {}),
       });
       setSubmitted(true);
     } catch (cause) {
-      setError(
-        cause instanceof Error && cause.message === 'already_applied'
-          ? t('provider.upgrade.errors.alreadyApplied')
-          : t('provider.upgrade.errors.submit'),
-      );
+      setError(t(refusalKey(cause instanceof Error ? cause.message : '')));
     } finally {
       setSubmitting(false);
     }
@@ -171,6 +188,18 @@ export default function BecomeProviderScreen() {
         keyboardType="number-pad"
         forceLtrInput
       />
+
+      {providerType === 'workshop' ? (
+        <Field
+          testID="cr-number"
+          label={t('provider.upgrade.crLabel')}
+          hint={t('provider.upgrade.crHint')}
+          value={crNumber}
+          onChangeText={setCrNumber}
+          keyboardType="number-pad"
+          forceLtrInput
+        />
+      ) : null}
 
       <Field
         testID="iban"

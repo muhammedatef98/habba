@@ -459,6 +459,9 @@ function seed(): State {
       created_at: owner.profile.created_at,
       has_national_id: true,
       has_iban: status === 'approved',
+      identity_kind: 'national',
+      national_id_tail: '4471',
+      iban_tail: status === 'approved' ? '7519' : null,
     },
     owner: {
       id: owner.profile.id,
@@ -1610,6 +1613,18 @@ export class FixtureTransport implements Transport {
           verification_status: status,
         });
         return null;
+      }
+
+      case 'ops_reveal_provider_kyc': {
+        reasonOf(args['p_reason']);
+        const found = s.providers.find((p) => p.provider.id === args['p_provider_id']);
+        this.audit('read', 'providers', String(args['p_provider_id']), { kyc_revealed: true });
+        return {
+          identity_kind: 'national',
+          national_id: '1000004471',
+          iban: found?.provider.has_iban === true ? 'SA0380000000608010167519' : null,
+          legacy: false,
+        };
       }
 
       case 'ops_force_offline':

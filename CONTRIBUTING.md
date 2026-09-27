@@ -139,10 +139,10 @@ APK on Android and a simulator build on iOS.
 
 There is one mobile app: `apps/mobile` (CLAUDE.md §5.1). It serves vehicle
 owners and providers from one binary and one account. Signup never asks which
-one you are, and `ENABLE_PROVIDER_MODE` is off, so the provider group is
-unreachable — `apps/mobile/src/features/shared/access/provider-access.test.ts`
-is what holds that shut, and it reads the screens' source to prove the check is
-still wired, not merely defined.
+one you are, and the provider group opens only for an approved provider role —
+`apps/mobile/src/features/shared/access/provider-access.test.ts` is what holds
+that shut, and it reads the screens' source to prove the check is still wired,
+not merely defined.
 
 `customer/**` and `provider/**` must never import from each other; only
 `shared/**` may be imported by both, and the boundaries lint rule fails CI on a

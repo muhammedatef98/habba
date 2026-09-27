@@ -75,8 +75,9 @@ round-tripped through a decoder in `qr.test.ts`.
 Supabase project, so the app runs on the in-memory repository, and phone OTP is
 a dev stub. Neither is a code gap.
 
-**Deliberately off:** `ENABLE_PROVIDER_MODE` (see `apps/mobile/README.md`). The
-launch collects no national ID or IBAN while the KYC vault is a placeholder.
+**Provider sign-up is on** (0089): the national ID and IBAN are sealed in
+Supabase Vault on the server, and operators open or close applications from
+the console.
 
 ---
 
@@ -188,22 +189,22 @@ the completion screen or shares it as a PDF (`47_invoices_issued_at_completion.s
 
 From HANDOFF.md §9. These block real work, and none of them is a coding task.
 
-| #   | Decision                                                                   | Blocks                                                                                                                                                                                                                                                                            |
-| --- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **ADR-0008 — payments, merchant of record, SAMA**                          | Anything that moves real money, so all of Phase 3's escrow. The authorise/capture functions are the interface; the PSP behind them is unchosen.                                                                                                                                   |
-| 2   | **ADR-0009 — ZATCA seller of record**                                      | Phase 6 invoicing, and with it the legality of billing for completed work. The schema records _which_ seller so invoices stay attributable either way.                                                                                                                            |
-| 3   | **ADR-0010 — PDPL transfer basis** (region decided: Frankfurt, 2026-09-05) | Scale, not the pilot. The region is settled, so the project can be created; what remains is the lawful basis for cross-border transfer, a DPA, retention, and erasure against an append-only timeline. Still blocks KYC sealing (ADR-0017), and therefore `ENABLE_PROVIDER_MODE`. |
-| 4   | **SMS provider** (Unifonic / Taqnyat / Twilio)                             | Real phone OTP, and therefore any launch at all. CITC sender-ID registration is required and takes calendar time — worth starting before it is on the critical path.                                                                                                              |
-| 5   | **Plate letter map verification** against an official MOI/Absher source    | ADR-0011, now load-bearing in five or more places. A wrong mapping silently corrupts stored plates, and the logbook is keyed on them.                                                                                                                                             |
-| 6   | **Expo SDK 57 vs Expo Go**                                                 | Nothing structural. SDK 57 is current stable, so an up-to-date Expo Go works; the fallback is a dev build.                                                                                                                                                                        |
+| #   | Decision                                                                   | Blocks                                                                                                                                                                                                                                           |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **ADR-0008 — payments, merchant of record, SAMA**                          | Anything that moves real money, so all of Phase 3's escrow. The authorise/capture functions are the interface; the PSP behind them is unchosen.                                                                                                  |
+| 2   | **ADR-0009 — ZATCA seller of record**                                      | Phase 6 invoicing, and with it the legality of billing for completed work. The schema records _which_ seller so invoices stay attributable either way.                                                                                           |
+| 3   | **ADR-0010 — PDPL transfer basis** (region decided: Frankfurt, 2026-09-05) | Scale, not the pilot. The region is settled, so the project can be created; what remains is the lawful basis for cross-border transfer, a DPA, retention, and erasure against an append-only timeline. KYC sealing itself is implemented (0089). |
+| 4   | **SMS provider** (Unifonic / Taqnyat / Twilio)                             | Real phone OTP, and therefore any launch at all. CITC sender-ID registration is required and takes calendar time — worth starting before it is on the critical path.                                                                             |
+| 5   | **Plate letter map verification** against an official MOI/Absher source    | ADR-0011, now load-bearing in five or more places. A wrong mapping silently corrupts stored plates, and the logbook is keyed on them.                                                                                                            |
+| 6   | **Expo SDK 57 vs Expo Go**                                                 | Nothing structural. SDK 57 is current stable, so an up-to-date Expo Go works; the fallback is a dev build.                                                                                                                                       |
 
 Two more that are decisions rather than open questions, recorded here because
 they gate visible behaviour:
 
-| Decision                                    | Effect                                                                                                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **KYC sealing is a placeholder** (ADR-0017) | `ENABLE_PROVIDER_MODE` stays off; no real ID or IBAN may be accepted. Lifts when decision 3 lands and Vault/pgsodium is wired. |
-| **Erasure is anonymisation** (0070)         | The account keeps its id so invoices and the logbook's hash stay valid; needs counsel's sign-off with decision 3.              |
+| Decision                                 | Effect                                                                                                                                               |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **KYC sealed in Vault** (ADR-0017, 0089) | Applications validate and seal the ID and IBAN on the server; operators reveal them with a reason, audited. Counsel still signs off with decision 3. |
+| **Erasure is anonymisation** (0070)      | The account keeps its id so invoices and the logbook's hash stay valid; needs counsel's sign-off with decision 3.                                    |
 
 ---
 

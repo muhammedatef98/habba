@@ -632,6 +632,8 @@
       "nationalIdHint": "10 digits starting with 1 (ID) or 2 (Iqama).",
       "ibanLabel": "IBAN",
       "ibanHint": "Starts with SA, 24 characters. Payouts go here.",
+      "crLabel": "Commercial registration number",
+      "crHint": "10 digits, as on the workshop's CR certificate.",
       "nafathNote": "Nafath verification is required before approval and will be requested in a later step.",
       "submit": "Submit application",
       "submittedTitle": "We have your application",
@@ -649,7 +651,11 @@
         "nationalId": "That National ID or Iqama number is not valid.",
         "iban": "That IBAN is not valid. Check the digits.",
         "alreadyApplied": "You already have an application in progress.",
-        "submit": "Could not send the application. Check your connection and try again."
+        "submit": "Could not send the application. Check your connection and try again.",
+        "cr": "The commercial registration number is 10 digits.",
+        "identityInUse": "This ID is already registered to another provider account. Contact us if that is a mistake.",
+        "closed": "Provider sign-ups are paused for now. Please try again later.",
+        "suspended": "Your account is suspended, so the application cannot be sent. Contact us."
       }
     },
     "navShift": "Shift",

@@ -77,9 +77,8 @@ select test.assert_eq(
   (select count(*)::int from public.legal_acceptances), 0, 'and nobody else''s');
 
 -- Applying as a provider adds the provider terms.
-insert into public.providers (owner_profile_id, provider_type, business_name_ar, city_id)
-values ('22222222-0000-4000-5353-000000000002', 'individual', 'فنّي الدمام',
-        'c0000000-0000-4000-5353-000000000001');
+select public.submit_provider_application('individual', 'فنّي الدمام',
+  'c0000000-0000-4000-5353-000000000001', '1000000008', 'SA0380000000608010167519');
 select test.assert_eq(
   (select string_agg(kind::text, ',' order by kind) from public.my_pending_legal_documents()),
   'terms,privacy,provider_terms', 'an applicant also has the provider terms to accept');

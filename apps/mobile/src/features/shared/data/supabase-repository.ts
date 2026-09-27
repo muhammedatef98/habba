@@ -24,9 +24,7 @@ import {
   type LegalDocumentKind,
   type SarAmount,
 } from '@habba/core';
-import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
-import { kycVault } from '@/features/shared/lib/kyc.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
 import { DevPaymentProvider, type PaymentProvider } from '@/features/shared/lib/payments.js';
@@ -660,37 +658,27 @@ export class SupabaseRepository implements Repository {
   }
 
   async applyAsProvider(input: ProviderApplicationInput): Promise<ProviderApplication> {
-    // See the in-memory implementation: the flag gates the data path too, so a
-    // KYC payload cannot leave the device through a screen added later.
-    assertProviderApplicationsAllowed();
+    if (this.userId() === null) throw new Error('applyAsProvider: not authenticated');
 
-    const userId = this.userId();
-    if (userId === null) throw new Error('applyAsProvider: not authenticated');
+    // The ID and IBAN go to the server as typed, over TLS, and nowhere else:
+    // submit_provider_application validates them and seals each one in Vault
+    // (0089). Nothing is sealed, cached or logged on the device. The status
+    // returned is the server's, never a hopeful default written here.
+    const { data, error } = await this.client.rpc('submit_provider_application', {
+      p_provider_type: input.providerType,
+      p_business_name_ar: input.businessNameAr,
+      p_city_id: input.cityId,
+      p_national_id: input.nationalId,
+      p_iban: input.iban,
+      p_cr_number: input.crNumber ?? null,
+    });
+    if (error !== null) throw new Error(applicationRefusal(error.hint, error.message));
 
-    // Note what is NOT sent: verification_status. The policy pins a
-    // self-inserted row to `pending` (0022), and the column guard refuses to
-    // let the owner move it afterwards (0034) — so the status this returns is
-    // the server's, not a hopeful default written here.
-    const row = unwrap(
-      await this.client
-        .from('providers')
-        .insert({
-          owner_profile_id: userId,
-          provider_type: input.providerType,
-          business_name_ar: input.businessNameAr,
-          city_id: input.cityId,
-          national_id_encrypted: await kycVault.seal(input.nationalId),
-          iban_encrypted: await kycVault.seal(input.iban),
-        })
-        .select('business_name_ar, verification_status, created_at')
-        .single(),
-      'applyAsProvider',
-    ) as {
+    const row = data as {
       business_name_ar: string;
       verification_status: ProviderApplicationStatus;
       created_at: string;
     };
-
     return {
       status: row.verification_status,
       businessNameAr: row.business_name_ar,
@@ -1908,5 +1896,27 @@ export class SupabaseRepository implements Repository {
     });
 
     if (error !== null) throw new Error(`snoozeMaintenanceItem: ${error.message}`);
+  }
+}
+
+/**
+ * The refusals a person can act on, by the hint the server attaches (0089).
+ * Anything else is reported as a failure to send, with the server's message
+ * kept for the log. The message never contains the ID or IBAN.
+ */
+function applicationRefusal(hint: string | undefined, message: string): string {
+  switch (hint) {
+    case 'already_applied':
+    case 'identity_in_use':
+    case 'invalid_national_id':
+    case 'invalid_iban':
+    case 'invalid_cr_number':
+    case 'invalid_business_name':
+    case 'account_suspended':
+      return hint;
+    case 'feature_disabled:provider_applications':
+      return 'applications_closed';
+    default:
+      return `applyAsProvider: ${message}`;
   }
 }

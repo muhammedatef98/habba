@@ -16,6 +16,7 @@ import { sarOrThrow } from '@habba/core';
 import { DevPaymentProvider } from '@/features/shared/lib/payments.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import { mintTestJwt } from './test-jwt.js';
+import { applyAsTestProvider } from './test-provider.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
@@ -159,20 +160,14 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     if ((existing.data ?? []).length > 0) {
       providerId = (existing.data as { id: string }[])[0]!.id;
     } else {
-      const created = await tech
-        .from('providers')
-        .insert({
-          owner_profile_id: TECH_ID,
-          provider_type: 'individual',
-          business_name_ar: 'خدمة بطاريات سريعة',
-          city_id: cityId,
-        })
-        .select('id, verification_status')
-        .single();
-
-      expect(created.error).toBeNull();
-      providerId = (created.data as { id: string }).id;
-      expect((created.data as { verification_status: string }).verification_status).toBe('pending');
+      const created = await applyAsTestProvider(tech, {
+        ownerId: TECH_ID,
+        providerType: 'individual',
+        businessNameAr: 'خدمة بطاريات سريعة',
+        cityId,
+      });
+      providerId = created.id;
+      expect(created.verificationStatus).toBe('pending');
     }
 
     // KYC is an ops decision. If a provider could set this, verification would

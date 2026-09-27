@@ -21,6 +21,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { sarOrThrow } from '@habba/core';
 import { DevPaymentProvider } from '@/features/shared/lib/payments.js';
 import { mintTestJwt } from './test-jwt.js';
+import { applyAsTestProvider } from './test-provider.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
@@ -154,21 +155,15 @@ describe.skipIf(!harnessUp)('Phase 4 acceptance — workshop booking', () => {
     if ((existing.data ?? []).length > 0) {
       providerId = (existing.data as { id: string }[])[0]!.id;
     } else {
-      const created = await workshop
-        .from('providers')
-        .insert({
-          owner_profile_id: WORKSHOP_ID,
-          provider_type: 'workshop',
-          business_name_ar: 'ورشة الاختبار الآلي',
-          cr_number: '7070707070',
-          city_id: cityId,
-        })
-        .select('id, verification_status')
-        .single();
-
-      expect(created.error).toBeNull();
-      providerId = (created.data as { id: string }).id;
-      expect((created.data as { verification_status: string }).verification_status).toBe('pending');
+      const created = await applyAsTestProvider(workshop, {
+        ownerId: WORKSHOP_ID,
+        providerType: 'workshop',
+        businessNameAr: 'ورشة الاختبار الآلي',
+        crNumber: '7070707070',
+        cityId,
+      });
+      providerId = created.id;
+      expect(created.verificationStatus).toBe('pending');
     }
 
     // Ops approval, applied directly — the admin console is Phase 6, same as

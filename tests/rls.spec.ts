@@ -20,6 +20,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { mintTestJwt } from '../apps/mobile/src/features/shared/data/test-jwt.js';
+import { applyAsTestProvider } from '../apps/mobile/src/features/shared/data/test-provider.js';
 
 /**
  * HABBA_POSTGREST_URL has exactly one meaning: **the origin supabase-js is
@@ -290,8 +291,6 @@ function clientFor(userId: string | null): SupabaseClient {
 // rather than failing in setup for reasons that have nothing to do with RLS.
 const VEHICLE_ID = 'bb000000-0000-4000-8000-000000000001';
 const STRANGER_VEHICLE_ID = 'bb000000-0000-4000-8000-000000000002';
-const APPLICANT_PROVIDER_ID = 'cc000000-0000-4000-8000-000000000001';
-const PROVIDER_RECORD_ID = 'cc000000-0000-4000-8000-000000000002';
 let cityId = '';
 
 beforeAll(async () => {
@@ -342,28 +341,25 @@ beforeAll(async () => {
 
   // The applicant applies and stays pending. The provider applies and is
   // approved through the harness shim, which stands in for the ops console.
-  for (const [id, providerId, name] of [
-    [APPLICANT_ID, APPLICANT_PROVIDER_ID, 'متقدّم'],
-    [PROVIDER_ID, PROVIDER_RECORD_ID, 'فنّي معتمد'],
+  // Applying is a function call (0089): a client cannot insert a providers row.
+  // "Already applied" on a re-run, or hosted where verify-hosted.sh creates
+  // both records, is the expected, harmless outcome (0041) — anything else is
+  // a setup failure worth seeing.
+  for (const [id, name] of [
+    [APPLICANT_ID, 'متقدّم'],
+    [PROVIDER_ID, 'فنّي معتمد'],
   ] as const) {
-    // insert, not upsert: 0037 leaves `authenticated` without a table-wide
-    // UPDATE grant on providers, so an upsert is refused outright. A duplicate
-    // key on a re-run is the expected, harmless outcome (0041) — anything else
-    // is a setup failure worth seeing.
-    const written = await clientFor(id).from('providers').insert({
-      id: providerId,
-      owner_profile_id: id,
-      provider_type: 'individual',
-      business_name_ar: name,
-      city_id: cityId,
-      national_id_encrypted: 'enc:dev:test',
-      iban_encrypted: 'enc:dev:test',
-    });
-
-    if (written.error !== null && written.error.code !== '23505') {
-      throw new Error(
-        `RLS suite setup: could not create provider record — ${written.error.message}`,
-      );
+    try {
+      await applyAsTestProvider(clientFor(id), {
+        ownerId: id,
+        providerType: 'individual',
+        businessNameAr: name,
+        cityId,
+      });
+    } catch (cause) {
+      if (!/already applied/i.test(String(cause))) {
+        throw new Error(`RLS suite setup: could not create provider record — ${String(cause)}`);
+      }
     }
   }
 
@@ -372,8 +368,13 @@ beforeAll(async () => {
   // write. Locally the shim does it; hosted, verify-hosted.sh does it in SQL
   // before this runs.
   if (!HOSTED) {
+    const record = await clientFor(PROVIDER_ID)
+      .from('providers')
+      .select('id')
+      .eq('owner_profile_id', PROVIDER_ID)
+      .single();
     await clientFor(PROVIDER_ID).rpc('test_approve_provider', {
-      p_provider_id: PROVIDER_RECORD_ID,
+      p_provider_id: (record.data as { id: string }).id,
     });
   }
 });

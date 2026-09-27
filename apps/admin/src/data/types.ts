@@ -358,6 +358,10 @@ export interface ProviderFile {
     readonly created_at: string;
     readonly has_national_id: boolean;
     readonly has_iban: boolean;
+    /** 0089: kept beside the sealed values so support can quote them. */
+    readonly identity_kind?: 'national' | 'iqama' | null;
+    readonly national_id_tail?: string | null;
+    readonly iban_tail?: string | null;
   };
   readonly owner: {
     readonly id: string;
@@ -612,4 +616,13 @@ export interface NewLegalDocument {
   readonly requiresAcceptance: boolean;
   /** ISO time it takes effect; null for now. */
   readonly publishedAt: string | null;
+}
+
+/** ops_reveal_provider_kyc (0089): the sealed values, read back with a reason. */
+export interface ProviderKyc {
+  readonly identity_kind: 'national' | 'iqama' | null;
+  readonly national_id: string | null;
+  readonly iban: string | null;
+  /** Sealed by the old dev placeholder, so not readable. */
+  readonly legacy: boolean;
 }

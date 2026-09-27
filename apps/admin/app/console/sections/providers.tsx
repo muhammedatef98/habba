@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { api, PAGE_SIZE } from '@/data/api';
-import type { ProviderFile, ProviderRow, VerificationStatus } from '@/data/types';
+import type { ProviderFile, ProviderKyc, ProviderRow, VerificationStatus } from '@/data/types';
 import { date, dateTime, hijri, money, phone, riyadhToday, since } from '@/lib/format';
 import { label, ORDER_STATUS, PAYOUT_STATUS, VERIFICATION } from '../labels';
 import { go, hrefFor } from '../router';
@@ -179,6 +179,11 @@ function ProviderDetail({ id }: { readonly id: string }) {
   );
 }
 
+/** `••••4471`: the tail support may quote, the rest never shown unasked. */
+function masked(tail: string | null | undefined): string {
+  return tail === null || tail === undefined ? 'محفوظة (مشفّرة)' : `••••${tail}`;
+}
+
 const DECISIONS: readonly {
   readonly status: VerificationStatus;
   readonly label: string;
@@ -198,6 +203,8 @@ function ProviderFileView({
   readonly reload: () => void;
 }) {
   const { provider, owner, stats } = file;
+  // Held only in this component: leaving the page forgets the values.
+  const [revealed, setRevealed] = useState<ProviderKyc | null>(null);
   const acceptance =
     stats.offers_sent > 0
       ? `${Math.round((stats.offers_accepted / stats.offers_sent) * 100)}%`
@@ -374,8 +381,26 @@ function ProviderFileView({
                     </Badge>
                   ),
                 ],
-                ['الهوية/الإقامة', provider.has_national_id ? 'محفوظة (مشفّرة)' : 'لم تُقدَّم'],
-                ['الآيبان', provider.has_iban ? 'محفوظ (مشفّر)' : 'لم يُقدَّم'],
+                [
+                  provider.identity_kind === 'iqama' ? 'الإقامة' : 'الهوية',
+                  provider.has_national_id ? (
+                    <span key="id" className="numeric">
+                      {revealed?.national_id ?? masked(provider.national_id_tail)}
+                    </span>
+                  ) : (
+                    'لم تُقدَّم'
+                  ),
+                ],
+                [
+                  'الآيبان',
+                  provider.has_iban ? (
+                    <span key="iban" className="numeric">
+                      {revealed?.iban ?? masked(provider.iban_tail)}
+                    </span>
+                  ) : (
+                    'لم يُقدَّم'
+                  ),
+                ],
                 [
                   'السجل التجاري',
                   <span key="cr" className="numeric">
@@ -391,9 +416,27 @@ function ProviderFileView({
                 ['الاسم بالإنجليزية', provider.business_name_en ?? '—'],
               ]}
             />
-            <p className="subtle" style={{ marginBottom: 0 }}>
-              رقم الهوية والآيبان مشفّران ولا يظهران في اللوحة لأحد. التحقق من الهوية يتم عبر نفاذ.
+            {revealed?.legacy === true ? (
+              <p className="notice" data-tone="warn">
+                هذه البيانات حُفظت بالطريقة التجريبية القديمة ولا يمكن قراءتها. اطلب من مقدّم الخدمة
+                إعادة التقديم.
+              </p>
+            ) : null}
+            <p className="subtle">
+              رقم الهوية والآيبان محفوظان مشفّرين في خزنة Supabase. يظهر هنا آخر أربعة أرقام فقط،
+              وعرضهما كاملين يُسجَّل باسمك مع السبب.
             </p>
+            {(provider.has_national_id || provider.has_iban) && revealed === null ? (
+              <ActionButton
+                label="عرض الهوية والآيبان كاملين"
+                size="small"
+                reasonLabel="سبب العرض"
+                reasonHint="مثلاً: التحقق قبل الاعتماد، أو تحويل مستحقات. يُسجَّل باسمك."
+                confirmLabel="عرض"
+                onConfirm={async (reason) => setRevealed(await api.revealKyc(provider.id, reason))}
+                success="عُرضت البيانات وسُجّل ذلك."
+              />
+            ) : null}
           </Card>
 
           <Card title="الموقع والتشغيل">

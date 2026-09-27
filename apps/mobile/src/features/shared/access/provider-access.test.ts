@@ -1,30 +1,24 @@
 /**
- * The KYC screen must be unreachable while ENABLE_PROVIDER_MODE is off.
+ * Who reaches the KYC screen and the provider side.
  *
- * That claim has three parts, and this file proves all three, because any one
- * of them alone can be true while a national ID still reaches storage:
+ * Two parts, because either alone can be true while the wrong person still
+ * reaches the form:
  *
  *   1. the decision — `canApplyAsProvider` / `canEnterProviderMode`
- *   2. the data path — `applyAsProvider` refuses, whatever screen called it
- *   3. the wiring — the screens actually consult the decision
+ *   2. the wiring — the screens actually consult the decision
  *
- * Part 3 is asserted by reading the source rather than by rendering, because
+ * Part 2 is asserted by reading the source rather than by rendering, because
  * this repo has no React Native test renderer. That is a weaker test than
  * mounting the screen, and it is here deliberately: without it, deleting one
  * `if (!canApply) return <Redirect …/>` line would leave every other test in
- * this file green while the form asking for an IBAN became reachable again.
+ * this file green while the form became reachable to someone it should not be.
  */
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import {
-  assertProviderApplicationsAllowed,
-  canApplyAsProvider,
-  canEnterProviderMode,
-  holdsProviderRole,
-} from './provider-access.js';
+import { canApplyAsProvider, canEnterProviderMode, holdsProviderRole } from './provider-access.js';
 import type { UserRole } from '@/features/shared/data/types';
 
 const CUSTOMER: readonly UserRole[] = ['customer'];
@@ -33,54 +27,40 @@ const WORKSHOP: readonly UserRole[] = ['customer', 'workshop_admin'];
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-describe('with ENABLE_PROVIDER_MODE off (the default)', () => {
-  const off = { providerModeEnabled: false } as const;
-
-  test('«اشتغل معنا كفنّي» is not offered to anyone', () => {
-    expect(canApplyAsProvider({ roles: CUSTOMER, ...off })).toBe(false);
-    expect(canApplyAsProvider({ roles: [], ...off })).toBe(false);
+describe('applying', () => {
+  test('a customer-only user is offered the upgrade while applications are open', () => {
+    expect(canApplyAsProvider({ roles: CUSTOMER, applicationsOpen: true })).toBe(true);
   });
 
-  test('the mode switcher is hidden even from an approved provider', () => {
-    // The role is real and the server would honour it. The surface behind the
-    // switcher still depends on an ops console that does not exist, so the flag
-    // wins.
-    expect(holdsProviderRole(TECHNICIAN)).toBe(true);
-    expect(canEnterProviderMode({ roles: TECHNICIAN, ...off })).toBe(false);
-    expect(canEnterProviderMode({ roles: WORKSHOP, ...off })).toBe(false);
-  });
-
-  test('an application cannot be submitted at all', () => {
-    // The KYC values never leave the device, so nothing is sealed with the
-    // placeholder vault (ADR-0017).
-    expect(() => assertProviderApplicationsAllowed()).toThrow('provider_mode_disabled');
-  });
-});
-
-describe('with ENABLE_PROVIDER_MODE on', () => {
-  const on = { providerModeEnabled: true } as const;
-
-  test('a customer-only user is offered the upgrade', () => {
-    expect(canApplyAsProvider({ roles: CUSTOMER, ...on })).toBe(true);
+  test('nobody is offered it while operators have applications closed', () => {
+    expect(canApplyAsProvider({ roles: CUSTOMER, applicationsOpen: false })).toBe(false);
+    expect(canApplyAsProvider({ roles: [], applicationsOpen: false })).toBe(false);
   });
 
   test('someone who already holds the role is not', () => {
-    expect(canApplyAsProvider({ roles: TECHNICIAN, ...on })).toBe(false);
-    expect(canApplyAsProvider({ roles: WORKSHOP, ...on })).toBe(false);
+    expect(canApplyAsProvider({ roles: TECHNICIAN, applicationsOpen: true })).toBe(false);
+    expect(canApplyAsProvider({ roles: WORKSHOP, applicationsOpen: true })).toBe(false);
+  });
+});
+
+describe('provider mode', () => {
+  test('the switcher appears only for a held provider role', () => {
+    expect(holdsProviderRole(TECHNICIAN)).toBe(true);
+    expect(canEnterProviderMode({ roles: TECHNICIAN })).toBe(true);
+    expect(canEnterProviderMode({ roles: WORKSHOP })).toBe(true);
+    expect(canEnterProviderMode({ roles: CUSTOMER })).toBe(false);
+    expect(canEnterProviderMode({ roles: ['ops'] })).toBe(false);
   });
 
-  test('the switcher appears only for a held provider role', () => {
-    expect(canEnterProviderMode({ roles: TECHNICIAN, ...on })).toBe(true);
-    expect(canEnterProviderMode({ roles: WORKSHOP, ...on })).toBe(true);
-    expect(canEnterProviderMode({ roles: CUSTOMER, ...on })).toBe(false);
-    expect(canEnterProviderMode({ roles: ['ops'], ...on })).toBe(false);
+  test('closing applications does not lock out a provider already approved', () => {
+    expect(canEnterProviderMode({ roles: TECHNICIAN, applicationsOpen: false })).toBe(true);
   });
 
   test('an unanswered roles query renders nothing provider-shaped', () => {
     // `roles` is empty while the query is loading and after it errors. Both
     // must read as "not a provider" — showing the switcher on an unanswered
     // question is the one outcome that must not happen.
-    expect(canEnterProviderMode({ roles: [], ...on })).toBe(false);
+    expect(canEnterProviderMode({ roles: [] })).toBe(false);
   });
 });
 

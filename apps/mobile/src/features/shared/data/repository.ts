@@ -20,6 +20,8 @@ import {
   addSar,
   applyRate,
   compareSar,
+  isValidNationalId,
+  isValidSaudiIban,
   isZeroSar,
   multiplySar,
   normalisePlate,
@@ -29,9 +31,7 @@ import {
   type SarAmount,
 } from '@habba/core';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
-import { assertProviderApplicationsAllowed } from '@/features/shared/access/provider-access.js';
 import { CARE_LEAD_DAYS, CARE_LEAD_KM } from '@/features/shared/lib/care-language.js';
-import { kycVault } from '@/features/shared/lib/kyc.js';
 import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { getSupabaseClient } from '@/features/shared/lib/supabase.js';
@@ -2142,18 +2142,19 @@ export class InMemoryRepository implements Repository {
   }
 
   async applyAsProvider(input: ProviderApplicationInput): Promise<ProviderApplication> {
-    // Not only a UI concern: with ENABLE_PROVIDER_MODE off, no national ID or
-    // IBAN may be sealed and stored, whatever screen asked (ADR-0017).
-    assertProviderApplicationsAllowed();
     if (this.profile === null) throw new Error('not_signed_in');
     if (this.application !== null && this.application.status !== 'rejected') {
       throw new Error('already_applied');
     }
 
-    // Sealed here for the same reason the server refuses plaintext: the value
-    // must never exist in storage in a readable form (§11).
-    await kycVault.seal(input.nationalId);
-    await kycVault.seal(input.iban);
+    // The server's checks, so the dev stub refuses what production refuses.
+    // The values themselves are not kept: the server seals them in Vault
+    // (0089), and the stub has nothing to seal them in.
+    if (!isValidNationalId(input.nationalId)) throw new Error('invalid_national_id');
+    if (!isValidSaudiIban(input.iban)) throw new Error('invalid_iban');
+    if (input.providerType === 'workshop' && !/^[0-9]{10}$/.test(input.crNumber ?? '')) {
+      throw new Error('invalid_cr_number');
+    }
 
     this.applicationType = input.providerType;
     this.application = {

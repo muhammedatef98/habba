@@ -1,6 +1,6 @@
 # ADR-0017 — An in-page QR for تقرير هبّة, and the KYC sealing seam
 
-- **Status:** Accepted (QR implemented); KYC sealing is a **stub pending ADR-0010**
+- **Status:** Accepted (QR implemented); KYC sealing **implemented server-side in 0089** (see §2, Update)
 - **Date:** 2026-09-04
 - **Relates to:** ADR-0005, ADR-0010, build prompt §7.3, §11
 
@@ -76,3 +76,20 @@ tail, marked `enc:dev:`.
 - **Until then, do not accept real KYC data.** A dev-sealed IBAN cannot be paid
   out to, and a dev-sealed ID cannot be verified against Nafath. This is a
   blocker on onboarding real providers, and is listed as such.
+
+### Update — 2026-09-27: the seal is real (0089)
+
+The seam is gone rather than filled in. The app no longer seals anything:
+`submit_provider_application()` receives the ID and IBAN over TLS, validates
+them with the same rules as `@habba/core`, and stores each one with
+`vault.create_secret()`. The row keeps `vault:<secret id>` in the `*_encrypted`
+columns, plus the identity kind and the last four characters. A keyed digest,
+in a table no client can read, keeps one identity to one provider account.
+Clients cannot insert `providers` rows or change the sealed columns. Operators
+read the values back through `ops_reveal_provider_kyc()`, with a reason, and
+each read is audited without the values. Erasure deletes the secrets.
+
+Vault is used rather than pgsodium, which Supabase no longer recommends for new
+projects. `ENABLE_PROVIDER_MODE` is removed, and operators open or close
+applications with `feature_provider_applications` (0081). ADR-0010's legal
+questions (transfer basis, DPA, retention) are unchanged and still need counsel.

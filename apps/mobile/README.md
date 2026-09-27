@@ -76,11 +76,10 @@ scheme, bundle ids).
 cp .env.example .env.local   # git-ignored
 ```
 
-| Variable                           | Default | Notes                                         |
-| ---------------------------------- | ------- | --------------------------------------------- |
-| `EXPO_PUBLIC_SUPABASE_URL`         | unset   | Unset → in-memory repository and the dev OTP  |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | unset   | Public by design; useless unless RLS is wrong |
-| `EXPO_PUBLIC_ENABLE_PROVIDER_MODE` | `false` | See below                                     |
+| Variable                        | Default | Notes                                         |
+| ------------------------------- | ------- | --------------------------------------------- |
+| `EXPO_PUBLIC_SUPABASE_URL`      | unset   | Unset → in-memory repository and the dev OTP  |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | unset   | Public by design; useless unless RLS is wrong |
 
 `EXPO_PUBLIC_*` values are **inlined into the bundle** and readable by anyone
 with the app. That is correct for these three and for nothing else: the
@@ -88,21 +87,17 @@ service-role key, the Unifonic credentials and the SMS hook secret are set on
 the server (Supabase → Edge Functions → Secrets). `docs/supabase-setup.md` is
 the full runbook.
 
-## Feature flags
+## The provider side
 
-| Flag                               | Default | Effect when off                                                                                                                                                                                                          |
-| ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `EXPO_PUBLIC_ENABLE_PROVIDER_MODE` | `false` | «اشتغل معنا كفنّي» is not offered, the KYC screen redirects before rendering a field, the mode switcher is hidden even from an approved provider, the `(provider)` group is unreachable, and `applyAsProvider()` throws. |
+There is no build flag for it any more. «اشتغل معنا كفنّي» is offered while
+operators have applications open (console → الإعدادات → الميزات,
+`feature_provider_applications`), and the `(provider)` group opens for anyone
+the server says holds an approved provider role.
 
-Off by default for the logbook launch: the KYC vault is a placeholder
-(ADR-0017) and there is no ops console to approve an application (Amendment B,
-Phase 6). Collecting a national ID and an IBAN we cannot yet protect, from
-applicants nobody can approve, is the thing the flag prevents.
-
-To work on the provider side, set it to exactly `true` in `.env.local` and restart Metro. The flag
-decides only what renders and what the client will send — a user still holds no
-provider role until approval, and RLS refuses every provider read regardless
-(§5.1.3).
+The national ID and IBAN are sent once to `submit_provider_application()`,
+which validates them and seals each in Supabase Vault (0089). The device
+keeps nothing, and no client can read them back. An operator can, with a
+reason, and that is audited.
 
 ## Pointing it at Supabase
 

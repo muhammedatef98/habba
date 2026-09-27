@@ -25,6 +25,7 @@ import type {
   Payout,
   PayoutStatus,
   ProviderFile,
+  ProviderKyc,
   ProviderRow,
   RatingRow,
   RecordKind,
@@ -203,6 +204,13 @@ export function createApi(transport: Transport) {
         p_provider_id: id,
         p_status: status,
         p_note: note,
+      }),
+
+    /** Audited with its reason; the audit never holds the values (0089). */
+    revealKyc: (id: string, reason: string) =>
+      transport.rpc<ProviderKyc>('ops_reveal_provider_kyc', {
+        p_provider_id: id,
+        p_reason: reason,
       }),
 
     forceOffline: (id: string, reason: string) =>

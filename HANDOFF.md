@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-88 migrations · 56 SQL suites (all pass) · tests/rls.spec.ts
+89 migrations · 57 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0088, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0089, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -234,7 +234,7 @@ as a user would. The fixes that matter beyond one screen:
 | --- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **ADR-0008 — payments, merchant of record, SAMA**                       | Real money. Authorise/capture/void/refund are interfaces over a dev provider; `payment_operations` is the queue a Moyasar worker would drain (today an operator carries them out by hand and records the reference) |
 | 2   | **ADR-0009 — ZATCA seller of record**                                   | Lawful invoices, and the credit note a refund needs                                                                                                                                                                 |
-| 3   | **ADR-0010 — PDPL** (region: Frankfurt)                                 | KYC sealing (so provider mode stays off), and counsel's sign-off on erasure-by-anonymisation (0070)                                                                                                                 |
+| 3   | **ADR-0010 — PDPL** (region: Frankfurt)                                 | Counsel's sign-off on the transfer basis, retention, and erasure-by-anonymisation (0070). KYC is sealed in Vault since 0089                                                                                         |
 | 4   | **SMS provider**: Authentica (wired, 0088) or Unifonic + CITC sender ID | Phone OTP, so any launch                                                                                                                                                                                            |
 | 5   | **Plate letter map** checked against an official source                 | ADR-0011; the logbook is keyed on plates                                                                                                                                                                            |
 | 6   | **Warranty options**                                                    | The technician chooses 30/90/180 days, default 30, no "none" — confirm                                                                                                                                              |
