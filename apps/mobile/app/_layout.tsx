@@ -51,6 +51,7 @@ import { i18next } from '@/features/shared/lib/i18n';
 import { configureNotificationPresentation } from '@/features/shared/lib/push';
 import { useMode } from '@/features/shared/state/mode';
 import { useSession } from '@/features/shared/state/session';
+import { CardFormHost } from '@/features/shared/components/CardFormHost';
 
 configureNotificationPresentation();
 
@@ -197,6 +198,8 @@ export default function RootLayout() {
               </VersionGate>
             </View>
             <Toast />
+            {/* Above every screen: payment can be asked for from any of them. */}
+            <CardFormHost />
           </View>
         </ThemeProvider>
       </SafeAreaProvider>

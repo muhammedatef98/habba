@@ -423,30 +423,38 @@ within a couple of seconds. If it does not,
 says why — `no_device` means the phone never registered (see §9, the EAS
 project id), `expired` means nothing called `push-tick` in time.
 
-### 7b. The payments function (only when payments go live)
+### 7b. The payments function
 
 `payments` (0077) verifies a Moyasar authorisation with the secret key and
 carries out queued captures, voids and refunds. It is off the payment path
-until the `payments_gateway` setting says `moyasar`; deploy it before that.
+until the `payments_gateway` setting says `moyasar`. Deploy it before that.
 
 ```bash
-supabase functions deploy payments          # JWT verified: customers call it
-supabase secrets set MOYASAR_SECRET_KEY=sk_live_… HABBA_PAYMENTS_TICK_SECRET=…
+supabase functions deploy payments --no-verify-jwt
 ```
+
+`--no-verify-jwt`: the tick comes from pg_cron with a shared secret, and
+`confirm` verifies the customer's session itself.
+
+The two secrets live in Vault (SQL editor). Nobody types the tick secret:
 
 ```sql
-select vault.create_secret('<HABBA_PAYMENTS_TICK_SECRET>', 'payments_tick_secret');
-
-select cron.schedule('habba-payments-tick', '30 seconds', $$
-  select net.http_post(
-    url     := 'https://<project-ref>.supabase.co/functions/v1/payments',
-    headers := jsonb_build_object('x-habba-tick',
-                 (select decrypted_secret from vault.decrypted_secrets where name = 'payments_tick_secret')),
-    body    := '{"action":"tick"}'::jsonb);
-$$);
+select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'payments_tick_secret');
+select vault.create_secret('sk_test_…', 'moyasar_secret_key');   -- 0092; sk_live_… for real money
 ```
 
-`docs/GO-LIVE.md` has the full switch-over, app side included.
+Then run `supabase/hosted/payments-tick-schedule.sql` (pg_cron every 30
+seconds).
+
+The app side: set `EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY=pk_test_…` (public by
+design) and restart Metro. The card form (`CardFormHost`) creates the payment
+with that key, authorise-only with 3-D Secure. Moyasar returns the customer to
+the console's `/pay/return`, which hands them back to the app. Then switch
+`payments_gateway` to `moyasar` in the console (الإعدادات → الدفع).
+
+Test cards (test keys only): `4111 1111 1111 1111`, any future expiry, any
+CVC, any name with two words. Moyasar's 3-D Secure test page lets you choose
+the outcome.
 
 ## 8. There is no report function to deploy
 

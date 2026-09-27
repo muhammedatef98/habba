@@ -975,5 +975,26 @@
     "gateAcceptFailed": "Couldn't record your acceptance. Try again.",
     "providerConsent": "I have read and accept the <provider_terms>Provider terms</provider_terms>.",
     "providerConsentRequired": "Accept the provider terms to send your application."
+  },
+  "cardForm": {
+    "title": "Pay by card",
+    "amount": "SAR {{amount}}",
+    "holdNote": "The amount is held on your card now, and only taken once you confirm the work is done.",
+    "name": "Name on card",
+    "number": "Card number",
+    "expiry": "Expiry",
+    "cvc": "Security code",
+    "pay": "Pay",
+    "secureNote": "mada, Visa and Mastercard. Your card details go straight to the payment gateway (Moyasar) and are never stored by Habba.",
+    "declined": "The payment was declined. Try another card or contact your bank.",
+    "declinedWith": "The payment was declined: {{reason}}",
+    "unverified": "The card could not be verified. Please try again.",
+    "network": "Could not reach the payment gateway. Check your connection and try again.",
+    "invalid": {
+      "name": "Enter the name as it appears on the card.",
+      "number": "That card number is not valid.",
+      "expiry": "The expiry date is wrong or has passed.",
+      "cvc": "The security code is 3 or 4 digits."
+    }
   }
 }

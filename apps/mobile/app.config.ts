@@ -58,6 +58,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // `payments` Edge Function (lib/payment-provider.ts).
     moyasarPublishableKey: env('EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY'),
 
+    // The console's /pay/return page, where Moyasar sends the customer after
+    // 3-D Secure (lib/moyasar-card-form.ts). Defaults to the production console.
+    paymentReturnUrl: env('EXPO_PUBLIC_PAYMENT_RETURN_URL'),
+
     // Where push tokens come from (expo-notifications reads it here). Not a
     // secret — it identifies the project, it does not authorise anything.
     // Absent, the app runs unchanged and simply registers for no pushes.

@@ -24,8 +24,10 @@ reset role;
 set role service_role;
 select test.assert(public.edge_provider_secret('authentica_api_key') is null,
   'without Vault (this harness) there is no key, and no error: the hook stays closed');
+select test.assert(public.edge_provider_secret('moyasar_secret_key') is null,
+  'the Moyasar key is one of them (0092), absent here like the others');
 select test.assert_raises($$select public.edge_provider_secret('push_tick_secret')$$,
-  'the service key reads only the two provider secrets, not the tick secrets', '22023');
+  'the service key reads only the provider secrets, not the tick secrets', '22023');
 reset role;
 
 rollback;

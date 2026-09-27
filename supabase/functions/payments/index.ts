@@ -30,9 +30,15 @@
  *     operator, who sees it in the console's finance page. Run it on the same
  *     schedule as dispatch-tick.
  *
+ * Secrets: the function's environment, or Vault — `moyasar_secret_key`
+ * (0092) and `payments_tick_secret` (0087).
+ *
  * Deploy:
- *   supabase secrets set MOYASAR_SECRET_KEY=sk_live_… HABBA_PAYMENTS_TICK_SECRET=…
- *   supabase functions deploy payments
+ *   supabase functions deploy payments --no-verify-jwt
+ *
+ * `--no-verify-jwt` because the tick comes from pg_cron with a shared secret,
+ * not a session. `confirm` does not rely on the gateway for the session: it
+ * verifies the bearer token itself with Supabase Auth, below.
  *
  * Then set `payments_gateway` to `moyasar` in the console's settings. Until
  * that setting changes, nothing here is on the payment path.
@@ -62,7 +68,7 @@ const SERVICE_KEY = resolveSecretKey({
   secretKeys: Deno.env.get('SUPABASE_SECRET_KEYS'),
   legacy: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
 });
-const MOYASAR_SECRET_KEY = Deno.env.get('MOYASAR_SECRET_KEY') ?? '';
+const MOYASAR_SECRET_KEY_ENV = Deno.env.get('MOYASAR_SECRET_KEY') ?? '';
 const TICK_SECRET = Deno.env.get('HABBA_PAYMENTS_TICK_SECRET') ?? '';
 /**
  * For a local run against a stand-in gateway only. Unset in every deployed
@@ -78,8 +84,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (request: Request) => {
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
-  if (MOYASAR_SECRET_KEY === '') return json({ error: 'gateway_not_configured' }, 503);
-
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
@@ -92,8 +96,14 @@ Deno.serve(async (request: Request) => {
     global: { fetch: apiKeyOnlyFetch(SERVICE_KEY, fetch) },
   });
 
-  if (body['action'] === 'confirm') return confirm(request, body, db, 'initial');
-  if (body['action'] === 'confirm_top_up') return confirm(request, body, db, 'top_up');
+  // Read per request, so a key put into (or rotated in) Vault needs no redeploy.
+  const secretKey = await resolveTickSecret(MOYASAR_SECRET_KEY_ENV, () =>
+    db.rpc('edge_provider_secret', { p_name: 'moyasar_secret_key' }),
+  );
+  if (secretKey === '') return json({ error: 'gateway_not_configured' }, 503);
+
+  if (body['action'] === 'confirm') return confirm(request, body, db, secretKey, 'initial');
+  if (body['action'] === 'confirm_top_up') return confirm(request, body, db, secretKey, 'top_up');
   if (body['action'] === 'tick') {
     const expected = await resolveTickSecret(TICK_SECRET, () =>
       db.rpc('edge_tick_secret', { p_name: 'payments_tick_secret' }),
@@ -101,7 +111,7 @@ Deno.serve(async (request: Request) => {
     if (!secretsMatch(request.headers.get('x-habba-tick'), expected)) {
       return new Response('Not found', { status: 404 });
     }
-    return tick(db);
+    return tick(db, secretKey);
   }
   return json({ error: 'bad_request' }, 400);
 });
@@ -110,6 +120,7 @@ async function confirm(
   request: Request,
   body: Record<string, unknown>,
   db: SupabaseClient,
+  secretKey: string,
   purpose: 'initial' | 'top_up',
 ): Promise<Response> {
   const orderId = typeof body['order_id'] === 'string' ? body['order_id'] : '';
@@ -143,7 +154,7 @@ async function confirm(
   const holdSar = Number(expected.data).toFixed(2);
   if (Number(holdSar) <= 0) return json({ error: 'nothing_due' }, 409);
 
-  const fetchRequest = fetchPaymentRequest(MOYASAR_SECRET_KEY, paymentId);
+  const fetchRequest = fetchPaymentRequest(secretKey, paymentId);
   let payment: MoyasarPayment;
   try {
     const response = await fetch(gatewayUrl(fetchRequest.url), fetchRequest.init);
@@ -178,7 +189,7 @@ interface ClaimedOperation {
   readonly payment_id: string;
 }
 
-async function tick(db: SupabaseClient): Promise<Response> {
+async function tick(db: SupabaseClient, secretKey: string): Promise<Response> {
   const claim = await db.rpc('claim_payment_operations', { p_limit: 20 });
   if (claim.error !== null) return json({ error: claim.error.message }, 500);
 
@@ -188,7 +199,7 @@ async function tick(db: SupabaseClient): Promise<Response> {
     let outcome: { ok: boolean; reference: string | null; error: string | null };
     try {
       const call = operationRequest(
-        MOYASAR_SECRET_KEY,
+        secretKey,
         operation.kind,
         operation.payment_id,
         Number(operation.amount).toFixed(2),

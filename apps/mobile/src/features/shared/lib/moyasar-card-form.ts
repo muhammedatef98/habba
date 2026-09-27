@@ -1,36 +1,33 @@
 /**
- * THE PLUG POINT for card payments: Moyasar's card form.
+ * Card payments through Moyasar, on the phone.
  *
- * Everything else about live payments is built — the `payments` Edge
- * Function verifies what this returns with the secret key, the database
- * records the hold only from there (0077), captures, voids and refunds run
- * from a queue. What is left is the one part that needs Moyasar's own UI on
- * the phone, which cannot be written without their SDK and a development
- * build (it is native code; Expo Go does not carry it).
+ * The customer types the card into Habba's own form (<CardFormHost>), and
+ * the phone creates the payment directly with Moyasar using the PUBLISHABLE
+ * key: authorise only (`manual`), 3-D Secure on, `metadata.order_id` set
+ * (@habba/core payments/moyasar-card.ts). The card number goes from the
+ * phone to Moyasar and nowhere else — not to Habba's servers, not to a log.
  *
- * To connect it:
+ * 3-D Secure opens in an in-app browser; Moyasar sends it back to the
+ * console's /pay/return page, which hands the result to the app's own link
+ * and closes the browser.
  *
- *   1. Add Moyasar's React Native SDK (see docs.moyasar.com → Mobile SDKs)
- *      and make a development build (`pnpm --filter @habba/mobile build:dev`).
- *   2. Replace `collectCardPayment` below with a function that shows the
- *      form and resolves when it closes. Configure it with:
- *        - `publishableKey`             — `request.publishableKey`
- *        - `amount`                     — `request.amountHalalas` (integer)
- *        - `currency`                   — 'SAR'
- *        - `description`                — `request.description`
- *        - `metadata: { order_id }`     — `request.orderId`. REQUIRED: the
- *                                         server refuses a payment made for
- *                                         any other order.
- *        - `manual: true`               — authorise only. The money is taken
- *                                         when the customer confirms the job.
- *        - networks: mada, visa, mastercard; Apple Pay with your merchant id.
- *   3. Set EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY, deploy the `payments`
- *      function with MOYASAR_SECRET_KEY, and switch `payments_gateway` to
- *      `moyasar` in the console. docs/GO-LIVE.md has the whole list.
- *
- * Until then this is null, and a build configured for Moyasar refuses to
- * take a payment ('card_form_unavailable') rather than pretending to.
+ * What comes back is only a payment id. The `payments` Edge Function then
+ * fetches that payment with the SECRET key and records the hold only if it
+ * is authorised, for this order, for the exact amount. Nothing the phone
+ * says about a payment is believed on its own.
  */
+
+import Constants from 'expo-constants';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import {
+  createCardPaymentRequest,
+  readCreatedPayment,
+  validateCard,
+  type CardField,
+  type CardInput,
+} from '@habba/core';
+import { useCardForm } from '@/features/shared/state/card-form';
 
 export interface CardPaymentRequest {
   readonly publishableKey: string;
@@ -46,4 +43,70 @@ export type CardPaymentResult =
 
 export type CardFormCollector = (request: CardPaymentRequest) => Promise<CardPaymentResult>;
 
-export const collectCardPayment: CardFormCollector | null = null;
+/** The form's answer to `authorise`: shown by <CardFormHost>, settled by it. */
+export const collectCardPayment: CardFormCollector = (request) =>
+  useCardForm.getState().open(request);
+
+/** Where Moyasar returns after 3-D Secure (the console's /pay/return page). */
+function returnPage(): string {
+  const configured = (Constants.expoConfig?.extra as { paymentReturnUrl?: string } | undefined)
+    ?.paymentReturnUrl;
+  return configured !== undefined && configured.trim() !== ''
+    ? configured.trim()
+    : 'https://habba-admin.vercel.app/pay/return';
+}
+
+export type CardAttempt =
+  | { readonly status: 'authorised'; readonly paymentId: string }
+  | { readonly status: 'invalid'; readonly fields: readonly CardField[] }
+  | { readonly status: 'declined'; readonly message: string }
+  | { readonly status: 'unverified' }
+  | { readonly status: 'network' };
+
+/**
+ * One attempt with the card as typed. The form stays open on anything but
+ * `authorised`, so the customer can fix a typo or try another card.
+ */
+export async function payWithCard(
+  request: CardPaymentRequest,
+  input: CardInput,
+): Promise<CardAttempt> {
+  const checked = validateCard(input);
+  if (!checked.ok) return { status: 'invalid', fields: checked.errors };
+
+  const appLink = Linking.createURL('pay-return');
+  const callbackUrl = `${returnPage()}?to=${encodeURIComponent(appLink)}`;
+
+  let created;
+  try {
+    const spec = createCardPaymentRequest(
+      request.publishableKey,
+      {
+        orderId: request.orderId,
+        amountHalalas: request.amountHalalas,
+        description: request.description,
+        callbackUrl,
+      },
+      checked.card,
+    );
+    const response = await fetch(spec.url, spec.init);
+    created = readCreatedPayment(response.status, await response.text());
+  } catch {
+    // Not the caught error: it can carry the request, and the request
+    // carries the card.
+    return { status: 'network' };
+  }
+
+  if (created.kind === 'failed') return { status: 'declined', message: created.message };
+  if (created.kind === 'authorised') return { status: 'authorised', paymentId: created.paymentId };
+
+  const session = await WebBrowser.openAuthSessionAsync(created.url, appLink);
+  if (session.type !== 'success') return { status: 'unverified' };
+
+  const returned = Linking.parse(session.url).queryParams ?? {};
+  if (returned['status'] === 'authorized') {
+    return { status: 'authorised', paymentId: created.paymentId };
+  }
+  const message = returned['message'];
+  return { status: 'declined', message: typeof message === 'string' ? message : '' };
+}

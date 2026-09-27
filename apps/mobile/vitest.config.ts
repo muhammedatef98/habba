@@ -32,6 +32,17 @@ export default defineConfig({
         find: /^expo-secure-store$/,
         replacement: path.resolve(__dirname, 'test/stubs/expo-secure-store.ts'),
       },
+      // The card form's browser and link helpers (lib/moyasar-card-form.ts),
+      // reached through data/repository.ts → payment-provider. Both are only
+      // called when a customer pays, which no unit test does.
+      {
+        find: /^expo-linking$/,
+        replacement: path.resolve(__dirname, 'test/stubs/expo-linking.ts'),
+      },
+      {
+        find: /^expo-web-browser$/,
+        replacement: path.resolve(__dirname, 'test/stubs/expo-web-browser.ts'),
+      },
       // `.js` specifiers are correct for tsc's Node resolution but there is no
       // build step here, so map them back onto the TypeScript sources — the
       // same retry metro.config.js performs.

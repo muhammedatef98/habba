@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-91 migrations · 59 SQL suites (all pass) · tests/rls.spec.ts
+92 migrations · 59 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0091, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0092, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -205,9 +205,9 @@ as a user would. The fixes that matter beyond one screen:
 ## 6b. The hosted project, as of 2026-09-27
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
-  0001–0091 applied. 0001–0053 were applied on 2026-09-05 by
+  0001–0092 applied. 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
-  0054–0091 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
+  0054–0092 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
   policy files are applied. The four `rls-…@habba.test` users are the RLS
   suite's fixtures, not people.
@@ -234,8 +234,12 @@ as a user would. The fixes that matter beyond one screen:
   leaked-password protection, a dashboard setting.
 - **Switched off until configured:** guest sign-in (`feature_guest_login` =
   false; turn on Anonymous sign-ins in Supabase first).
-- **Not yet done on the project:** the `payments` function (needs a Moyasar
-  key; the gateway setting is still `dev`), leaked-password protection
+- **Payments:** `payments` is deployed and its tick scheduled every 30 s
+  (`supabase/hosted/payments-tick-schedule.sql`). The card form is in the app
+  (`CardFormHost`, 3-D Secure back through the console's `/pay/return`).
+  Waiting on the owner: `moyasar_secret_key` in Vault, the publishable key
+  in the app's env, then `payments_gateway` → `moyasar` in the console.
+- **Not yet done on the project:** leaked-password protection
   (Authentication → Policies, one switch).
 
 ## 7. Open decisions — these block launch, and none is a coding task
@@ -252,7 +256,6 @@ as a user would. The fixes that matter beyond one screen:
 
 ## 8. Known incomplete (code)
 
-- **Payment provider worker** — waits on decision 1.
 - **ZATCA credit notes** — waits on decision 2.
 - **Real two-phone run** — every flow is proven by integration tests through
   the app's own repositories, but never by two people on two devices.

@@ -38,6 +38,7 @@
     "expo-secure-store": "~57.0.1",
     "expo-sharing": "^57.0.18",
     "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.3",
     "i18next": "^25.7.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",

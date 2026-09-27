@@ -8,6 +8,7 @@ export * from './text/bidi.js';
 export * from './money/sar.js';
 // Integer halalas for a payment gateway (Moyasar counts in them).
 export { toHalalas as halalasOf } from './payments/moyasar.js';
+export * from './payments/moyasar-card.js';
 export * from './report/types.js';
 export * from './report/labels.js';
 export * from './report/render.js';
