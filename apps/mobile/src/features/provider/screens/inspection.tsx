@@ -16,7 +16,8 @@
  */
 
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +29,10 @@ import {
 } from '@/features/provider/data/provider-repository';
 
 const RATINGS: readonly ItemRating[] = ['pass', 'attention', 'fail', 'na'];
+
+/** The server's limit per item (0090): enough to show a fault, not an album. */
+const MAX_PHOTOS_PER_ITEM = 4;
+const CAMERA_DENIED = 'camera_denied';
 
 type Results = Record<string, Record<string, InspectionResultEntry>>;
 
@@ -57,6 +62,9 @@ export default function InspectionScreen() {
   const [year, setYear] = useState('');
   const [mileage, setMileage] = useState('');
   const [filed, setFiled] = useState<FiledInspection | null>(null);
+  // What the camera took, by `section.item`, shown until the report is filed.
+  const [previews, setPreviews] = useState<Record<string, readonly string[]>>({});
+  const [photoError, setPhotoError] = useState<{ key: string; message: string } | null>(null);
 
   const sections = template.data?.sections ?? [];
   const progress = useMemo(() => inspectionProgress(sections, results), [sections, results]);
@@ -92,6 +100,58 @@ export default function InspectionScreen() {
         [item]: { ...current[section]?.[item], rating },
       },
     }));
+
+  /**
+   * Camera only, uploaded at once — the same rule as the completion photos:
+   * a picture of this car, taken here, and a failed upload reported beside
+   * the item while the inspector is still standing at it.
+   */
+  const capture = useMutation({
+    mutationFn: async ({ section, item }: { section: string; item: string }) => {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) throw new Error(CAMERA_DENIED);
+      const shot = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.6,
+        exif: false,
+      });
+      const asset = shot.canceled ? undefined : shot.assets[0];
+      if (asset === undefined) return null;
+      const reference = await providerRepository.uploadInspectionPhoto(
+        id ?? '',
+        section,
+        item,
+        asset.uri,
+      );
+      return { section, item, reference, preview: asset.uri };
+    },
+    onMutate: () => setPhotoError(null),
+    onSuccess: (shot) => {
+      if (shot === null) return;
+      setResults((current) => {
+        const entry = current[shot.section]?.[shot.item];
+        if (entry === undefined) return current;
+        return {
+          ...current,
+          [shot.section]: {
+            ...current[shot.section],
+            [shot.item]: { ...entry, photos: [...(entry.photos ?? []), shot.reference] },
+          },
+        };
+      });
+      const key = `${shot.section}.${shot.item}`;
+      setPreviews((current) => ({ ...current, [key]: [...(current[key] ?? []), shot.preview] }));
+    },
+    onError: (cause: unknown, target) => {
+      setPhotoError({
+        key: `${target.section}.${target.item}`,
+        message:
+          cause instanceof Error && cause.message === CAMERA_DENIED
+            ? t('provider.cameraDenied')
+            : t('provider.photoUploadFailed'),
+      });
+    },
+  });
 
   const note = (section: string, item: string, text: string) =>
     setResults((current) => {
@@ -264,6 +324,22 @@ export default function InspectionScreen() {
                     placeholder={t('inspection.notePlaceholder')}
                   />
                 ) : null}
+                {entry !== undefined && entry.rating !== 'na' ? (
+                  <ItemPhotos
+                    previews={previews[`${section.key}.${item.key}`] ?? []}
+                    label={item.label_ar}
+                    busy={
+                      capture.isPending &&
+                      capture.variables?.section === section.key &&
+                      capture.variables.item === item.key
+                    }
+                    error={
+                      photoError?.key === `${section.key}.${item.key}` ? photoError.message : null
+                    }
+                    onAdd={() => capture.mutate({ section: section.key, item: item.key })}
+                    testID={`photo-${section.key}-${item.key}`}
+                  />
+                ) : null}
               </View>
             );
           })}
@@ -290,5 +366,59 @@ export default function InspectionScreen() {
       />
       <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
+  );
+}
+
+/**
+ * An item's photos: what was taken, and the button for one more. Optional
+ * everywhere, and worth most on a fault — a buyer believes a photo of the
+ * leak more than the word «خلل».
+ */
+function ItemPhotos({
+  previews,
+  label,
+  busy,
+  error,
+  onAdd,
+  testID,
+}: {
+  readonly previews: readonly string[];
+  readonly label: string;
+  readonly busy: boolean;
+  readonly error: string | null;
+  readonly onAdd: () => void;
+  readonly testID: string;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const full = previews.length >= MAX_PHOTOS_PER_ITEM;
+
+  return (
+    <View style={{ gap: theme.spacing.xs }}>
+      <Row gap="xs" align="center" wrap>
+        {previews.map((uri, index) => (
+          <Image
+            key={uri}
+            source={{ uri }}
+            accessibilityLabel={t('inspection.photoOf', { item: label, number: index + 1 })}
+            style={{ width: 56, height: 56, borderRadius: theme.radius.md }}
+          />
+        ))}
+        <Button
+          testID={testID}
+          label={full ? t('inspection.photosFull') : t('inspection.addPhoto')}
+          variant="secondary"
+          size="medium"
+          onPress={onAdd}
+          loading={busy}
+          disabled={full}
+        />
+      </Row>
+      {error !== null ? (
+        <Text variant="caption" tone="emergency">
+          {error}
+        </Text>
+      ) : null}
+    </View>
   );
 }

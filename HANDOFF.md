@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-89 migrations · 57 SQL suites (all pass) · tests/rls.spec.ts
+90 migrations · 58 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0089, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0090, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -243,8 +243,6 @@ as a user would. The fixes that matter beyond one screen:
 
 ## 8. Known incomplete (code)
 
-- **Inspection photos per item** — the form rates and annotates; it does not
-  attach a photo to an item yet.
 - **Payment provider worker** — waits on decision 1.
 - **ZATCA credit notes** — waits on decision 2.
 - **Real two-phone run** — every flow is proven by integration tests through

@@ -905,7 +905,10 @@
     "jobCardTodo": "Fill in the report item by item before handing back.",
     "jobCardFiled": "Report submitted.",
     "jobCardAction": "Fill in the report",
-    "blocksHandBack": "The job cannot be handed back before the inspection report is submitted."
+    "blocksHandBack": "The job cannot be handed back before the inspection report is submitted.",
+    "addPhoto": "Add a photo",
+    "photosFull": "Photo limit reached",
+    "photoOf": "Photo {{number}}: {{item}}"
   },
   "inspectionReport": {
     "title": "Inspection report",

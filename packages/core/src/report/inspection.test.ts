@@ -66,6 +66,32 @@ describe('collectFindings', () => {
     expect(findings.every((f) => f.rating === 'fail' || f.rating === 'attention')).toBe(true);
   });
 
+  test("carries an item's photos with it, and adds nothing where there are none", () => {
+    const withPhoto: InspectionReport = {
+      ...REPORT,
+      results: Object.fromEntries(
+        Object.entries(REPORT.results).map(([section, items]) => [
+          section,
+          Object.fromEntries(
+            Object.entries(items).map(([item, entry]) => [
+              item,
+              entry.rating === 'fail'
+                ? { ...entry, photos: ['storage://completion-media/o/insp-a.jpg'] }
+                : entry,
+            ]),
+          ),
+        ]),
+      ),
+    };
+
+    const findings = collectFindings(withPhoto);
+    expect(findings.filter((f) => f.rating === 'fail').every((f) => f.photos?.length === 1)).toBe(
+      true,
+    );
+    expect(findings.filter((f) => f.rating !== 'fail').every((f) => !('photos' in f))).toBe(true);
+    expect(collectFindings(REPORT).every((f) => !('photos' in f))).toBe(true);
+  });
+
   test('orders by what it costs to fix, not by template order', () => {
     // Accident evidence (weight 4 × section 4, failing) must outrank a torn
     // seat (weight 1 × section 1) even though the seat comes first in the

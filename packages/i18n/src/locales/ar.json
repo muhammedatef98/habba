@@ -1029,7 +1029,10 @@
     "jobCardTodo": "عبّئ التقرير بنداً بنداً قبل تسليم العمل.",
     "jobCardFiled": "قُدّم التقرير.",
     "jobCardAction": "تعبئة التقرير",
-    "blocksHandBack": "لا يُسلَّم العمل قبل تقديم تقرير الفحص."
+    "blocksHandBack": "لا يُسلَّم العمل قبل تقديم تقرير الفحص.",
+    "addPhoto": "أضف صورة",
+    "photosFull": "اكتملت الصور",
+    "photoOf": "صورة {{number}}: {{item}}"
   },
   "inspectionReport": {
     "title": "تقرير الفحص",

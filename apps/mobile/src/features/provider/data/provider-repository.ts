@@ -171,6 +171,13 @@ export interface ProviderRepository {
    * Files the report (0026). Scored by the server, never here; once filed it
    * is final — it is evidence, and the order holds exactly one.
    */
+  /** One item's photo, into the order's folder; returns its storage reference. */
+  uploadInspectionPhoto(
+    orderId: string,
+    section: string,
+    item: string,
+    localUri: string,
+  ): Promise<string>;
   submitInspection(
     orderId: string,
     templateKey: string,
@@ -352,6 +359,27 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`uploadEvidencePhoto: ${error.message}`);
 
     return { url: storageRef(COMPLETION_MEDIA_BUCKET, path), kind };
+  }
+
+  async uploadInspectionPhoto(
+    orderId: string,
+    section: string,
+    item: string,
+    localUri: string,
+  ): Promise<string> {
+    const body = await (await fetch(localUri)).arrayBuffer();
+    // Directly in the order's folder, named `insp-…`: the bucket authorises on
+    // the first segment, and submit_inspection_report() accepts only this
+    // order's inspection photos (0090).
+    const safe = (key: string) => key.replace(/[^A-Za-z0-9_]/g, '_');
+    const path = `${orderId}/insp-${safe(section)}-${safe(item)}-${Date.now()}.jpg`;
+
+    const { error } = await this.client.storage
+      .from(COMPLETION_MEDIA_BUCKET)
+      .upload(path, body, { contentType: 'image/jpeg', upsert: false });
+    if (error !== null) throw new Error(`uploadInspectionPhoto: ${error.message}`);
+
+    return storageRef(COMPLETION_MEDIA_BUCKET, path);
   }
 
   async getInspectionTemplate(key: string): Promise<InspectionTemplate | null> {
@@ -684,6 +712,16 @@ export class InMemoryProviderRepository implements ProviderRepository {
     localUri: string,
   ): Promise<CompletionMediaItem> {
     return { url: localUri, kind };
+  }
+
+  // As with evidence photos: no storage here, so the camera's file stands in.
+  async uploadInspectionPhoto(
+    _orderId: string,
+    _section: string,
+    _item: string,
+    localUri: string,
+  ): Promise<string> {
+    return localUri;
   }
 
   async getInspectionTemplate(key: string): Promise<InspectionTemplate | null> {

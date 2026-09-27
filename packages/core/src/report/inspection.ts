@@ -78,14 +78,19 @@ const RECOMMENDATION_AR: Record<Recommendation, string> = {
  * A buyer needs "what is wrong with this car" before "what did it score".
  * Leading with a number invites them to stop reading at a reassuring one.
  */
-export function collectFindings(
-  report: InspectionReport,
-): Array<{ section: string; label: string; rating: ItemRating; note?: string }> {
+export function collectFindings(report: InspectionReport): Array<{
+  section: string;
+  label: string;
+  rating: ItemRating;
+  note?: string;
+  photos?: readonly string[];
+}> {
   const findings: Array<{
     section: string;
     label: string;
     rating: ItemRating;
     note?: string;
+    photos?: readonly string[];
     weight: number;
   }> = [];
 
@@ -101,6 +106,9 @@ export function collectFindings(
         label: item.label_ar,
         rating: entry.rating,
         ...(entry.note === undefined ? {} : { note: entry.note }),
+        ...(entry.photos === undefined || entry.photos.length === 0
+          ? {}
+          : { photos: entry.photos }),
         // Sorted by what it costs to fix, not by template order.
         weight: (item.weight ?? 1) * (section.weight ?? 1) * (entry.rating === 'fail' ? 2 : 1),
       });

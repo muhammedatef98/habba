@@ -21,6 +21,7 @@ import { repository } from '@/features/shared/data/repository';
 import type { OrderInspection } from '@/features/shared/data/types';
 import { inspectionDocument } from '@/features/shared/lib/report-pdf';
 import { DocumentActions } from '@/features/shared/components/DocumentActions';
+import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 
 export function InspectionReportCard({
   inspection,
@@ -82,6 +83,21 @@ export function InspectionReportCard({
                 <Text variant="caption" tone="muted">
                   {finding.note}
                 </Text>
+              ) : null}
+              {finding.photos !== undefined && finding.photos.length > 0 ? (
+                <Row gap="xs" wrap>
+                  {finding.photos.map((photo, photoIndex) => (
+                    <EvidencePhoto
+                      key={photo}
+                      reference={photo}
+                      size={72}
+                      accessibilityLabel={t('inspection.photoOf', {
+                        item: finding.label,
+                        number: photoIndex + 1,
+                      })}
+                    />
+                  ))}
+                </Row>
               ) : null}
             </View>
           ))
