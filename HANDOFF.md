@@ -202,12 +202,12 @@ as a user would. The fixes that matter beyond one screen:
 - **Register.** The dialect test also catches spoken negation and future
   («ما عندك», «ما فيه», «بيظهر», «تسوي شي», «يشتغل»…).
 
-## 6b. The hosted project, as of 2026-09-25
+## 6b. The hosted project, as of 2026-09-27
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
-  0001–0088 applied. 0001–0053 were applied on 2026-09-05 by
+  0001–0091 applied. 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
-  0054–0088 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
+  0054–0091 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
   policy files are applied. The four `rls-…@habba.test` users are the RLS
   suite's fixtures, not people.
@@ -221,23 +221,32 @@ as a user would. The fixes that matter beyond one screen:
   deployed and called by a trigger on every `notification_outbox` insert plus
   a one-minute pg_cron safety net; its secret is only in Vault
   (`push_tick_secret`, read through 0087). The three jobs 0056/0062 schedule
-  are active.
+  are active. `pg_net` lives in the `extensions` schema.
+- **Sign-in:** phone OTP through the Send SMS hook (`send-sms-hook`,
+  Authentica; the hook secret and API key are in Vault, read through 0088),
+  and email OTP over the owner's SMTP. The hook refuses non-Saudi numbers.
+- **Provider sign-up is open** (`feature_provider_applications` = true). The
+  ID and IBAN are sealed in Vault (0089); the first application creates the
+  `kyc_digest_key` secret.
+- **Security advisor:** what remains is intended — definer functions that
+  are the client API and check their caller, five internal tables with RLS
+  and no policies, the public report readers for `anon` — plus
+  leaked-password protection, a dashboard setting.
 - **Switched off until configured:** guest sign-in (`feature_guest_login` =
   false; turn on Anonymous sign-ins in Supabase first).
-- **Not yet done on the project:** the SMS hook (phone sign-in, needs a
-  Unifonic account), the `payments` function (needs a Moyasar key; the
-  gateway setting is still `dev`), leaked-password protection.
+- **Not yet done on the project:** the `payments` function (needs a Moyasar
+  key; the gateway setting is still `dev`), leaked-password protection
+  (Authentication → Policies, one switch).
 
 ## 7. Open decisions — these block launch, and none is a coding task
 
-| #   | Decision                                                                | Blocks                                                                                                                                                                                                              |
-| --- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **ADR-0008 — payments, merchant of record, SAMA**                       | Real money. Authorise/capture/void/refund are interfaces over a dev provider; `payment_operations` is the queue a Moyasar worker would drain (today an operator carries them out by hand and records the reference) |
-| 2   | **ADR-0009 — ZATCA seller of record**                                   | Lawful invoices, and the credit note a refund needs                                                                                                                                                                 |
-| 3   | **ADR-0010 — PDPL** (region: Frankfurt)                                 | Counsel's sign-off on the transfer basis, retention, and erasure-by-anonymisation (0070). KYC is sealed in Vault since 0089                                                                                         |
-| 4   | **SMS provider**: Authentica (wired, 0088) or Unifonic + CITC sender ID | Phone OTP, so any launch                                                                                                                                                                                            |
-| 5   | **Plate letter map** checked against an official source                 | ADR-0011; the logbook is keyed on plates                                                                                                                                                                            |
-| 6   | **Warranty options**                                                    | The technician chooses 30/90/180 days, default 30, no "none" — confirm                                                                                                                                              |
+| #   | Decision                                                | Blocks                                                                                                                                                                                                              |
+| --- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **ADR-0008 — payments, merchant of record, SAMA**       | Real money. Authorise/capture/void/refund are interfaces over a dev provider; `payment_operations` is the queue a Moyasar worker would drain (today an operator carries them out by hand and records the reference) |
+| 2   | **ADR-0009 — ZATCA seller of record**                   | Lawful invoices, and the credit note a refund needs                                                                                                                                                                 |
+| 3   | **ADR-0010 — PDPL** (region: Frankfurt)                 | Counsel's sign-off on the transfer basis, retention, and erasure-by-anonymisation (0070). KYC is sealed in Vault since 0089                                                                                         |
+| 4   | **Plate letter map** checked against an official source | ADR-0011; the logbook is keyed on plates                                                                                                                                                                            |
+| 5   | **Warranty options**                                    | The technician chooses 30/90/180 days, default 30, no "none" — confirm                                                                                                                                              |
 
 ---
 
