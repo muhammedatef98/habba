@@ -21,7 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { parsePlate } from '@habba/core';
 import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
-import { ChipRow } from '@/features/customer/components/form/ChipRow';
+import { ChipRow } from '@/features/shared/components/form/ChipRow';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 

@@ -44,4 +44,14 @@ describe('splitTagged', () => {
       { text: 'see <terms>the terms', tag: null },
     ]);
   });
+
+  test('a tag with an underscore is a link, not raw text', () => {
+    expect(splitTagged('قرأت <provider_terms>شروط مقدّمي الخدمة</provider_terms> وأوافق.')).toEqual(
+      [
+        { text: 'قرأت ', tag: null },
+        { text: 'شروط مقدّمي الخدمة', tag: 'provider_terms' },
+        { text: ' وأوافق.', tag: null },
+      ],
+    );
+  });
 });

@@ -20,7 +20,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@habba/ui';
 import { toLatinDigits } from '@habba/core';
-import { ChipRow } from './ChipRow';
+import { ChipRow } from '@/features/shared/components/form/ChipRow';
 
 export interface DateChipsProps {
   /** `YYYY-MM-DD`. */

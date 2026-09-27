@@ -17,9 +17,10 @@ import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isValidNationalId, isValidSaudiIban, normaliseIban, toLatinDigits } from '@habba/core';
-import { Button, Card, Field, ListRow, Row, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Field, Row, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { ConsentCheck } from '@/features/shared/components/ConsentCheck';
+import { ChipRow } from '@/features/shared/components/form/ChipRow';
 import { useLegalDocument } from '@/features/shared/components/LegalDocumentView';
 import { useCanApplyAsProvider } from '@/features/shared/hooks/use-roles';
 import { useIsAuthenticated } from '@/features/shared/state/session';
@@ -164,20 +165,16 @@ export default function BecomeProviderScreen() {
         onChangeText={setBusinessName}
       />
 
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="label" tone="muted">
-          {t('provider.upgrade.cityLabel')}
-        </Text>
-        {(cities.data ?? []).map((city) => (
-          <ListRow
-            key={city.id}
-            testID={`city-${city.id}`}
-            title={isArabic ? city.nameAr : city.nameEn}
-            selected={cityId === city.id}
-            onPress={() => setCityId(city.id)}
-          />
-        ))}
-      </View>
+      <ChipRow
+        label={t('provider.upgrade.cityLabel')}
+        options={(cities.data ?? []).map((city) => ({
+          key: city.id,
+          label: isArabic ? city.nameAr : city.nameEn,
+        }))}
+        selected={cityId}
+        onSelect={setCityId}
+        testIdPrefix="city"
+      />
 
       <Field
         testID="national-id"

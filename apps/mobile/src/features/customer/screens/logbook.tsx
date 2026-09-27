@@ -36,6 +36,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PlateBadge } from '@/features/customer/components/PlateBadge';
 import {
   Button,
   Card,
@@ -240,9 +241,7 @@ export default function LogbookScreen() {
           }}
         >
           {car?.plateNormalised != null ? (
-            <Text variant="bodySmall" tone="muted" numeric>
-              {car.plateNormalised}
-            </Text>
+            <PlateBadge plate={car.plateNormalised} variant="compact" />
           ) : null}
           {events.length > 0 ? (
             <Text variant="bodySmall" tone="subtle">

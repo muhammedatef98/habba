@@ -29,7 +29,7 @@ export interface TaggedSegment {
  */
 export function splitTagged(sentence: string): readonly TaggedSegment[] {
   const segments: TaggedSegment[] = [];
-  const pattern = /<([a-z]+)>(.*?)<\/\1>/g;
+  const pattern = /<([a-z_]+)>(.*?)<\/\1>/g;
   let last = 0;
   for (const match of sentence.matchAll(pattern)) {
     const start = match.index;

@@ -20,6 +20,7 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { parsePlate, toArabicIndicDigits } from '@habba/core';
+import { useTranslation } from 'react-i18next';
 import { Text, alignStartFor, useTheme } from '@habba/ui';
 
 export interface PlateBadgeProps {
@@ -32,6 +33,7 @@ export interface PlateBadgeProps {
 
 export function PlateBadge({ plate, variant = 'full', testID }: PlateBadgeProps) {
   const theme = useTheme();
+  const { i18n } = useTranslation();
   const parsed = parsePlate(plate);
 
   // An unparseable plate is still the customer's plate: it was accepted at
@@ -51,11 +53,13 @@ export function PlateBadge({ plate, variant = 'full', testID }: PlateBadgeProps)
   const arabicLine = `${[...lettersAr].join(' ')} ${toArabicIndicDigits(digits)}`;
   const latinLine = `${[...lettersEn].join(' ')} ${digits}`;
 
+  // One line, in the reader's own script: an Arabic reader reads the plate
+  // the way it is printed on the car, not its Latin transliteration.
   if (variant === 'compact') {
     return (
       <Badge testID={testID}>
         <Text variant="caption" tone="subtle" numeric>
-          {latinLine}
+          {i18n.language.startsWith('ar') ? arabicLine : latinLine}
         </Text>
       </Badge>
     );

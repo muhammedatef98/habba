@@ -41,6 +41,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PlateBadge } from '@/features/customer/components/PlateBadge';
 import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
 import {
   BottomSheet,
@@ -221,9 +222,7 @@ export default function TransferScreen() {
         </Text>
         <Text variant="title">{carLabel}</Text>
         {car?.plateNormalised != null ? (
-          <Text variant="bodySmall" tone="muted" numeric>
-            {car.plateNormalised}
-          </Text>
+          <PlateBadge plate={car.plateNormalised} variant="compact" />
         ) : null}
       </View>
 
@@ -304,7 +303,7 @@ export default function TransferScreen() {
               testID="transfer-report"
               load={loadReport}
               viewLabel={t('documents.viewReport')}
-              viewVariant="accent"
+              viewVariant="secondary"
               onPrepared={() => {
                 setReportReady(true);
                 setReportError(null);

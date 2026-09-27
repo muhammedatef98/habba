@@ -22,7 +22,7 @@ export interface DocumentActionsProps {
   readonly load: () => Promise<ViewableDocument>;
   readonly viewLabel: string;
   /** The view button's weight; the share button is always the quieter one. */
-  readonly viewVariant?: 'primary' | 'accent' | undefined;
+  readonly viewVariant?: 'primary' | 'accent' | 'secondary' | undefined;
   /** Once, when the document first exists — for a screen that confirms it. */
   readonly onPrepared?: (() => void) | undefined;
   /** For a failure to build the document (the share sheet's own is handled here). */
