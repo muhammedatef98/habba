@@ -27,6 +27,7 @@ import {
   providerRepository,
   type FiledInspection,
 } from '@/features/provider/data/provider-repository';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 const RATINGS: readonly ItemRating[] = ['pass', 'attention', 'fail', 'na'];
 
@@ -169,7 +170,6 @@ export default function InspectionScreen() {
         <Text variant="body" tone="muted">
           {job.isLoading || template.isLoading ? t('common.loading') : t('errors.notFound')}
         </Text>
-        <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -200,6 +200,7 @@ export default function InspectionScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{template.data?.nameAr ?? t('inspection.title')}</Text>
         <Text testID="inspection-progress" variant="caption" tone="muted" numeric>
@@ -364,7 +365,6 @@ export default function InspectionScreen() {
         loading={submit.isPending}
         disabled={!ready}
       />
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

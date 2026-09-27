@@ -24,6 +24,7 @@ import { ChipRow } from '@/features/shared/components/form/ChipRow';
 import { useLegalDocument } from '@/features/shared/components/LegalDocumentView';
 import { useCanApplyAsProvider } from '@/features/shared/hooks/use-roles';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 type ProviderType = 'individual' | 'workshop';
 
@@ -132,6 +133,7 @@ export default function BecomeProviderScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar label={t('settings.title')} />
       <Text variant="title">{t('provider.upgrade.title')}</Text>
       <Text variant="body" tone="muted">
         {t('provider.upgrade.subtitle')}

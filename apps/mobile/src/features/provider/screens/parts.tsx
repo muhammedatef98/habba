@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { canQuoteParts, multiplySar, sar } from '@habba/core';
@@ -24,6 +24,7 @@ import { Button, Card, Field, Row, Screen, StatusPill, Text, useTheme } from '@h
 import { providerRepository, type QuotedPart } from '@/features/provider/data/provider-repository';
 import { useLiveRefresh } from '@/features/shared/lib/live';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 type FormError = 'name' | 'quantity' | 'price' | 'warranty';
 
@@ -134,6 +135,7 @@ export default function PartsScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('provider.partsTitle')}</Text>
         <Text variant="body" tone="muted">
@@ -291,8 +293,6 @@ export default function PartsScreen() {
           />
         </Card>
       ) : null}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

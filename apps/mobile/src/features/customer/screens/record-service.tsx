@@ -29,6 +29,7 @@ import { useIsAuthenticated } from '@/features/shared/state/session';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { FeatureUnavailable } from '@/features/shared/components/FeatureUnavailable';
 import { DateChips } from '@/features/customer/components/form/DateChips';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 interface FieldErrors {
   summary?: string | undefined;
@@ -184,6 +185,7 @@ export default function RecordServiceScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar label={t('logbook.title')} />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('logbook.recordTitle')}</Text>
         <Text variant="body" tone="muted">

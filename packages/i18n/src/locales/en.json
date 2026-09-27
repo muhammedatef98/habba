@@ -67,7 +67,10 @@
     "codeLabel": "Code",
     "nameOptionalHint": "Optional — we use it to address you.",
     "otpLabel": "Verification code",
-    "changePhone": "Change phone number"
+    "changePhone": "Change phone number",
+    "valueHelp": "A technician comes to you, day or night",
+    "valueLogbook": "A service record that raises your car's resale value",
+    "valuePayment": "You're only charged after you confirm the work is done"
   },
   "vehicle": {
     "addTitle": "Add your vehicle",

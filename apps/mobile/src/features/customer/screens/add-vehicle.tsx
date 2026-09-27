@@ -24,6 +24,7 @@ import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
 import { ChipRow } from '@/features/shared/components/form/ChipRow';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 26 }, (_, index) => CURRENT_YEAR + 1 - index);
@@ -156,6 +157,7 @@ export default function AddVehicleScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('vehicle.addTitle')}</Text>
         <Text variant="body" tone="muted">

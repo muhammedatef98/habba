@@ -41,6 +41,7 @@ import { formatCount, formatShortDate } from '@/features/shared/lib/format-numbe
 import { daysUntil } from '@/features/shared/lib/transfer-window';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 import type { IncomingTransfer } from '@/features/shared/data/types';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 const CODE_LENGTH = 6;
 
@@ -95,6 +96,7 @@ export default function AcceptTransferScreen() {
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
+      <BackBar />
       {incoming.isError ? (
         <ErrorState
           testID="accept-error"
@@ -110,6 +112,7 @@ export default function AcceptTransferScreen() {
         // not verified" and "expired" — one answer for all three, because the
         // server gives one answer for all three.
         <EmptyState
+          iconName="home"
           testID="accept-empty"
           title={t('transfer.errors.gone')}
           body={t('transfer.verifiedNotice')}
@@ -213,8 +216,6 @@ export default function AcceptTransferScreen() {
           </Text>
         </>
       )}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

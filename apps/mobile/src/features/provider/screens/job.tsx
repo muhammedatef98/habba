@@ -23,6 +23,7 @@ import { useLiveRefresh } from '@/features/shared/lib/live';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
 import { formatAppointment } from '@/features/shared/lib/dates';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 export default function JobScreen() {
   const { t, i18n } = useTranslation();
@@ -120,7 +121,6 @@ export default function JobScreen() {
         <Text variant="body" tone="muted">
           {job.isLoading ? t('common.loading') : t('errors.notFound')}
         </Text>
-        <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -152,6 +152,7 @@ export default function JobScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{data.serviceNameAr}</Text>
         <Text variant="caption" tone="muted">
@@ -337,8 +338,6 @@ export default function JobScreen() {
           loading={decline.isPending}
         />
       ) : null}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

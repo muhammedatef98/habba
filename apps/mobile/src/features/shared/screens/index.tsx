@@ -17,7 +17,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
-import { Button, Field, HabbaWordmark, Row, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Field, HabbaWordmark, Icon, Row, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/features/shared/lib/otp';
 import { repository } from '@/features/shared/data/repository';
 import { LegalConsent } from '@/features/shared/components/LegalConsent';
@@ -110,6 +110,36 @@ export default function PhoneScreen() {
           <Text variant="body" tone="muted">
             {t('auth.welcomeSubtitle')}
           </Text>
+        </View>
+
+        {/* What Habba is, in three lines, before it asks for a number: the
+            first screen is also the only advert the app gets. */}
+        <View style={{ gap: theme.spacing.sm }}>
+          {(
+            [
+              ['tow', 'auth.valueHelp'],
+              ['inspection', 'auth.valueLogbook'],
+              ['check', 'auth.valuePayment'],
+            ] as const
+          ).map(([icon, key]) => (
+            <Row key={key} gap="md">
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: theme.radius.full,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.colors.primarySubtle,
+                }}
+              >
+                <Icon name={icon} size={theme.iconSize.sm} color={theme.colors.primary} />
+              </View>
+              <Text variant="bodySmall" style={{ flex: 1 }}>
+                {t(key)}
+              </Text>
+            </Row>
+          ))}
         </View>
 
         <Field

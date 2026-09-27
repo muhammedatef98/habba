@@ -16,7 +16,6 @@ import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   Card,
   ErrorState,
   FadeIn,
@@ -28,12 +27,14 @@ import {
   rowDirectionFor,
   useTheme,
 } from '@habba/ui';
+import { EmptyState } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import type { InvoiceSummary } from '@/features/shared/data/types';
 import { formatShortDate } from '@/features/shared/lib/format-number';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { invoiceDocument } from '@/features/shared/lib/report-pdf';
 import { useDocumentViewer } from '@/features/shared/state/document-viewer';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 export default function InvoicesScreen() {
   const { t, i18n } = useTranslation();
@@ -60,11 +61,10 @@ export default function InvoicesScreen() {
     onError: () => setFailed(true),
   });
 
-  const back = <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />;
-
   if (invoices.isPending) {
     return (
       <Screen style={{ gap: theme.spacing.lg }}>
+        <BackBar label={t('settings.title')} />
         <Text variant="title">{t('invoices.title')}</Text>
         <View
           accessibilityRole="progressbar"
@@ -81,6 +81,7 @@ export default function InvoicesScreen() {
   if (invoices.isError) {
     return (
       <Screen style={{ gap: theme.spacing.lg }}>
+        <BackBar label={t('settings.title')} />
         <Text variant="title">{t('invoices.title')}</Text>
         <ErrorState
           testID="invoices-error"
@@ -89,7 +90,6 @@ export default function InvoicesScreen() {
           retrying={invoices.isFetching}
           onRetry={() => void invoices.refetch()}
         />
-        {back}
       </Screen>
     );
   }
@@ -98,6 +98,7 @@ export default function InvoicesScreen() {
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
+      <BackBar label={t('settings.title')} />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('invoices.title')}</Text>
         <Text variant="bodySmall" tone="muted">
@@ -106,12 +107,12 @@ export default function InvoicesScreen() {
       </View>
 
       {rows.length === 0 ? (
-        <Card testID="invoices-empty" elevation="none" style={{ gap: theme.spacing.sm }}>
-          <Text variant="bodyStrong">{t('invoices.empty')}</Text>
-          <Text variant="bodySmall" tone="muted">
-            {t('invoices.emptyBody')}
-          </Text>
-        </Card>
+        <EmptyState
+          testID="invoices-empty"
+          iconName="wallet"
+          title={t('invoices.empty')}
+          body={t('invoices.emptyBody')}
+        />
       ) : (
         <Card elevation="none" style={{ paddingVertical: theme.spacing.xs }}>
           {rows.map((invoice, index) => (
@@ -140,8 +141,6 @@ export default function InvoicesScreen() {
           {t('invoices.openFailed')}
         </Text>
       ) : null}
-
-      {back}
     </Screen>
   );
 }

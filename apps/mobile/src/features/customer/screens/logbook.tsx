@@ -66,6 +66,7 @@ import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicl
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 import type { MaintenanceItem } from '@/features/shared/data/types';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 /**
  * «ذكّرني لاحقاً» defers by a fortnight, matching `care_default_snooze_days()`
@@ -228,10 +229,8 @@ export default function LogbookScreen() {
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
+      <BackBar label={t('logbook.title')} />
       <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="label" tone="muted">
-          {t('logbook.title')}
-        </Text>
         <Text variant="title">{heading}</Text>
         <View
           style={{
@@ -511,8 +510,6 @@ export default function LogbookScreen() {
           </View>
         </>
       )}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

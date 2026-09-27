@@ -242,6 +242,20 @@ as a user would. The fixes that matter beyond one screen:
 - **Settings** are grouped tiles with toggles, a pinned row of links to each
   group and a search box; switching a feature off asks first.
 
+### Mobile visual pass
+
+- **`BackBar`** (shared/components) is the top of every pushed screen: a round
+  back button (`chevronBack`, mirrored) and the section's name. The «رجوع»
+  links at the bottom of screens are gone.
+- **`MenuGroup` / `MenuRow`**: settings-style lists, one card per group, with
+  hairline dividers and each icon in a tinted square. Used on the account tab
+  (vehicles and invoices, support, legal).
+- **`EmptyState` takes `iconName`**, drawn in a round tinted badge.
+- **The welcome screen** lists what Habba does in three lines (help anywhere,
+  the logbook, paid only after completion).
+- **Upcoming care** rows carry the item's icon (oil, brakes, tyres…); overdue
+  items tint it amber.
+
 ## 6b. The hosted project, as of 2026-09-27
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations

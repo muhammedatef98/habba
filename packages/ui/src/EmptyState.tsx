@@ -12,6 +12,8 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { Button } from './Button.js';
+import { Icon } from './Icon.js';
+import type { IconName } from './icon-names.js';
 import { Text } from './Text.js';
 import { useTheme } from './theme.js';
 
@@ -19,6 +21,8 @@ export interface EmptyStateProps {
   readonly title: string;
   readonly body?: string | undefined;
   readonly icon?: ReactNode;
+  /** A design-system glyph, drawn in a soft circle — the usual choice over `icon`. */
+  readonly iconName?: IconName | undefined;
   readonly actionLabel?: string | undefined;
   readonly onAction?: (() => void) | undefined;
   readonly secondaryActionLabel?: string | undefined;
@@ -30,6 +34,7 @@ export function EmptyState({
   title,
   body,
   icon,
+  iconName,
   actionLabel,
   onAction,
   secondaryActionLabel,
@@ -48,7 +53,21 @@ export function EmptyState({
         paddingHorizontal: theme.spacing.base,
       }}
     >
-      {icon !== undefined ? (
+      {iconName !== undefined ? (
+        <View
+          accessible={false}
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: theme.radius.full,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.primarySubtle,
+          }}
+        >
+          <Icon name={iconName} size={28} color={theme.colors.primary} />
+        </View>
+      ) : icon !== undefined ? (
         <View accessible={false} style={{ opacity: 0.9 }}>
           {icon}
         </View>

@@ -25,7 +25,7 @@ import Constants from 'expo-constants';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, ListRow, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
@@ -34,6 +34,7 @@ import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
 import { unregisterThisDevice } from '@/features/shared/lib/push';
 import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
+import { MenuGroup, MenuRow } from '@/features/shared/components/MenuGroup';
 import { DeleteAccountCard } from '@/features/shared/components/DeleteAccountCard';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
@@ -184,52 +185,21 @@ export default function AccountScreen() {
           ) : null}
         </Card>
 
-        <Card
-          testID="account-vehicles"
-          elevation="none"
-          onPress={() => router.push('/vehicles')}
-          accessibilityLabel={t('settings.myVehicles')}
-          style={{
-            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-            alignItems: 'center',
-            gap: theme.spacing.md,
-            minHeight: theme.minTouchTarget,
-            borderColor: theme.colors.border,
-            borderWidth: 1,
-          }}
-        >
-          <Icon name="home" size={theme.iconSize.md} color={theme.colors.textMuted} />
-          <Text variant="bodySmall" style={{ flex: 1 }}>
-            {t('settings.myVehicles')}
-          </Text>
-          <Text variant="caption" tone="muted">
-            {t('settings.vehiclesCount', {
-              count: vehicles.data?.length ?? 0,
-            })}
-          </Text>
-          <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
-        </Card>
-
-        <Card
-          testID="account-invoices"
-          elevation="none"
-          onPress={() => router.push('/invoices')}
-          accessibilityLabel={t('settings.myInvoices')}
-          style={{
-            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-            alignItems: 'center',
-            gap: theme.spacing.md,
-            minHeight: theme.minTouchTarget,
-            borderColor: theme.colors.border,
-            borderWidth: 1,
-          }}
-        >
-          <Icon name="wallet" size={theme.iconSize.md} color={theme.colors.textMuted} />
-          <Text variant="bodySmall" style={{ flex: 1 }}>
-            {t('settings.myInvoices')}
-          </Text>
-          <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
-        </Card>
+        <MenuGroup>
+          <MenuRow
+            testID="account-vehicles"
+            icon="home"
+            title={t('settings.myVehicles')}
+            value={t('settings.vehiclesCount', { count: vehicles.data?.length ?? 0 })}
+            onPress={() => router.push('/vehicles')}
+          />
+          <MenuRow
+            testID="account-invoices"
+            icon="wallet"
+            title={t('settings.myInvoices')}
+            onPress={() => router.push('/invoices')}
+          />
+        </MenuGroup>
       </View>
 
       <View style={{ gap: theme.spacing.md }}>
@@ -300,16 +270,18 @@ export default function AccountScreen() {
       {hasSupport ? (
         <View testID="support-section" style={{ gap: theme.spacing.md }}>
           <SectionHeader title={t('settings.sectionSupport')} />
-          <Card elevation="none" style={{ borderColor: theme.colors.border, borderWidth: 1 }}>
+          <MenuGroup>
             {support.supportPhone !== '' ? (
-              <ListRow
+              <MenuRow
+                icon="phone"
                 title={t('settings.supportCall')}
                 value={support.supportPhone}
                 onPress={() => void Linking.openURL(`tel:${support.supportPhone}`)}
               />
             ) : null}
             {support.supportWhatsapp !== '' ? (
-              <ListRow
+              <MenuRow
+                icon="chat"
                 title={t('settings.supportWhatsapp')}
                 value={support.supportWhatsapp}
                 onPress={() =>
@@ -320,13 +292,14 @@ export default function AccountScreen() {
               />
             ) : null}
             {support.supportEmail !== '' ? (
-              <ListRow
+              <MenuRow
+                icon="chat"
                 title={t('settings.supportEmail')}
                 value={support.supportEmail}
                 onPress={() => void Linking.openURL(`mailto:${support.supportEmail}`)}
               />
             ) : null}
-          </Card>
+          </MenuGroup>
         </View>
       ) : null}
 
@@ -335,31 +308,30 @@ export default function AccountScreen() {
 
         {/* The documents in force (0083), and the provider terms for anyone
             who works with Habba. */}
-        <Card
-          testID="legal-section"
-          elevation="none"
-          style={{ borderColor: theme.colors.border, borderWidth: 1 }}
-        >
-          <ListRow
+        <MenuGroup testID="legal-section">
+          <MenuRow
             testID="legal-terms-row"
+            icon="inspection"
             title={t('legal.terms')}
             onPress={() => router.push({ pathname: '/legal', params: { kind: 'terms' } })}
           />
-          <ListRow
+          <MenuRow
             testID="legal-privacy-row"
+            icon="lockout"
             title={t('legal.privacy')}
             onPress={() => router.push({ pathname: '/legal', params: { kind: 'privacy' } })}
           />
           {isProvider ? (
-            <ListRow
+            <MenuRow
               testID="legal-provider-terms-row"
+              icon="wrench"
               title={t('legal.providerTerms')}
               onPress={() =>
                 router.push({ pathname: '/legal', params: { kind: 'provider_terms' } })
               }
             />
           ) : null}
-        </Card>
+        </MenuGroup>
 
         <Card elevation="none" style={{ borderColor: theme.colors.border, borderWidth: 1 }}>
           <View

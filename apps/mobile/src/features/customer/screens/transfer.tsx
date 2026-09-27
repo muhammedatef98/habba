@@ -38,7 +38,7 @@
 
 import { useState } from 'react';
 import { View } from 'react-native';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PlateBadge } from '@/features/customer/components/PlateBadge';
@@ -63,6 +63,7 @@ import { DocumentActions } from '@/features/shared/components/DocumentActions';
 import { daysUntil } from '@/features/shared/lib/transfer-window';
 import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 type Stage = 'warn' | 'address' | 'code';
 type Channel = 'phone' | 'email';
@@ -216,10 +217,8 @@ export default function TransferScreen() {
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
+      <BackBar label={t('transfer.entry')} />
       <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="label" tone="muted">
-          {t('transfer.entry')}
-        </Text>
         <Text variant="title">{carLabel}</Text>
         {car?.plateNormalised != null ? (
           <PlateBadge plate={car.plateNormalised} variant="compact" />
@@ -485,8 +484,6 @@ export default function TransferScreen() {
           />
         </View>
       </BottomSheet>
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

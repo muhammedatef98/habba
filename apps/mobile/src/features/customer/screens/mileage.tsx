@@ -18,7 +18,7 @@
 
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, EmptyState, Field, Row, Screen, Text, useTheme } from '@habba/ui';
@@ -27,6 +27,7 @@ import { formatCount } from '@/features/shared/lib/format-number';
 import { repository } from '@/features/shared/data/repository';
 import type { TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 interface Reading {
   readonly at: Date;
@@ -127,6 +128,7 @@ export default function MileageScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar label={t('logbook.title')} />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('logbook.mileageTitle')}</Text>
         <Text variant="body" tone="muted">
@@ -173,6 +175,7 @@ export default function MileageScreen() {
       {readings.length === 0 ? (
         <EmptyState
           testID="mileage-empty"
+          iconName="gauge"
           title={t('logbook.mileageEmptyTitle')}
           body={t('logbook.mileageEmptyBody')}
         />
@@ -229,8 +232,6 @@ export default function MileageScreen() {
           ))}
         </View>
       )}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }
