@@ -19,7 +19,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { normalisePlate } from '@habba/core';
+import { parsePlate } from '@habba/core';
 import { Button, Field, Screen, Text, useTheme } from '@habba/ui';
 import { ChipRow } from '@/features/customer/components/form/ChipRow';
 import { repository } from '@/features/shared/data/repository';
@@ -127,8 +127,15 @@ export default function AddVehicleScreen() {
       setPlateError(t('vehicle.errors.plateRequired'));
       return;
     }
-    if (normalisePlate(plate) === null) {
-      setPlateError(t('vehicle.errors.plateUnparseable'));
+    const parsed = parsePlate(plate);
+    if (!parsed.ok) {
+      // Name the letter that is wrong: "could not read the plate" leaves the
+      // owner guessing, when most failures are one letter plates never use.
+      setPlateError(
+        parsed.error === 'unknown_letter' && parsed.offendingChar !== undefined
+          ? t('vehicle.errors.plateLetter', { letter: parsed.offendingChar })
+          : t('vehicle.errors.plateUnparseable'),
+      );
       return;
     }
     setPlateError(undefined);

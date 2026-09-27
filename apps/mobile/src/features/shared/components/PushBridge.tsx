@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,13 +31,17 @@ export function PushBridge() {
   const locale = useSession((state) => state.locale);
   const handledLaunch = useRef(false);
 
-  useEffect(() => {
-    if (userId === null) return;
-    void registerThisDevice({ prompt: false, locale });
-  }, [userId, locale]);
+  // Push is a phone's: on web (a preview of the screens, never shipped)
+  // expo-notifications has no device token and no launch response, and asks throw.
+  const noPush = Platform.OS === 'web';
 
   useEffect(() => {
-    if (userId === null) return;
+    if (userId === null || noPush) return;
+    void registerThisDevice({ prompt: false, locale });
+  }, [userId, locale, noPush]);
+
+  useEffect(() => {
+    if (userId === null || noPush) return;
 
     const open = (data: unknown) => {
       const target = targetFor(data);
@@ -72,7 +77,7 @@ export function PushBridge() {
       received.remove();
       tapped.remove();
     };
-  }, [userId, queryClient, setMode]);
+  }, [userId, queryClient, setMode, noPush]);
 
   return null;
 }

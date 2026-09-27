@@ -47,7 +47,6 @@ import {
   rowDirectionFor,
   useTheme,
 } from '@habba/ui';
-import { CoverageBar } from '@/features/customer/components/logbook/CoverageBar';
 import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCare';
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
@@ -81,6 +80,9 @@ const FILTER_LABEL_KEY: Readonly<Record<LogbookFilter, string>> = {
   inspection: 'logbook.filterInspection',
   mileage: 'logbook.filterMileage',
 };
+
+/** Below this many entries the history is read at a glance; no filters. */
+const FILTERS_FROM = 6;
 
 export default function LogbookScreen() {
   const { t, i18n } = useTranslation();
@@ -209,7 +211,7 @@ export default function LogbookScreen() {
   const selfReportedCount = events.length - verifiedCount;
 
   const counts = countByFilter(events);
-  const shown = filterEvents(events, filter);
+  const shown = events.length >= FILTERS_FROM ? filterEvents(events, filter) : events;
 
   const sources = { makes: makes.data, models: models.data, isArabic };
   const car = vehicle.data;
@@ -250,7 +252,7 @@ export default function LogbookScreen() {
         </View>
       </View>
 
-      {/* القادم, above حصل and OUTSIDE the timeline's loading branches: what
+      {/* Upcoming maintenance, above the history and OUTSIDE the timeline's loading branches: what
           the car needs next does not depend on the logbook having loaded, and
           a dropped timeline fetch must not take the section that can book a
           service down with it. */}
@@ -328,11 +330,12 @@ export default function LogbookScreen() {
               </Text>
             </View>
 
-            <CoverageBar
-              testID="logbook-coverage-bar"
-              verified={verifiedCount}
-              selfReported={selfReportedCount}
-            />
+            <Text testID="logbook-coverage-line" variant="bodySmall" tone="muted">
+              {t('logbook.coverage', {
+                verified: formatCount(verifiedCount, i18n.language),
+                selfReported: formatCount(selfReportedCount, i18n.language),
+              })}
+            </Text>
 
             {features.habbaReport ? (
               <DocumentActions
@@ -372,12 +375,6 @@ export default function LogbookScreen() {
                 <Text variant="caption" tone="muted">
                   {t('logbook.reportShareHint')}
                 </Text>
-                <Text variant="caption" tone="subtle">
-                  {t('logbook.reportCoverage', {
-                    verified: formatCount(verifiedCount, i18n.language),
-                    total: formatCount(events.length, i18n.language),
-                  })}
-                </Text>
               </View>
             ) : null}
 
@@ -389,7 +386,7 @@ export default function LogbookScreen() {
           </Card>
 
           <View style={{ gap: theme.spacing.md }}>
-            {/* حصل. The same timeline, under the name the section has on the
+            {/* Service history. The same timeline, under the name the section has on the
                 screen — not a second history surface (ADR-0022). */}
             <SectionHeader
               title={t('care.happened')}
@@ -397,44 +394,47 @@ export default function LogbookScreen() {
               onAction={() => router.push({ pathname: '/record-service', params: { id } })}
             />
 
-            {/* A filter with nothing behind it is a control that punishes
-                curiosity, so an empty bucket is not offered. */}
-            <View
-              style={{
-                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-                flexWrap: 'wrap',
-                gap: theme.spacing.sm,
-              }}
-            >
-              {LOGBOOK_FILTERS.filter((option) => counts[option] > 0).map((option) => {
-                const selected = filter === option;
-                return (
-                  <Card
-                    selected={selected}
-                    key={option}
-                    testID={`logbook-filter-${option}`}
-                    elevation="none"
-                    onPress={() => setFilter(option)}
-                    style={{
-                      paddingVertical: theme.spacing.xs,
-                      paddingHorizontal: theme.spacing.md,
-                      minHeight: 36,
-                      justifyContent: 'center',
-                      borderRadius: theme.radius.full,
-                      backgroundColor: selected
-                        ? theme.colors.primarySubtle
-                        : theme.colors.surfaceSunken,
-                      borderColor: selected ? theme.colors.primary : theme.colors.border,
-                      borderWidth: selected ? 1.5 : 1,
-                    }}
-                  >
-                    <Text variant="caption" tone={selected ? 'primary' : 'muted'}>
-                      {`${t(FILTER_LABEL_KEY[option])} · ${formatCount(counts[option], i18n.language)}`}
-                    </Text>
-                  </Card>
-                );
-              })}
-            </View>
+            {/* Filters earn their place only on a long history; a short one is
+                read at a glance. A filter with nothing behind it punishes
+                curiosity, so an empty bucket is not offered either. */}
+            {events.length >= FILTERS_FROM ? (
+              <View
+                style={{
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                  flexWrap: 'wrap',
+                  gap: theme.spacing.sm,
+                }}
+              >
+                {LOGBOOK_FILTERS.filter((option) => counts[option] > 0).map((option) => {
+                  const selected = filter === option;
+                  return (
+                    <Card
+                      selected={selected}
+                      key={option}
+                      testID={`logbook-filter-${option}`}
+                      elevation="none"
+                      onPress={() => setFilter(option)}
+                      style={{
+                        paddingVertical: theme.spacing.xs,
+                        paddingHorizontal: theme.spacing.md,
+                        minHeight: 36,
+                        justifyContent: 'center',
+                        borderRadius: theme.radius.full,
+                        backgroundColor: selected
+                          ? theme.colors.primarySubtle
+                          : theme.colors.surfaceSunken,
+                        borderColor: selected ? theme.colors.primary : theme.colors.border,
+                        borderWidth: selected ? 1.5 : 1,
+                      }}
+                    >
+                      <Text variant="caption" tone={selected ? 'primary' : 'muted'}>
+                        {`${t(FILTER_LABEL_KEY[option])} · ${formatCount(counts[option], i18n.language)}`}
+                      </Text>
+                    </Card>
+                  );
+                })}
+              </View>
+            ) : null}
 
             {shown.length === 0 ? (
               <Text variant="bodySmall" tone="muted">

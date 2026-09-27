@@ -5,12 +5,19 @@
  * seller hands a buyer is a PDF produced from the frozen payload
  * `generate_habba_report()` issued — not a link, not a live view.
  *
- * The layout is docs/design/report-pdf.md, approved before any of this was
- * written. Three sections, each starting on a fresh sheet:
+ * Written for someone who has never heard of a logbook: a buyer standing
+ * next to the car, or the owner opening it in the app. The same page is read
+ * on a phone and printed on A4, so it is one column that reads top to bottom:
  *
- *   1. The car, what Habba can stand behind, and the odometer over time.
- *   2. The service history, grouped by the year the work happened.
- *   3. Warranty status, inspection scores, and what this document is not.
+ *   1. The car.
+ *   2. The answer, in plain words: how much of this history Habba did itself,
+ *      how much the owner wrote down, and what the odometer did.
+ *   3. The service history, newest first, one line of meaning per job.
+ *   4. Warranty and inspections, when the payload carries them.
+ *   5. Can I trust this? — what is guaranteed and what is not, plainly.
+ *
+ * No percentages, no charts, no technical terms: "hash chain" became "saved
+ * and cannot be edited", and the odometer is two readings in a sentence.
  *
  * Pure string in, string out. It runs in `expo-print` on a phone, but nothing
  * here touches a browser, a network or a file system, so the whole document is
@@ -34,13 +41,12 @@ import type {
   ReportMileagePoint,
   ReportWarranty,
 } from './types.js';
-import { carriesWarrantyAndScore, verifiedRatio } from './types.js';
+import { carriesWarrantyAndScore } from './types.js';
 import {
   ATTACHMENT_FORMS,
   DAY_FORMS,
   DETAIL_LABEL_AR,
   MONTH_FORMS,
-  PROVENANCE_LABEL_AR,
   RECOMMENDATION_LABEL_AR,
   RECORD_FORMS,
   WARRANTY_STATUS_LABEL_AR,
@@ -58,7 +64,6 @@ const SUBTLE = '#5F6967';
 const LINE = '#E2DDD2';
 const BAND = '#F0EBE1';
 const TINT = '#EFF7F6';
-const MID = '#6FB3AE';
 const PALE = '#D9EBE9';
 
 function dateOnly(timestamp: string): string {
@@ -103,131 +108,95 @@ function yearOf(date: string): string {
   return date.slice(0, 4);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Sheet 1                                                                     */
-/* -------------------------------------------------------------------------- */
+const MONTHS_AR = [
+  'يناير',
+  'فبراير',
+  'مارس',
+  'أبريل',
+  'مايو',
+  'يونيو',
+  'يوليو',
+  'أغسطس',
+  'سبتمبر',
+  'أكتوبر',
+  'نوفمبر',
+  'ديسمبر',
+] as const;
+
+/** "2026-05-01" → «مايو 2026». Falls back to the raw date if it is not one. */
+function monthYear(date: string): string {
+  const match = /^(\d{4})-(\d{2})/.exec(date);
+  const month = match === null ? undefined : MONTHS_AR[Number(match[2]) - 1];
+  return match === null || month === undefined ? isolate(date) : `${month} ${isolate(match[1]!)}`;
+}
+
+/** "2026-09-06" → «6 سبتمبر 2026». */
+function dayMonthYear(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  const month = match === null ? undefined : MONTHS_AR[Number(match[2]) - 1];
+  return match === null || month === undefined
+    ? isolate(date)
+    : `${isolate(String(Number(match[3])))} ${month} ${isolate(match[1]!)}`;
+}
 
 /** `value` is HTML: identity values are Latin runs and must arrive isolated. */
-function renderIdentityField(label: string, value: string): string {
-  return `<div class="field"><div class="field-label">${escapeHtml(label)}</div><div class="field-value">${value}</div></div>`;
+function renderIdentityField(label: string, value: string, wide = false): string {
+  return `<div class="field${wide ? ' field-wide' : ''}"><div class="field-label">${escapeHtml(label)}</div><div class="field-value">${value}</div></div>`;
 }
 
-function renderCoverage(report: HabbaReport): string {
-  const { coverage } = report;
-  const percent = Math.round(verifiedRatio(coverage) * 100);
-
-  // Owner-entered-with-an-attachment is its own segment. Folding it into
-  // "self reported" would hide the difference between a receipt and a memory,
-  // which is most of what ADR-0005 is for.
-  const documented = coverage.self_documented;
-  const reported = coverage.self_reported + coverage.third_party;
-  const total = Math.max(coverage.total, 1);
-
-  const widths = {
-    verified: (coverage.habba_verified / total) * 100,
-    documented: (documented / total) * 100,
-    reported: (reported / total) * 100,
-  };
-
-  const legend = [
-    [coverage.habba_verified, PETROL, PROVENANCE_LABEL_AR.habba_verified],
-    [documented, MID, PROVENANCE_LABEL_AR.self_documented],
-    [reported, PALE, PROVENANCE_LABEL_AR.self_reported],
-  ] as const;
-
-  return `
-  <section class="panel">
-    <h2>ما الذي تضمنه هبّة</h2>
-    <div class="ratio">
-      <span class="ratio-value">${isolate(`${formatNumber(percent)}%`)}</span>
-      <span class="ratio-caption">من السجلات موثّقة من هبّة</span>
-    </div>
-    <div class="bar">
-      <span style="width:${widths.verified.toFixed(2)}%;background:${PETROL}"></span>
-      <span style="width:${widths.documented.toFixed(2)}%;background:${MID}"></span>
-      <span style="width:${widths.reported.toFixed(2)}%;background:${PALE}"></span>
-    </div>
-    <div class="legend">
-      ${legend
-        .map(
-          ([count, colour, label]) =>
-            `<span class="legend-item"><i style="background:${colour}"></i>${num(count)} ${escapeHtml(label)}</span>`,
-        )
-        .join('')}
-    </div>
-    <p class="panel-note">
-      السجلات الموثّقة من هبّة نفّذها فنّي عبر التطبيق مع صور وقراءة عدّاد.
-      السجلات المُدخلة من المالك أدخلها صاحب السيارة ولم تتحقّق منها هبّة.
-    </p>
-  </section>`;
-}
+/* -------------------------------------------------------------------------- */
+/* The answer                                                                  */
+/* -------------------------------------------------------------------------- */
 
 /**
- * The odometer over time, running RIGHT TO LEFT — oldest reading at the right,
- * newest at the left, matching the direction the rest of the page is read in.
- *
- * Both ends are direct-labelled with their date and their reading, so the
- * direction cannot be misread even by someone who reads the chart left to
- * right out of habit. One series, one hue, no legend: the heading names it.
+ * What a buyer wants to know first, in three short lines. Counts, not a
+ * percentage: «2 نفّذتها هبّة» is something anyone can check against the list
+ * below; «33%» is a number they have to trust.
  */
-function renderMileageChart(points: readonly ReportMileagePoint[]): string {
-  if (points.length < 2) {
-    return points.length === 0
-      ? ''
-      : `<section class="block"><h2>قراءات العدّاد</h2><p class="note">قراءة واحدة فقط حتى الآن — لا يمكن رسم تغيّر العدّاد بعد.</p></section>`;
-  }
+function renderSummary(report: HabbaReport): string {
+  const { coverage } = report;
+  const documented = coverage.self_documented;
+  const byOwner = coverage.self_documented + coverage.self_reported + coverage.third_party;
 
-  const width = 698;
-  const height = 190;
-  const baseline = 152;
-  const top = 22;
-  const inset = 30;
-
-  const mileages = points.map((point) => point.mileage);
-  const min = Math.min(...mileages);
-  const max = Math.max(...mileages);
-  const span = max - min === 0 ? 1 : max - min;
-
-  // index 0 is the OLDEST point and sits at the RIGHT edge.
-  const x = (index: number): number =>
-    width - inset - (index * (width - inset * 2)) / (points.length - 1);
-  const y = (mileage: number): number =>
-    baseline - 20 - ((mileage - min) / span) * (baseline - 20 - top);
-
-  const coordinates = points.map((point, index) => ({
-    x: x(index),
-    y: y(point.mileage),
-    point,
-  }));
-
-  const polyline = coordinates.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
-  const dots = coordinates
-    .map((c) => `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4.5" fill="${PETROL}"/>`)
-    .join('');
-
-  const first = coordinates[0]!;
-  const last = coordinates[coordinates.length - 1]!;
+  const tiles = `
+    <div class="tiles">
+      <div class="tile tile-habba">
+        <div class="tile-number">${num(coverage.habba_verified)}</div>
+        <div class="tile-label">نفّذتها هبّة بنفسها</div>
+        <div class="tile-hint">فنّي هبّة سجّلها من التطبيق مع صور وقراءة العدّاد</div>
+      </div>
+      <div class="tile">
+        <div class="tile-number">${num(byOwner)}</div>
+        <div class="tile-label">سجّلها صاحب السيارة</div>
+        <div class="tile-hint">${
+          documented > 0
+            ? `منها ${num(documented)} بإيصال أو صورة. لم تتحقّق منها هبّة`
+            : 'لم تتحقّق منها هبّة'
+        }</div>
+      </div>
+    </div>`;
 
   return `
   <section class="block">
-    <h2>قراءات العدّاد</h2>
-    <svg viewBox="0 0 ${width} ${height}" class="chart" role="img"
-         aria-label="تطور قراءة العدّاد من ${formatNumber(first.point.mileage)} إلى ${formatNumber(last.point.mileage)} كيلومتر">
-      <line x1="8" y1="${baseline}" x2="${width - 8}" y2="${baseline}" stroke="${LINE}" stroke-width="1"/>
-      <polyline points="${polyline}" fill="none" stroke="${PETROL}" stroke-width="2"
-                stroke-linejoin="round" stroke-linecap="round"/>
-      ${dots}
-      <text x="${first.x.toFixed(1)}" y="${baseline}" dy="16" dir="ltr" text-anchor="middle" class="axis">${escapeHtml(first.point.occurred_at)}</text>
-      <text x="${last.x.toFixed(1)}" y="${baseline}" dy="16" dir="ltr" text-anchor="middle" class="axis">${escapeHtml(last.point.occurred_at)}</text>
-      <text x="${(first.x - 12).toFixed(1)}" y="${first.y.toFixed(1)}" dy="-10" text-anchor="end" class="point-label">${formatNumber(first.point.mileage)} كم</text>
-      <text x="${(last.x + 12).toFixed(1)}" y="${last.y.toFixed(1)}" dy="-10" text-anchor="start" class="point-label point-label-latest">${formatNumber(last.point.mileage)} كم</text>
-    </svg>
-    <p class="note">العدّاد لا يرجع إلى الوراء في هبّة: قراءة أقل من المسجّلة تُرفض عند الإدخال.</p>
+    <h2>الخلاصة</h2>
+    ${tiles}
+    ${renderOdometer(report.mileage_history)}
   </section>`;
 }
 
+/** The odometer, as a sentence: where it started, where it is now. */
+function renderOdometer(points: readonly ReportMileagePoint[]): string {
+  if (points.length === 0) return '';
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
+  if (points.length === 1) {
+    return `<p class="line">العدّاد: قراءة واحدة حتى الآن — ${num(first.mileage)} كم في ${monthYear(first.occurred_at)}.</p>`;
+  }
+  return `<p class="line">العدّاد: من ${num(first.mileage)} كم في ${monthYear(first.occurred_at)} إلى ${num(last.mileage)} كم في ${monthYear(last.occurred_at)}. عدّاد السيارة في هبّة لا يمكن إرجاعه للخلف.</p>`;
+}
+
 /* -------------------------------------------------------------------------- */
-/* Sheet 2 — the history                                                       */
+/* The history                                                                 */
 /* -------------------------------------------------------------------------- */
 
 function renderDetailChips(details: Readonly<Record<string, unknown>>): string {
@@ -244,40 +213,44 @@ function renderDetailChips(details: Readonly<Record<string, unknown>>): string {
     .join('')}</div>`;
 }
 
+const WHO_DID_IT: Readonly<Record<ReportEvent['provenance'], string>> = {
+  habba_verified: 'نفّذتها هبّة ✓',
+  self_documented: 'سجّلها المالك بإيصال',
+  self_reported: 'سجّلها المالك',
+  third_party: 'من جهة خارجية',
+};
+
 function renderEvent(event: ReportEvent): string {
   const verified = event.provenance === 'habba_verified';
 
   const meta = [
-    event.mileage === null ? null : `العدّاد ${num(event.mileage)} كم`,
+    monthYear(event.occurred_at),
+    event.mileage === null ? null : `${num(event.mileage)} كم`,
     event.attachment_count > 0 ? counted(event.attachment_count, ATTACHMENT_FORMS) : null,
-    // Where an entry was written materially later than the work happened, say
-    // so (ADR-0012). A buyer deserves to know which entries were recorded at
-    // the time and which were written from memory.
+    // Written materially later than the work happened (ADR-0012): a buyer
+    // should know which entries were recorded at the time.
     new Date(event.recorded_at).getTime() - new Date(event.occurred_at).getTime() >
     7 * 24 * 60 * 60 * 1000
-      ? `سُجّل لاحقاً في ${isolate(event.recorded_at)}`
+      ? `سُجّلت لاحقاً في ${monthYear(event.recorded_at)}`
       : null,
   ].filter((part): part is string => part !== null);
 
   return `
-    <div class="event">
-      <div class="event-date">${isolate(event.occurred_at)}</div>
-      <div class="event-body ${verified ? 'is-verified' : 'is-self'}">
-        <div class="event-head">
-          <span class="event-title">${escapeHtml(event.summary_ar)}</span>
-          <span class="badge ${verified ? 'badge-verified' : 'badge-self'}">${escapeHtml(
-            PROVENANCE_LABEL_AR[event.provenance],
-          )}</span>
-        </div>
-        ${meta.length === 0 ? '' : `<div class="event-meta">${meta.join(' · ')}</div>`}
-        ${renderDetailChips(event.details)}
+    <div class="event ${verified ? 'is-verified' : 'is-self'}">
+      <div class="event-head">
+        <span class="event-title">${escapeHtml(event.summary_ar)}</span>
+        <span class="badge ${verified ? 'badge-verified' : 'badge-self'}">${escapeHtml(
+          WHO_DID_IT[event.provenance],
+        )}</span>
       </div>
+      <div class="event-meta">${meta.join(' · ')}</div>
+      ${renderDetailChips(event.details)}
     </div>`;
 }
 
 /**
- * Groups by the year the work HAPPENED, newest first — the same grouping the
- * logbook screen uses, so paper and app tell one story in one order.
+ * Newest year first — the same grouping the logbook screen uses, so paper and
+ * app tell one story in one order.
  */
 function groupEventsByYear(
   events: readonly ReportEvent[],
@@ -297,69 +270,57 @@ function groupEventsByYear(
 }
 
 function renderYearGroup(year: string, events: readonly ReportEvent[]): string {
-  const verified = events.filter((event) => event.provenance === 'habba_verified').length;
-  const summary =
-    verified === 0
-      ? `${counted(events.length, RECORD_FORMS)} · لا شيء موثّق من هبّة`
-      : `${counted(events.length, RECORD_FORMS)} · ${num(verified)} موثّق من هبّة`;
-
   return `
     <div class="year">
-      <div class="year-head">
-        <span class="year-number">${isolate(year)}</span>
-        <span class="year-summary">${summary}</span>
-      </div>
+      <div class="year-head">${isolate(year)}</div>
       ${events.map(renderEvent).join('')}
     </div>`;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Sheet 3 — warranty, inspections, and what this document is not              */
+/* Warranty and inspections                                                    */
 /* -------------------------------------------------------------------------- */
 
 function renderWarranties(warranties: readonly ReportWarranty[]): string {
   if (warranties.length === 0) {
     return `
   <section class="block">
-    <h2>الضمانات</h2>
-    <p class="note">لا يوجد عمل تحت الضمان على هذه السيارة. الأعمال المُدخلة من المالك لا ضمان لها من هبّة.</p>
+    <h2>الضمان</h2>
+    <p class="note">لا يوجد عمل تحت الضمان على هذه السيارة. الضمان يكون على ما نفّذته هبّة فقط.</p>
   </section>`;
   }
 
   const rows = warranties
     .map((warranty) => {
       const active = warranty.status === 'active';
-      const remaining =
+      const state = [
+        escapeHtml(WARRANTY_STATUS_LABEL_AR[warranty.status]),
         active && warranty.days_remaining !== null
-          ? `<span class="warranty-remaining">يتبقّى ${counted(warranty.days_remaining, DAY_FORMS)}</span>`
-          : '';
-      const claim = warranty.has_open_claim
-        ? '<span class="warranty-claim">مطالبة ضمان مفتوحة</span>'
-        : '';
+          ? `يتبقّى ${counted(warranty.days_remaining, DAY_FORMS)}`
+          : null,
+        warranty.has_open_claim ? 'مطالبة ضمان مفتوحة' : null,
+      ].filter((part): part is string => part !== null);
 
       return `
-      <div class="table-row">
-        <div>${escapeHtml(warranty.service_ar)}</div>
-        <div class="muted">${isolate(warranty.completed_at)}</div>
-        <div class="muted">${warranty.warranty_days === null ? '—' : counted(warranty.warranty_days, DAY_FORMS)}</div>
-        <div class="warranty-status ${active ? 'is-active' : 'is-expired'}">
-          <span>${escapeHtml(WARRANTY_STATUS_LABEL_AR[warranty.status])}</span>
-          ${remaining}${claim}
+      <div class="row">
+        <div>
+          <div class="row-title">${escapeHtml(warranty.service_ar)}</div>
+          <div class="muted">${dayMonthYear(warranty.completed_at)}${
+            warranty.warranty_days === null
+              ? ''
+              : ` · ضمان ${counted(warranty.warranty_days, DAY_FORMS)}`
+          }</div>
         </div>
+        <div class="state ${active ? 'is-active' : 'is-expired'}">${state.join(' · ')}</div>
       </div>`;
     })
     .join('');
 
   return `
   <section class="block">
-    <h2>الضمانات</h2>
-    <div class="table">
-      <div class="table-row table-head">
-        <div>العمل</div><div>التاريخ</div><div>المدة</div><div>الحالة</div>
-      </div>
-      ${rows}
-    </div>
-    <p class="note">الضمان يغطي العمل الذي نفّذه فنّي هبّة. الأعمال المُدخلة من المالك لا ضمان لها من هبّة.</p>
+    <h2>الضمان</h2>
+    ${rows}
+    <p class="note">الضمان يغطي العمل الذي نفّذه فنّي هبّة، وليس ما سجّله المالك.</p>
   </section>`;
 }
 
@@ -372,26 +333,21 @@ function renderInspections(inspections: readonly ReportInspection[]): string {
   </section>`;
   }
 
-  const cards = inspections
+  const rows = inspections
     .map((inspection) => {
       const meta = [
+        dayMonthYear(inspection.completed_at),
         inspection.mileage_at_inspection === null
           ? null
-          : `العدّاد ${num(inspection.mileage_at_inspection)} كم`,
-        'نفّذه فنّي معتمد من هبّة',
+          : `${num(inspection.mileage_at_inspection)} كم`,
       ].filter((part): part is string => part !== null);
 
       // The scale is printed beside the score because "84" on its own is not
-      // a fact. It comes from the payload rather than being assumed here, so
-      // an old report keeps printing the scale it was actually scored on.
+      // a fact. It comes from the payload, so an old report keeps its scale.
       return `
-      <div class="inspection">
-        <div class="score">
-          <div class="score-value">${num(inspection.overall_score)}</div>
-          <div class="score-scale">من ${num(inspection.score_scale)}</div>
-        </div>
-        <div class="inspection-body">
-          <div class="inspection-title">${escapeHtml(inspection.template_ar)} — ${isolate(inspection.completed_at)}</div>
+      <div class="row">
+        <div>
+          <div class="row-title">${escapeHtml(inspection.template_ar)}</div>
           <div class="muted">${meta.join(' · ')}</div>
           ${
             inspection.recommendation === null
@@ -399,6 +355,7 @@ function renderInspections(inspections: readonly ReportInspection[]): string {
               : `<div class="muted">التوصية: ${escapeHtml(RECOMMENDATION_LABEL_AR[inspection.recommendation])}</div>`
           }
         </div>
+        <div class="score"><span class="score-value">${num(inspection.overall_score)}</span> <span class="muted">من ${num(inspection.score_scale)}</span></div>
       </div>`;
     })
     .join('');
@@ -406,22 +363,19 @@ function renderInspections(inspections: readonly ReportInspection[]): string {
   return `
   <section class="block">
     <h2>الفحوصات</h2>
-    ${cards}
+    ${rows}
   </section>`;
 }
 
 /**
- * Rendered only when the payload is a version that captured these at all.
- *
- * A version 1 report predates them (0046). Printing «لا يوجد ضمان» for a car
- * whose warranties were simply never captured would be a claim the data never
- * made — so the sheet says which it is instead.
+ * A version 1 payload predates warranty and inspection capture (0046).
+ * Printing «لا يوجد ضمان» for it would be a claim the data never made.
  */
 function renderWarrantyAndInspections(report: HabbaReport): string {
   if (!carriesWarrantyAndScore(report)) {
     return `
   <section class="block">
-    <h2>الضمانات والفحوصات</h2>
+    <h2>الضمان والفحوصات</h2>
     <p class="note">
       صدر هذا التقرير قبل أن تُسجَّل حالة الضمان ونتائج الفحص في التقارير، فلا يمكنه
       عرضها. أصدر تقريراً جديداً من التطبيق لتظهر.
@@ -436,190 +390,120 @@ function renderWarrantyAndInspections(report: HabbaReport): string {
 /* -------------------------------------------------------------------------- */
 
 const STYLE = `
-  /* A4 with a real margin on both platforms. iOS honours @page; Android's
-     print framework applies its own, and a document that also carried inner
-     padding would end up with a margin twice as wide on one of them. */
+  /* A4 with a real margin when printed; on a phone it is the viewer's width. */
   @page { size: A4; margin: 12mm; }
 
   * { box-sizing: border-box; }
 
   body {
-    margin: 0;
+    margin: 0 auto;
+    max-width: 760px;
+    padding: 16px;
     color: ${INK};
     background: #FFFFFF;
-    /* No webfont: the PDF is generated on a phone, possibly offline, and a
-       @font-face that fails to load silently reflows the whole document. Every
-       platform in scope ships an Arabic face — iOS Geeza Pro, Android Noto
-       Naskh — and the stack names them so the fallback is chosen rather than
-       inherited. */
+    /* No webfont: generated on a phone, possibly offline. Every platform in
+       scope ships an Arabic face, and the stack names them. */
     font-family: "IBM Plex Sans Arabic", "Tajawal", "Geeza Pro", "Noto Naskh Arabic",
                  "Droid Arabic Naskh", system-ui, sans-serif;
-    /* Arabic needs the taller rhythm — §8. */
-    line-height: 1.7;
-    font-size: 14.5px;
+    line-height: 1.75;
+    font-size: 15px;
   }
+  @media print { body { padding: 0; max-width: none; } }
 
-  .sheet + .sheet { break-before: page; page-break-before: always; }
-  .sheet { display: flex; flex-direction: column; gap: 20px; }
+  .sheet { display: flex; flex-direction: column; gap: 22px; }
 
-  h2 { font-size: 18px; font-weight: 700; margin: 0 0 10px; }
-  .block, .panel { break-inside: avoid; page-break-inside: avoid; }
-  .note { font-size: 13px; color: ${SUBTLE}; margin: 8px 0 0; }
-  .muted { color: ${MUTED}; }
+  h2 { font-size: 19px; font-weight: 700; margin: 0 0 12px; }
+  .block { break-inside: avoid; page-break-inside: avoid; }
+  .note { font-size: 13.5px; color: ${SUBTLE}; margin: 10px 0 0; }
+  .muted { color: ${MUTED}; font-size: 13.5px; }
+  .line { font-size: 14.5px; color: ${INK}; margin: 14px 0 0; }
 
-  /* Masthead: a rule, not a flood fill. A full-bleed dark band drinks ink on
-     every copy anyone prints. */
-  .masthead {
-    display: flex; justify-content: space-between; align-items: flex-end;
-    border-bottom: 3px solid ${PETROL}; padding-bottom: 12px;
-  }
-  .masthead-title { font-size: 27px; font-weight: 700; color: ${PETROL}; line-height: 1.3; }
-  .masthead-sub { font-size: 15px; color: ${MUTED}; }
-  .masthead-side { text-align: left; font-size: 13px; color: ${SUBTLE}; line-height: 1.6; }
-  .running-head {
-    display: flex; justify-content: space-between; align-items: flex-end;
-    border-bottom: 3px solid ${PETROL}; padding-bottom: 12px;
-  }
-  .running-head h1 { font-size: 20px; font-weight: 700; color: ${PETROL}; margin: 0; }
-  .running-head div { font-size: 13px; color: ${SUBTLE}; }
+  .masthead { border-bottom: 3px solid ${PETROL}; padding-bottom: 10px; }
+  .masthead-title { font-size: 24px; font-weight: 700; color: ${PETROL}; line-height: 1.3; }
+  .masthead-sub { font-size: 14px; color: ${MUTED}; }
 
-  .car-name { font-size: 34px; font-weight: 700; line-height: 1.35; }
-  .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-  .field-label { font-size: 13px; color: ${SUBTLE}; }
-  .field-value { font-size: 17px; font-weight: 600; }
+  .car { border: 1px solid ${LINE}; border-radius: 14px; padding: 18px; background: #FCFBF8; }
+  .car-name { font-size: 26px; font-weight: 700; line-height: 1.35; margin-bottom: 12px; }
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+  .field-label { font-size: 12.5px; color: ${SUBTLE}; }
+  .field-value { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+  .field-wide { grid-column: 1 / -1; }
 
-  .panel { border: 1px solid ${LINE}; background: #FCFBF8; padding: 20px; }
-  .panel-note {
-    font-size: 13.5px; color: ${MUTED}; border-top: 1px solid ${LINE};
-    padding-top: 12px; margin: 12px 0 0;
-  }
-  .ratio { display: flex; align-items: baseline; gap: 10px; }
-  .ratio-value { font-size: 44px; font-weight: 700; color: ${PETROL}; line-height: 1; }
-  .ratio-caption { font-size: 15px; color: ${MUTED}; }
-  .bar { display: flex; gap: 2px; height: 14px; width: 100%; margin: 14px 0; }
-  .bar > span { display: block; }
-  .legend { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13.5px; color: ${MUTED}; }
-  .legend-item { display: flex; align-items: center; gap: 7px; }
-  .legend-item i { width: 11px; height: 11px; flex: none; }
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .tile { border: 1px solid ${LINE}; border-radius: 14px; padding: 14px; background: ${BAND}; }
+  .tile-habba { background: ${TINT}; border-color: ${PETROL}; }
+  .tile-number { font-size: 34px; font-weight: 700; line-height: 1.1; color: ${INK}; }
+  .tile-habba .tile-number { color: ${PETROL}; }
+  .tile-label { font-size: 15px; font-weight: 600; }
+  .tile-hint { font-size: 12.5px; color: ${MUTED}; line-height: 1.6; margin-top: 4px; }
 
-  .chart { width: 100%; height: 190px; }
-  .axis { font-size: 12.5px; fill: ${SUBTLE}; }
-  .point-label { font-size: 13px; fill: ${MUTED}; }
-  .point-label-latest { font-weight: 600; fill: ${INK}; }
-
-  .year { margin-bottom: 18px; }
+  .year { margin-bottom: 8px; }
   .year-head {
-    display: flex; align-items: baseline; gap: 10px;
-    background: ${BAND}; padding: 7px 12px; margin-bottom: 14px;
+    font-size: 15px; font-weight: 700; color: ${MUTED};
+    border-bottom: 1px solid ${LINE}; padding-bottom: 4px; margin-bottom: 10px;
     break-after: avoid; page-break-after: avoid;
   }
-  .year-number { font-size: 16px; font-weight: 700; }
-  .year-summary { font-size: 13px; color: ${MUTED}; }
-
   /* An entry split across a page boundary is a history a buyer has to
      reassemble by hand, so entries never break. */
-  .event { display: flex; gap: 14px; margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
-  .event-date { width: 84px; flex: none; font-size: 13px; color: ${SUBTLE}; padding-top: 2px; }
-  .event-body { flex: 1 1 auto; border-right: 2px solid ${LINE}; padding-right: 14px; }
-  .event-body.is-verified { border-right-color: ${PETROL}; }
-  .event-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .event-title { font-size: 16.5px; font-weight: 600; }
+  .event {
+    border-right: 3px solid ${LINE}; padding: 2px 12px 2px 0; margin-bottom: 14px;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .event.is-verified { border-right-color: ${PETROL}; }
+  .event-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .event-title { font-size: 16px; font-weight: 600; }
   .event-meta { font-size: 13.5px; color: ${MUTED}; }
-  .badge { font-size: 12px; padding: 1px 10px; }
-  .badge-verified { font-weight: 600; color: ${PETROL}; border: 1px solid ${PETROL}; background: ${TINT}; }
+  .badge { font-size: 12px; padding: 1px 10px; border-radius: 99px; white-space: nowrap; }
+  .badge-verified { font-weight: 600; color: ${PETROL}; background: ${TINT}; border: 1px solid ${PETROL}; }
   .badge-self { color: ${MUTED}; background: ${BAND}; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .chip {
-    font-size: 12.5px; color: ${MUTED}; background: #F6F3ED;
-    border: 1px solid ${LINE}; padding: 2px 9px;
+    font-size: 12px; color: ${MUTED}; background: #F6F3ED;
+    border: 1px solid ${LINE}; padding: 1px 8px; border-radius: 8px;
   }
 
-  .table { border: 1px solid ${LINE}; }
-  .table-row {
-    display: grid; grid-template-columns: 2.4fr 1.2fr 1fr 1.4fr; gap: 12px;
-    padding: 12px 14px; border-top: 1px solid ${LINE}; align-items: center;
+  .row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    border-top: 1px solid ${LINE}; padding: 12px 0;
     break-inside: avoid; page-break-inside: avoid;
   }
-  .table-head {
-    background: ${BAND}; border-top: 0; padding: 10px 14px;
-    font-size: 13px; color: ${MUTED}; font-weight: 600;
-  }
-  .warranty-status { display: flex; flex-direction: column; }
-  .warranty-status.is-active > span:first-child { font-weight: 600; color: ${PETROL}; }
-  .warranty-status.is-expired > span:first-child { color: ${MUTED}; }
-  .warranty-remaining, .warranty-claim { font-size: 12.5px; color: ${SUBTLE}; }
+  .row-title { font-size: 15.5px; font-weight: 600; }
+  .state { font-size: 13.5px; text-align: left; }
+  .state.is-active { color: ${PETROL}; font-weight: 600; }
+  .state.is-expired { color: ${MUTED}; }
+  .score { white-space: nowrap; }
+  .score-value { font-size: 28px; font-weight: 700; color: ${PETROL}; }
 
-  .inspection {
-    border: 1px solid ${LINE}; padding: 18px; display: flex; gap: 22px;
-    align-items: center; margin-bottom: 12px;
-    break-inside: avoid; page-break-inside: avoid;
-  }
-  .score {
-    flex: none; display: flex; flex-direction: column; align-items: center;
-    border-left: 1px solid ${LINE}; padding-left: 22px;
-  }
-  .score-value { font-size: 40px; font-weight: 700; color: ${PETROL}; line-height: 1; }
-  .score-scale { font-size: 12.5px; color: ${SUBTLE}; }
-  .inspection-body { flex: 1 1 auto; font-size: 13.5px; }
-  .inspection-title { font-size: 16px; font-weight: 600; }
+  .trust { border-radius: 14px; background: ${TINT}; border: 1px solid ${PALE}; padding: 18px; break-inside: avoid; }
+  .trust h2 { color: ${PETROL}; }
+  .trust ul { margin: 0; padding: 0 18px 0 0; }
+  .trust li { margin-bottom: 8px; }
+  .trust .warn { color: #8A4B08; font-weight: 600; }
 
-  .verify { border: 1px solid ${PETROL}; background: ${TINT}; padding: 20px; break-inside: avoid; }
-  .verify h2 { color: ${PETROL}; font-size: 17px; margin: 0 0 10px; }
-  .verify p { margin: 0 0 10px; font-size: 14.5px; }
-  .verify .caveat {
-    font-size: 13px; color: ${MUTED}; border-top: 1px solid #A9D2CE;
-    padding-top: 12px; margin: 0;
-  }
-
-  .foot {
-    border-top: 1px solid ${LINE}; padding-top: 12px; margin-top: 8px;
-    display: flex; justify-content: space-between; gap: 16px;
-    font-size: 12px; color: ${SUBTLE};
-  }
-
-  /* Read in the app on a phone as well as printed. The layout is set for
-     A4; at phone width it steps down so nothing runs off the side. Print
-     never matches — an A4 page is wider than this. */
-  @media (max-width: 520px) {
-    body { font-size: 13.5px; padding: 12px; }
-    .masthead, .running-head { flex-wrap: wrap; gap: 6px; }
-    .masthead-title { font-size: 22px; }
-    .car-name { font-size: 24px; }
-    .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .panel { padding: 14px; }
-    .ratio-value { font-size: 34px; }
-    .event-date { width: 76px; font-size: 12px; white-space: nowrap; }
-    .table-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .inspection { flex-direction: column; align-items: stretch; }
-    .score { border-left: 0; padding-left: 0; }
-    .foot { flex-direction: column; gap: 4px; }
-  }
+  .foot { border-top: 1px solid ${LINE}; padding-top: 10px; font-size: 12px; color: ${SUBTLE}; }
 `;
 
 export interface ReportPdfOptions {
   /**
-   * Shown in the masthead. Defaults to the payload's own `generated_at`, which
-   * is the only date that describes what the document actually says — a
-   * "printed on" date would imply the contents are current when they are
-   * frozen.
+   * The issue date. Defaults to the payload's own `generated_at` — the only
+   * date that describes what the document says. A "printed on" date would
+   * imply the contents are current when they are frozen.
    */
   readonly issuedOn?: string;
 }
 
 export function renderHabbaReportPdf(report: HabbaReport, options: ReportPdfOptions = {}): string {
-  const { vehicle, chain, coverage } = report;
+  const { vehicle, chain } = report;
   const issued = options.issuedOn ?? dateOnly(report.generated_at);
   // The year is a label, not a quantity: `formatNumber` would print «2,019».
   const carName = `${vehicle.make_ar} ${vehicle.model_ar} ${vehicle.year}`;
-  const plate = vehicle.plate ?? '';
 
   const identity = [
     vehicle.plate === null ? null : renderIdentityField('رقم اللوحة', isolate(vehicle.plate)),
-    vehicle.vin === null ? null : renderIdentityField('رقم الهيكل', isolate(vehicle.vin)),
+    renderIdentityField('العدّاد الآن', `${num(vehicle.current_mileage)} كم`),
     vehicle.colour === null ? null : renderIdentityField('اللون', escapeHtml(vehicle.colour)),
-    renderIdentityField('قراءة العدّاد', `${num(vehicle.current_mileage)} كم`),
-    renderIdentityField('على هبّة منذ', counted(report.ownership.months_on_habba, MONTH_FORMS)),
-    renderIdentityField('عدد السجلات', counted(coverage.total, RECORD_FORMS)),
+    renderIdentityField('في هبّة منذ', counted(report.ownership.months_on_habba, MONTH_FORMS)),
+    vehicle.vin === null ? null : renderIdentityField('رقم الهيكل', isolate(vehicle.vin), true),
   ]
     .filter((field): field is string => field !== null)
     .join('');
@@ -631,8 +515,9 @@ export function renderHabbaReportPdf(report: HabbaReport, options: ReportPdfOpti
           .map((group) => renderYearGroup(group.year, group.events))
           .join('');
 
-  const privacyLine =
-    'لا يحتوي هذا التقرير على اسم المالك أو رقم جواله أو عنوانه. المعلومات المعروضة تخصّ السيارة وحدها.';
+  const trust = chain.is_valid
+    ? `<li>كل ${counted(chain.length, RECORD_FORMS)} في هذا التقرير محفوظة كما كُتبت أول مرة، ولا يمكن تعديلها أو حذفها. تأكّدنا من ذلك يوم ${dayMonthYear(issued)}.</li>`
+    : '<li class="warn">تعذّر التأكّد من سلامة السجلات في هذا التقرير. لا تعتمد عليه، واطلب من البائع إصدار تقرير جديد.</li>';
 
   return `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -643,72 +528,37 @@ export function renderHabbaReportPdf(report: HabbaReport, options: ReportPdfOpti
 <style>${STYLE}</style>
 </head>
 <body>
-
 <div class="sheet">
   <div class="masthead">
-    <div>
-      <div class="masthead-title">تقرير هبّة</div>
-      <div class="masthead-sub">سجل صيانة السيارة</div>
-    </div>
-    <div class="masthead-side">صدر في ${isolate(issued)}</div>
+    <div class="masthead-title">تقرير هبّة</div>
+    <div class="masthead-sub">سجل صيانة السيارة · صدر في ${dayMonthYear(issued)}</div>
   </div>
 
-  <div class="block">
+  <div class="car block">
     <div class="car-name">${escapeHtml(carName)}</div>
     <div class="fields">${identity}</div>
   </div>
 
-  ${renderCoverage(report)}
-  ${renderMileageChart(report.mileage_history)}
+  ${renderSummary(report)}
 
-  <div class="foot">
-    <div>${escapeHtml(privacyLine)}</div>
-    <div>هبّة</div>
-  </div>
-</div>
-
-<div class="sheet">
-  <div class="running-head">
-    <h1>سجل الصيانة</h1>
-    <div>${escapeHtml(carName)} · ${isolate(plate)}</div>
-  </div>
-  ${history}
-  <div class="foot">
-    <div>تقرير هبّة · صدر في ${isolate(issued)}</div>
-    <div>هبّة</div>
-  </div>
-</div>
-
-<div class="sheet">
-  <div class="running-head">
-    <h1>الضمان والفحوصات</h1>
-    <div>${escapeHtml(carName)} · ${isolate(plate)}</div>
-  </div>
+  <section>
+    <h2>سجل الصيانة</h2>
+    ${history}
+  </section>
 
   ${renderWarrantyAndInspections(report)}
 
-  <section class="verify">
-    <h2>${chain.is_valid ? 'سلسلة السجل مُتحقّق منها' : 'تعذّر التحقّق من سلسلة السجل'}</h2>
-    <p>
-      ${
-        chain.is_valid
-          ? `يحتوي هذا التقرير على ${counted(chain.length, RECORD_FORMS)} مترابطة بسلسلة تجزئة (hash chain). تحقّقت هبّة من السلسلة كاملة عند إصدار هذا الملف في ${isolate(issued)}، ولم يُعدَّل أو يُحذَف أي سجل منذ تدوينه.`
-          : 'لم تتحقّق هبّة من سلسلة السجلات في هذا الملف.'
-      }
-    </p>
-    <p class="caveat">
-      هذا التحقّق يثبت أن السجلات لم تُعدَّل بعد إدخالها، ولا يثبت صحة ما أدخله المالك بنفسه.
-      وهذا الملف نسخة مطبوعة من سجل داخل التطبيق: للتأكّد منه بشكل مستقل، اطلب من البائع
-      فتح دفتر السيارة في تطبيق هبّة أمامك.
-    </p>
+  <section class="trust">
+    <h2>هل أثق في هذا التقرير؟</h2>
+    <ul>
+      ${trust}
+      <li>ما كُتب عليه «نفّذتها هبّة» أدخله فنّي هبّة من التطبيق وقت العمل. أما ما سجّله المالك فلم تتحقّق منه هبّة.</li>
+      <li>للتأكّد بنفسك، اطلب من البائع أن يفتح دفتر السيارة في تطبيق هبّة أمامك.</li>
+    </ul>
   </section>
 
-  <div class="foot">
-    <div>${escapeHtml(privacyLine)}</div>
-    <div>تقرير هبّة · ${isolate(issued)}</div>
-  </div>
+  <div class="foot">لا يحتوي هذا التقرير على اسم المالك أو رقم جواله أو عنوانه. المعلومات المعروضة تخصّ السيارة وحدها.</div>
 </div>
-
 </body>
 </html>`;
 }
