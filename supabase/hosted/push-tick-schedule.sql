@@ -9,7 +9,9 @@
 -- secret named push_tick_secret (0087 lets the function read it from there):
 --   select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'push_tick_secret');
 
-create extension if not exists pg_net;
+-- In `extensions`, not `public` (the security advisor flags an extension in
+-- public). Its functions live in the `net` schema either way.
+create extension if not exists pg_net with schema extensions;
 
 -- One call to push-tick, with the secret from Vault. Never raises: an insert
 -- into the outbox must not fail because the poke could not be sent — the
