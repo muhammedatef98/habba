@@ -37,7 +37,7 @@ select test.assert(
 -- A second template, to prove the wrong one is refused.
 insert into public.inspection_templates (key, name_ar, name_en, sections)
 values ('quick_check_v1', 'فحص سريع', 'Quick check',
-        '[{"key":"body","title_ar":"الهيكل","weight":1,"items":[{"key":"dents","label_ar":"صدمات","type":"rating","required":true}]}]');
+        '[{"key":"body","title_ar":"الهيكل","title_en":"Body","weight":1,"items":[{"key":"dents","label_ar":"صدمات","label_en":"Dents","type":"rating","required":true}]}]');
 
 insert into public.orders
   (id, customer_id, vehicle_id, service_id, fulfilment_mode, status,

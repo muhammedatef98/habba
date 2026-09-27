@@ -7,7 +7,9 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./legal": "./src/legal/document.ts"
+    "./legal": "./src/legal/document.ts",
+    "./catalogue-icons": "./src/catalogue/icons.ts",
+    "./inspection-template": "./src/catalogue/inspection-template.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

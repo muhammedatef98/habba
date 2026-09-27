@@ -897,7 +897,10 @@ function seed(): State {
           supported_modes: ['mobile_ondemand', 'mobile_scheduled'],
           name_ar: 'بطارية — شحن أو تبديل',
           name_en: 'Battery jump or replacement',
-          category: 'battery',
+          category: 'emergency',
+          icon: 'battery',
+          price_is_fixed: true,
+          requires_vehicle: true,
           base_price: 150,
           est_duration_min: 30,
           is_active: true,
@@ -907,7 +910,10 @@ function seed(): State {
           supported_modes: ['mobile_ondemand', 'mobile_scheduled'],
           name_ar: 'ونش/سحب',
           name_en: 'Tow',
-          category: 'towing',
+          category: 'emergency',
+          icon: 'truck',
+          price_is_fixed: true,
+          requires_vehicle: true,
           base_price: 250,
           est_duration_min: 45,
           is_active: true,
@@ -917,7 +923,10 @@ function seed(): State {
           supported_modes: ['mobile_ondemand', 'mobile_scheduled'],
           name_ar: 'تغيير زيت وفلتر',
           name_en: 'Oil and filter change',
-          category: 'maintenance',
+          category: 'periodic',
+          icon: 'oil',
+          requires_vehicle: true,
+          description_ar: 'زيت وفلتر أصلي، مع تسجيل القراءة في دفتر السيارة',
           base_price: 180,
           est_duration_min: 40,
           is_active: true,
@@ -928,6 +937,7 @@ function seed(): State {
           name_ar: 'فحص قبل الشراء (شامل)',
           name_en: 'Pre-purchase inspection',
           category: 'inspection',
+          icon: 'clipboard',
           base_price: 350,
           est_duration_min: 90,
           requires_vehicle: false,
@@ -1001,7 +1011,56 @@ function seed(): State {
           key: 'pre_purchase_v1',
           name_ar: 'فحص ما قبل الشراء (شامل)',
           name_en: 'Pre-purchase inspection (comprehensive)',
-          sections: [],
+          sections: [
+            {
+              key: 'engine',
+              title_ar: 'المحرك',
+              title_en: 'Engine',
+              weight: 3,
+              items: [
+                {
+                  key: 'oil_leaks',
+                  type: 'rating',
+                  weight: 2,
+                  label_ar: 'تسريب زيت',
+                  label_en: 'Oil leaks',
+                  required: true,
+                },
+                {
+                  key: 'cold_start',
+                  type: 'rating',
+                  weight: 2,
+                  label_ar: 'التشغيل البارد',
+                  label_en: 'Cold start',
+                  required: true,
+                },
+                {
+                  key: 'belts',
+                  type: 'rating',
+                  label_ar: 'السيور',
+                  label_en: 'Belts',
+                  required: false,
+                },
+              ],
+            },
+            {
+              key: 'history',
+              title_ar: 'تاريخ الحوادث',
+              title_en: 'Accident history',
+              weight: 4,
+              items: [
+                {
+                  key: 'accident_evidence',
+                  type: 'rating',
+                  weight: 4,
+                  critical: true,
+                  label_ar: 'آثار حوادث',
+                  label_en: 'Evidence of accidents',
+                  required: true,
+                },
+              ],
+            },
+          ],
           is_active: true,
         }),
       ],
@@ -1866,6 +1925,20 @@ export class FixtureTransport implements Transport {
             : p,
         );
         return null;
+      }
+
+      case 'ops_adjust_service_prices': {
+        const category = args['p_category'] as string | null;
+        const factor = 1 + Number(args['p_percent']) / 100;
+        let changed = 0;
+        s.tables['services'] = ((s.tables['services'] ?? []) as Row[]).map((row) => {
+          if (row['base_price'] === null || (category !== null && row['category'] !== category)) {
+            return row;
+          }
+          changed += 1;
+          return { ...row, base_price: Math.round(Number(row['base_price']) * factor * 100) / 100 };
+        });
+        return changed;
       }
 
       case 'ops_broadcast': {

@@ -7,7 +7,9 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./icon-shapes": "./src/icon-shapes.ts",
+    "./icon-names": "./src/icon-names.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -328,6 +328,13 @@ export function createApi(transport: Transport) {
     updateSetting: (key: string, value: unknown) =>
       transport.update('platform_settings', { key }, { value }),
 
+    adjustServicePrices: (category: string | null, percent: number, reason: string) =>
+      transport.rpc<number>('ops_adjust_service_prices', {
+        p_category: category,
+        p_percent: percent,
+        p_reason: reason,
+      }),
+
     table: <T extends Row>(table: string, options?: ListOptions) =>
       transport.list<T>(table, options),
     insertRow: (table: string, row: Row) => transport.insert(table, row),

@@ -438,6 +438,47 @@ export function Button({
   );
 }
 
+/**
+ * An on/off switch: green and «يعمل» when on, grey and «متوقف» when off. A
+ * button with role="switch", so a screen reader announces its state. Clicks
+ * do not reach a clickable table row underneath.
+ */
+export function Switch({
+  checked,
+  onChange,
+  busy = false,
+  label,
+  onText = 'يعمل',
+  offText = 'متوقف',
+}: {
+  readonly checked: boolean;
+  readonly onChange: (next: boolean) => void;
+  readonly busy?: boolean | undefined;
+  readonly label: string;
+  readonly onText?: string | undefined;
+  readonly offText?: string | undefined;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className="switch"
+      disabled={busy}
+      onClick={(event) => {
+        event.stopPropagation();
+        onChange(!checked);
+      }}
+    >
+      <span className="switch-track">
+        <span className="switch-thumb" />
+      </span>
+      <span className="switch-text">{checked ? onText : offText}</span>
+    </button>
+  );
+}
+
 export function Field({
   label,
   hint,
@@ -459,10 +500,13 @@ export function Field({
 export function Dialog({
   title,
   onClose,
+  wide = false,
   children,
 }: {
   readonly title: string;
   readonly onClose: () => void;
+  /** For forms with more than a column of fields: the catalogue's editors. */
+  readonly wide?: boolean | undefined;
   readonly children: ReactNode;
 }) {
   useEffect(() => {
@@ -477,6 +521,7 @@ export function Dialog({
     <div className="dialog-backdrop" onClick={onClose}>
       <div
         className="dialog"
+        data-wide={wide}
         role="dialog"
         aria-modal="true"
         aria-label={title}

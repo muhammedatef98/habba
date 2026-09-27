@@ -20,3 +20,5 @@ export * from './sms/unifonic.js';
 export * from './sms/authentica.js';
 export * from './supabase/api-keys.js';
 export * from './legal/document.js';
+export * from './catalogue/icons.js';
+export * from './catalogue/inspection-template.js';

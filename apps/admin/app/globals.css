@@ -790,3 +790,195 @@ pre.json {
   direction: ltr;
   text-align: left;
 }
+
+/* ---------------------------------------------------------------------------
+   Catalogue and settings editors
+   ------------------------------------------------------------------------- */
+
+/* An on/off switch: green and pushed to the end when on, grey when off. A
+   button underneath, so it is reachable and announced as one. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text-muted);
+}
+.switch:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+.switch-track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-border-strong, #c9c3b8);
+  transition: background 120ms ease;
+  flex: none;
+}
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  inset-inline-start: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: inset-inline-start 120ms ease;
+}
+.switch[aria-checked='true'] .switch-track {
+  background: var(--color-success-fg);
+}
+.switch[aria-checked='true'] .switch-thumb {
+  inset-inline-start: 21px;
+}
+.switch[aria-checked='true'] .switch-text {
+  color: var(--color-success-fg);
+  font-weight: 600;
+}
+
+.dialog[data-wide='true'] {
+  max-width: 860px;
+}
+
+.form-section {
+  display: grid;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+.form-section:last-of-type {
+  border-bottom: none;
+}
+.form-section > h3 {
+  margin: 0;
+  font-size: var(--text-md, 1rem);
+}
+
+.two-col {
+  display: grid;
+  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--space-xs);
+}
+.icon-option {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: var(--space-sm) var(--space-xs);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text);
+}
+.icon-option[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle, #e3f0ed);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.chip {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-text-muted);
+}
+.chip[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle, #e3f0ed);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.service-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 220px;
+}
+.service-glyph {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken, #f1ede6);
+  color: var(--color-primary);
+  flex: none;
+}
+
+.row-muted td {
+  opacity: 0.55;
+}
+
+.template-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+  background: var(--color-surface);
+}
+.template-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) auto auto auto auto;
+  gap: var(--space-xs);
+  align-items: center;
+}
+@media (max-width: 760px) {
+  .template-item {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.jump-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  background: var(--color-background);
+}
+
+.settings-grid {
+  display: grid;
+  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+.setting-tile {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-xs);
+  align-content: start;
+  background: var(--color-surface);
+}
+.setting-tile[data-off='true'] {
+  background: var(--color-surface-sunken, #f5f1ea);
+}

@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-93 migrations · 60 SQL suites (all pass) · tests/rls.spec.ts
+94 migrations · 61 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0093, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0094, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -222,12 +222,32 @@ as a user would. The fixes that matter beyond one screen:
   map; home, work and the last five places are kept on the phone
   (`lib/places.ts`) and erased on sign-out.
 
+### The catalogue, rebuilt for editing (0094)
+
+- **Services** have their own editor (`sections/catalogue/services.tsx`):
+  glyph, both names, the price before VAT and what the customer pays, the
+  ways it can be done, and an on/off switch in the row; order moves with
+  arrows. The form picks the icon from `CATALOGUE_ICONS` (@habba/core — the
+  same list the app draws, which fixed twelve seeded names the app showed as
+  a warning sign), previews the price with VAT, copies a service, and deletes
+  only from inside. «تعديل الأسعار بنسبة» moves a category's prices through
+  `ops_adjust_service_prices` (reason required, ±bounds, audited per row).
+- **Inspection templates** are edited as sections and items (weights, required,
+  critical), checked while typing (`@habba/core/inspection-template`) and by
+  the database on write. A template with filed reports keeps every item they
+  answered (suite 61).
+- **Every other table** has search, an on/off filter and switch, models by
+  make, the rate in force today marked, and a city centre from a pasted Google
+  Maps link.
+- **Settings** are grouped tiles with toggles, a pinned row of links to each
+  group and a search box; switching a feature off asks first.
+
 ## 6b. The hosted project, as of 2026-09-27
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
-  0001–0093 applied. 0001–0053 were applied on 2026-09-05 by
+  0001–0094 applied. 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
-  0054–0093 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
+  0054–0094 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
   policy files are applied. The four `rls-…@habba.test` users are the RLS
   suite's fixtures, not people.
