@@ -24,6 +24,7 @@ import { FinanceSection } from './sections/finance';
 import { CatalogueSection } from './sections/catalogue';
 import { NotificationsSection } from './sections/notifications';
 import { SettingsSection } from './sections/settings';
+import { CopySection } from './sections/copy';
 import { ComplianceSection } from './sections/compliance';
 import { LegalSection } from './sections/legal';
 import { StaffSection } from './sections/staff';
@@ -75,7 +76,8 @@ const NAV: readonly {
     items: [
       { section: 'catalogue', label: 'الكتالوج' },
       { section: 'notifications', label: 'الإشعارات' },
-      { section: 'settings', label: 'الإعدادات' },
+      { section: 'settings', label: 'الإعدادات وتشغيل الميزات' },
+      { section: 'copy', label: 'نصوص التطبيق' },
     ],
   },
   {
@@ -210,6 +212,8 @@ function SectionView({ section, id }: { readonly section: Section; readonly id: 
       return <NotificationsSection />;
     case 'settings':
       return <SettingsSection />;
+    case 'copy':
+      return <CopySection />;
     case 'compliance':
       return <ComplianceSection />;
     case 'legal':

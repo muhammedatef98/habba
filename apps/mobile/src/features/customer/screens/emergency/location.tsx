@@ -12,25 +12,48 @@
  * technician brings and whether a tow truck can physically reach the vehicle.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Field, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  Field,
+  Icon,
+  Row,
+  Screen,
+  Text,
+  rowDirectionFor,
+  useTheme,
+  type IconName,
+} from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
+import { useSavedPlaces } from '@/features/shared/hooks/use-saved-places';
+import type { SavedPlace } from '@/features/shared/lib/places';
 import { locationProvider } from '@/features/shared/lib/location';
 import {
   MAP_FALLBACK_LOCATION,
   movedFromFallback,
   type DeviceLocation,
+  type PlaceMatch,
 } from '@/features/shared/lib/location-provider';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { priceWithVat } from '@/features/shared/lib/order-price';
 import { registerThisDevice } from '@/features/shared/lib/push';
 import { useEmergencyDraft, type PlaceKind } from '@/features/shared/state/emergency-draft';
-import { LocationPicker } from '@/features/customer/components/map/LocationPicker';
+import { LocationPicker, type MapFocus } from '@/features/customer/components/map/LocationPicker';
+
+/** Wait for the map to rest before asking the phone to name the spot. */
+const DESCRIBE_DELAY_MS = 600;
+
+const PLACE_ICON: Readonly<Record<SavedPlace['kind'], IconName>> = {
+  home: 'home',
+  work: 'briefcase',
+  recent: 'clock',
+};
 
 export default function LocationConfirmScreen() {
   const { t, i18n } = useTranslation();
@@ -41,6 +64,21 @@ export default function LocationConfirmScreen() {
   const [locationDenied, setLocationDenied] = useState(false);
   const [pinMoved, setPinMoved] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [focus, setFocus] = useState<MapFocus | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [detected, setDetected] = useState<string | null>(null);
+  const [detecting, setDetecting] = useState(false);
+  const [query, setQuery] = useState('');
+  const [matches, setMatches] = useState<readonly PlaceMatch[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [savedAs, setSavedAs] = useState<'home' | 'work' | null>(null);
+  const saved = useSavedPlaces();
+
+  const focusOn = (location: DeviceLocation) => {
+    setFocus({ location, nonce: Date.now() });
+    setPinMoved(true);
+    setSavedAs(null);
+  };
 
   /**
    * The order this screen already created, if sending it failed afterwards.
@@ -57,6 +95,7 @@ export default function LocationConfirmScreen() {
       const result = await locationProvider.getCurrentLocation();
       if (result.ok) {
         draft.setLocation(result.location);
+        setAccuracy(result.accuracyMetres ?? null);
       } else {
         // No permission is a normal answer, not a dead end: the map opens on
         // a fallback the customer moves to their car.
@@ -71,6 +110,39 @@ export default function LocationConfirmScreen() {
   const handleSettled = (location: DeviceLocation) => {
     draft.setLocation(location);
     if (movedFromFallback(location)) setPinMoved(true);
+    setSavedAs(null);
+  };
+
+  // Name the spot under the pin once the map rests: the customer checks it
+  // against what they see, and it fills the address field if they have not
+  // typed one — "حي الشاطئ، طريق الخليج" is what a technician drives to.
+  const lat = draft.location?.lat;
+  const lon = draft.location?.lon;
+  useEffect(() => {
+    if (lat === undefined || lon === undefined) return;
+    let current = true;
+    setDetecting(true);
+    const timer = setTimeout(() => {
+      void locationProvider.describe({ lat, lon }).then((line) => {
+        if (!current) return;
+        setDetecting(false);
+        setDetected(line);
+        if (line !== null && useEmergencyDraft.getState().addressAr.trim().length === 0) {
+          useEmergencyDraft.getState().setAddress(line);
+        }
+      });
+    }, DESCRIBE_DELAY_MS);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [lat, lon]);
+
+  const runSearch = async () => {
+    if (query.trim().length === 0) return;
+    setSearching(true);
+    setMatches(await locationProvider.search(query));
+    setSearching(false);
   };
 
   const submit = useMutation({
@@ -96,6 +168,9 @@ export default function LocationConfirmScreen() {
       // Created is not sent. This holds the payment and puts the request in
       // front of nearby technicians — until it succeeds, nobody can see it.
       await repository.submitOrder(orderId);
+      if (features.savedPlaces) {
+        await saved.remember(draft.location, draft.addressAr.trim() || (detected ?? ''));
+      }
       return orderId;
     },
     onMutate: () => setError(undefined),
@@ -153,12 +228,176 @@ export default function LocationConfirmScreen() {
         </Text>
       </View>
 
+      {features.mapSearch ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <Row gap="sm" align="flex-end">
+            <View style={{ flex: 1 }}>
+              <Field
+                testID="emergency-map-search"
+                label={t('emergency.searchLabel')}
+                value={query}
+                onChangeText={(text) => {
+                  setQuery(text);
+                  if (text.trim().length === 0) setMatches(null);
+                }}
+                placeholder={t('emergency.searchPlaceholder')}
+                returnKeyType="search"
+                onSubmitEditing={() => void runSearch()}
+              />
+            </View>
+            <View>
+              <Button
+                testID="emergency-map-search-go"
+                label={t('common.search')}
+                variant="secondary"
+                size="medium"
+                onPress={() => void runSearch()}
+                loading={searching}
+                disabled={query.trim().length === 0}
+              />
+            </View>
+          </Row>
+          {matches !== null && matches.length === 0 && !searching ? (
+            <Text variant="caption" tone="muted">
+              {t('emergency.searchNoResults')}
+            </Text>
+          ) : null}
+          {(matches ?? []).map((match, index) => (
+            <Card
+              key={`${match.location.lat},${match.location.lon},${index}`}
+              testID={`emergency-map-match-${index}`}
+              elevation="none"
+              onPress={() => {
+                focusOn(match.location);
+                setMatches(null);
+              }}
+              style={{ backgroundColor: theme.colors.surfaceSunken }}
+            >
+              <Row gap="sm">
+                <Icon name="pin" size={theme.iconSize.sm} color={theme.colors.primary} />
+                <Text variant="bodySmall" style={{ flex: 1 }}>
+                  {match.label}
+                </Text>
+              </Row>
+            </Card>
+          ))}
+        </View>
+      ) : null}
+
+      {features.savedPlaces && saved.places.length > 0 ? (
+        <Row gap="sm" wrap testID="emergency-saved-places">
+          {saved.places.map((place, index) => (
+            <Card
+              key={`${place.kind}-${index}`}
+              testID={`emergency-place-saved-${place.kind}-${index}`}
+              elevation="none"
+              onPress={() => focusOn(place)}
+              style={{
+                paddingVertical: theme.spacing.xs,
+                paddingHorizontal: theme.spacing.md,
+                minHeight: theme.minTouchTarget,
+                justifyContent: 'center',
+                borderRadius: theme.radius.full,
+                maxWidth: 220,
+              }}
+            >
+              <Row gap="xs">
+                <Icon name={PLACE_ICON[place.kind]} size={theme.iconSize.sm} />
+                <Text variant="caption" numberOfLines={1}>
+                  {place.kind === 'home'
+                    ? t('emergency.placeHome')
+                    : place.kind === 'work'
+                      ? t('emergency.placeWork')
+                      : place.label || t('emergency.placeRecent')}
+                </Text>
+              </Row>
+            </Card>
+          ))}
+        </Row>
+      ) : null}
+
       {draft.location !== null ? (
-        <LocationPicker testID="emergency-map" initial={draft.location} onSettled={handleSettled} />
+        <LocationPicker
+          testID="emergency-map"
+          initial={draft.location}
+          onSettled={handleSettled}
+          focus={focus}
+          onLocated={(metres) => {
+            if (metres === null) {
+              setLocationDenied(true);
+              return;
+            }
+            setLocationDenied(false);
+            setPinMoved(true);
+            setAccuracy(metres);
+          }}
+        />
       ) : !locationDenied ? (
         <Text variant="caption" tone="muted">
           {t('emergency.locatingNow')}
         </Text>
+      ) : null}
+
+      {draft.location !== null ? (
+        <Card
+          testID="emergency-detected"
+          elevation="none"
+          style={{ backgroundColor: theme.colors.surfaceSunken, gap: theme.spacing.xs }}
+        >
+          <Row gap="sm" align="flex-start">
+            <Icon name="pin" size={theme.iconSize.sm} color={theme.colors.accent} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="caption" tone="muted">
+                {t('emergency.pinnedAddress')}
+              </Text>
+              <Text variant="bodySmall">
+                {detecting
+                  ? t('emergency.detectingAddress')
+                  : (detected ?? t('emergency.addressUnknown'))}
+              </Text>
+              {accuracy !== null && !pinMoved ? (
+                <Text variant="caption" tone="subtle">
+                  {t('emergency.accuracy', { metres: Math.round(accuracy) })}
+                </Text>
+              ) : null}
+            </View>
+          </Row>
+          <Row gap="sm" wrap>
+            {detected !== null && draft.addressAr.trim() !== detected ? (
+              <Button
+                testID="emergency-use-detected"
+                label={t('emergency.useThisAddress')}
+                variant="ghost"
+                size="medium"
+                onPress={() => draft.setAddress(detected)}
+              />
+            ) : null}
+            {features.savedPlaces
+              ? (['home', 'work'] as const).map((kind) => (
+                  <Button
+                    key={kind}
+                    testID={`emergency-save-${kind}`}
+                    label={
+                      savedAs === kind
+                        ? t('emergency.savedPlace')
+                        : kind === 'home'
+                          ? t('emergency.saveAsHome')
+                          : t('emergency.saveAsWork')
+                    }
+                    variant="ghost"
+                    size="medium"
+                    disabled={savedAs === kind}
+                    onPress={() => {
+                      if (draft.location === null) return;
+                      void saved
+                        .save(kind, draft.location, detected ?? draft.addressAr)
+                        .then(() => setSavedAs(kind));
+                    }}
+                  />
+                ))
+              : null}
+          </Row>
+        </Card>
       ) : null}
 
       <Field

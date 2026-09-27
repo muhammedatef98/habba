@@ -47,7 +47,7 @@ recorded in an immutable audit log. What stands between this and real users
 is **not code**: see §7, open decisions.
 
 ```
-92 migrations · 59 SQL suites (all pass) · tests/rls.spec.ts
+93 migrations · 60 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -74,7 +74,7 @@ habba/
 │  ├─ ui/         design system (tokens → both apps)
 │  └─ i18n/       ar.json + en.json (a test enforces Modern Standard Arabic)
 ├─ supabase/
-│  ├─ migrations/ 0001–0092, forward-only, each paired with a suite
+│  ├─ migrations/ 0001–0093, forward-only, each paired with a suite
 │  ├─ tests/      00_helpers + 01–46
 │  ├─ functions/  dispatch-tick, push-tick, send-sms-hook; _shared is
 │  │              VENDORED from @habba/core by scripts/sync-edge-shared.sh
@@ -202,12 +202,32 @@ as a user would. The fixes that matter beyond one screen:
 - **Register.** The dialect test also catches spoken negation and future
   («ما عندك», «ما فيه», «بيظهر», «تسوي شي», «يشتغل»…).
 
+### The console controls more, and edits the app's words (0093)
+
+- **Switches.** Besides 0081's eight, «الإعدادات وتشغيل الميزات» now turns off
+  booking to the customer's location, workshop bookings, owner-added past
+  services, maintenance reminders (section, home alert and the daily sweep),
+  ratings, the map's address search and saved places. Each with a server path
+  is refused by the database when off (suite 60); the two map switches are the
+  app's alone. `useFeatures()` treats booking with both ways off as booking off.
+- **«نصوص التطبيق».** Every sentence in `packages/i18n` is listed and can be
+  replaced in Arabic, English or both; a row in `app_copy` (public read,
+  operator write, audited). The app fetches the rows at launch and every few
+  minutes (`CopyOverrides`) and lays them over its own words. A replacement
+  that drops a `{{placeholder}}` or a `<link>` is refused by the console and
+  skipped by the app (`@habba/i18n/overrides`, a separate entry because Next
+  does not map `./x.js` to `./x.ts` inside a package).
+- **Map.** Address search and naming the spot under the pin use the phone's
+  own geocoder (no key); «موقعي», zoom, satellite and a taller map sit on the
+  map; home, work and the last five places are kept on the phone
+  (`lib/places.ts`) and erased on sign-out.
+
 ## 6b. The hosted project, as of 2026-09-27
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
-  0001–0092 applied. 0001–0053 were applied on 2026-09-05 by
+  0001–0093 applied. 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
-  0054–0092 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
+  0054–0093 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
   policy files are applied. The four `rls-…@habba.test` users are the RLS
   suite's fixtures, not people.

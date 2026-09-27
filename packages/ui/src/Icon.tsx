@@ -85,6 +85,19 @@ const ICONS: Record<IconName, readonly Shape[]> = {
   wash: [c(9.5, 14.5, 4), c(16, 10, 3), c(17, 17.5, 2)],
   inspection: [r(6, 4, 12, 16, 2), p('M9.5 4h5v2.5h-5z'), p('M9.5 13l2 2 3.5-3.5')],
   wrench: [p('M19.5 4.5a4.5 4.5 0 0 1-6 6L6.5 17.5l-2-2L11.5 8.5a4.5 4.5 0 0 1 6-6l-3 3 2 2 3-3z')],
+
+  search: [c(10.5, 10.5, 6), p('M15 15l5 5')],
+  pin: [p('M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z'), c(12, 10, 2.2)],
+  plus: [p('M12 5v14M5 12h14')],
+  minus: [p('M5 12h14')],
+  layers: [p('M12 4l8 4-8 4-8-4z'), p('M4 12l8 4 8-4'), p('M4 16l8 4 8-4')],
+  expand: [p('M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5')],
+  collapse: [p('M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5')],
+  briefcase: [
+    r(3.5, 7.5, 17, 12, 2),
+    p('M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17'),
+  ],
+  clock: [c(12, 12, 8.5), p('M12 7.5V12l3 2')],
 };
 
 /** Filled rather than stroked — a rating, not an action. */

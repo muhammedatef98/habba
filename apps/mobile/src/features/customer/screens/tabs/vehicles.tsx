@@ -201,7 +201,8 @@ export default function HomeScreen() {
     router.push('/booking');
   }
 
-  const alert = (alerts.data ?? [])[0];
+  // Reminders switched off in the console (0093) take the home alert with them.
+  const alert = features.careReminders ? (alerts.data ?? [])[0] : undefined;
 
   function openEmergency() {
     if (!hasVehicles) {

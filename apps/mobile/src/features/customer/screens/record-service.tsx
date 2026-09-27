@@ -26,6 +26,8 @@ import { BottomSheet, Button, Card, Field, ListRow, Screen, Text, useTheme } fro
 import { repository } from '@/features/shared/data/repository';
 import type { PastServicePart, TimelineAttachment } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
+import { FeatureUnavailable } from '@/features/shared/components/FeatureUnavailable';
 import { DateChips } from '@/features/customer/components/form/DateChips';
 
 interface FieldErrors {
@@ -60,6 +62,7 @@ function parseDate(value: string): Date | null {
 }
 
 export default function RecordServiceScreen() {
+  const features = useFeatures();
   const { t } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -127,6 +130,8 @@ export default function RecordServiceScreen() {
   });
 
   if (!isAuthenticated) return <Redirect href="/" />;
+  // Switched off in the console (0093); the server refuses it regardless.
+  if (!features.recordService) return <FeatureUnavailable testID="record-service-unavailable" />;
 
   /**
    * Stands in for the camera, mirroring the provider evidence screen. The

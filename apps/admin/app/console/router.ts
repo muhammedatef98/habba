@@ -25,6 +25,7 @@ export type Section =
   | 'catalogue'
   | 'notifications'
   | 'settings'
+  | 'copy'
   | 'compliance'
   | 'legal'
   | 'staff'
@@ -43,6 +44,7 @@ const SECTIONS: readonly Section[] = [
   'catalogue',
   'notifications',
   'settings',
+  'copy',
   'compliance',
   'legal',
   'staff',

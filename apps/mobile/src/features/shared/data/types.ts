@@ -377,6 +377,20 @@ export interface AppFeatures {
   readonly providerApplications: boolean;
   readonly guestLogin: boolean;
   readonly emailLogin: boolean;
+  /** Booking a technician to the customer's location (0093). */
+  readonly bookingMobile: boolean;
+  /** Booking at a workshop (0093). */
+  readonly bookingWorkshop: boolean;
+  /** The owner adding a past service to the logbook (0093). */
+  readonly recordService: boolean;
+  /** Upcoming maintenance, car papers, and their reminders (0093). */
+  readonly careReminders: boolean;
+  /** Rating the technician after a job (0093). */
+  readonly ratings: boolean;
+  /** Address search over the location map; the app's alone (0093). */
+  readonly mapSearch: boolean;
+  /** Home, work and recent places under the map; on the device only (0093). */
+  readonly savedPlaces: boolean;
 }
 
 export interface OrderPart {

@@ -17,6 +17,7 @@ import { PriceBreakdown } from './PriceBreakdown';
 import type { Order, ProviderSummary } from '@/features/shared/data/types';
 import { DocumentActions } from '@/features/shared/components/DocumentActions';
 import { invoiceDocument } from '@/features/shared/lib/report-pdf';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 
 export interface CompletedProps {
   readonly order: Order;
@@ -55,6 +56,10 @@ export function Completed({
   const { t } = useTranslation();
   const theme = useTheme();
   const rated = rateSucceeded || (givenRating !== null && givenRating !== undefined);
+  // Ratings switched off (0093): no invitation to rate. A rating already given
+  // is still shown — it happened.
+  const canRate = useFeatures().ratings;
+  const hideRating = givenRating === undefined || (!canRate && !rated);
 
   return (
     // Each state arrives rather than replacing the last between frames.
@@ -123,7 +128,7 @@ export function Completed({
         <Button label={t('tracking.viewLogbook')} variant="secondary" onPress={onViewLogbook} />
       ) : null}
 
-      {givenRating === undefined && !rateSucceeded ? null : (
+      {hideRating && !rateSucceeded ? null : (
         <Card testID="completed-rating">
           <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>
             <Text variant="bodyStrong" align="center">
@@ -164,8 +169,8 @@ export function Completed({
 
       <Button
         testID="completed-done"
-        label={rated ? t('common.done') : t('common.later')}
-        variant={rated ? 'secondary' : 'ghost'}
+        label={rated || !canRate ? t('common.done') : t('common.later')}
+        variant={rated || !canRate ? 'secondary' : 'ghost'}
         onPress={onDismiss}
       />
     </FadeIn>

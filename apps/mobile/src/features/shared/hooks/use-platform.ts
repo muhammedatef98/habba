@@ -22,5 +22,10 @@ export function usePlatformStatus(): PlatformStatus {
 }
 
 export function useFeatures(): AppFeatures {
-  return usePlatformStatus().features;
+  const features = usePlatformStatus().features;
+  // Booking with both of its ways switched off is booking switched off: the
+  // home screen should not offer a flow with nothing at the end of it.
+  return features.bookingMobile || features.bookingWorkshop
+    ? features
+    : { ...features, booking: false };
 }

@@ -24,6 +24,7 @@ import {
   type LegalDocumentKind,
   type SarAmount,
 } from '@habba/core';
+import type { CopyOverride } from '@habba/i18n/overrides';
 import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
 import { parseStorageRef } from '@/features/shared/lib/media-ref.js';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
@@ -1545,11 +1546,24 @@ export class SupabaseRepository implements Repository {
         providerApplications: values['feature_provider_applications'] !== false,
         guestLogin: values['feature_guest_login'] !== false,
         emailLogin: values['feature_email_login'] !== false,
+        bookingMobile: values['feature_booking_mobile'] !== false,
+        bookingWorkshop: values['feature_booking_workshop'] !== false,
+        recordService: values['feature_record_service'] !== false,
+        careReminders: values['feature_care_reminders'] !== false,
+        ratings: values['feature_ratings'] !== false,
+        mapSearch: values['feature_map_search'] !== false,
+        savedPlaces: values['feature_saved_places'] !== false,
       },
       minAppVersion: text('min_app_version'),
       appStoreUrl: text('app_store_url'),
       playStoreUrl: text('play_store_url'),
     };
+  }
+
+  async listAppCopy(): Promise<readonly CopyOverride[]> {
+    const { data, error } = await this.client.from('app_copy').select('key, ar, en');
+    if (error !== null) throw new Error(`listAppCopy: ${error.message}`);
+    return (data ?? []) as CopyOverride[];
   }
 
   async confirmOrderCompletion(orderId: string): Promise<void> {

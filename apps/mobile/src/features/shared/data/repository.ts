@@ -16,6 +16,7 @@
  */
 
 import type { HabbaReport, InvoiceDocument, LegalDocumentKind } from '@habba/core';
+import type { CopyOverride } from '@habba/i18n/overrides';
 import {
   addSar,
   applyRate,
@@ -274,6 +275,8 @@ export interface Repository {
   ): Promise<string>;
   /** The operators' switches and this account's standing (0069, 0070). */
   getPlatformStatus(): Promise<PlatformStatus>;
+  /** The operators' replacements for the app's words (0093). Public. */
+  listAppCopy(): Promise<readonly CopyOverride[]>;
   /** The version in force of a legal document, its placeholders filled (0083). */
   getLegalDocument(kind: LegalDocumentKind): Promise<LegalDocument>;
   /** What this account has yet to accept; empty when signed out (0083). */
@@ -1681,6 +1684,11 @@ export class InMemoryRepository implements Repository {
   // Development has no operators: nothing paused, nothing announced.
   async getPlatformStatus(): Promise<PlatformStatus> {
     return DEFAULT_PLATFORM_STATUS;
+  }
+
+  // Nothing changed by an operator: the app's own words.
+  async listAppCopy(): Promise<readonly CopyOverride[]> {
+    return [];
   }
 
   // Without a server there is nothing published and nothing to agree to: the

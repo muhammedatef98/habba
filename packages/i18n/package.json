@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./overrides": "./src/overrides.ts",
     "./locales/ar": "./src/locales/ar.json",
     "./locales/en": "./src/locales/en.json"
   },

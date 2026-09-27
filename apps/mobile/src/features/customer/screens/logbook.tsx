@@ -255,34 +255,37 @@ export default function LogbookScreen() {
           the car needs next does not depend on the logbook having loaded, and
           a dropped timeline fetch must not take the section that can book a
           service down with it. */}
-      <View style={{ gap: theme.spacing.md }}>
-        <SectionHeader title={t('care.title')} />
-        {care.isPending || documents.isPending ? (
-          <SkeletonCard testID="care-skeleton" lines={2} />
-        ) : care.isError || documents.isError ? (
-          <ErrorState
-            testID="care-error"
-            message={t('errors.offline')}
-            retryLabel={t('common.retry')}
-            retrying={care.isFetching || documents.isFetching}
-            onRetry={() => {
-              void care.refetch();
-              void documents.refetch();
-            }}
-          />
-        ) : (
-          <UpcomingCare
-            testID="care-section"
-            items={care.data ?? []}
-            documents={documents.data ?? []}
-            busyItemId={actOnItem.isPending ? (actOnItem.variables?.itemId ?? null) : null}
-            onDone={(itemId) => actOnItem.mutate({ itemId, kind: 'done' })}
-            onSnooze={(itemId) => actOnItem.mutate({ itemId, kind: 'snooze' })}
-            onBook={(item) => startBooking.mutate(item)}
-            onConfirmOdometer={() => router.push({ pathname: '/mileage', params: { id } })}
-          />
-        )}
-      </View>
+      {/* Reminders switched off in the console (0093) take the section too. */}
+      {features.careReminders ? (
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader title={t('care.title')} />
+          {care.isPending || documents.isPending ? (
+            <SkeletonCard testID="care-skeleton" lines={2} />
+          ) : care.isError || documents.isError ? (
+            <ErrorState
+              testID="care-error"
+              message={t('errors.offline')}
+              retryLabel={t('common.retry')}
+              retrying={care.isFetching || documents.isFetching}
+              onRetry={() => {
+                void care.refetch();
+                void documents.refetch();
+              }}
+            />
+          ) : (
+            <UpcomingCare
+              testID="care-section"
+              items={care.data ?? []}
+              documents={documents.data ?? []}
+              busyItemId={actOnItem.isPending ? (actOnItem.variables?.itemId ?? null) : null}
+              onDone={(itemId) => actOnItem.mutate({ itemId, kind: 'done' })}
+              onSnooze={(itemId) => actOnItem.mutate({ itemId, kind: 'snooze' })}
+              onBook={(item) => startBooking.mutate(item)}
+              onConfirmOdometer={() => router.push({ pathname: '/mileage', params: { id } })}
+            />
+          )}
+        </View>
+      ) : null}
 
       {/* The one screen the product cannot afford to be wrong about. Telling
           an owner with two years of history that their logbook "starts here"
@@ -312,11 +315,13 @@ export default function LogbookScreen() {
             <Text variant="body" tone="muted">
               {t('logbook.emptyBody')}
             </Text>
-            <Button
-              testID="record-service"
-              label={t('logbook.addRecord')}
-              onPress={() => router.push({ pathname: '/record-service', params: { id } })}
-            />
+            {features.recordService ? (
+              <Button
+                testID="record-service"
+                label={t('logbook.addRecord')}
+                onPress={() => router.push({ pathname: '/record-service', params: { id } })}
+              />
+            ) : null}
           </View>
         </Card>
       ) : (
@@ -389,8 +394,12 @@ export default function LogbookScreen() {
                 screen — not a second history surface (ADR-0022). */}
             <SectionHeader
               title={t('care.happened')}
-              actionLabel={t('logbook.addRecord')}
-              onAction={() => router.push({ pathname: '/record-service', params: { id } })}
+              {...(features.recordService
+                ? {
+                    actionLabel: t('logbook.addRecord'),
+                    onAction: () => router.push({ pathname: '/record-service', params: { id } }),
+                  }
+                : {})}
             />
 
             {/* Filters earn their place only on a long history; a short one is

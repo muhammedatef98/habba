@@ -43,6 +43,7 @@ import { syncLayoutDirection } from '@/features/shared/lib/rtl';
 import { OfflineNotice } from '@/features/shared/components/OfflineNotice';
 import { PlatformNotice } from '@/features/shared/components/PlatformNotice';
 import { PushBridge } from '@/features/shared/components/PushBridge';
+import { CopyOverrides } from '@/features/shared/components/CopyOverrides';
 import { Toast } from '@/features/shared/components/Toast';
 import { VersionGate } from '@/features/shared/components/VersionGate';
 import { LegalGate } from '@/features/shared/components/LegalGate';
@@ -177,6 +178,7 @@ export default function RootLayout() {
         <ThemeProvider locale={locale} preference={themePreference}>
           <StatusBar style="auto" />
           <PushBridge />
+          <CopyOverrides />
           {/* Above the navigator and outside it, so the notice survives every
               screen change instead of each screen having to remember it.
               Deliberately NOT wrapped in a SafeAreaView: <Screen> already

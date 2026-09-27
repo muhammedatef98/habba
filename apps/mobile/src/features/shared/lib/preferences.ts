@@ -20,10 +20,12 @@
 
 import * as SecureStore from 'expo-secure-store';
 import { isSupportedLocale, type Locale } from '@habba/i18n';
+import { parsePlaces, type SavedPlace } from './places.js';
 
 const LOCALE_KEY = 'habba.preference.locale';
 const THEME_KEY = 'habba.preference.theme';
 const SESSION_KEY = 'habba.session';
+const PLACES_KEY = 'habba.places';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -126,10 +128,32 @@ export async function writeStoredSession(session: StoredSession): Promise<void> 
   }
 }
 
-/** Signing out. The identity must not outlive it on the device. */
+/**
+ * Signing out. The identity must not outlive it on the device, and neither
+ * must where that person lives and works: the next person to sign in on this
+ * phone should not find someone else's home under the map.
+ */
 export async function clearStoredSession(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(SESSION_KEY);
+    await SecureStore.deleteItemAsync(PLACES_KEY);
+  } catch {
+    // Fails soft — see the module note.
+  }
+}
+
+/** Home, work and recent places (places.ts). On this phone only. */
+export async function readSavedPlaces(): Promise<readonly SavedPlace[]> {
+  try {
+    return parsePlaces(await SecureStore.getItemAsync(PLACES_KEY));
+  } catch {
+    return [];
+  }
+}
+
+export async function writeSavedPlaces(places: readonly SavedPlace[]): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(PLACES_KEY, JSON.stringify(places));
   } catch {
     // Fails soft — see the module note.
   }

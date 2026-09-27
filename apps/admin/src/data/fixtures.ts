@@ -575,6 +575,76 @@ function seed(): State {
     ),
     setting('support_phone', '', 'text', 'app', 'هاتف الدعم', null, true, 50),
     setting('feature_emergency', true, 'boolean', 'features', 'الطلب الطارئ', null, true, 10),
+    setting(
+      'feature_booking_mobile',
+      true,
+      'boolean',
+      'features',
+      'الحجز: الفنّي يأتي لموقع العميل',
+      null,
+      true,
+      22,
+    ),
+    setting(
+      'feature_booking_workshop',
+      true,
+      'boolean',
+      'features',
+      'الحجز: في الورشة',
+      null,
+      true,
+      24,
+    ),
+    setting(
+      'feature_record_service',
+      true,
+      'boolean',
+      'features',
+      'إضافة صيانة سابقة',
+      null,
+      true,
+      55,
+    ),
+    setting(
+      'feature_care_reminders',
+      true,
+      'boolean',
+      'features',
+      'مواعيد الصيانة والتذكيرات',
+      null,
+      true,
+      57,
+    ),
+    setting(
+      'feature_ratings',
+      true,
+      'boolean',
+      'features',
+      'تقييم الفنّي بعد الخدمة',
+      null,
+      true,
+      58,
+    ),
+    setting(
+      'feature_map_search',
+      true,
+      'boolean',
+      'features',
+      'البحث بالعنوان في الخريطة',
+      null,
+      true,
+      62,
+    ),
+    setting(
+      'feature_saved_places',
+      true,
+      'boolean',
+      'features',
+      'الأماكن المحفوظة والأخيرة',
+      null,
+      true,
+      64,
+    ),
     setting('feature_booking', true, 'boolean', 'features', 'حجز المواعيد', null, true, 20),
     setting(
       'feature_video_triage',
@@ -811,6 +881,7 @@ function seed(): State {
     ],
     tables: {
       platform_settings: settings,
+      app_copy: [],
       legal_documents: (['terms', 'privacy', 'provider_terms'] as const).map((kind) => ({
         id: `legal-${kind}-1`,
         kind,
@@ -1864,7 +1935,7 @@ export class FixtureTransport implements Transport {
   async insert(table: string, row: Row): Promise<void> {
     const rows = this.state.tables[table] ?? [];
     const withId =
-      'id' in row || table === 'maintenance_item_types'
+      'id' in row || table === 'maintenance_item_types' || table === 'app_copy'
         ? row
         : { id: `${table}-${Date.now()}`, ...row };
     this.state.tables[table] = [...rows, withId];

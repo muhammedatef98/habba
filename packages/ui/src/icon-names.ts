@@ -49,7 +49,17 @@ export type IconName =
   | 'ac'
   | 'wash'
   | 'inspection'
-  | 'wrench';
+  | 'wrench'
+  // The location map: search, zoom, layers, places.
+  | 'search'
+  | 'pin'
+  | 'plus'
+  | 'minus'
+  | 'layers'
+  | 'expand'
+  | 'collapse'
+  | 'briefcase'
+  | 'clock';
 
 /**
  * Glyphs that must flip with the reading direction (§8).
