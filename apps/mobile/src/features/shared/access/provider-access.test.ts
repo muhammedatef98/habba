@@ -66,7 +66,9 @@ describe('provider mode', () => {
 
 describe('the screens are wired to the gate', () => {
   const becomeProvider = readFileSync(join(SRC, 'screens/become-provider.tsx'), 'utf8');
-  const profile = readFileSync(join(SRC, 'screens/profile.tsx'), 'utf8');
+  // The account tab, where both doors live. They were on a profile screen
+  // that no other screen linked to, so neither could be reached at all.
+  const account = readFileSync(join(SRC, '../customer/screens/tabs/account.tsx'), 'utf8');
 
   test('the KYC screen redirects before it renders a single field', () => {
     expect(becomeProvider).toContain('useCanApplyAsProvider');
@@ -80,9 +82,14 @@ describe('the screens are wired to the gate', () => {
     expect(guardAt).toBeLessThan(firstFieldAt);
   });
 
-  test('the profile screen gates the upgrade card on the same decision', () => {
-    expect(profile).toContain('useCanApplyAsProvider');
-    expect(profile).toContain('{canApply ? (');
+  test('the account tab gates the upgrade card and the switcher on the same decisions', () => {
+    expect(account).toContain('useCanApplyAsProvider');
+    expect(account).toContain('canApply ? (');
+    // The switcher only on the server's answer, and checked first, so an
+    // approved provider is never shown the invitation to apply.
+    expect(account).toContain('useIsApprovedProvider');
+    expect(account.indexOf('{isProvider ? (')).toBeLessThan(account.indexOf('canApply ? ('));
+    expect(account).toContain("router.push('/become-provider')");
   });
 
   test('the KYC screen asks for an ID and an IBAN — so the guard matters', () => {

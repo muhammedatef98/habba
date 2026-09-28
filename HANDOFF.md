@@ -261,6 +261,10 @@ as a user would. The fixes that matter beyond one screen:
   code first, then read the profile: an existing (non-guest) account goes
   straight in with its saved name; only a new one gets «حسابك جاهز» and the
   name field. Re-signing in no longer overwrites the saved name.
+- **The technician's way in is the «حسابي» tab.** «اشتغل معنا كفنّي» (or the
+  application's status) and, for an approved provider, «انتقل إلى وضع
+  الفنّي» both sat on a `/profile` screen nothing linked to, so no one could
+  reach either. They are on the account tab now; `/profile` is removed.
 - **Upcoming care** rows carry the item's icon (oil, brakes, tyres…); overdue
   items tint it amber.
 

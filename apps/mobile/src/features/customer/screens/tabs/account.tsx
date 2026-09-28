@@ -25,7 +25,7 @@ import Constants from 'expo-constants';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Row, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { Locale } from '@habba/i18n';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
@@ -33,10 +33,25 @@ import { formatPhone } from '@/features/shared/lib/format-phone';
 import { applyLocale } from '@/features/shared/lib/locale-switch';
 import { writeStoredTheme, type ThemePreference } from '@/features/shared/lib/preferences';
 import { unregisterThisDevice } from '@/features/shared/lib/push';
-import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
+import {
+  useCanApplyAsProvider,
+  useIsApprovedProvider,
+  useProviderApplication,
+} from '@/features/shared/hooks/use-roles';
+import { useMode } from '@/features/shared/state/mode';
+import type { ProviderApplicationStatus } from '@/features/shared/data/types';
 import { MenuGroup, MenuRow } from '@/features/shared/components/MenuGroup';
 import { DeleteAccountCard } from '@/features/shared/components/DeleteAccountCard';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
+
+const APPLICATION_STATUS_KEY: Readonly<Record<ProviderApplicationStatus, string>> = {
+  none: 'provider.upgrade.statusNone',
+  pending: 'provider.upgrade.statusPending',
+  in_review: 'provider.upgrade.statusInReview',
+  approved: 'provider.upgrade.statusApproved',
+  rejected: 'provider.upgrade.statusRejected',
+  suspended: 'provider.upgrade.statusSuspended',
+};
 
 export default function AccountScreen() {
   const { t } = useTranslation();
@@ -90,6 +105,12 @@ export default function AccountScreen() {
   });
   const support = platform.data;
   const isProvider = useIsApprovedProvider();
+  const canApply = useCanApplyAsProvider();
+  const application = useProviderApplication();
+  const setMode = useMode((state) => state.setMode);
+  const applicationStatus = application.data?.status ?? 'none';
+  // A rejected application can be sent again, so it shows the button.
+  const hasApplied = applicationStatus !== 'none' && applicationStatus !== 'rejected';
   const hasSupport =
     support !== undefined &&
     (support.supportPhone !== '' || support.supportWhatsapp !== '' || support.supportEmail !== '');
@@ -200,6 +221,70 @@ export default function AccountScreen() {
             onPress={() => router.push('/invoices')}
           />
         </MenuGroup>
+
+        {/* The way into the provider side, on the tab everyone already
+            visits. It used to live on a separate profile screen that nothing
+            linked to, so a technician had no way in at all. §5.1.4: the
+            switch renders only for a role the SERVER granted; a customer
+            sees the invitation to apply instead, or where their application
+            stands, and neither once operators close applications. */}
+        {isProvider ? (
+          <MenuGroup testID="mode-switcher">
+            <MenuRow
+              testID="switch-to-provider"
+              icon="wrench"
+              title={t('profile.switchToProvider')}
+              subtitle={t('profile.modeBody')}
+              onPress={() => {
+                setMode('provider');
+                router.replace('/shift');
+              }}
+            />
+          </MenuGroup>
+        ) : canApply ? (
+          <Card
+            testID="provider-upgrade"
+            elevation="none"
+            style={{
+              gap: theme.spacing.sm,
+              backgroundColor: theme.colors.primarySubtle,
+              borderColor: theme.colors.border,
+              borderWidth: 1,
+            }}
+          >
+            <Row gap="md">
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: theme.radius.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.colors.surface,
+                }}
+              >
+                <Icon name="wrench" size={theme.iconSize.sm} color={theme.colors.primary} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="bodyStrong">{t('provider.upgrade.cardTitle')}</Text>
+                <Text variant="caption" tone="muted">
+                  {hasApplied
+                    ? t(APPLICATION_STATUS_KEY[applicationStatus])
+                    : t('provider.upgrade.cardBody')}
+                </Text>
+              </View>
+            </Row>
+            {hasApplied ? null : (
+              <Button
+                testID="become-provider"
+                label={t('provider.upgrade.cta')}
+                variant="accent"
+                size="medium"
+                onPress={() => router.push('/become-provider')}
+              />
+            )}
+          </Card>
+        ) : null}
       </View>
 
       <View style={{ gap: theme.spacing.md }}>

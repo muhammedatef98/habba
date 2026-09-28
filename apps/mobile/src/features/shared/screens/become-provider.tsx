@@ -71,7 +71,7 @@ export default function BecomeProviderScreen() {
   // already held and there is nothing here to apply for. The redirect happens
   // before render, so no field that asks for a national ID or an IBAN is ever
   // mounted for someone who cannot apply — not disabled, not hidden, not mounted.
-  if (!canApply) return <Redirect href="/profile" />;
+  if (!canApply) return <Redirect href="/account" />;
 
   async function handleSubmit() {
     setError(undefined);
@@ -125,7 +125,7 @@ export default function BecomeProviderScreen() {
         <Button
           testID="upgrade-done"
           label={t('common.done')}
-          onPress={() => router.replace('/profile')}
+          onPress={() => router.replace('/account')}
         />
       </Screen>
     );
