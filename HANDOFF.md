@@ -253,6 +253,14 @@ as a user would. The fixes that matter beyond one screen:
 - **`EmptyState` takes `iconName`**, drawn in a round tinted badge.
 - **The welcome screen** is the wordmark, centred, with one line under it, and
   then sign-in. No second «welcome to Habba» heading under the logo.
+- **Opening animation** (`AppIntro`, root layout): on a cold start, wind
+  streaks sweep across in the reading direction and carry the white wordmark
+  in on petrol (#12514F), then it lifts away (~1.8s). Plain fade under
+  reduce-motion. The pre-boot view is the same colour, so nothing flashes.
+- **Sign-in asks for a name once.** The phone and email screens verify the
+  code first, then read the profile: an existing (non-guest) account goes
+  straight in with its saved name; only a new one gets «حسابك جاهز» and the
+  name field. Re-signing in no longer overwrites the saved name.
 - **Upcoming care** rows carry the item's icon (oil, brakes, tyres…); overdue
   items tint it amber.
 

@@ -1,10 +1,13 @@
 /**
  * OTP verification.
  *
- * On success the user gets a name, a profile, and a session. The name step is
- * folded in here rather than given its own screen — build prompt §9.1 wants a
- * vehicle added in as few taps as possible, and an extra full screen for one
- * text field works against that.
+ * The code first, and the name only if there is nobody yet to call by one.
+ * The name used to sit under the code on every sign-in, so a returning
+ * customer typed their own name again to get back into their own account —
+ * and whatever they typed that day overwrote what was saved. Who is signing in
+ * is only known once the code is right, so that is when the question is
+ * decided: an account that exists goes straight in, a new number gets one
+ * short step on this same screen.
  */
 
 import { useEffect, useState } from 'react';
@@ -25,6 +28,7 @@ export default function VerifyScreen() {
   const locale = useSession((state) => state.locale);
   const signIn = useSession((state) => state.signIn);
 
+  const [step, setStep] = useState<'code' | 'name'>('code');
   const [code, setCode] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
@@ -59,8 +63,34 @@ export default function VerifyScreen() {
       return;
     }
 
-    // The code was right; saving the profile can still fail on a dropped
-    // connection. Left uncaught, the button spun forever with no way on.
+    // The code was right. A number that already has an account is signed
+    // straight in, with the name it already has. Reading it can fail on a
+    // dropped connection like any request; left uncaught, the button spun
+    // forever with no way on.
+    try {
+      const existing = await repository.getProfile();
+      if (existing !== null && !existing.isGuest) {
+        setBusy(false);
+        signIn(existing.id, existing.fullName);
+        router.replace('/vehicles');
+        return;
+      }
+    } catch {
+      setBusy(false);
+      setError(t('auth.errors.network'));
+      return;
+    }
+
+    setBusy(false);
+    setStep('name');
+  }
+
+  async function handleCreate() {
+    if (phoneE164 === null) return;
+
+    setBusy(true);
+    setError(undefined);
+
     let profile: Awaited<ReturnType<typeof repository.upsertProfile>>;
     try {
       profile = await repository.upsertProfile({
@@ -92,7 +122,43 @@ export default function VerifyScreen() {
     }
   }
 
-  const canSubmit = code.length === OTP_LENGTH && fullName.trim().length > 1;
+  if (step === 'name') {
+    return (
+      <Screen scrollable>
+        <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Row>
+              <HabbaMark size={40} />
+            </Row>
+            <Text variant="title">{t('auth.nameStepTitle')}</Text>
+            <Text variant="body" tone="muted">
+              {t('auth.nameStepSubtitle')}
+            </Text>
+          </View>
+
+          <Field
+            testID="name-input"
+            label={t('auth.nameLabel')}
+            value={fullName}
+            onChangeText={(value) => {
+              setFullName(value);
+              if (error !== undefined) setError(undefined);
+            }}
+            autoComplete="name"
+            error={error}
+          />
+
+          <Button
+            testID="name-continue"
+            label={t('common.continue')}
+            onPress={() => void handleCreate()}
+            loading={busy}
+            disabled={fullName.trim().length < 2}
+          />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen scrollable>
@@ -132,20 +198,12 @@ export default function VerifyScreen() {
           error={error}
         />
 
-        <Field
-          testID="name-input"
-          label={t('auth.nameLabel')}
-          value={fullName}
-          onChangeText={setFullName}
-          autoComplete="name"
-        />
-
         <Button
           testID="verify-button"
           label={t('auth.verify')}
           onPress={() => void handleVerify()}
           loading={busy}
-          disabled={!canSubmit}
+          disabled={code.length !== OTP_LENGTH}
         />
 
         <Button

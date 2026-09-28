@@ -31,7 +31,7 @@ import { emailOtpProvider } from '@/features/shared/lib/email-otp';
 import { repository } from '@/features/shared/data/repository';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
 
-type Step = 'address' | 'code';
+type Step = 'address' | 'code' | 'name';
 
 export default function EmailScreen() {
   const { t } = useTranslation();
@@ -89,6 +89,30 @@ export default function EmailScreen() {
       return;
     }
 
+    // An address that already has an account goes straight in, keeping its
+    // name; the name question is for a new one only (see verify.tsx).
+    try {
+      const existing = await repository.getProfile();
+      if (existing !== null && !existing.isGuest) {
+        setBusy(false);
+        signIn(existing.id, existing.fullName);
+        router.replace('/vehicles');
+        return;
+      }
+    } catch {
+      setBusy(false);
+      setError(t('auth.errors.network'));
+      return;
+    }
+
+    setBusy(false);
+    setStep('name');
+  }
+
+  async function handleCreate() {
+    setBusy(true);
+    setError(undefined);
+
     // The address is the identity; the name is what the person is called. An
     // empty name falls back to the address rather than blocking the sign-in on
     // a field nobody has to fill in.
@@ -103,7 +127,7 @@ export default function EmailScreen() {
         preferredLocale: locale,
       });
     } catch {
-      // As on the phone screen: the code was right, the save was not.
+      // The code was right, the save was not.
       setBusy(false);
       setError(t('auth.errors.network'));
       return;
@@ -118,9 +142,15 @@ export default function EmailScreen() {
     <Screen scrollable>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.sm }}>
-          <Text variant="title">{t('auth.emailSignInTitle')}</Text>
+          <Text variant="title">
+            {step === 'name' ? t('auth.nameStepTitle') : t('auth.emailSignInTitle')}
+          </Text>
           <Text variant="body" tone="muted">
-            {step === 'address' ? t('auth.emailSubtitle') : t('auth.emailCodeSubtitle', { email })}
+            {step === 'address'
+              ? t('auth.emailSubtitle')
+              : step === 'code'
+                ? t('auth.emailCodeSubtitle', { email })
+                : t('auth.nameStepSubtitle')}
           </Text>
         </View>
 
@@ -152,7 +182,7 @@ export default function EmailScreen() {
               disabled={!isValidEmail(email)}
             />
           </>
-        ) : (
+        ) : step === 'code' ? (
           <>
             <Field
               testID="email-code-input"
@@ -167,15 +197,6 @@ export default function EmailScreen() {
               autoComplete="one-time-code"
               error={error}
               forceLtrInput
-            />
-
-            <Field
-              testID="email-name-input"
-              label={t('auth.nameLabel')}
-              hint={t('auth.nameOptionalHint')}
-              value={fullName}
-              onChangeText={setFullName}
-              autoComplete="name"
             />
 
             <Button
@@ -195,6 +216,25 @@ export default function EmailScreen() {
                 setCode('');
                 setError(undefined);
               }}
+            />
+          </>
+        ) : (
+          <>
+            <Field
+              testID="email-name-input"
+              label={t('auth.nameLabel')}
+              hint={t('auth.nameOptionalHint')}
+              value={fullName}
+              onChangeText={setFullName}
+              error={error}
+              autoComplete="name"
+            />
+
+            <Button
+              testID="email-name-continue"
+              label={t('common.continue')}
+              onPress={() => void handleCreate()}
+              loading={busy}
             />
           </>
         )}

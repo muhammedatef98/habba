@@ -11,8 +11,8 @@
  * RLS. Nothing here grants anything.
  */
 
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -36,7 +36,7 @@ import {
   Outfit_700Bold,
   useFonts,
 } from '@expo-google-fonts/outfit';
-import { ThemeProvider, lightColors } from '@habba/ui';
+import { ThemeProvider } from '@habba/ui';
 import { detectDeviceLocale, initI18n } from '@/features/shared/lib/i18n';
 import { readStoredLocale, readStoredTheme } from '@/features/shared/lib/preferences';
 import { syncLayoutDirection } from '@/features/shared/lib/rtl';
@@ -53,6 +53,7 @@ import { configureNotificationPresentation } from '@/features/shared/lib/push';
 import { useMode } from '@/features/shared/state/mode';
 import { useSession } from '@/features/shared/state/session';
 import { CardFormHost } from '@/features/shared/components/CardFormHost';
+import { AppIntro, INTRO_BACKGROUND } from '@/features/shared/components/AppIntro';
 
 configureNotificationPresentation();
 
@@ -98,6 +99,9 @@ export default function RootLayout() {
   const hydrate = useSession((state) => state.hydrate);
   const restoreMode = useMode((state) => state.restore);
   const [ready, setReady] = useState(false);
+  // Once per cold start: the component lives as long as the process does.
+  const [introDone, setIntroDone] = useState(false);
+  const finishIntro = useCallback(() => setIntroDone(true), []);
 
   // The design's Latin face, used for every figure in the app. Loaded by exact
   // weight because React Native resolves faces by family name and does not
@@ -158,25 +162,17 @@ export default function RootLayout() {
   // in the fallback face and then reflows, which on the tracking screen means
   // the price visibly jumping.
   if (!ready || !fontsLoaded) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: lightColors.background,
-        }}
-      >
-        <ActivityIndicator color={lightColors.primary} />
-      </View>
-    );
+    // The intro's own colour, empty: boot hands straight over to the intro
+    // with nothing changing on screen, instead of a spinner on cream flashing
+    // between the system's launch screen and the teal one.
+    return <View style={{ flex: 1, backgroundColor: INTRO_BACKGROUND }} />;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <ThemeProvider locale={locale} preference={themePreference}>
-          <StatusBar style="auto" />
+          <StatusBar style={introDone ? 'auto' : 'light'} />
           <PushBridge />
           <CopyOverrides />
           {/* Above the navigator and outside it, so the notice survives every
@@ -202,6 +198,7 @@ export default function RootLayout() {
             <Toast />
             {/* Above every screen: payment can be asked for from any of them. */}
             <CardFormHost />
+            {introDone ? null : <AppIntro onDone={finishIntro} />}
           </View>
         </ThemeProvider>
       </SafeAreaProvider>

@@ -69,7 +69,9 @@
     "codeLabel": "الرمز",
     "nameOptionalHint": "اختياري — نستخدمه لمخاطبتك.",
     "otpLabel": "رمز التحقّق",
-    "changePhone": "تغيير رقم الجوال"
+    "changePhone": "تغيير رقم الجوال",
+    "nameStepTitle": "حسابك جاهز",
+    "nameStepSubtitle": "ما اسمك؟ نسألك مرة واحدة فقط."
   },
   "vehicle": {
     "addTitle": "أضف سيارتك",

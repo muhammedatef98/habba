@@ -65,7 +65,9 @@
     "codeLabel": "Code",
     "nameOptionalHint": "Optional — we use it to address you.",
     "otpLabel": "Verification code",
-    "changePhone": "Change phone number"
+    "changePhone": "Change phone number",
+    "nameStepTitle": "Your account is ready",
+    "nameStepSubtitle": "What should we call you? We only ask once."
   },
   "vehicle": {
     "addTitle": "Add your vehicle",
