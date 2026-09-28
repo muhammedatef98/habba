@@ -19,7 +19,6 @@
     "close": "Close"
   },
   "auth": {
-    "welcomeTitle": "Welcome to Habba",
     "welcomeSubtitle": "Your car's service record, and a technician wherever you are",
     "phoneLabel": "Mobile number",
     "phonePlaceholder": "5X XXX XXXX",
@@ -34,7 +33,6 @@
     "nameTitle": "What's your name?",
     "nameLabel": "Full name",
     "continueAsGuest": "Continue as a guest",
-    "guestHint": "Try the app first and add your number later — you keep everything.",
     "useEmail": "Continue with email",
     "emailSignInTitle": "Sign in with email",
     "emailSubtitle": "We'll email you a sign-in code.",
@@ -67,10 +65,7 @@
     "codeLabel": "Code",
     "nameOptionalHint": "Optional — we use it to address you.",
     "otpLabel": "Verification code",
-    "changePhone": "Change phone number",
-    "valueHelp": "A technician comes to you, day or night",
-    "valueLogbook": "A service record that raises your car's resale value",
-    "valuePayment": "You're only charged after you confirm the work is done"
+    "changePhone": "Change phone number"
   },
   "vehicle": {
     "addTitle": "Add your vehicle",

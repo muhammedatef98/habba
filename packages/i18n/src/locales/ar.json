@@ -19,7 +19,6 @@
     "close": "إغلاق"
   },
   "auth": {
-    "welcomeTitle": "أهلاً بك في هبّة",
     "welcomeSubtitle": "سجل صيانة سيارتك، وفنّي يصلك أينما كنت",
     "phoneLabel": "رقم الجوال",
     "phonePlaceholder": "5X XXX XXXX",
@@ -38,7 +37,6 @@
     "nameTitle": "ما اسمك؟",
     "nameLabel": "الاسم الكامل",
     "continueAsGuest": "الدخول كضيف",
-    "guestHint": "جرّب التطبيق أولاً، وأضف رقمك لاحقاً دون أن تفقد شيئاً.",
     "useEmail": "الدخول بالبريد الإلكتروني",
     "emailSignInTitle": "الدخول بالبريد",
     "emailSubtitle": "سنرسل لك رمز الدخول على بريدك.",
@@ -71,10 +69,7 @@
     "codeLabel": "الرمز",
     "nameOptionalHint": "اختياري — نستخدمه لمخاطبتك.",
     "otpLabel": "رمز التحقّق",
-    "changePhone": "تغيير رقم الجوال",
-    "valueHelp": "فنّي يصلك أينما كنت، على مدار الساعة",
-    "valueLogbook": "سجل صيانة لسيارتك يرفع قيمتها عند البيع",
-    "valuePayment": "لا نخصم المبلغ إلا بعد أن تؤكّد انتهاء العمل"
+    "changePhone": "تغيير رقم الجوال"
   },
   "vehicle": {
     "addTitle": "أضف سيارتك",

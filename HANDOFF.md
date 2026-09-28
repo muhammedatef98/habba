@@ -251,8 +251,8 @@ as a user would. The fixes that matter beyond one screen:
   hairline dividers and each icon in a tinted square. Used on the account tab
   (vehicles and invoices, support, legal).
 - **`EmptyState` takes `iconName`**, drawn in a round tinted badge.
-- **The welcome screen** lists what Habba does in three lines (help anywhere,
-  the logbook, paid only after completion).
+- **The welcome screen** is the wordmark, centred, with one line under it, and
+  then sign-in. No second «welcome to Habba» heading under the logo.
 - **Upcoming care** rows carry the item's icon (oil, brakes, tyres…); overdue
   items tint it amber.
 
