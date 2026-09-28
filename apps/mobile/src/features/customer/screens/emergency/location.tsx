@@ -32,7 +32,7 @@ import {
 import { repository } from '@/features/shared/data/repository';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useSavedPlaces } from '@/features/shared/hooks/use-saved-places';
-import type { SavedPlace } from '@/features/shared/lib/places';
+import { addressAfterPinMove, type SavedPlace } from '@/features/shared/lib/places';
 import { locationProvider } from '@/features/shared/lib/location';
 import {
   MAP_FALLBACK_LOCATION,
@@ -68,6 +68,11 @@ export default function LocationConfirmScreen() {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [detected, setDetected] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
+  // The last address line the APP wrote into the field. While the field still
+  // holds it, the customer has not written their own, so moving the pin
+  // replaces it; once they type, their words stay. Without this the field kept
+  // the first name ever found — «حي الشاطئ» — wherever the pin went next.
+  const autoFilled = useRef<string | null>(null);
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<readonly PlaceMatch[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -122,13 +127,22 @@ export default function LocationConfirmScreen() {
     if (lat === undefined || lon === undefined) return;
     let current = true;
     setDetecting(true);
+    // The old name is wrong the moment the pin moves; saying nothing while
+    // the new one loads beats showing the last place for half a second.
+    setDetected(null);
     const timer = setTimeout(() => {
       void locationProvider.describe({ lat, lon }).then((line) => {
         if (!current) return;
         setDetecting(false);
         setDetected(line);
-        if (line !== null && useEmergencyDraft.getState().addressAr.trim().length === 0) {
-          useEmergencyDraft.getState().setAddress(line);
+        const next = addressAfterPinMove(
+          useEmergencyDraft.getState().addressAr,
+          autoFilled.current,
+          line,
+        );
+        if (next !== null) {
+          autoFilled.current = next.autoFilled;
+          useEmergencyDraft.getState().setAddress(next.address);
         }
       });
     }, DESCRIBE_DELAY_MS);
@@ -369,7 +383,10 @@ export default function LocationConfirmScreen() {
                 label={t('emergency.useThisAddress')}
                 variant="ghost"
                 size="medium"
-                onPress={() => draft.setAddress(detected)}
+                onPress={() => {
+                  autoFilled.current = detected;
+                  draft.setAddress(detected);
+                }}
               />
             ) : null}
             {features.savedPlaces

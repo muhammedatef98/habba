@@ -73,14 +73,19 @@ export class DevLocationProvider implements LocationProvider {
     return { ok: true, location: DEV_FIXED_LOCATION, accuracyMetres: 12 };
   }
 
+  /**
+   * The sample place under the pin, or null. Only a place within about a
+   * kilometre counts: naming a spot after the nearest of six districts in the
+   * country is not describing it, and "I don't know" is an answer the screen
+   * handles.
+   */
   async describe(location: DeviceLocation): Promise<string | null> {
+    const distance = (place: PlaceMatch) =>
+      Math.abs(place.location.lat - location.lat) + Math.abs(place.location.lon - location.lon);
     const nearest = DEV_PLACES.reduce((best, place) =>
-      Math.abs(place.location.lat - location.lat) + Math.abs(place.location.lon - location.lon) <
-      Math.abs(best.location.lat - location.lat) + Math.abs(best.location.lon - location.lon)
-        ? place
-        : best,
+      distance(place) < distance(best) ? place : best,
     );
-    return nearest.label;
+    return distance(nearest) <= DEV_NAMING_RADIUS_DEGREES ? nearest.label : null;
   }
 
   async search(query: string): Promise<readonly PlaceMatch[]> {
@@ -89,6 +94,9 @@ export class DevLocationProvider implements LocationProvider {
     return DEV_PLACES.filter((place) => place.label.includes(needle)).slice(0, MAX_MATCHES);
   }
 }
+
+/** Roughly a kilometre, in degrees of latitude plus longitude. */
+const DEV_NAMING_RADIUS_DEGREES = 0.01;
 
 /** A handful of real places, so search and naming work in the dev build too. */
 const DEV_PLACES: readonly PlaceMatch[] = [

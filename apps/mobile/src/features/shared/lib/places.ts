@@ -144,3 +144,22 @@ export function formatAddress(parts: AddressParts): string {
     })
     .join('، ');
 }
+
+/**
+ * What the address field should hold once the spot under the pin has a name.
+ *
+ * `autoFilled` is the last line the app itself wrote there. While the field
+ * is empty or still holds it, the customer has not written their own, so the
+ * new name replaces it — or clears it when the phone could not name the new
+ * spot, rather than leaving the old place's name on a request sent from
+ * somewhere else. Anything the customer typed is theirs and stays.
+ */
+export function addressAfterPinMove(
+  current: string,
+  autoFilled: string | null,
+  named: string | null,
+): { readonly address: string; readonly autoFilled: string | null } | null {
+  const typed = current.trim();
+  if (typed.length > 0 && typed !== autoFilled) return null;
+  return { address: named ?? '', autoFilled: named };
+}

@@ -265,6 +265,12 @@ as a user would. The fixes that matter beyond one screen:
   application's status) and, for an approved provider, «انتقل إلى وضع
   الفنّي» both sat on a `/profile` screen nothing linked to, so no one could
   reach either. They are on the account tab now; `/profile` is removed.
+- **The address follows the pin.** Expo Go used to get the fixed dev location
+  provider (every fix in Dammam, every pin named after the nearest of six
+  sample districts, so «حي الشاطئ» everywhere). Phones now always use real GPS
+  and the phone's geocoder; the stub is for the web preview only, and names a
+  spot only within ~1 km. The address field follows the pin until the
+  customer types their own (`addressAfterPinMove`, tested).
 - **Upcoming care** rows carry the item's icon (oil, brakes, tyres…); overdue
   items tint it amber.
 

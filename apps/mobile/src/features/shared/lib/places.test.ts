@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   MAX_RECENT,
+  addressAfterPinMove,
   distanceMetres,
   formatAddress,
   orderedPlaces,
@@ -93,5 +94,33 @@ describe('formatAddress', () => {
       'حي الشاطئ، الشرقية',
     );
     expect(formatAddress({})).toBe('');
+  });
+});
+
+describe('addressAfterPinMove', () => {
+  test('fills an empty field with the name under the pin', () => {
+    expect(addressAfterPinMove('', null, 'حي الشاطئ، الدمام')).toEqual({
+      address: 'حي الشاطئ، الدمام',
+      autoFilled: 'حي الشاطئ، الدمام',
+    });
+  });
+
+  test('follows the pin while the field still holds what the app wrote', () => {
+    expect(
+      addressAfterPinMove('حي الشاطئ، الدمام', 'حي الشاطئ، الدمام', 'حي العليا، الخبر'),
+    ).toEqual({ address: 'حي العليا، الخبر', autoFilled: 'حي العليا، الخبر' });
+  });
+
+  test('clears the old name when the new spot has none', () => {
+    expect(addressAfterPinMove('حي الشاطئ، الدمام', 'حي الشاطئ، الدمام', null)).toEqual({
+      address: '',
+      autoFilled: null,
+    });
+  });
+
+  test('never overwrites what the customer typed', () => {
+    expect(
+      addressAfterPinMove('عند البوابة ٣', 'حي الشاطئ، الدمام', 'حي العليا، الخبر'),
+    ).toBeNull();
   });
 });
