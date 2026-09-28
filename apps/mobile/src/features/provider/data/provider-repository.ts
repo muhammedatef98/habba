@@ -128,6 +128,159 @@ export interface Position {
   readonly heading?: number | undefined;
 }
 
+/** One period's completed work (0095). Money is the server's 2dp strings. */
+export interface EarningsPeriod {
+  readonly jobs: number;
+  readonly gross: string;
+  /** After Habba's commission, as the payout will compute it. */
+  readonly net: string;
+}
+
+export type PayoutStatus = 'pending' | 'approved' | 'paid' | 'failed';
+
+export interface PayoutSummary {
+  readonly id: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly netAmount: string;
+  readonly orderCount: number;
+  readonly status: PayoutStatus;
+  readonly paidAt: string | null;
+}
+
+export interface ProviderReview {
+  readonly stars: number;
+  readonly tags: readonly string[];
+  readonly comment: string | null;
+  readonly createdAt: string;
+}
+
+export interface CompletedJob {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly serviceNameAr: string;
+  readonly serviceNameEn: string;
+  readonly completedAt: string;
+  readonly totalAmount: string;
+  readonly net: string;
+}
+
+/**
+ * Everything a technician's own dashboard shows, in one call (0095). The
+ * server computes all of it — the net especially is its arithmetic, not the
+ * app's (§2.2) — and refuses anyone who is not an approved provider.
+ */
+export interface ProviderDashboard {
+  readonly profile: {
+    readonly businessNameAr: string;
+    readonly businessNameEn: string | null;
+    readonly providerType: 'individual' | 'workshop';
+    readonly cityNameAr: string;
+    readonly cityNameEn: string;
+    readonly ratingAvg: number;
+    readonly ratingCount: number;
+    readonly jobsCompleted: number;
+    readonly acceptanceRate: number | null;
+    readonly nafathVerified: boolean;
+    readonly memberSince: string;
+  };
+  readonly periods: {
+    readonly today: EarningsPeriod;
+    readonly week: EarningsPeriod;
+    readonly month: EarningsPeriod;
+  };
+  readonly unpaid: { readonly jobs: number; readonly net: string };
+  readonly payouts: readonly PayoutSummary[];
+  /** Visible reviews per star, 1–5. */
+  readonly stars: Readonly<Record<'1' | '2' | '3' | '4' | '5', number>>;
+  readonly reviews: readonly ProviderReview[];
+  readonly recent: readonly CompletedJob[];
+}
+
+interface DashboardRow {
+  profile: {
+    business_name_ar: string;
+    business_name_en: string | null;
+    provider_type: 'individual' | 'workshop';
+    city_name_ar: string;
+    city_name_en: string;
+    rating_avg: number | string;
+    rating_count: number;
+    jobs_completed: number;
+    acceptance_rate: number | string | null;
+    nafath_verified: boolean;
+    member_since: string;
+  };
+  periods: Record<'today' | 'week' | 'month', EarningsPeriod>;
+  unpaid: { jobs: number; net: string };
+  payouts: {
+    id: string;
+    period_start: string;
+    period_end: string;
+    net_amount: string;
+    order_count: number;
+    status: PayoutStatus;
+    paid_at: string | null;
+  }[];
+  stars: Record<'1' | '2' | '3' | '4' | '5', number>;
+  reviews: { stars: number; tags: string[]; comment: string | null; created_at: string }[];
+  recent: {
+    order_id: string;
+    order_number: string;
+    name_ar: string;
+    name_en: string;
+    completed_at: string;
+    total_amount: string;
+    net: string;
+  }[];
+}
+
+export function toDashboard(row: DashboardRow): ProviderDashboard {
+  return {
+    profile: {
+      businessNameAr: row.profile.business_name_ar,
+      businessNameEn: row.profile.business_name_en,
+      providerType: row.profile.provider_type,
+      cityNameAr: row.profile.city_name_ar,
+      cityNameEn: row.profile.city_name_en,
+      ratingAvg: Number(row.profile.rating_avg),
+      ratingCount: row.profile.rating_count,
+      jobsCompleted: row.profile.jobs_completed,
+      acceptanceRate:
+        row.profile.acceptance_rate === null ? null : Number(row.profile.acceptance_rate),
+      nafathVerified: row.profile.nafath_verified,
+      memberSince: row.profile.member_since,
+    },
+    periods: row.periods,
+    unpaid: row.unpaid,
+    payouts: row.payouts.map((payout) => ({
+      id: payout.id,
+      periodStart: payout.period_start,
+      periodEnd: payout.period_end,
+      netAmount: payout.net_amount,
+      orderCount: payout.order_count,
+      status: payout.status,
+      paidAt: payout.paid_at,
+    })),
+    stars: row.stars,
+    reviews: row.reviews.map((review) => ({
+      stars: review.stars,
+      tags: review.tags,
+      comment: review.comment,
+      createdAt: review.created_at,
+    })),
+    recent: row.recent.map((job) => ({
+      orderId: job.order_id,
+      orderNumber: job.order_number,
+      serviceNameAr: job.name_ar,
+      serviceNameEn: job.name_en,
+      completedAt: job.completed_at,
+      totalAmount: job.total_amount,
+      net: job.net,
+    })),
+  };
+}
+
 export interface ProviderRepository {
   setOnline(online: boolean): Promise<void>;
   broadcastLocation(position: Position): Promise<void>;
@@ -191,6 +344,8 @@ export interface ProviderRepository {
     media: readonly CompletionMediaItem[],
     warrantyDays: number,
   ): Promise<void>;
+  /** The caller's own earnings, payouts, ratings and recent work (0095). */
+  getDashboard(): Promise<ProviderDashboard>;
 }
 
 interface OpenJobRow {
@@ -442,6 +597,12 @@ export class SupabaseProviderRepository implements ProviderRepository {
     });
     if (error !== null) throw new Error(`recordEvidence: ${error.message}`);
   }
+
+  async getDashboard(): Promise<ProviderDashboard> {
+    const { data, error } = await this.client.rpc('provider_dashboard');
+    if (error !== null) throw new Error(`getDashboard: ${error.message}`);
+    return toDashboard(data as DashboardRow);
+  }
 }
 
 interface OrderRow {
@@ -600,6 +761,94 @@ const DEV_INSPECTION_TEMPLATE: InspectionTemplate = {
   ],
 };
 
+/** What the demo build shows a technician: a plausible first month. */
+const DEV_DASHBOARD: ProviderDashboard = {
+  profile: {
+    businessNameAr: 'فنّي هبّة',
+    businessNameEn: 'Habba technician',
+    providerType: 'individual',
+    cityNameAr: 'الدمام',
+    cityNameEn: 'Dammam',
+    ratingAvg: 4.8,
+    ratingCount: 23,
+    jobsCompleted: 31,
+    acceptanceRate: 92,
+    nafathVerified: true,
+    memberSince: '2026-08-02T09:00:00Z',
+  },
+  periods: {
+    today: { jobs: 2, gross: '345.00', net: '297.00' },
+    week: { jobs: 7, gross: '1265.00', net: '1089.00' },
+    month: { jobs: 24, gross: '4380.00', net: '3771.00' },
+  },
+  unpaid: { jobs: 7, net: '1089.00' },
+  payouts: [
+    {
+      id: 'dev-payout-2',
+      periodStart: '2026-09-14',
+      periodEnd: '2026-09-20',
+      netAmount: '1312.50',
+      orderCount: 9,
+      status: 'paid',
+      paidAt: '2026-09-22T10:00:00Z',
+    },
+    {
+      id: 'dev-payout-1',
+      periodStart: '2026-09-07',
+      periodEnd: '2026-09-13',
+      netAmount: '1369.50',
+      orderCount: 8,
+      status: 'paid',
+      paidAt: '2026-09-15T10:00:00Z',
+    },
+  ],
+  stars: { '1': 0, '2': 0, '3': 1, '4': 3, '5': 19 },
+  reviews: [
+    {
+      stars: 5,
+      tags: ['سرعة', 'احترافية'],
+      comment: 'وصل خلال ربع ساعة وشرح المشكلة بوضوح.',
+      createdAt: '2026-09-27T18:20:00Z',
+    },
+    { stars: 5, tags: ['نظافة'], comment: null, createdAt: '2026-09-26T12:05:00Z' },
+    {
+      stars: 4,
+      tags: ['سعر مناسب'],
+      comment: 'تأخر قليلاً لكن الشغل ممتاز.',
+      createdAt: '2026-09-24T09:40:00Z',
+    },
+  ],
+  recent: [
+    {
+      orderId: 'dev-done-3',
+      orderNumber: 'HB-2026-000231',
+      serviceNameAr: 'بطارية — شحن أو تبديل',
+      serviceNameEn: 'Battery boost or swap',
+      completedAt: '2026-09-28T08:40:00Z',
+      totalAmount: '172.50',
+      net: '148.50',
+    },
+    {
+      orderId: 'dev-done-2',
+      orderNumber: 'HB-2026-000228',
+      serviceNameAr: 'تغيير زيت وفلتر',
+      serviceNameEn: 'Oil and filter change',
+      completedAt: '2026-09-28T06:10:00Z',
+      totalAmount: '172.50',
+      net: '148.50',
+    },
+    {
+      orderId: 'dev-done-1',
+      orderNumber: 'HB-2026-000219',
+      serviceNameAr: 'بنشر وتبديل إطار',
+      serviceNameEn: 'Flat tyre',
+      completedAt: '2026-09-26T15:30:00Z',
+      totalAmount: '115.00',
+      net: '99.00',
+    },
+  ],
+};
+
 /** In-memory stand-in, used until a Supabase project exists (ADR-0010). */
 export class InMemoryProviderRepository implements ProviderRepository {
   private online = false;
@@ -744,6 +993,10 @@ export class InMemoryProviderRepository implements ProviderRepository {
     if (job !== undefined) {
       this.jobs.set(orderId, { ...job, completionMileage: mileage, completionMedia: media });
     }
+  }
+
+  async getDashboard(): Promise<ProviderDashboard> {
+    return DEV_DASHBOARD;
   }
 }
 

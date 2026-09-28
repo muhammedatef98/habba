@@ -1,5 +1,6 @@
 /**
- * The provider app's two tabs.
+ * The provider app's tabs: the shift, the jobs on hand, what they earned,
+ * and the technician's own profile.
  *
  * Navigation was a ghost "طلباتي" button at the bottom of the shift screen and
  * a "رجوع" at the bottom of the jobs list — a two-screen app pretending to be
@@ -52,6 +53,20 @@ export default function ProviderTabsLayout() {
         options={{
           title: t('provider.navJobs'),
           tabBarIcon: ({ color }) => <Icon name="wrench" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="earnings"
+        options={{
+          title: t('pro.navEarnings'),
+          tabBarIcon: ({ color }) => <Icon name="wallet" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="pro"
+        options={{
+          title: t('pro.navProfile'),
+          tabBarIcon: ({ color }) => <Icon name="person" color={color} />,
         }}
       />
     </Tabs>

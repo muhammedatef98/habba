@@ -531,6 +531,24 @@ describe.skipIf(!harnessUp)('Amendment A6: roles are enforced server-side', () =
     expect(locations.data ?? []).toHaveLength(0);
   });
 
+  test('the earnings dashboard refuses a customer and a pending applicant alike', async () => {
+    // §5.1.3: "any earnings surface — even with a hand-crafted request".
+    // provider_dashboard (0095) raises rather than returning an empty
+    // dashboard, so a customer learns nothing, not even the shape.
+    for (const id of [CUSTOMER_ID, APPLICANT_ID]) {
+      const attempt = await clientFor(id).rpc('provider_dashboard');
+      expect(attempt.data).toBeNull();
+      expect(attempt.error?.code).toBe('42501');
+    }
+  });
+
+  test('an approved provider reads their own dashboard', async () => {
+    const dashboard = await clientFor(PROVIDER_ID).rpc('provider_dashboard');
+    expect(dashboard.error).toBeNull();
+    const profile = (dashboard.data as { profile: { business_name_ar: string } }).profile;
+    expect(profile.business_name_ar.length).toBeGreaterThan(0);
+  });
+
   test('an applicant cannot approve themselves', async () => {
     const applicant = clientFor(APPLICANT_ID);
 

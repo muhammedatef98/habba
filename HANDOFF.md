@@ -271,6 +271,21 @@ as a user would. The fixes that matter beyond one screen:
   and the phone's geocoder; the stub is for the web preview only, and names a
   spot only within ~1 km. The address field follows the pin until the
   customer types their own (`addressAfterPinMove`, tested).
+
+### The technician's side (0095, suite 62)
+
+- **`provider_dashboard()`** — one call, the caller's own approved provider
+  only (customers and pending applicants get 42501, also in `rls.spec.ts`):
+  profile and record, today / week (from Sunday) / month in Riyadh time with
+  gross and net (net exactly as `build_payout` computes it), unpaid (captured,
+  not in a payout), last six payouts, star distribution, last ten visible
+  reviews without the rater, last fifteen completed jobs. Money as 2dp strings.
+- **Four tabs**: الوردية (greeting, business badge, today's net / jobs / rating
+  on a petrol card that opens earnings; an off-shift tip), طلباتي, **أرباحي**
+  (period switcher, net hero, waiting to be paid, payouts with status, recent
+  jobs), **ملفي** (business card with approved/Nafath badges, record tiles,
+  rating breakdown, reviews, switch to customer, provider terms, support).
+  The switch back to customer moved from the top of the shift to ملفي.
 - **Upcoming care** rows carry the item's icon (oil, brakes, tyres…); overdue
   items tint it amber.
 
