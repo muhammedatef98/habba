@@ -7,17 +7,17 @@ The phase definitions come from `docs/HABBA_BUILD_PROMPT.md` §10; this file is
 the status view over them. Where the two disagree, the build prompt is the
 specification and this is the mistake.
 
-**Last updated:** 2026-09-24 · **Amendments applied:** A (one mobile app,
+**Last updated:** 2026-10-01 · **Amendments applied:** A (one mobile app,
 `user_roles`) and B (admin stays a separate web app) — see CLAUDE.md §5.1.
 
-| Phase                         | Status                                                 |
-| ----------------------------- | ------------------------------------------------------ |
-| 1 — Foundation                | ✅ **Done**                                            |
-| 2 — The logbook (the moat)    | ✅ **Done**                                            |
-| 3 — On-demand emergency       | ✅ Built end to end; launch waits on decisions 1 and 4 |
-| 4 — Scheduled & workshop      | ✅ Built end to end                                    |
-| 5 — Inspections               | ✅ Built end to end                                    |
-| 6 — Intelligence & compliance | 🟡 Console done; ZATCA waits on decision 2             |
+| Phase                         | Status                                                            |
+| ----------------------------- | ----------------------------------------------------------------- |
+| 1 — Foundation                | ✅ **Done**                                                       |
+| 2 — The logbook (the moat)    | ✅ **Done**                                                       |
+| 3 — On-demand emergency       | ✅ Built end to end; launch waits on decision 1                   |
+| 4 — Scheduled & workshop      | ✅ Built end to end                                               |
+| 5 — Inspections               | ✅ Built end to end                                               |
+| 6 — Intelligence & compliance | 🟡 Console + credit notes done; ZATCA Phase 2 waits on decision 2 |
 
 "Backend done" means the migrations exist, run, and pass their own SQL suites.
 It does **not** mean the phase is shippable — see each phase below, and §Open
@@ -43,8 +43,7 @@ bundles for iOS. Amendment A's boundary rule (`features/customer/**` and
 `features/provider/**` cannot import each other) is an ESLint error and fails
 CI.
 
-**Not covered:** real SMS credentials (the transport is built — see open decision 4), and there are
-no component or E2E tests: screens are covered by typecheck, lint, and the data
+**Not covered:** there are no E2E tests: screens are covered by typecheck, lint, and the data
 layer beneath them.
 
 ---
@@ -71,9 +70,9 @@ mileage progression. The report renders Arabic RTL with no JavaScript and no
 external requests, and carries a verification QR generated in-page (ADR-0017),
 round-tripped through a decoder in `qr.test.ts`.
 
-**Blocking an actual launch:** open decisions 3 and 4 — there is no hosted
-Supabase project, so the app runs on the in-memory repository, and phone OTP is
-a dev stub. Neither is a code gap.
+**Hosted and live:** the Supabase project runs in Frankfurt (eu-central-1)
+and phone OTP is delivered through Authentica by the Send SMS hook. What is
+left for this phase is counsel's sign-off on PDPL (decision 3).
 
 **Provider sign-up is on** (0089): the national ID and IBAN are sealed in
 Supabase Vault on the server, and operators open or close applications from
@@ -181,7 +180,13 @@ tax invoice when an order completes (never blocking completion; the console
 issues it later if no seller was configured), and the customer opens it on
 the completion screen or shares it as a PDF (`47_invoices_issued_at_completion.sql`).
 
-**What it needs:** ZATCA delivery and refund credit notes (open decision 2).
+**Since then (0096):** every refund on an invoiced order issues a simplified
+credit note against that invoice, with its own QR; a full refund reverses the
+invoice's VAT exactly; the customer gets each note after the invoice in the
+viewer and the PDF (`63_credit_notes.sql`).
+
+**What it needs:** ZATCA Phase 2 — UBL XML, the cryptographic stamp and
+clearance/reporting — for invoices and credit notes (open decision 2).
 
 ---
 
@@ -194,7 +199,7 @@ From HANDOFF.md §9. These block real work, and none of them is a coding task.
 | 1   | **ADR-0008 — payments, merchant of record, SAMA**                          | Anything that moves real money, so all of Phase 3's escrow. The authorise/capture functions are the interface; the PSP behind them is unchosen.                                                                                                  |
 | 2   | **ADR-0009 — ZATCA seller of record**                                      | Phase 6 invoicing, and with it the legality of billing for completed work. The schema records _which_ seller so invoices stay attributable either way.                                                                                           |
 | 3   | **ADR-0010 — PDPL transfer basis** (region decided: Frankfurt, 2026-09-05) | Scale, not the pilot. The region is settled, so the project can be created; what remains is the lawful basis for cross-border transfer, a DPA, retention, and erasure against an append-only timeline. KYC sealing itself is implemented (0089). |
-| 4   | **SMS provider** (Unifonic / Taqnyat / Twilio)                             | Real phone OTP, and therefore any launch at all. CITC sender-ID registration is required and takes calendar time — worth starting before it is on the critical path.                                                                             |
+| 4   | ~~**SMS provider**~~ — **decided: Authentica**                             | Done. Phone OTP is delivered through Authentica by `send-sms-hook`, with the hook secret and API key in Vault (0088).                                                                                                                            |
 | 5   | **Plate letter map verification** against an official MOI/Absher source    | ADR-0011, now load-bearing in five or more places. A wrong mapping silently corrupts stored plates, and the logbook is keyed on them.                                                                                                            |
 | 6   | **Expo SDK 57 vs Expo Go**                                                 | Nothing structural. SDK 57 is current stable, so an up-to-date Expo Go works; the fallback is a dev build.                                                                                                                                       |
 
@@ -212,7 +217,11 @@ they gate visible behaviour:
 
 In the order that buys the most, given the above:
 
-1. **Decisions 3 and 4** — a hosted project and an SMS provider. Everything
-   built is finished code that cannot reach a user without them.
-2. **Decision 1**, then a two-phone run by people, emergency and booking.
-3. **Decision 2** — ZATCA delivery and credit notes.
+1. **Apply 0096** to the hosted project, and turn on leaked-password
+   protection (Authentication → Policies).
+2. **Decision 1** — Moyasar keys in Vault and the app's env, then
+   `payments_gateway` → `moyasar` in the console — then a two-phone run by
+   people, emergency and booking.
+3. **Decision 3** — counsel's sign-off on PDPL; **decision 5** — the plate
+   letter map checked against an official source.
+4. **Decision 2** — ZATCA Phase 2 onboarding and delivery.

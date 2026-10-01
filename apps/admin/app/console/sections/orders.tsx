@@ -584,6 +584,22 @@ function OrderFileView({
                 </ul>
               </>
             ) : null}
+            {(file.credit_notes ?? []).length > 0 ? (
+              <>
+                <h3>الإشعارات الدائنة</h3>
+                <ul className="list">
+                  {(file.credit_notes ?? []).map((note) => (
+                    <li key={note.id} className="timeline-item">
+                      <span className="numeric">
+                        {note.credit_note_number} · {money(note.total_amount)} ·{' '}
+                        {dateTime(note.issued_at)}
+                      </span>
+                      <div className="subtle">{note.reason_ar}</div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </Card>
 
           {file.rating !== null ? (
@@ -670,6 +686,17 @@ function OrderActions({ file, reload }: { readonly file: OrderFile; readonly rel
           onConfirm={() => api.issueInvoice(order.id)}
           onDone={reload}
           success="صدرت الفاتورة."
+        />
+      ) : null}
+
+      {(file.credit_owed ?? 0) > 0 ? (
+        <ActionButton
+          label="إصدار الإشعار الدائن"
+          description={`استُرد للعميل ${money(file.credit_owed ?? 0)} دون إشعار دائن يقابله في الفاتورة. يُصدر الإشعار الآن بالمبلغ المسترد.`}
+          reason="none"
+          onConfirm={() => api.issueCreditNotes(order.id)}
+          onDone={reload}
+          success="صدر الإشعار الدائن."
         />
       ) : null}
 

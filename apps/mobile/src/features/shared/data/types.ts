@@ -287,6 +287,8 @@ export interface InvoiceSummary {
   readonly issuedAt: string;
   /** Including VAT, 2dp, as issued. */
   readonly total: string;
+  /** Refunded and credited against it (0096), 2dp; null when nothing was. */
+  readonly credited: string | null;
   readonly serviceNameAr: string;
   readonly serviceNameEn: string;
 }

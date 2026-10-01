@@ -1360,6 +1360,17 @@ export class SupabaseRepository implements Repository {
       .eq('order_id', orderId);
     if (parts.error !== null) throw new Error(`getOrderInvoice: ${parts.error.message}`);
 
+    // إشعارات دائنة for refunds on this order (0096), read under the same
+    // rule as the invoice. They print as pages after it.
+    const notes = await this.client
+      .from('zatca_credit_notes')
+      .select(
+        'credit_note_number, issued_at, reason_ar, net_amount, vat_amount, total_amount, qr_base64',
+      )
+      .eq('order_id', orderId)
+      .order('issued_at', { ascending: true });
+    if (notes.error !== null) throw new Error(`getOrderInvoice: ${notes.error.message}`);
+
     const fixed = (value: number | string) => Number(value).toFixed(2);
     const labour = row.orders?.labour_amount;
 
@@ -1396,6 +1407,25 @@ export class SupabaseRepository implements Repository {
       vatRate: Number(row.vat_rate),
       total: fixed(row.total_amount),
       qrBase64: row.qr_base64,
+      creditNotes: (
+        notes.data as {
+          credit_note_number: string;
+          issued_at: string;
+          reason_ar: string;
+          net_amount: number | string;
+          vat_amount: number | string;
+          total_amount: number | string;
+          qr_base64: string;
+        }[]
+      ).map((note) => ({
+        creditNoteNumber: note.credit_note_number,
+        issuedAt: note.issued_at,
+        reasonAr: note.reason_ar,
+        net: fixed(note.net_amount),
+        vat: fixed(note.vat_amount),
+        total: fixed(note.total_amount),
+        qrBase64: note.qr_base64,
+      })),
     };
   }
 
@@ -1646,7 +1676,8 @@ export class SupabaseRepository implements Repository {
       await this.client
         .from('zatca_invoices')
         .select(
-          'order_id, invoice_number, issued_at, total_amount, orders!inner(customer_id, services(name_ar, name_en))',
+          'order_id, invoice_number, issued_at, total_amount, zatca_credit_notes(total_amount), ' +
+            'orders!inner(customer_id, services(name_ar, name_en))',
         )
         .eq('orders.customer_id', userId)
         .order('issued_at', { ascending: false })
@@ -1660,16 +1691,23 @@ export class SupabaseRepository implements Repository {
         invoice_number: string;
         issued_at: string;
         total_amount: number | string;
+        zatca_credit_notes: readonly { total_amount: number | string }[] | null;
         orders: { services: ServiceNames | readonly ServiceNames[] | null } | null;
       }[]
     ).map((row) => {
       const embedded = row.orders?.services ?? null;
       const service = Array.isArray(embedded) ? embedded[0] : embedded;
+      // Summed in halalas: adding 2dp strings as floats drifts.
+      const creditedHalalas = (row.zatca_credit_notes ?? []).reduce(
+        (sum, note) => sum + Math.round(Number(note.total_amount) * 100),
+        0,
+      );
       return {
         orderId: row.order_id,
         invoiceNumber: row.invoice_number,
         issuedAt: row.issued_at,
         total: Number(row.total_amount).toFixed(2),
+        credited: creditedHalalas === 0 ? null : (creditedHalalas / 100).toFixed(2),
         serviceNameAr: service?.name_ar ?? '',
         serviceNameEn: service?.name_en ?? service?.name_ar ?? '',
       };

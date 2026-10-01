@@ -164,6 +164,8 @@ function baseOrder(
     handover: null,
     rating: null,
     invoices: [],
+    credit_notes: [],
+    credit_owed: 0,
     disputes: [],
     payment_operations: [],
     // The hold made at booking, captured once the customer confirmed.
@@ -1200,6 +1202,43 @@ export class FixtureTransport implements Transport {
     return file;
   }
 
+  /**
+   * Mirrors 0096: whatever has been refunded on an invoiced order and not yet
+   * credited gets one credit note, VAT split at 15%, the last note taking
+   * exactly the VAT left on the invoice.
+   */
+  private creditOwed(id: string, reason: string): void {
+    const file = this.orderFile(id);
+    const invoice = file.invoices[0];
+    if (invoice === undefined) return;
+    const credited = (file.credit_notes ?? []).reduce((sum, note) => sum + note.total_amount, 0);
+    const owed =
+      Math.round((Math.min(file.order.refunded_amount, invoice.total_amount) - credited) * 100) /
+      100;
+    if (owed <= 0) return;
+    const invoiceVat = file.order.vat_amount;
+    const creditedVat = (file.credit_notes ?? []).reduce((sum, note) => sum + note.vat_amount, 0);
+    const vat =
+      credited + owed === invoice.total_amount
+        ? Math.round((invoiceVat - creditedVat) * 100) / 100
+        : Math.round(((owed * 0.15) / 1.15) * 100) / 100;
+    const note = {
+      id: `crn-${id}-${(file.credit_notes ?? []).length + 1}`,
+      credit_note_number: `HB-CRN-DEV-${file.order.order_number}-${(file.credit_notes ?? []).length + 1}`,
+      reason_ar: reason,
+      net_amount: Math.round((owed - vat) * 100) / 100,
+      vat_amount: vat,
+      total_amount: owed,
+      issued_at: new Date().toISOString(),
+    };
+    this.state.orders = this.state.orders.map((candidate) =>
+      candidate.order.id === id
+        ? { ...candidate, credit_notes: [...(candidate.credit_notes ?? []), note], credit_owed: 0 }
+        : candidate,
+    );
+    this.audit('insert', 'zatca_credit_notes', note.id, { ...note, order_id: id });
+  }
+
   private setOrder(id: string, patch: Partial<OrderFile['order']>, extra: Partial<OrderFile> = {}) {
     this.state.orders = this.state.orders.map((file) =>
       file.order.id === id ? { ...file, ...extra, order: { ...file.order, ...patch } } : file,
@@ -1433,7 +1472,19 @@ export class FixtureTransport implements Transport {
           candidate.order.id === file.order.id ? { ...candidate, invoices: [invoice] } : candidate,
         );
         this.audit('insert', 'zatca_invoices', id, { ...invoice, order_id: file.order.id });
+        this.creditOwed(file.order.id, 'استرداد مبلغ للعميل');
         return id;
+      }
+
+      case 'ops_issue_credit_notes': {
+        const only = args['p_order_id'];
+        const owing = s.orders.filter(
+          (file) =>
+            (only === null || only === undefined || file.order.id === only) &&
+            (file.credit_owed ?? 0) > 0,
+        );
+        for (const file of owing) this.creditOwed(file.order.id, 'استرداد مبلغ للعميل');
+        return owing.length;
       }
 
       case 'ops_open_dispute': {
@@ -1521,6 +1572,7 @@ export class FixtureTransport implements Transport {
             customer_name: file.customer?.full_name ?? '',
             requested_by_name: 'مشغّل التطوير',
           });
+          this.creditOwed(file.order.id, `استرداد بعد مراجعة شكوى: ${note}`);
         }
         return null;
       }

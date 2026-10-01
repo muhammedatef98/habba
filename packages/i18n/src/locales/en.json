@@ -968,7 +968,8 @@
     "subtitle": "The tax invoice for every completed order, newest first.",
     "empty": "No invoices yet",
     "emptyBody": "Every completed order gets a tax invoice. You will find it here to view or share.",
-    "openFailed": "Couldn't open the invoice. Try again."
+    "openFailed": "Couldn't open the invoice. Try again.",
+    "credited": "{{amount}} refunded"
   },
   "features": {
     "unavailableTitle": "This service is paused for now",

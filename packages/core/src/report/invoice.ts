@@ -41,6 +41,23 @@ export interface InvoiceDocument {
   readonly total: string;
   /** The ZATCA TLV, base64 — scanned as-is by the authority's app. */
   readonly qrBase64: string;
+  /**
+   * إشعارات دائنة issued against this invoice for refunds (0096), oldest
+   * first. Each prints as its own page after the invoice. Absent or empty
+   * when nothing was refunded.
+   */
+  readonly creditNotes?: readonly CreditNoteDocument[];
+}
+
+/** A simplified credit note, as issued by `issue_zatca_credit_note` (0096). */
+export interface CreditNoteDocument {
+  readonly creditNoteNumber: string;
+  readonly issuedAt: string;
+  readonly reasonAr: string;
+  readonly net: string;
+  readonly vat: string;
+  readonly total: string;
+  readonly qrBase64: string;
 }
 
 const INK = '#14201F';
@@ -76,6 +93,40 @@ function qrBlock(payload: string): string {
   } catch {
     return `<code class="qr-fallback">${escapeHtml(payload)}</code>`;
   }
+}
+
+function creditNotePage(invoice: InvoiceDocument, note: CreditNoteDocument, rate: string): string {
+  return `<article class="credit-note">
+  <header>
+    <div>
+      <h1>إشعار دائن مبسّط</h1>
+      <div class="muted">Simplified Credit Note</div>
+    </div>
+    <div class="brand">هبّة</div>
+  </header>
+
+  <section class="grid">
+    <div><div class="label">رقم الإشعار</div><div class="value">${isolate(note.creditNoteNumber)}</div></div>
+    <div><div class="label">تاريخ الإصدار (بتوقيت الرياض)</div><div class="value">${isolate(issuedAtRiyadh(note.issuedAt))}</div></div>
+    <div><div class="label">البائع</div><div class="value">${escapeHtml(invoice.seller.legalNameAr)}</div></div>
+    <div><div class="label">الرقم الضريبي</div><div class="value">${isolate(invoice.seller.vatNumber)}</div></div>
+    <div><div class="label">عن الفاتورة رقم</div><div class="value">${isolate(invoice.invoiceNumber)}</div></div>
+    <div><div class="label">تاريخ الفاتورة</div><div class="value">${isolate(issuedAtRiyadh(invoice.issuedAt))}</div></div>
+  </section>
+
+  <p><span class="label">سبب الإشعار: </span>${escapeHtml(note.reasonAr)}</p>
+
+  <section class="totals">
+    <div><span>المبلغ المسترد قبل الضريبة</span><span>${money(note.net)}</span></div>
+    <div><span>ضريبة القيمة المضافة (${isolate(rate)})</span><span>${money(note.vat)}</span></div>
+    <div class="grand"><span>إجمالي المبلغ المسترد</span><span>${money(note.total)}</span></div>
+  </section>
+
+  <section class="qr">
+    ${qrBlock(note.qrBase64)}
+    <div class="muted">امسح الرمز بتطبيق هيئة الزكاة والضريبة والجمارك للتحقّق من الإشعار.</div>
+  </section>
+</article>`;
 }
 
 export function renderInvoiceHtml(invoice: InvoiceDocument): string {
@@ -127,6 +178,9 @@ export function renderInvoiceHtml(invoice: InvoiceDocument): string {
   .qr-fallback { font-size: 10px; word-break: break-all; }
   bdi { unicode-bidi: isolate; }
   .totals span:last-child { white-space: nowrap; }
+  /* Each credit note is its own page in the PDF, and clearly apart on screen. */
+  .credit-note { break-before: page; page-break-before: always;
+    margin-top: 32px; padding-top: 16px; border-top: 4px double ${LINE}; }
   /* Read in the app on a phone as well as printed on A4: at phone width the
      totals take the full line rather than wrapping the grand total. */
   @media (max-width: 520px) {
@@ -168,6 +222,7 @@ export function renderInvoiceHtml(invoice: InvoiceDocument): string {
     ${qrBlock(invoice.qrBase64)}
     <div class="muted">امسح الرمز بتطبيق هيئة الزكاة والضريبة والجمارك للتحقّق من الفاتورة.</div>
   </section>
+${(invoice.creditNotes ?? []).map((note) => creditNotePage(invoice, note, rate)).join('\n')}
 </body>
 </html>`;
 }

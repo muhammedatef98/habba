@@ -1771,6 +1771,8 @@ export class InMemoryRepository implements Repository {
               invoiceNumber: invoice.invoiceNumber,
               issuedAt: order.createdAt,
               total: invoice.total,
+              // The dev build has no console to refund from.
+              credited: null as string | null,
               serviceNameAr: order.serviceNameAr,
               serviceNameEn: order.serviceNameEn,
             };

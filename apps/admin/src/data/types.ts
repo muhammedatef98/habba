@@ -223,6 +223,21 @@ export interface OrderFile {
     readonly total_amount: number;
     readonly issued_at: string;
   }[];
+  /**
+   * إشعارات دائنة — one per refund on an invoiced order (0096). Optional so a
+   * console deployed ahead of the migration still opens an order.
+   */
+  readonly credit_notes?: readonly {
+    readonly id: string;
+    readonly credit_note_number: string;
+    readonly reason_ar: string;
+    readonly net_amount: number;
+    readonly vat_amount: number;
+    readonly total_amount: number;
+    readonly issued_at: string;
+  }[];
+  /** Refunded but not yet credited — non-zero only when a trigger could not issue it. */
+  readonly credit_owed?: number;
   readonly disputes: readonly Dispute[];
   readonly payment_operations: readonly PaymentOperation[];
   /** Every hold on the customer's card: from booking, and any top-up (0078). */
