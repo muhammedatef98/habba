@@ -217,8 +217,7 @@ they gate visible behaviour:
 
 In the order that buys the most, given the above:
 
-1. **Apply 0096** to the hosted project, and turn on leaked-password
-   protection (Authentication → Policies).
+1. **Turn on leaked-password protection** (Authentication → Policies).
 2. **Decision 1** — Moyasar keys in Vault and the app's env, then
    `payments_gateway` → `moyasar` in the console — then a two-phone run by
    people, emergency and booking.

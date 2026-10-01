@@ -313,8 +313,8 @@ as a user would. The fixes that matter beyond one screen:
 ## 6b. The hosted project, as of 2026-10-01
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
-  0001–0095 applied; **0096 (credit notes) is not yet applied** — the console
-  tolerates its absence, so the order of deploy does not matter. 0001–0053 were applied on 2026-09-05 by
+  0001–0096 applied (0096, credit notes, on 2026-10-01; no refunded
+  invoiced orders existed, so nothing was owed). 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
   0054–0094 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
