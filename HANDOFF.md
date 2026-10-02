@@ -336,7 +336,7 @@ as a user would. The fixes that matter beyond one screen:
   0001–0096 applied (0096, credit notes, on 2026-10-01; no refunded
   invoiced orders existed, so nothing was owed). **0097 and 0098 are not yet
   applied**; until they are, the app hides the health ring, the cost card and
-  the week chart rather than erroring. 0001–0053 were applied on 2026-09-05 by
+  the week chart, and the console's car page shows an error in that one card. 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
   0054–0094 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
