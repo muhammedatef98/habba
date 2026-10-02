@@ -32,39 +32,78 @@ function env(name: string): string | undefined {
   return value === undefined || value.trim() === '' ? undefined : value.trim();
 }
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
-  ...config,
-  name: config.name ?? 'هبّة',
-  slug: config.slug ?? 'habba',
+/**
+ * What a store build must carry. Without the first two the app falls back to
+ * the in-memory repository and the dev OTP stub — a demo that looks real,
+ * signs anyone in with 123456 and saves nothing — and without the third it
+ * registers for no push notifications. Locally that fallback is the point;
+ * in a build headed for the App Store or Google Play it is a disaster nobody
+ * would notice until the reviews arrived. So a production build refuses to
+ * start instead.
+ */
+export const REQUIRED_FOR_STORE = [
+  'EXPO_PUBLIC_SUPABASE_URL',
+  'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY|EXPO_PUBLIC_SUPABASE_ANON_KEY',
+  'EAS_PROJECT_ID',
+] as const;
 
-  extra: {
-    ...config.extra,
+/** The variables a store build is missing, by name. Empty when it may proceed. */
+export function missingForStore(): string[] {
+  return REQUIRED_FOR_STORE.filter((names) =>
+    names.split('|').every((name) => env(name) === undefined),
+  ).map((names) => names.replace('|', ' or '));
+}
 
-    // Absent → the app runs on the in-memory repository and the dev OTP stub,
-    // which is what makes `pnpm start` work on a laptop with no project.
-    supabaseUrl: env('EXPO_PUBLIC_SUPABASE_URL'),
+export default ({ config }: ConfigContext): ExpoConfig => {
+  // EAS sets EAS_BUILD_PROFILE on its build machines; `production` is the
+  // profile the store builds use (eas.json).
+  if (process.env['EAS_BUILD_PROFILE'] === 'production') {
+    const missing = missingForStore();
+    if (missing.length > 0) {
+      throw new Error(
+        `A store build needs ${missing.join(', ')}. Set them as EAS environment ` +
+          'variables for the production environment (docs/release.md).',
+      );
+    }
+  }
+  return buildConfig(config);
+};
 
-    // Publishable key first, legacy anon key second. Both are designed to be
-    // public and both work here; the publishable key is the one that survives
-    // rotating the JWT signing secret, because it is not derived from it.
-    // Reading both means the swap is a change of environment variable, and can
-    // be reverted the same way.
-    supabaseAnonKey:
-      env('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ?? env('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
+function buildConfig(config: ConfigContext['config']): ExpoConfig {
+  return {
+    ...config,
+    name: config.name ?? 'هبّة',
+    slug: config.slug ?? 'habba',
 
-    // Moyasar's publishable key — public by design, it can only start a
-    // payment, never move money. Absent, the app uses the development payment
-    // provider. Present, card payments go through Moyasar's form and the
-    // `payments` Edge Function (lib/payment-provider.ts).
-    moyasarPublishableKey: env('EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY'),
+    extra: {
+      ...config.extra,
 
-    // The console's /pay/return page, where Moyasar sends the customer after
-    // 3-D Secure (lib/moyasar-card-form.ts). Defaults to the production console.
-    paymentReturnUrl: env('EXPO_PUBLIC_PAYMENT_RETURN_URL'),
+      // Absent → the app runs on the in-memory repository and the dev OTP stub,
+      // which is what makes `pnpm start` work on a laptop with no project.
+      supabaseUrl: env('EXPO_PUBLIC_SUPABASE_URL'),
 
-    // Where push tokens come from (expo-notifications reads it here). Not a
-    // secret — it identifies the project, it does not authorise anything.
-    // Absent, the app runs unchanged and simply registers for no pushes.
-    ...(env('EAS_PROJECT_ID') === undefined ? {} : { eas: { projectId: env('EAS_PROJECT_ID') } }),
-  },
-});
+      // Publishable key first, legacy anon key second. Both are designed to be
+      // public and both work here; the publishable key is the one that survives
+      // rotating the JWT signing secret, because it is not derived from it.
+      // Reading both means the swap is a change of environment variable, and can
+      // be reverted the same way.
+      supabaseAnonKey:
+        env('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ?? env('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
+
+      // Moyasar's publishable key — public by design, it can only start a
+      // payment, never move money. Absent, the app uses the development payment
+      // provider. Present, card payments go through Moyasar's form and the
+      // `payments` Edge Function (lib/payment-provider.ts).
+      moyasarPublishableKey: env('EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY'),
+
+      // The console's /pay/return page, where Moyasar sends the customer after
+      // 3-D Secure (lib/moyasar-card-form.ts). Defaults to the production console.
+      paymentReturnUrl: env('EXPO_PUBLIC_PAYMENT_RETURN_URL'),
+
+      // Where push tokens come from (expo-notifications reads it here). Not a
+      // secret — it identifies the project, it does not authorise anything.
+      // Absent, the app runs unchanged and simply registers for no pushes.
+      ...(env('EAS_PROJECT_ID') === undefined ? {} : { eas: { projectId: env('EAS_PROJECT_ID') } }),
+    },
+  };
+}

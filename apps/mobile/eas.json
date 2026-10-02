@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 13.2.0",
+    "version": ">= 16.0.0",
     "appVersionSource": "remote"
   },
   "build": {
@@ -27,10 +27,17 @@
       },
       "ios": {
         "buildConfiguration": "Release"
-      }
+      },
+      "environment": "production"
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {}
+    }
   }
 }
