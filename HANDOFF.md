@@ -48,7 +48,7 @@ recorded in an immutable audit log. A refund issues its ZATCA credit note
 open decisions.
 
 ```
-96 migrations · 63 SQL suites (all pass) · tests/rls.spec.ts
+98 migrations · 64 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -293,6 +293,26 @@ as a user would. The fixes that matter beyond one screen:
   who reads the invoice. The customer gets each note as its own page after
   the invoice in the viewer and the PDF; فواتيري shows «استُرد …» on the row.
 
+### صحة السيارة, تكلفة الملكية and the technician's week (0097–0098)
+
+- **`vehicle_health()`** — 0–100, a grade (ممتازة / جيدة / متوسطة / تحتاج
+  عناية) and every factor that moved it: overdue (−15), snoozed past due (−8),
+  upcoming (−5) care; expired (−15) or expiring (−5) documents; no service in
+  18 months (−10); undocumented records (up to −10); live warranty (+5). A car
+  with nothing recorded is «لا تقييم بعد», never a flattering 100. Never red.
+- **`vehicle_cost_summary()`** — all time, 12 months, this year (Riyadh), twelve
+  monthly totals, by category, and cost per 1,000 km once the odometer moved
+  500 km. Orders at what was finally paid, owner entries at what they typed.
+- Both gated to the current owner or ops (suite 64). `@habba/core`
+  (`vehicle/insights.ts`) mirrors the rule for the in-memory repository.
+- **App**: the ring on the home car card; on the logbook, the score explained
+  factor by factor and a cost card with a 12-month chart (`ScoreRing`,
+  `MiniBars` in `@habba/ui`, direction-aware). Today's date in both calendars
+  under the name on home.
+- **0098**: `provider_dashboard()` gains `daily` (last 7 days); «أرباحي» draws
+  it with one-letter Arabic weekdays and names the best day.
+- **Console**: the car's page shows the same health and costs.
+
 ### The technician's side (0095, suite 62)
 
 - **`provider_dashboard()`** — one call, the caller's own approved provider
@@ -314,7 +334,9 @@ as a user would. The fixes that matter beyond one screen:
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
   0001–0096 applied (0096, credit notes, on 2026-10-01; no refunded
-  invoiced orders existed, so nothing was owed). 0001–0053 were applied on 2026-09-05 by
+  invoiced orders existed, so nothing was owed). **0097 and 0098 are not yet
+  applied**; until they are, the app hides the health ring, the cost card and
+  the week chart rather than erroring. 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
   0054–0094 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
