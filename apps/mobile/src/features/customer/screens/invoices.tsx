@@ -171,7 +171,13 @@ function InvoiceRow({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={`${t('documents.viewInvoice')} — ${service} — ${amount}`}
+      accessibilityLabel={
+        invoice.credited === null
+          ? `${t('documents.viewInvoice')} — ${service} — ${amount}`
+          : `${t('documents.viewInvoice')} — ${service} — ${amount} — ${t('invoices.credited', {
+              amount: t('common.sar', { amount: formatSarDisplay(invoice.credited) }),
+            })}`
+      }
       accessibilityState={{ busy: opening, disabled }}
       style={({ pressed }) => [
         {
@@ -208,9 +214,19 @@ function InvoiceRow({
         </Text>
       </View>
 
-      <Text variant="caption" tone="muted" numeric>
-        {amount}
-      </Text>
+      <View style={{ alignItems: 'flex-end', gap: 2 }}>
+        <Text variant="caption" tone="muted" numeric>
+          {amount}
+        </Text>
+        {invoice.credited !== null ? (
+          // A refund was credited against it (0096); the note is in the document.
+          <Text testID="invoices-row-credited" variant="caption" tone="subtle" numeric>
+            {t('invoices.credited', {
+              amount: t('common.sar', { amount: formatSarDisplay(invoice.credited) }),
+            })}
+          </Text>
+        ) : null}
+      </View>
 
       {opening ? (
         <ActivityIndicator size="small" color={theme.colors.primary} />

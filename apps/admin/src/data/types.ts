@@ -223,6 +223,21 @@ export interface OrderFile {
     readonly total_amount: number;
     readonly issued_at: string;
   }[];
+  /**
+   * إشعارات دائنة — one per refund on an invoiced order (0096). Optional so a
+   * console deployed ahead of the migration still opens an order.
+   */
+  readonly credit_notes?: readonly {
+    readonly id: string;
+    readonly credit_note_number: string;
+    readonly reason_ar: string;
+    readonly net_amount: number;
+    readonly vat_amount: number;
+    readonly total_amount: number;
+    readonly issued_at: string;
+  }[];
+  /** Refunded but not yet credited — non-zero only when a trigger could not issue it. */
+  readonly credit_owed?: number;
   readonly disputes: readonly Dispute[];
   readonly payment_operations: readonly PaymentOperation[];
   /** Every hold on the customer's card: from booking, and any top-up (0078). */
@@ -625,4 +640,26 @@ export interface ProviderKyc {
   readonly iban: string | null;
   /** Sealed by the old dev placeholder, so not readable. */
   readonly legacy: boolean;
+}
+
+/** `vehicle_health()` as it arrives (0097). */
+export interface VehicleHealthRow {
+  readonly score: number | null;
+  readonly grade: 'excellent' | 'good' | 'fair' | 'attention' | 'unknown';
+  readonly factors: readonly {
+    readonly key: string;
+    readonly count: number;
+    readonly impact: number;
+  }[];
+}
+
+/** `vehicle_cost_summary()` as it arrives (0097). Money as 2dp strings. */
+export interface VehicleCostsRow {
+  readonly total: string;
+  readonly last_12_months: string;
+  readonly this_year: string;
+  readonly entries: number;
+  readonly km_12_months: number;
+  readonly per_1000_km: string | null;
+  readonly categories: readonly { readonly category: string; readonly amount: string }[];
 }

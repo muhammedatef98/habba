@@ -15,7 +15,13 @@
  * shape of this interface reflects the shape of the security model.
  */
 
-import type { HabbaReport, InvoiceDocument, LegalDocumentKind } from '@habba/core';
+import type {
+  HabbaReport,
+  InvoiceDocument,
+  LegalDocumentKind,
+  VehicleCostSummary,
+  VehicleHealth,
+} from '@habba/core';
 import type { CopyOverride } from '@habba/i18n/overrides';
 import {
   addSar,
@@ -27,8 +33,13 @@ import {
   multiplySar,
   normalisePlate,
   sarOrThrow,
+  costCategoryFor,
+  riyadhDay,
   SAUDI_VAT_RATE,
+  scoreVehicleHealth,
   subtractSar,
+  summariseCosts,
+  type CostLine,
   type SarAmount,
 } from '@habba/core';
 import { priceWithVat } from '@/features/shared/lib/order-price.js';
@@ -385,6 +396,12 @@ export interface Repository {
   markMaintenanceItemDone(itemId: string): Promise<void>;
   /** «ذكّرني لاحقًا» — silences the notification, not the row. */
   snoozeMaintenanceItem(itemId: string, days: number): Promise<void>;
+
+  // صحة السيارة and تكلفة الملكية (0097). Both decided on the server.
+  /** 0–100, a grade, and every factor that moved it. */
+  getVehicleHealth(vehicleId: string): Promise<VehicleHealth>;
+  /** What the car has cost: all time, 12 months, monthly, by category, per 1,000 km. */
+  getVehicleCosts(vehicleId: string): Promise<VehicleCostSummary>;
 }
 
 /** Exactly one of `phone` or `email` — the server refuses both and neither. */
@@ -1166,6 +1183,14 @@ class DevOrderSimulator {
  * `derive_timeline_provenance` does. A stub that behaves differently from
  * production teaches the UI the wrong lessons.
  */
+/** Events that mean somebody worked on the car — as 0097 counts them. */
+const HEALTH_SERVICE_EVENTS: ReadonlySet<TimelineEvent['eventType']> = new Set([
+  'service_completed',
+  'parts_replaced',
+  'inspection_completed',
+  'warranty_claimed',
+]);
+
 export class InMemoryRepository implements Repository {
   private readonly vehicles = new Map<string, Vehicle>();
   private readonly timeline = new Map<string, TimelineEvent[]>();
@@ -1771,6 +1796,8 @@ export class InMemoryRepository implements Repository {
               invoiceNumber: invoice.invoiceNumber,
               issuedAt: order.createdAt,
               total: invoice.total,
+              // The dev build has no console to refund from.
+              credited: null as string | null,
               serviceNameAr: order.serviceNameAr,
               serviceNameEn: order.serviceNameEn,
             };
@@ -2051,6 +2078,75 @@ export class InMemoryRepository implements Repository {
         lastReadingAt: null,
       } satisfies MaintenanceItem;
     });
+  }
+
+  /** Mirrors `vehicle_health` (0097) through the same rule, in @habba/core. */
+  async getVehicleHealth(vehicleId: string): Promise<VehicleHealth> {
+    const items = await this.listMaintenanceItems(vehicleId);
+    const documents = await this.listVehicleDocuments(vehicleId);
+    const services = (this.timeline.get(vehicleId) ?? []).filter((event) =>
+      HEALTH_SERVICE_EVENTS.has(event.eventType),
+    );
+    const now = Date.now();
+    const snoozed = (item: MaintenanceItem) =>
+      item.snoozedUntil !== null && Date.parse(item.snoozedUntil) > now;
+    const last = services.reduce<string | null>(
+      (latest, event) => (latest === null || event.occurredAt > latest ? event.occurredAt : latest),
+      null,
+    );
+
+    return scoreVehicleHealth({
+      careItems: items.length,
+      careOverdue: items.filter((item) => item.isDue && !snoozed(item)).length,
+      careSnoozed: items.filter((item) => item.isDue && snoozed(item)).length,
+      careSoon: items.filter((item) => !item.isDue && item.isApproaching).length,
+      documents: documents.length,
+      documentsExpired: documents.filter((document) => document.isExpired).length,
+      documentsExpiring: documents.filter((document) => !document.isExpired && document.isExpiring)
+        .length,
+      services: services.length,
+      documentedServices: services.filter((event) => event.provenance !== 'self_reported').length,
+      monthsSinceLastService:
+        last === null ? null : (now - Date.parse(last)) / (30.44 * 86_400_000),
+      warrantyActive: (await this.listVehicleWarranties(vehicleId)).length > 0,
+    });
+  }
+
+  /** Mirrors `vehicle_cost_summary` (0097) through `summariseCosts`. */
+  async getVehicleCosts(vehicleId: string): Promise<VehicleCostSummary> {
+    const services = [
+      ...(await this.listEmergencyServices()),
+      ...(await this.listBookableServices()),
+    ];
+    const lines: CostLine[] = [];
+    for (const summary of this.orders.recent(Number.MAX_SAFE_INTEGER)) {
+      const order = this.orders.get(summary.id);
+      if (order === null) continue;
+      if (order.vehicleId !== vehicleId || order.status !== 'completed') continue;
+      if (order.totalAmount === null) continue;
+      const category = services.find((service) => service.id === order.serviceId)?.category;
+      lines.push({
+        day: riyadhDay(new Date(summary.createdAt)),
+        halalas: Math.round(Number(order.totalAmount) * 100),
+        category: costCategoryFor(category ?? null, null),
+      });
+    }
+    // The owner's own entries. Order-backed logbook rows are counted above.
+    for (const event of this.timeline.get(vehicleId) ?? []) {
+      if (event.provenance === 'habba_verified') continue;
+      const day = riyadhDay(new Date(event.occurredAt));
+      const cost = event.details['cost_sar'];
+      if (typeof cost !== 'string' || !/^[0-9]+(\.[0-9]{1,2})?$/.test(cost)) continue;
+      const type = event.details['service_type'];
+      lines.push({
+        day,
+        halalas: Math.round(Number(cost) * 100),
+        category: costCategoryFor(null, typeof type === 'string' ? type : null),
+      });
+    }
+    // The dev build keeps one reading per car, so it never knows the distance
+    // driven over a window; the ratio is withheld, as the server does under 500 km.
+    return summariseCosts(lines, riyadhDay(new Date()), 0);
   }
 
   async listVehicleDocuments(vehicleId: string): Promise<readonly VehicleDocument[]> {

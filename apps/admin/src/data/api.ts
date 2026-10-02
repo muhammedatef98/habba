@@ -35,7 +35,9 @@ import type {
   StaffRole,
   UserFile,
   UserRow,
+  VehicleCostsRow,
   VehicleFile,
+  VehicleHealthRow,
   VerificationStatus,
 } from './types';
 
@@ -127,6 +129,10 @@ export function createApi(transport: Transport) {
 
     /** For a completed order completion could not invoice (no seller configured then). */
     issueInvoice: (id: string) => transport.rpc<string>('ops_issue_invoice', { p_order_id: id }),
+
+    /** For a refund the trigger could not credit (0096). Returns how many notes it issued. */
+    issueCreditNotes: (id: string) =>
+      transport.rpc<number>('ops_issue_credit_notes', { p_order_id: id }),
 
     openDispute: (id: string, reason: string) =>
       transport.rpc<void>('ops_open_dispute', { p_order_id: id, p_reason: reason }),
@@ -231,6 +237,12 @@ export function createApi(transport: Transport) {
 
     // -- Cars ---------------------------------------------------------------------------------------
     vehicle: (id: string) => transport.rpc<VehicleFile>('ops_vehicle_detail', { p_vehicle_id: id }),
+
+    /** صحة السيارة and تكلفة الملكية (0097) — the same figures the owner sees. */
+    vehicleHealth: (id: string) =>
+      transport.rpc<VehicleHealthRow>('vehicle_health', { p_vehicle_id: id }),
+    vehicleCosts: (id: string) =>
+      transport.rpc<VehicleCostsRow>('vehicle_cost_summary', { p_vehicle_id: id }),
 
     annotateVehicle: (id: string, note: string) =>
       transport.rpc<string>('ops_annotate_vehicle', {

@@ -12,6 +12,7 @@
  */
 
 import {
+  riyadhDay,
   sarOrThrow,
   type CompletionMediaItem,
   type FulfilmentMode,
@@ -195,6 +196,18 @@ export interface ProviderDashboard {
   readonly stars: Readonly<Record<'1' | '2' | '3' | '4' | '5', number>>;
   readonly reviews: readonly ProviderReview[];
   readonly recent: readonly CompletedJob[];
+  /**
+   * The last seven days, oldest first, today last (0098). Empty against a
+   * server that predates it, so the chart simply does not draw.
+   */
+  readonly daily: readonly DailyEarnings[];
+}
+
+export interface DailyEarnings {
+  /** Riyadh calendar day, `YYYY-MM-DD`. */
+  readonly day: string;
+  readonly jobs: number;
+  readonly net: string;
 }
 
 interface DashboardRow {
@@ -233,6 +246,7 @@ interface DashboardRow {
     total_amount: string;
     net: string;
   }[];
+  daily?: { day: string; jobs: number; net: string }[];
 }
 
 export function toDashboard(row: DashboardRow): ProviderDashboard {
@@ -252,6 +266,7 @@ export function toDashboard(row: DashboardRow): ProviderDashboard {
       memberSince: row.profile.member_since,
     },
     periods: row.periods,
+    daily: (row.daily ?? []).map((day) => ({ day: day.day, jobs: day.jobs, net: day.net })),
     unpaid: row.unpaid,
     payouts: row.payouts.map((payout) => ({
       id: payout.id,
@@ -781,6 +796,21 @@ const DEV_DASHBOARD: ProviderDashboard = {
     week: { jobs: 7, gross: '1265.00', net: '1089.00' },
     month: { jobs: 24, gross: '4380.00', net: '3771.00' },
   },
+  // Relative to today, so the dev chart always ends on the day it is opened;
+  // today matches `periods.today` above.
+  daily: [
+    ['0.00', 0],
+    ['215.00', 1],
+    ['138.00', 1],
+    ['0.00', 0],
+    ['312.00', 2],
+    ['127.00', 1],
+    ['297.00', 2],
+  ].map(([net, jobs], index) => ({
+    day: riyadhDay(new Date(Date.now() - (6 - index) * 86_400_000)),
+    jobs: Number(jobs),
+    net: String(net),
+  })),
   unpaid: { jobs: 7, net: '1089.00' },
   payouts: [
     {

@@ -968,7 +968,8 @@
     "subtitle": "The tax invoice for every completed order, newest first.",
     "empty": "No invoices yet",
     "emptyBody": "Every completed order gets a tax invoice. You will find it here to view or share.",
-    "openFailed": "Couldn't open the invoice. Try again."
+    "openFailed": "Couldn't open the invoice. Try again.",
+    "credited": "{{amount}} refunded"
   },
   "features": {
     "unavailableTitle": "This service is paused for now",
@@ -1069,6 +1070,46 @@
     "providerTermsHint": "The terms you accepted when you joined",
     "supportTitle": "Provider support",
     "tipTitle": "Tip",
-    "tipEvidence": "Photograph the car before and after every job: the photos protect you in any dispute, and lift your rating."
+    "tipEvidence": "Photograph the car before and after every job: the photos protect you in any dispute, and lift your rating.",
+    "weekTitle": "Last 7 days",
+    "weekBest": "Best day: {{day}} · {{amount}}",
+    "weekChartA11y": "Your net over the last 7 days; the best was {{day}}",
+    "weekEmpty": "No completed jobs in the last 7 days"
+  },
+  "insights": {
+    "healthTitle": "Car health",
+    "healthOutOf": "out of 100",
+    "healthA11y": "Car health {{score}} out of 100, {{grade}}",
+    "healthUnknownA11y": "No car health score yet",
+    "grade_excellent": "Excellent",
+    "grade_good": "Good",
+    "grade_fair": "Fair",
+    "grade_attention": "Needs attention",
+    "grade_unknown": "Not rated yet",
+    "healthUnknownBody": "Record a first service or the registration expiry date and we will rate your car's condition.",
+    "healthAllGood": "Everything is on time, and nothing is taking points off.",
+    "healthWhy": "What affects the score",
+    "healthHint": "The score rises when maintenance is done on time and each record has its invoice or photo.",
+    "factor_care_overdue": "Overdue maintenance ({{count}})",
+    "factor_care_snoozed": "Maintenance postponed past due ({{count}})",
+    "factor_care_soon": "Maintenance coming up ({{count}})",
+    "factor_documents_expired": "Expired documents ({{count}})",
+    "factor_documents_expiring": "Documents expiring soon ({{count}})",
+    "factor_no_recent_service": "No service recorded in over 18 months",
+    "factor_undocumented": "Records without an invoice or photo ({{count}})",
+    "factor_warranty_active": "Warranty in force",
+    "costTitle": "Cost of ownership",
+    "cost12m": "Last 12 months",
+    "costThisYear": "This year",
+    "costPer1000": "Per 1,000 km",
+    "costTotal": "Since the logbook began",
+    "costEmpty": "Record what each service costs to see what your car really costs you.",
+    "costChartA11y": "Monthly spending over the last 12 months, {{amount}} in total",
+    "cat_maintenance": "Routine maintenance",
+    "cat_emergency": "Emergencies",
+    "cat_inspection": "Inspections",
+    "cat_wash": "Washes",
+    "cat_bodywork": "Bodywork",
+    "cat_misc": "Other"
   }
 }

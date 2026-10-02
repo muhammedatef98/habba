@@ -16,6 +16,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Icon, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { greetingKeyNow } from '@/features/shared/lib/greeting';
+import { formatTodayLine } from '@/features/shared/lib/dates';
 
 export interface HomeHeaderProps {
   /** The customer's name; omitted for a guest, whose "name" is a placeholder. */
@@ -25,10 +26,12 @@ export interface HomeHeaderProps {
 }
 
 export function HomeHeader({ name, onAccount, testID }: HomeHeaderProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
 
   const greeting = t(`home.${greetingKeyNow()}`);
+  // Both calendars, as Saudi readers keep both (§5).
+  const today = formatTodayLine(new Date(), i18n.language);
 
   return (
     <View
@@ -49,6 +52,9 @@ export function HomeHeader({ name, onAccount, testID }: HomeHeaderProps) {
             {name}
           </Text>
         ) : null}
+        <Text testID="home-today" variant="caption" tone="subtle" numberOfLines={1}>
+          {today}
+        </Text>
       </View>
 
       <Pressable

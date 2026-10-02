@@ -1,7 +1,7 @@
 # Habba (هبّة) — Session Handoff
 
 > **Purpose:** everything a new session needs to continue the work.
-> Rewritten 2026-09-24. Read `CLAUDE.md` first (the permanent spec, §0–5.1),
+> Rewritten 2026-09-24; credit notes (0096) added 2026-10-01. Read `CLAUDE.md` first (the permanent spec, §0–5.1),
 > then this, then `docs/ROADMAP.md` for the phase-by-phase status.
 
 ---
@@ -43,11 +43,12 @@ in the app, the buyer reads and shares it, then adds the car they bought with
 the inspection as its first logbook entry). Each step pushes a notification. The **ops console**
 (`apps/admin`) reaches everything an operator is answerable for, behind
 mandatory 2FA and 8-hour sessions, with every change and every file opened
-recorded in an immutable audit log. What stands between this and real users
-is **not code**: see §7, open decisions.
+recorded in an immutable audit log. A refund issues its ZATCA credit note
+(0096). What stands between this and real users is **not code**: see §7,
+open decisions.
 
 ```
-94 migrations · 61 SQL suites (all pass) · tests/rls.spec.ts
+98 migrations · 64 SQL suites (all pass) · tests/rls.spec.ts
 mobile 234 unit + integration (Vitest) + 8 render (Jest) · core 177 · ui 54 · i18n 12
 admin 16 unit + 8 against the real database · request-flow integration 17
 inspection-flow integration 5
@@ -272,6 +273,46 @@ as a user would. The fixes that matter beyond one screen:
   spot only within ~1 km. The address field follows the pin until the
   customer types their own (`addressAfterPinMove`, tested).
 
+### Credit notes for refunds (0096, suite 63)
+
+- **Every refund on an invoiced order issues a simplified credit note**
+  (إشعار دائن مبسّط, `zatca_credit_notes`), numbered on its own series
+  `HB-CRN-YYYY-NNNNNN`, naming the invoice it credits and the reason (the
+  dispute note), with its own Phase 1 TLV QR. Issued by a trigger on
+  `orders.refunded_amount`, whoever made the refund.
+- **A refund before the invoice** (completed with no seller configured, then
+  refunded, then invoiced from the console) is credited the moment the
+  invoice is issued, for the full total less nothing.
+- **VAT reverses exactly**: notes split at the invoice's rate, and the note
+  that completes a full refund takes precisely the VAT left — so partial then
+  full refunds sum to the invoice's total, VAT and net to the halala.
+- **Never blocks the refund.** A note that could not be issued is shown on
+  the order's page in the console with «إصدار الإشعار الدائن»
+  (`ops_issue_credit_notes`, idempotent, audited).
+- Immutable (no UPDATE/DELETE for anyone, owner included), read by exactly
+  who reads the invoice. The customer gets each note as its own page after
+  the invoice in the viewer and the PDF; فواتيري shows «استُرد …» on the row.
+
+### صحة السيارة, تكلفة الملكية and the technician's week (0097–0098)
+
+- **`vehicle_health()`** — 0–100, a grade (ممتازة / جيدة / متوسطة / تحتاج
+  عناية) and every factor that moved it: overdue (−15), snoozed past due (−8),
+  upcoming (−5) care; expired (−15) or expiring (−5) documents; no service in
+  18 months (−10); undocumented records (up to −10); live warranty (+5). A car
+  with nothing recorded is «لا تقييم بعد», never a flattering 100. Never red.
+- **`vehicle_cost_summary()`** — all time, 12 months, this year (Riyadh), twelve
+  monthly totals, by category, and cost per 1,000 km once the odometer moved
+  500 km. Orders at what was finally paid, owner entries at what they typed.
+- Both gated to the current owner or ops (suite 64). `@habba/core`
+  (`vehicle/insights.ts`) mirrors the rule for the in-memory repository.
+- **App**: the ring on the home car card; on the logbook, the score explained
+  factor by factor and a cost card with a 12-month chart (`ScoreRing`,
+  `MiniBars` in `@habba/ui`, direction-aware). Today's date in both calendars
+  under the name on home.
+- **0098**: `provider_dashboard()` gains `daily` (last 7 days); «أرباحي» draws
+  it with one-letter Arabic weekdays and names the best day.
+- **Console**: the car's page shows the same health and costs.
+
 ### The technician's side (0095, suite 62)
 
 - **`provider_dashboard()`** — one call, the caller's own approved provider
@@ -289,10 +330,11 @@ as a user would. The fixes that matter beyond one screen:
 - **Upcoming care** rows carry the item's icon (oil, brakes, tyres…); overdue
   items tint it amber.
 
-## 6b. The hosted project, as of 2026-09-27
+## 6b. The hosted project, as of 2026-10-01
 
 - **Supabase** `habba` (`zelhhlcfyhdqbxsykpnk`, eu-central-1). Migrations
-  0001–0094 applied. 0001–0053 were applied on 2026-09-05 by
+  0001–0098 applied (0096 credit notes on 2026-10-01; 0097 vehicle insights
+  and 0098 the technician's week on 2026-10-02, checked against a real car). 0001–0053 were applied on 2026-09-05 by
   `verify-hosted.sh` and are not in `supabase_migrations.schema_migrations`;
   0054–0094 are recorded there. Seeds 01–04 are in (seeds 01–03 are **not**
   idempotent: re-running them duplicates cities and services). Both storage
@@ -343,7 +385,11 @@ as a user would. The fixes that matter beyond one screen:
 
 ## 8. Known incomplete (code)
 
-- **ZATCA credit notes** — waits on decision 2.
+- **ZATCA Phase 2** (UBL XML, cryptographic stamp, clearance/reporting API)
+  for invoices and credit notes alike — waits on decision 2 and ZATCA CSID
+  onboarding. Phase 1 (QR) documents, including credit notes, are issued.
+- **Real Nafath** — KYC runs behind the interface with the badge set by an
+  operator; the live integration needs an Elm/Nafath contract and credentials.
 - **Real two-phone run** — every flow is proven by integration tests through
   the app's own repositories, but never by two people on two devices.
 - **No E2E (Detox) and few render tests** — screens are covered by typecheck,

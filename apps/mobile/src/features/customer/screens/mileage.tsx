@@ -96,6 +96,9 @@ export default function MileageScreen() {
       await queryClient.invalidateQueries({ queryKey: ['timeline', id] });
       await queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
       await queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      // A new record or reading moves the score and the costs (0097).
+      await queryClient.invalidateQueries({ queryKey: ['vehicle-health', id] });
+      await queryClient.invalidateQueries({ queryKey: ['vehicle-costs', id] });
     },
     onError: (cause: Error) => {
       // The odometer only moves forward — enforced server-side (0034), so the

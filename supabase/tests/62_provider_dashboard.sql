@@ -144,6 +144,18 @@ select test.assert_eq((:'dash'::jsonb -> 'reviews' -> 0 ->> 'comment'), 'شغل 
 select test.assert(
   not ((:'dash'::jsonb -> 'reviews' -> 0) ? 'rater_id'),
   'but never who wrote it');
+-- 0098: the last seven days, oldest first, today last.
+select test.assert_eq(jsonb_array_length(:'dash'::jsonb -> 'daily'), 7,
+  'the week is seven days, every one present even with no work');
+select test.assert(
+  (:'dash'::jsonb -> 'daily' -> 6 ->> 'day') = to_char((now() at time zone 'Asia/Riyadh')::date, 'YYYY-MM-DD')
+    and (:'dash'::jsonb -> 'daily' -> 6 ->> 'jobs')::int = 1,
+  'today is the last day, with today''s job');
+select test.assert_eq((:'dash'::jsonb -> 'daily' -> 6 ->> 'net')::numeric,
+  (:'dash'::jsonb -> 'periods' -> 'today' ->> 'net')::numeric,
+  'and the same net the today total gives');
+select test.assert_eq((:'dash'::jsonb -> 'daily' -> 0 ->> 'net'), '0.00',
+  'a day without work is zero, as money');
 select test.assert_eq((:'dash'::jsonb -> 'unpaid' ->> 'jobs')::int, 1,
   'a captured job not yet in a payout is waiting to be paid');
 

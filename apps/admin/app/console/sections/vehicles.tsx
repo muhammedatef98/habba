@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 import { api } from '@/data/api';
-import type { SearchHit, VehicleFile } from '@/data/types';
+import type { SearchHit, VehicleFile, VehicleHealthRow } from '@/data/types';
 import { date, dateTime, hijri, money } from '@/lib/format';
 import { label, ORDER_STATUS, PROVENANCE, TIMELINE_EVENT, TRANSFER_STATUS } from '../labels';
 import { go, hrefFor } from '../router';
@@ -224,6 +224,8 @@ function VehicleFileView({
         </div>
 
         <div className="grid">
+          <VehicleInsightsCard id={vehicle.id} />
+
           <Card title="السيارة">
             <KeyValue
               items={[
@@ -337,5 +339,157 @@ function VehicleFileView({
         </div>
       </div>
     </>
+  );
+}
+
+const GRADE: Record<VehicleHealthRow['grade'], string> = {
+  excellent: 'ممتازة',
+  good: 'جيدة',
+  fair: 'متوسطة',
+  attention: 'تحتاج عناية',
+  unknown: 'لا تقييم بعد',
+};
+
+const FACTOR: Record<string, string> = {
+  care_overdue: 'صيانة متأخرة',
+  care_snoozed: 'صيانة مؤجلة بعد موعدها',
+  care_soon: 'صيانة يقترب موعدها',
+  documents_expired: 'وثائق منتهية',
+  documents_expiring: 'وثائق تنتهي قريباً',
+  no_recent_service: 'لا صيانة منذ 18 شهراً',
+  undocumented: 'سجلات بلا فاتورة أو صورة',
+  warranty_active: 'ضمان ساري المفعول',
+};
+
+const CATEGORY: Record<string, string> = {
+  maintenance: 'صيانة دورية',
+  emergency: 'طوارئ',
+  inspection: 'فحص',
+  wash: 'غسيل',
+  bodywork: 'سمكرة ودهان',
+  other: 'أخرى',
+};
+
+/**
+ * The owner's صحة السيارة and تكلفة الملكية (0097), read with the same
+ * functions the app uses — so support answering "why is my car 60?" sees
+ * exactly the factors the owner sees, not a console-side recalculation.
+ */
+function VehicleInsightsCard({ id }: { readonly id: string }) {
+  const health = useLoad(() => api.vehicleHealth(id), `health-${id}`);
+  const costs = useLoad(() => api.vehicleCosts(id), `costs-${id}`);
+
+  return (
+    <Card title="صحة السيارة وتكلفتها">
+      <Loadable state={health}>
+        {(row) => (
+          <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center' }}>
+            <ScoreRingWeb score={row.score} grade={row.grade} />
+            <div style={{ display: 'grid', gap: 4 }}>
+              <strong>{GRADE[row.grade]}</strong>
+              {row.factors.length === 0 ? (
+                <span className="muted">لا شيء ينقص التقييم.</span>
+              ) : (
+                row.factors.map((factor) => (
+                  <span key={factor.key} className="subtle">
+                    {FACTOR[factor.key] ?? factor.key} ({factor.count}){' '}
+                    <Badge tone={factor.impact > 0 ? 'good' : 'warn'}>
+                      <span className="numeric">
+                        {factor.impact > 0 ? '+' : '−'}
+                        {Math.abs(factor.impact)}
+                      </span>
+                    </Badge>
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Loadable>
+      <Loadable state={costs}>
+        {(row) =>
+          row.entries === 0 ? (
+            <p className="muted">لا تكاليف مسجّلة.</p>
+          ) : (
+            <KeyValue
+              items={[
+                ['آخر 12 شهراً', money(Number(row.last_12_months))],
+                ['هذه السنة', money(Number(row.this_year))],
+                ['لكل 1000 كم', row.per_1000_km === null ? '—' : money(Number(row.per_1000_km))],
+                ['منذ بداية السجل', money(Number(row.total))],
+                ...row.categories.map(
+                  (category) =>
+                    [
+                      CATEGORY[category.category] ?? category.category,
+                      money(Number(category.amount)),
+                    ] as const,
+                ),
+              ]}
+            />
+          )
+        }
+      </Loadable>
+    </Card>
+  );
+}
+
+function ScoreRingWeb({
+  score,
+  grade,
+}: {
+  readonly score: number | null;
+  readonly grade: VehicleHealthRow['grade'];
+}) {
+  const size = 64;
+  const stroke = 7;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const colour =
+    grade === 'excellent'
+      ? 'var(--color-success)'
+      : grade === 'good'
+        ? 'var(--color-primary)'
+        : grade === 'unknown'
+          ? 'var(--color-border-strong)'
+          : 'var(--color-accent)';
+  return (
+    <svg
+      width={size}
+      height={size}
+      role="img"
+      aria-label={score === null ? 'لا تقييم بعد' : `صحة السيارة ${score} من 100`}
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="var(--color-surface-sunken)"
+        strokeWidth={stroke}
+      />
+      {score !== null ? (
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={colour}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${(circumference * score) / 100} ${circumference}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      ) : null}
+      <text
+        x="50%"
+        y="50%"
+        dominantBaseline="central"
+        textAnchor="middle"
+        className="numeric"
+        style={{ fontWeight: 600, fill: 'currentColor' }}
+      >
+        {score === null ? '—' : score}
+      </text>
+    </svg>
   );
 }

@@ -25,3 +25,5 @@ export * from './ProgressStages.js';
 export * from './Skeleton.js';
 export * from './StatCluster.js';
 export * from './TimelineList.js';
+export * from './ScoreRing.js';
+export * from './MiniBars.js';

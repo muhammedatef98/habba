@@ -13,8 +13,8 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Row, Screen, StatusPill, Text, useTheme } from '@habba/ui';
-import type { PayoutStatus } from '@/features/provider/data/provider-repository';
+import { Button, Card, Icon, MiniBars, Row, Screen, StatusPill, Text, useTheme } from '@habba/ui';
+import type { DailyEarnings, PayoutStatus } from '@/features/provider/data/provider-repository';
 import { PRO_HERO, SectionTitle } from '@/features/provider/components/ProParts';
 import { useProviderDashboard } from '@/features/provider/hooks/use-dashboard';
 import { formatShortDate } from '@/features/shared/lib/format-number';
@@ -179,6 +179,10 @@ export default function EarningsScreen() {
         </Card>
       ) : null}
 
+      {data !== undefined && data.daily.length > 0 ? (
+        <WeekChart days={data.daily} language={language} />
+      ) : null}
+
       <View style={{ gap: theme.spacing.md }}>
         <SectionTitle title={t('pro.payoutsTitle')} />
         {data === undefined || data.payouts.length === 0 ? (
@@ -287,6 +291,66 @@ function HeroFigure({ label, value }: { readonly label: string; readonly value: 
       <Text variant="bodyStrong" numeric style={{ color: '#FFFFFF' }}>
         {value}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * The last seven days (0098), so a technician can see which days pay —
+ * the thing a total for the week cannot tell them. Weekdays by their
+ * one-letter Arabic names (ح ن ث ر خ ج س), as Saudi calendars print them.
+ */
+function WeekChart({
+  days,
+  language,
+}: {
+  readonly days: readonly DailyEarnings[];
+  readonly language: string;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const weekday = (day: string, width: 'narrow' | 'long') =>
+    new Date(`${day}T12:00:00Z`).toLocaleDateString(
+      language.startsWith('ar') ? 'ar-u-nu-latn' : language,
+      { weekday: width, timeZone: 'UTC' },
+    );
+  const best = days.reduce<DailyEarnings | null>(
+    (top, day) =>
+      Number(day.net) > 0 && (top === null || Number(day.net) > Number(top.net)) ? day : top,
+    null,
+  );
+  const today = days[days.length - 1]?.day;
+
+  return (
+    <View style={{ gap: theme.spacing.md }} testID="earnings-week">
+      <SectionTitle title={t('pro.weekTitle')} />
+      <Card
+        elevation="none"
+        style={{ borderWidth: 1, borderColor: theme.colors.border, gap: theme.spacing.md }}
+      >
+        <MiniBars
+          bars={days.map((day) => ({
+            key: day.day,
+            value: Number(day.net),
+            label: weekday(day.day, 'narrow'),
+          }))}
+          {...(today !== undefined ? { highlightKey: today } : {})}
+          height={88}
+          accessibilityLabel={
+            best === null
+              ? t('pro.weekEmpty')
+              : t('pro.weekChartA11y', { day: weekday(best.day, 'long') })
+          }
+        />
+        <Text variant="caption" tone="muted" testID="earnings-week-best">
+          {best === null
+            ? t('pro.weekEmpty')
+            : t('pro.weekBest', {
+                day: weekday(best.day, 'long'),
+                amount: `${formatSarDisplay(best.net)} ${t('provider.sarSuffix')}`,
+              })}
+        </Text>
+      </Card>
     </View>
   );
 }
