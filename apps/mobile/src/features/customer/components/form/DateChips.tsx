@@ -55,7 +55,7 @@ function iso(year: number, month: number, day: number): string {
 export function DateChips({ value, onChange, years = 15, testIdPrefix = 'date' }: DateChipsProps) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
-  const tag = i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language;
+  const tag = i18n.language.startsWith('ar') ? 'ar-u-ca-gregory-nu-latn' : i18n.language;
   const [picked, setPicked] = useState<Picked>(() => parts(value));
   const thisYear = new Date().getFullYear();
 

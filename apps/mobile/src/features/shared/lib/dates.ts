@@ -1,24 +1,19 @@
 /**
- * Dates as this app shows them.
+ * Dates as this app shows them: Gregorian only.
  *
- * CLAUDE.md §5: "Support Hijri dates in display alongside Gregorian." Alongside
- * is the operative word — Saudi users read both, and a logbook entry that gives
- * only one of them forces a mental conversion at exactly the moment they are
- * trying to remember whether that service was before or after Ramadan.
+ * The owner's decision (2026-10-02): every date in the app is Gregorian, and
+ * the Hijri date is not shown anywhere. The calendar is pinned with
+ * `-ca-gregory` rather than left to the locale, because `ar-SA` defaults to
+ * the Umm al-Qura calendar on some platforms and would bring Hijri back
+ * without anyone asking for it.
  *
  * §8: Latin numerals, so every tag below pins `-nu-latn` rather than trusting
  * the locale's default numbering system.
- *
- * The Hijri formatter degrades rather than throws. `islamic-umalqura` needs a
- * full-ICU build, and whether Hermes on a given device has one is not something
- * this app can guarantee — a logbook that crashes on a calendar it cannot
- * format would be a spectacular way to lose the thing the product is built on.
  */
 
 import { toLatinDigits } from '@habba/core';
 
-const LATIN = 'ar-u-nu-latn';
-const HIJRI = 'ar-SA-u-ca-islamic-umalqura-nu-latn';
+const LATIN = 'ar-u-ca-gregory-nu-latn';
 
 function tagFor(locale: string): string {
   return locale.startsWith('ar') ? LATIN : locale;
@@ -52,44 +47,6 @@ export function formatAppointment(iso: string, locale: string): string {
   );
 }
 
-/** `null` when the platform cannot format the Islamic calendar — never throws. */
-export function formatHijriDate(iso: string, locale: string): string | null {
-  if (!locale.startsWith('ar')) return null;
-
-  try {
-    // `-nu-latn` is honoured by Node's ICU but not by Hermes', which returns
-    // ١٤٤٨ regardless — so the numerals are normalised afterwards rather than
-    // trusted to the tag. Observed on the simulator: the Gregorian line above
-    // it read "2 سبتمبر 2026" and the Hijri line "٢٠ ربيع الأول ١٤٤٨",
-    // two numbering systems inside one card.
-    //
-    // `toArabicIndicDigits`' own docstring names Hijri dates as a case that
-    // wants Arabic-Indic. That holds for the printed report, where the whole
-    // page is set in Arabic; it does not hold for a line sitting directly under
-    // a Gregorian one, and §8's Latin-by-default settles the in-app case.
-    const formatted = toLatinDigits(
-      new Date(iso).toLocaleDateString(HIJRI, {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-    );
-    // A platform without the calendar silently falls back to Gregorian rather
-    // than throwing, so a result identical to the Gregorian one means the
-    // calendar was not applied and there is nothing to show "alongside".
-    const gregorian = toLatinDigits(
-      new Date(iso).toLocaleDateString(LATIN, {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-    );
-    return formatted === gregorian ? null : formatted;
-  } catch {
-    return null;
-  }
-}
-
 /** "سبتمبر 2026" — the heading a month of logbook entries sits under. */
 export function formatMonthLabel(iso: string, locale: string): string {
   return new Date(iso).toLocaleDateString(tagFor(locale), { month: 'long', year: 'numeric' });
@@ -112,16 +69,9 @@ export function yearKey(iso: string): string {
   return `${new Date(iso).getFullYear()}`;
 }
 
-/**
- * «الجمعة 2 أكتوبر · 21 ربيع الآخر 1448» — today, as the home header says it.
- *
- * Both calendars side by side for the reason §5 gives: Saudi readers live in
- * both, and the Hijri date is the one that tells you Ramadan is next week.
- * In English, or where the platform has no Islamic calendar, only the
- * Gregorian half — never a guessed Hijri date.
- */
+/** «الجمعة، 2 أكتوبر» — today, as the home header says it, in Riyadh. */
 export function formatTodayLine(at: Date, locale: string): string {
-  const gregorian = toLatinDigits(
+  return toLatinDigits(
     at.toLocaleDateString(tagFor(locale), {
       weekday: 'long',
       day: 'numeric',
@@ -129,6 +79,4 @@ export function formatTodayLine(at: Date, locale: string): string {
       timeZone: 'Asia/Riyadh',
     }),
   );
-  const hijri = formatHijriDate(at.toISOString(), locale);
-  return hijri === null ? gregorian : `${gregorian} · ${hijri}`;
 }

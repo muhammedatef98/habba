@@ -156,18 +156,21 @@ export default function BookingSlotScreen() {
     if (offset === 0) return t('booking.slotToday');
     if (offset === 1) return t('booking.slotTomorrow');
     return toLatinDigits(
-      date.toLocaleDateString(i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language, {
-        weekday: 'short',
-        day: 'numeric',
-        timeZone: 'Asia/Riyadh',
-      }),
+      date.toLocaleDateString(
+        i18n.language.startsWith('ar') ? 'ar-u-ca-gregory-nu-latn' : i18n.language,
+        {
+          weekday: 'short',
+          day: 'numeric',
+          timeZone: 'Asia/Riyadh',
+        },
+      ),
     );
   };
 
   const timeLabel = (slot: AppointmentSlot) =>
     toLatinDigits(
       new Date(slot.startsAt).toLocaleTimeString(
-        i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
+        i18n.language.startsWith('ar') ? 'ar-u-ca-gregory-nu-latn' : i18n.language,
         // Riyadh time, as the confirmation and the technician's schedule show
         // it (dates.ts `formatAppointment`) — not the phone's zone.
         { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' },

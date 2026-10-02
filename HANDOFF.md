@@ -307,8 +307,9 @@ as a user would. The fixes that matter beyond one screen:
   (`vehicle/insights.ts`) mirrors the rule for the in-memory repository.
 - **App**: the ring on the home car card; on the logbook, the score explained
   factor by factor and a cost card with a 12-month chart (`ScoreRing`,
-  `MiniBars` in `@habba/ui`, direction-aware). Today's date in both calendars
-  under the name on home.
+  `MiniBars` in `@habba/ui`, direction-aware). Today's date under the name on
+  home. **All dates are Gregorian only** (2026-10-02, CLAUDE.md §5): no Hijri
+  anywhere, and `-ca-gregory` is pinned so `ar-SA` cannot bring it back.
 - **0098**: `provider_dashboard()` gains `daily` (last 7 days); «أرباحي» draws
   it with one-letter Arabic weekdays and names the best day.
 - **Console**: the car's page shows the same health and costs.

@@ -14,7 +14,7 @@
 import { useState } from 'react';
 import { api, PAGE_SIZE } from '@/data/api';
 import type { ProviderFile, ProviderKyc, ProviderRow, VerificationStatus } from '@/data/types';
-import { date, dateTime, hijri, money, phone, riyadhToday, since } from '@/lib/format';
+import { date, dateTime, money, phone, riyadhToday, since } from '@/lib/format';
 import { label, ORDER_STATUS, PAYOUT_STATUS, VERIFICATION } from '../labels';
 import { go, hrefFor } from '../router';
 import {
@@ -484,7 +484,7 @@ function ProviderFileView({
                     <strong>{label(VERIFICATION, event.to).text}</strong>
                     {event.note !== null ? <div>«{event.note}»</div> : null}
                     <div className="subtle">
-                      {event.actor_name ?? '—'} · {dateTime(event.at)} · {hijri(event.at)}
+                      {event.actor_name ?? '—'} · {dateTime(event.at)}
                     </div>
                   </li>
                 ))}

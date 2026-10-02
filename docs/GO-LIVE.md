@@ -147,3 +147,47 @@ Expo Go بلا build خاص.
 - جرّب على جوال حقيقي: تسجيل برقم حقيقي ← طلب طوارئ من حساب، وقبوله من حساب
   فنّي آخر ← الإنجاز والتقييم ← الفاتورة.
 - `supabase-setup.md` §10.
+
+## 7. النشر على App Store وGoogle Play
+
+البناء والرفع يتمّان على EAS (خدمة Expo)، ويُشغَّلان من GitHub بضغطة واحدة:
+**Actions ← Release ← Run workflow** (`.github/workflows/release.yml`). يبني نسختَي iOS
+وAndroid بإعداد `production` ويرفعهما إلى المتجرين.
+
+**الإعداد مرّة واحدة:**
+
+1. **حساب Expo ومشروع EAS:** أنشئ حساباً على expo.dev، ثم من جهازك داخل `apps/mobile`:
+   `npx eas-cli login` ثم `npx eas-cli init`. انسخ معرّف المشروع (Project ID).
+2. **متغيّرات البناء على EAS** (expo.dev ← المشروع ← Environment variables، بيئة
+   **production**): `EXPO_PUBLIC_SUPABASE_URL` و`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   و`EAS_PROJECT_ID`. **بناء المتجر يرفض أن يبدأ إن نقص أيّ منها** (`app.config.ts`) —
+   وإلا لخرج التطبيق في وضع التجربة: بيانات وهمية ورمز دخول 123456.
+3. **رمز Expo في GitHub:** expo.dev ← Account settings ← Access tokens ← أنشئ رمزاً،
+   وضعه في المستودع: Settings ← Secrets and variables ← Actions ← `EXPO_TOKEN`.
+4. **Apple:**
+   - حساب Apple Developer (99 دولاراً سنوياً)، وتطبيق في App Store Connect بالمعرّف
+     `sa.habba.app`.
+   - مفتاح App Store Connect API (Users and Access ← Integrations ← Keys، دور
+     App Manager)، يُرفع إلى EAS: `npx eas-cli credentials` ← iOS ← App Store Connect API Key.
+     EAS يُنشئ شهادة التوقيع وملف التوزيع بنفسه.
+5. **Google:**
+   - حساب Google Play Console (25 دولاراً مرّة واحدة)، وتطبيق بالمعرّف `sa.habba.app`.
+   - حساب خدمة في Google Cloud بصلاحية الإصدار في Play Console، ومفتاحه (JSON) يُرفع إلى
+     EAS: `npx eas-cli credentials` ← Android ← Google Service Account.
+   - ⚠️ **أوّل إصدار على Google Play يُرفع يدوياً**: Google لا تقبل الرفع عبر الواجهة
+     البرمجية لتطبيق لم يُرفع له ملف قط. شغّل Release مع إلغاء «Submit»، نزّل ملف
+     `.aab` من صفحة البناء على expo.dev، وارفعه بيدك في Play Console ← Internal testing.
+     بعدها يرفع Release تلقائياً.
+
+**ما يرفعه Release:** Android إلى مسار **Internal testing** كمسوّدة؛ iOS إلى
+**TestFlight**. النشر للعامة خطوة يدوية في كل متجر بعد التجربة — عن قصد.
+
+**قبل الإرسال للمراجعة** (في صفحة كل متجر):
+
+- رابطا الشروط وسياسة الخصوصية: `/legal/terms` و`/legal/privacy` على لوحة التشغيل (§5b).
+- حساب تجريبي للمراجِع: رقم جوال ورمز ثابت، يُضبطان في Supabase ← Authentication ←
+  Sign In / Providers ← Phone ← «Test phone numbers». Apple تطلبه لأن الدخول برمز SMS.
+- لقطات الشاشة، والوصف بالعربية والإنجليزية، والتصنيف العمري، ونموذج خصوصية البيانات
+  (Apple: App Privacy؛ Google: Data safety) — يجمع التطبيق الجوال والموقع أثناء الطلب
+  والصور، ولا يتتبّع ولا يبيع بيانات.
+- Apple: حذف الحساب من داخل التطبيق متحقّق (§5b).

@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { api, PAGE_SIZE, type OrderFilter } from '@/data/api';
 import type { OrderFile, OrderRow } from '@/data/types';
-import { dateTime, hijri, money, phone } from '@/lib/format';
+import { dateTime, money, phone } from '@/lib/format';
 import {
   ESCROW,
   HOLD_KIND,
@@ -260,7 +260,7 @@ function OrderFileView({
           <Card title="الطلب">
             <KeyValue
               items={[
-                ['أُنشئ', `${dateTime(order.created_at)} · ${hijri(order.created_at)}`],
+                ['أُنشئ', dateTime(order.created_at)],
                 ['الموعد', order.scheduled_for !== null ? dateTime(order.scheduled_for) : '—'],
                 ['العنوان', order.service_address_ar ?? '—'],
                 [

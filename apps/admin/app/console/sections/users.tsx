@@ -12,7 +12,7 @@
 import { useState } from 'react';
 import { api, PAGE_SIZE } from '@/data/api';
 import type { UserFile, UserRow } from '@/data/types';
-import { dateTime, hijri, money, phone } from '@/lib/format';
+import { dateTime, money, phone } from '@/lib/format';
 import { label, ORDER_STATUS, ROLE, TRANSFER_STATUS, VERIFICATION } from '../labels';
 import { go, hrefFor } from '../router';
 import { useOperator } from '../shell';
@@ -174,7 +174,7 @@ function UserFileView({ file, reload }: { readonly file: UserFile; readonly relo
             {profile.full_name} {file.suspended ? <Badge tone="bad">موقوف</Badge> : null}
           </>
         }
-        description={`انضم ${dateTime(profile.created_at)} · ${hijri(profile.created_at)}`}
+        description={`انضم ${dateTime(profile.created_at)}`}
         actions={
           <>
             <ActionButton

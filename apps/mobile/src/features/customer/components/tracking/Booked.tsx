@@ -11,7 +11,7 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, FadeIn, StatusPill, Text, useTheme } from '@habba/ui';
-import { formatAppointment, formatHijriDate } from '@/features/shared/lib/dates';
+import { formatAppointment } from '@/features/shared/lib/dates';
 import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
 import type { Order, ProviderSummary } from '@/features/shared/data/types';
@@ -29,8 +29,6 @@ export function Booked({ order, provider, onCancel, cancelPending }: BookedProps
 
   const when =
     order.scheduledFor === null ? null : formatAppointment(order.scheduledFor, i18n.language);
-  const hijri =
-    order.scheduledFor === null ? null : formatHijriDate(order.scheduledFor, i18n.language);
 
   return (
     // Each state arrives rather than replacing the last between frames.
@@ -42,11 +40,6 @@ export function Booked({ order, provider, onCancel, cancelPending }: BookedProps
           <Text testID="booked-when" variant="title">
             {when}
           </Text>
-          {hijri !== null ? (
-            <Text variant="caption" tone="muted">
-              {hijri}
-            </Text>
-          ) : null}
         </View>
       ) : null}
 

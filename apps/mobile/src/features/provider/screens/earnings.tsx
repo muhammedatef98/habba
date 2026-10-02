@@ -311,7 +311,7 @@ function WeekChart({
   const theme = useTheme();
   const weekday = (day: string, width: 'narrow' | 'long') =>
     new Date(`${day}T12:00:00Z`).toLocaleDateString(
-      language.startsWith('ar') ? 'ar-u-nu-latn' : language,
+      language.startsWith('ar') ? 'ar-u-ca-gregory-nu-latn' : language,
       { weekday: width, timeZone: 'UTC' },
     );
   const best = days.reduce<DailyEarnings | null>(

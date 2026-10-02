@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { api } from '@/data/api';
 import type { SearchHit, VehicleFile, VehicleHealthRow } from '@/data/types';
-import { date, dateTime, hijri, money } from '@/lib/format';
+import { date, dateTime, money } from '@/lib/format';
 import { label, ORDER_STATUS, PROVENANCE, TIMELINE_EVENT, TRANSFER_STATUS } from '../labels';
 import { go, hrefFor } from '../router';
 import {
@@ -174,7 +174,7 @@ function VehicleFileView({
                       {entry.summary_ar}
                     </div>
                     <div className="subtle">
-                      {dateTime(entry.occurred_at)} · {hijri(entry.occurred_at)}
+                      {dateTime(entry.occurred_at)}
                       {entry.mileage !== null ? ` · ${entry.mileage} كم` : ''}
                       {entry.attachments > 0 ? ` · ${entry.attachments} مرفق` : ''}
                     </div>

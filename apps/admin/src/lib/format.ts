@@ -45,17 +45,6 @@ export function date(iso: string | null | undefined): string {
   });
 }
 
-/** The Hijri date beside the Gregorian (CLAUDE.md §5), Umm al-Qura as used in the Kingdom. */
-export function hijri(iso: string | null | undefined): string {
-  if (iso === null || iso === undefined) return '';
-  return new Date(iso).toLocaleDateString('ar-SA-u-nu-latn-ca-islamic-umalqura', {
-    timeZone: TIME_ZONE,
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 /** Today in Riyadh, as the YYYY-MM-DD a date filter takes. */
 export function riyadhToday(offsetDays = 0): string {
   const shifted = new Date(Date.now() + offsetDays * 86_400_000);
