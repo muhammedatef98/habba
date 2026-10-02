@@ -150,7 +150,9 @@ Use these exact terms in UI copy. Use the English identifiers in code.
 - IBAN: `SA` + 22 characters. Validate with mod-97.
 - National ID (هوية): 10 digits starting with `1`. Iqama (إقامة): 10 digits starting with `2`.
 - VAT: 15%. VAT number: 15 digits starting and ending with `3`.
-- Support **Hijri dates** in display alongside Gregorian.
+- **Dates are Gregorian only** in every surface (owner's decision, 2026-10-02 — supersedes the
+  earlier "Hijri alongside Gregorian" rule). Pin `-ca-gregory` so an `ar-SA` locale cannot
+  fall back to the Umm al-Qura calendar.
 
 ---
 

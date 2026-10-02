@@ -23,7 +23,7 @@ import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { repository } from '@/features/shared/data/repository';
 import type { Provenance } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
-import { formatGregorianDate, formatHijriDate } from '@/features/shared/lib/dates';
+import { formatGregorianDate } from '@/features/shared/lib/dates';
 import { formatCount } from '@/features/shared/lib/format-number';
 import { BackBar } from '@/features/shared/components/BackBar';
 
@@ -110,13 +110,8 @@ export default function EventScreen() {
     );
   }
 
-  // Gregorian with Latin digits, the Hijri date beside it (§5). `ar-SA` alone
-  // gave a Hijri date in Arabic-Indic digits with nothing saying which calendar.
-  const bothCalendars = (iso: string) => {
-    const hijri = formatHijriDate(iso, i18n.language);
-    const gregorian = formatGregorianDate(iso, i18n.language);
-    return hijri === null ? gregorian : `${gregorian} · ${hijri}`;
-  };
+  // Gregorian only, Latin digits (owner's decision, 2026-10-02).
+  const gregorianDate = (iso: string) => formatGregorianDate(iso, i18n.language);
   const detailEntries = Object.entries(event.details);
 
   return (
@@ -131,10 +126,10 @@ export default function EventScreen() {
 
       <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
         <View style={{ gap: theme.spacing.sm }}>
-          <ListRow title={t('logbook.detail.occurredAt')} value={bothCalendars(event.occurredAt)} />
+          <ListRow title={t('logbook.detail.occurredAt')} value={gregorianDate(event.occurredAt)} />
           {/* Both dates, always. "Recorded three years later" is exactly the
               context a buyer needs to weigh an entry (ADR-0012). */}
-          <ListRow title={t('logbook.detail.recordedAt')} value={bothCalendars(event.recordedAt)} />
+          <ListRow title={t('logbook.detail.recordedAt')} value={gregorianDate(event.recordedAt)} />
           {event.mileage !== null ? (
             <ListRow
               title={t('logbook.detail.mileage')}

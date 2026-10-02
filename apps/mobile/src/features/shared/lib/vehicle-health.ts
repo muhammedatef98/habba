@@ -30,7 +30,7 @@ export function shortMonth(key: string, locale: string): string {
   const [year, month] = key.split('-').map(Number) as [number, number];
   // Mid-month at noon UTC: no timezone can push it into a neighbouring month.
   const date = new Date(Date.UTC(year, month - 1, 15, 12));
-  return date.toLocaleDateString(locale.startsWith('ar') ? 'ar-u-nu-latn' : locale, {
+  return date.toLocaleDateString(locale.startsWith('ar') ? 'ar-u-ca-gregory-nu-latn' : locale, {
     month: 'short',
   });
 }

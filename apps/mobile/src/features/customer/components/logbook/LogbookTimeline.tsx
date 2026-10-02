@@ -24,7 +24,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, ProvenanceBadge, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { formatCount } from '@/features/shared/lib/format-number';
-import { formatGregorianDate, formatHijriDate, yearKey } from '@/features/shared/lib/dates';
+import { formatGregorianDate, yearKey } from '@/features/shared/lib/dates';
 import type { Provenance, TimelineEvent } from '@/features/shared/data/types';
 
 const PROVENANCE_LABEL_KEY: Readonly<Record<Provenance, string>> = {
@@ -60,7 +60,6 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
         lastYear = year;
 
         const isLast = index === events.length - 1;
-        const hijri = formatHijriDate(event.occurredAt, i18n.language);
         const recordedLater =
           new Date(event.recordedAt).getTime() - new Date(event.occurredAt).getTime() >
           RECORDED_LATER_MS;
@@ -148,14 +147,6 @@ export function LogbookTimeline({ events, testID }: LogbookTimelineProps) {
                         })}`
                       : ''}
                   </Text>
-
-                  {/* §5: Hijri alongside Gregorian, never instead of it. Absent
-                      when the platform has no Islamic calendar to format with. */}
-                  {hijri !== null ? (
-                    <Text variant="caption" tone="subtle">
-                      {hijri}
-                    </Text>
-                  ) : null}
 
                   {/* ADR-0012: an entry written well after the fact is a
                       recollection, and saying so is what keeps the rest of the

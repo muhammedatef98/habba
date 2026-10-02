@@ -10,7 +10,7 @@
  * grouping.
  */
 
-const LATIN_DIGITS_ARABIC = 'ar-u-nu-latn';
+const LATIN_DIGITS_ARABIC = 'ar-u-ca-gregory-nu-latn';
 
 export function formatCount(value: number, locale: string): string {
   const tag = locale.startsWith('ar') ? LATIN_DIGITS_ARABIC : locale;
