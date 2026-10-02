@@ -97,6 +97,7 @@ export default function HomeScreen() {
       void queryClient.invalidateQueries({ queryKey: ['recent-orders'] });
       void queryClient.invalidateQueries({ queryKey: ['vehicles'] });
       void queryClient.invalidateQueries({ queryKey: ['transfer', 'incoming'] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicle-health'] });
     }, [queryClient]),
   );
 
@@ -155,6 +156,12 @@ export default function HomeScreen() {
   const alerts = useQuery({
     queryKey: ['maintenance-alerts', primaryVehicleId],
     queryFn: () => repository.listMaintenanceAlerts(primaryVehicleId ?? ''),
+    enabled: primaryVehicleId !== undefined,
+  });
+
+  const health = useQuery({
+    queryKey: ['vehicle-health', primaryVehicleId],
+    queryFn: () => repository.getVehicleHealth(primaryVehicleId ?? ''),
     enabled: primaryVehicleId !== undefined,
   });
 
@@ -338,6 +345,7 @@ export default function HomeScreen() {
                       bookService(bookable.data?.find((service) => service.id === alert.serviceId)),
                   }
                 : {})}
+              {...(health.data !== undefined ? { health: health.data } : {})}
               onSelect={selectVehicle}
               onOpenLogbook={() =>
                 router.push({ pathname: '/logbook', params: { id: selectedVehicle.id } })

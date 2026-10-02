@@ -41,6 +41,7 @@ import {
   Button,
   Card,
   ErrorState,
+  FadeIn,
   Icon,
   Screen,
   SkeletonCard,
@@ -50,6 +51,8 @@ import {
 } from '@habba/ui';
 import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCare';
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
+import { OwnershipCostCard } from '@/features/customer/components/logbook/OwnershipCostCard';
+import { VehicleHealthCard } from '@/features/customer/components/logbook/VehicleHealthCard';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
@@ -129,6 +132,21 @@ export default function LogbookScreen() {
     enabled: id !== undefined,
   });
 
+  // صحة السيارة and تكلفة الملكية (0097). Neither is required for the page:
+  // a failed fetch hides its card rather than putting an error above the
+  // history the owner came to read.
+  const health = useQuery({
+    queryKey: ['vehicle-health', id],
+    queryFn: () => repository.getVehicleHealth(id ?? ''),
+    enabled: id !== undefined,
+  });
+
+  const costs = useQuery({
+    queryKey: ['vehicle-costs', id],
+    queryFn: () => repository.getVehicleCosts(id ?? ''),
+    enabled: id !== undefined,
+  });
+
   // «تم» and «ذكّرني لاحقاً» both change what القادم says, so both refetch it.
   // Optimism here would be the wrong trade: the due state is computed from the
   // odometer server-side, and a screen that guessed it would occasionally show
@@ -145,6 +163,8 @@ export default function LogbookScreen() {
       await queryClient.invalidateQueries({ queryKey: ['care', id] });
       // «تم» writes a reading, which is a logbook entry.
       await queryClient.invalidateQueries({ queryKey: ['timeline', id] });
+      // And either can change the score.
+      await queryClient.invalidateQueries({ queryKey: ['vehicle-health', id] });
     },
   });
 
@@ -249,6 +269,14 @@ export default function LogbookScreen() {
           ) : null}
         </View>
       </View>
+
+      {health.data !== undefined ? (
+        <FadeIn delay={0}>
+          <VehicleHealthCard testID="vehicle-health" health={health.data} />
+        </FadeIn>
+      ) : health.isPending ? (
+        <SkeletonCard testID="health-skeleton" lines={2} />
+      ) : null}
 
       {/* Upcoming maintenance, above the history and OUTSIDE the timeline's loading branches: what
           the car needs next does not depend on the logbook having loaded, and
@@ -451,6 +479,13 @@ export default function LogbookScreen() {
               <LogbookTimeline testID="logbook-timeline" events={shown} />
             )}
           </View>
+
+          {costs.data !== undefined ? (
+            <View style={{ gap: theme.spacing.md }}>
+              <SectionHeader title={t('insights.costTitle')} />
+              <OwnershipCostCard testID="ownership-costs" costs={costs.data} />
+            </View>
+          ) : null}
 
           {/* Live cover, from `vehicle_warranties()` rather than from anything
               under `orders` (ADR-0021). After a handover the two differ: the

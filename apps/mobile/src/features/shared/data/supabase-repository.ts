@@ -23,6 +23,8 @@ import {
   type InvoiceDocument,
   type LegalDocumentKind,
   type SarAmount,
+  type VehicleCostSummary,
+  type VehicleHealth,
 } from '@habba/core';
 import type { CopyOverride } from '@habba/i18n/overrides';
 import { invoiceLines } from '@/features/shared/lib/invoice-lines.js';
@@ -1864,6 +1866,45 @@ export class SupabaseRepository implements Repository {
   }
 
   // القادم -------------------------------------------------------------------
+
+  async getVehicleHealth(vehicleId: string): Promise<VehicleHealth> {
+    // The score is a judgement and the server makes it (0097, §2.2).
+    const { data, error } = await this.client.rpc('vehicle_health', { p_vehicle_id: vehicleId });
+    if (error !== null) throw new Error(`getVehicleHealth: ${error.message}`);
+    const row = data as {
+      score: number | null;
+      grade: VehicleHealth['grade'];
+      factors: VehicleHealth['factors'];
+    };
+    return { score: row.score, grade: row.grade, factors: row.factors };
+  }
+
+  async getVehicleCosts(vehicleId: string): Promise<VehicleCostSummary> {
+    const { data, error } = await this.client.rpc('vehicle_cost_summary', {
+      p_vehicle_id: vehicleId,
+    });
+    if (error !== null) throw new Error(`getVehicleCosts: ${error.message}`);
+    const row = data as {
+      total: string;
+      last_12_months: string;
+      this_year: string;
+      entries: number;
+      months: VehicleCostSummary['months'];
+      categories: VehicleCostSummary['categories'];
+      km_12_months: number;
+      per_1000_km: string | null;
+    };
+    return {
+      total: row.total,
+      last12Months: row.last_12_months,
+      thisYear: row.this_year,
+      entries: row.entries,
+      months: row.months,
+      categories: row.categories,
+      km12Months: row.km_12_months,
+      per1000Km: row.per_1000_km,
+    };
+  }
 
   async listMaintenanceItems(vehicleId: string): Promise<readonly MaintenanceItem[]> {
     const { data, error } = await this.client.rpc('vehicle_maintenance_status', {

@@ -22,3 +22,4 @@ export * from './supabase/api-keys.js';
 export * from './legal/document.js';
 export * from './catalogue/icons.js';
 export * from './catalogue/inspection-template.js';
+export * from './vehicle/insights.js';

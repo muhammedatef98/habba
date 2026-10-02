@@ -21,10 +21,12 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Card, Icon, StatCluster, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Card, Icon, ScoreRing, StatCluster, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import type { VehicleHealth } from '@habba/core';
 import { PlateBadge } from '@/features/customer/components/PlateBadge';
 import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
 import { formatCount } from '@/features/shared/lib/format-number';
+import { toneForGrade } from '@/features/shared/lib/vehicle-health';
 import type { Vehicle, VehicleMake, VehicleModel } from '@/features/shared/data/types';
 
 export interface VehicleHeroCardProps {
@@ -45,6 +47,11 @@ export interface VehicleHeroCardProps {
    */
   readonly alert?: { readonly message: string; readonly detail?: string | undefined } | undefined;
   readonly onAlertPress?: (() => void) | undefined;
+  /**
+   * صحة السيارة (0097), drawn as a ring beside the title. Undefined while it
+   * loads or if it failed — the card is complete without it.
+   */
+  readonly health?: VehicleHealth | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -59,6 +66,7 @@ export function VehicleHeroCard({
   onSelect,
   alert,
   onAlertPress,
+  health,
   testID,
 }: VehicleHeroCardProps) {
   const { t, i18n } = useTranslation();
@@ -133,6 +141,39 @@ export function VehicleHeroCard({
               {subtitle}
             </Text>
           </Pressable>
+
+          {health !== undefined ? (
+            <Pressable
+              testID="home-vehicle-health"
+              onPress={onOpenLogbook}
+              accessibilityRole="button"
+              accessibilityLabel={
+                health.score === null
+                  ? t('insights.healthUnknownA11y')
+                  : t('insights.healthA11y', {
+                      score: health.score,
+                      grade: t(`insights.grade_${health.grade}`),
+                    })
+              }
+              style={({ pressed }) => [
+                { alignItems: 'center', gap: 2 },
+                pressed ? { opacity: 0.7 } : null,
+              ]}
+            >
+              <ScoreRing
+                score={health.score}
+                tone={toneForGrade(health.grade)}
+                size={52}
+                {...(health.score !== null
+                  ? { formatted: formatCount(health.score, i18n.language) }
+                  : {})}
+                accessibilityLabel={t('insights.healthTitle')}
+              />
+              <Text variant="caption" tone="subtle" style={{ fontSize: 10 }}>
+                {t('insights.healthTitle')}
+              </Text>
+            </Pressable>
+          ) : null}
 
           {switchable ? (
             <Pressable
