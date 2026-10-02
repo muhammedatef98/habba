@@ -4,3 +4,6 @@ build
 coverage
 pnpm-lock.yaml
 supabase/functions/_shared/report.ts
+
+# Claude Code keeps per-machine permissions here; git ignores it, and so should the format check.
+.claude/settings.local.json

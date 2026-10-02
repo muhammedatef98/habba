@@ -16,6 +16,7 @@ import { sarOrThrow } from '@habba/core';
 import { DevPaymentProvider } from '@/features/shared/lib/payments.js';
 import { SupabaseRepository } from './supabase-repository.js';
 import { mintTestJwt } from './test-jwt.js';
+import { applyAsTestProvider } from './test-provider.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
@@ -49,6 +50,18 @@ if (process.env.HABBA_REQUIRE_HARNESS === '1' && !harnessUp) {
 function restFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   return fetch(raw.replace('/rest/v1/', '/'), init);
+}
+
+/** The server's own role — for internal functions no client may call (0075). */
+function serviceClient(): SupabaseClient {
+  const token = mintTestJwt(JWT_SECRET, {
+    sub: '00000000-0000-4000-8000-000000000000',
+    role: 'service_role',
+  });
+  return createClient(POSTGREST_URL, token, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: restFetch },
+  });
 }
 
 function clientFor(userId: string): SupabaseClient {
@@ -147,20 +160,14 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     if ((existing.data ?? []).length > 0) {
       providerId = (existing.data as { id: string }[])[0]!.id;
     } else {
-      const created = await tech
-        .from('providers')
-        .insert({
-          owner_profile_id: TECH_ID,
-          provider_type: 'individual',
-          business_name_ar: 'خدمة بطاريات سريعة',
-          city_id: cityId,
-        })
-        .select('id, verification_status')
-        .single();
-
-      expect(created.error).toBeNull();
-      providerId = (created.data as { id: string }).id;
-      expect((created.data as { verification_status: string }).verification_status).toBe('pending');
+      const created = await applyAsTestProvider(tech, {
+        ownerId: TECH_ID,
+        providerType: 'individual',
+        businessNameAr: 'خدمة بطاريات سريعة',
+        cityId,
+      });
+      providerId = created.id;
+      expect(created.verificationStatus).toBe('pending');
     }
 
     // KYC is an ops decision. If a provider could set this, verification would
@@ -222,7 +229,12 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     expect(searching.error).toBeNull();
     expect((searching.data as { status: string }).status).toBe('searching');
 
-    const matches = await customer.rpc('match_providers', { p_order_id: orderId });
+    // Matching is the server's own business (0075): a client that could call
+    // it could see which technicians are online near any order.
+    const refused = await customer.rpc('match_providers', { p_order_id: orderId });
+    expect(refused.error).not.toBeNull();
+
+    const matches = await serviceClient().rpc('match_providers', { p_order_id: orderId });
     expect(matches.error).toBeNull();
     expect((matches.data as unknown[]).length).toBeGreaterThanOrEqual(1);
     expect((matches.data as { provider_id: string }[])[0]?.provider_id).toBe(providerId);
@@ -365,10 +377,7 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
     const evidence = await tech.rpc('record_completion_evidence', {
       p_order_id: orderId,
       p_mileage: 45120,
-      p_media: [
-        { url: 'https://example.test/before.jpg', kind: 'before', caption: 'قبل' },
-        { url: 'https://example.test/after.jpg', kind: 'after', caption: 'بعد' },
-      ],
+      p_media: (await tech.rpc('test_upload_completion_photos', { p_order_id: orderId })).data,
     });
     expect(evidence.error).toBeNull();
 
@@ -482,5 +491,62 @@ describe.skipIf(!harnessUp)('Phase 3 acceptance — emergency order', () => {
       .single();
 
     expect((provider.data as { rating_count: number }).rating_count).toBe(countBefore + 1);
+  });
+});
+
+describe.skipIf(!harnessUp)('what the customer reads back afterwards', () => {
+  test('the order history names the service', async () => {
+    const repo = new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+    const rows = await repo.listRecentOrders(50);
+    const row = rows.find((candidate) => candidate.id === orderId);
+    expect(row?.serviceNameAr ?? '').not.toBe('');
+    expect(row?.serviceNameEn ?? '').not.toBe('');
+  });
+
+  test('an order rated once reads back as rated, so it is not asked for again', async () => {
+    const customer = new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+    expect(await customer.getOrderRating(orderId)).toBe(5);
+  });
+
+  test('the tracking screen names the technician and their rating', async () => {
+    const provider = await new SupabaseRepository(
+      clientFor(CUSTOMER_ID),
+      () => CUSTOMER_ID,
+    ).getOrderProvider(providerId);
+    expect(provider?.businessNameAr).toBe('خدمة بطاريات سريعة');
+    expect(typeof provider?.ratingAvg).toBe('number');
+    expect(provider?.ratingCount ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  test('roles are what the server says: a customer, and a technician who is both', async () => {
+    const customerRoles = await new SupabaseRepository(
+      clientFor(CUSTOMER_ID),
+      () => CUSTOMER_ID,
+    ).listRoles();
+    expect(customerRoles).toContain('customer');
+    expect(customerRoles).not.toContain('technician');
+
+    const tech = new SupabaseRepository(clientFor(TECH_ID), () => TECH_ID);
+    expect(await tech.listRoles()).toEqual(expect.arrayContaining(['customer', 'technician']));
+    expect((await tech.getProviderApplication()).status).toBe('approved');
+  });
+
+  test("the completed order is in the customer's invoices, and opens", async () => {
+    const customer = new SupabaseRepository(clientFor(CUSTOMER_ID), () => CUSTOMER_ID);
+    const invoices = await customer.listInvoices();
+    const listed = invoices.find((invoice) => invoice.orderId === orderId);
+    expect(listed).toBeDefined();
+    expect(listed?.serviceNameAr ?? '').not.toBe('');
+
+    const document = await customer.getOrderInvoice(orderId);
+    expect(document?.invoiceNumber).toBe(listed?.invoiceNumber);
+    expect(document?.total).toBe(listed?.total);
+  });
+
+  test('nobody else sees them in their invoices', async () => {
+    const stranger = new SupabaseRepository(clientFor(STRANGER_ID), () => STRANGER_ID);
+    const invoices = await stranger.listInvoices();
+    expect(invoices.some((invoice) => invoice.orderId === orderId)).toBe(false);
+    expect(await stranger.getOrderInvoice(orderId)).toBeNull();
   });
 });

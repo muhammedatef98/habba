@@ -46,6 +46,13 @@ jobs:
       - name: Bundle both apps
         run: pnpm bundle
 
+      # CLAUDE.md §5.1.6: the service key is server-only. Builds the console
+      # and fails if a secret key, or code reading one, reached the files a
+      # browser downloads — or if anything declares a NEXT_PUBLIC_ variable
+      # named like a secret, which Next would ship by design.
+      - name: No secret in the admin client bundle
+        run: pnpm admin:check-bundle
+
   preview-build:
     name: Preview build (EAS)
     runs-on: ubuntu-latest

@@ -1,12 +1,12 @@
 /**
  * The app's location provider instance.
  *
- * Real GPS in a build that can ask for it; the fixed stub otherwise, so the
- * emergency flow stays exercisable on a simulator with no location set — which
- * is where most of it gets tested.
+ * Real GPS on a phone; the fixed stub in the web preview. A simulator with no
+ * location set gets `unavailable` from the real one, which the emergency
+ * screen already handles (the map opens on a fallback the customer moves).
  */
 
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import {
   DevLocationProvider,
   ExpoLocationProvider,
@@ -14,12 +14,13 @@ import {
 } from './location-provider.js';
 
 /**
- * Expo Go cannot request location permissions for a bare-workflow app, and a
- * failed request there looks identical to a denial — which would send every
- * developer down the wrong path. The stub is the honest answer in that case.
+ * Real GPS and the phone's own geocoder everywhere a phone runs the app,
+ * Expo Go included: expo-location is part of Expo Go and asks for permission
+ * there like anywhere else. This used to hand Expo Go the fixed stub, which
+ * put every customer in Dammam and named every pin after the nearest of six
+ * sample districts — so a pin anywhere near the city read «حي الشاطئ».
+ *
+ * The stub is kept for the web preview, which has no geocoder to ask.
  */
-const canUseDeviceLocation = Constants.appOwnership !== 'expo';
-
-export const locationProvider: LocationProvider = canUseDeviceLocation
-  ? new ExpoLocationProvider()
-  : new DevLocationProvider();
+export const locationProvider: LocationProvider =
+  Platform.OS === 'web' ? new DevLocationProvider() : new ExpoLocationProvider();

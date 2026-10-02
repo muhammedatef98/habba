@@ -228,14 +228,24 @@ describe.skipIf(!harnessUp)('SupabaseRepository against real PostgREST + RLS', (
     const target = vehicles[0];
     if (target === undefined) return;
 
+    // The general timeline writer is closed to clients (0075): through it an
+    // owner could store any wording as a Habba-verified event.
+    const forged = await client.rpc('append_vehicle_timeline_event', {
+      p_vehicle_id: target.id,
+      p_event_type: 'record_annotated',
+      p_summary_ar: 'تم تغيير المحرك بالكامل في هبّة',
+      p_summary_en: 'Engine replaced at Habba',
+    });
+    expect(forged.error).not.toBeNull();
+
     // An owner recording their own past service gets `self_reported`, no
     // matter what they would like it to say (ADR-0005). There is no parameter
     // to override it, and the server derives it from context.
-    const { error } = await client.rpc('append_vehicle_timeline_event', {
+    const { error } = await client.rpc('record_past_service', {
       p_vehicle_id: target.id,
-      p_event_type: 'service_completed',
       p_summary_ar: 'تغيير زيت سابق',
       p_summary_en: 'Past oil change',
+      p_occurred_at: '2025-01-10T08:00:00Z',
       p_mileage: 42000,
     });
     expect(error).toBeNull();

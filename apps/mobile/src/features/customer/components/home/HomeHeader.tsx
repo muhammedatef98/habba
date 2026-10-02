@@ -7,23 +7,24 @@
  * with a bare "سياراتي" title, which named the screen instead of orienting the
  * person on it.
  *
- * The mark sits opposite the greeting at small size — the wordmark belongs to
- * onboarding, where the brand is being introduced. Here it is a bookmark, not
- * a billboard.
+ * Opposite the greeting: the person's initial, which opens their account. It
+ * was the brand mark — decoration in the one corner every app teaches people
+ * to reach for their profile. The brand is on the icon they tapped to get here.
  */
 
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { HabbaMark, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Icon, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { greetingKeyNow } from '@/features/shared/lib/greeting';
 
 export interface HomeHeaderProps {
   /** The customer's name; omitted for a guest, whose "name" is a placeholder. */
   readonly name?: string | undefined;
+  readonly onAccount: () => void;
   readonly testID?: string | undefined;
 }
 
-export function HomeHeader({ name, testID }: HomeHeaderProps) {
+export function HomeHeader({ name, onAccount, testID }: HomeHeaderProps) {
   const { t } = useTranslation();
   const theme = useTheme();
 
@@ -50,7 +51,34 @@ export function HomeHeader({ name, testID }: HomeHeaderProps) {
         ) : null}
       </View>
 
-      <HabbaMark size={34} accessibilityLabel="هبّة" />
+      <Pressable
+        testID="home-account"
+        onPress={onAccount}
+        accessibilityRole="button"
+        accessibilityLabel={t('nav.account')}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        style={({ pressed }) => [
+          {
+            width: 44,
+            height: 44,
+            borderRadius: theme.radius.full,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.primarySubtle,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          },
+          pressed ? { opacity: 0.8 } : null,
+        ]}
+      >
+        {name !== undefined && name.trim().length > 0 ? (
+          <Text variant="subheading" tone="primary">
+            {name.trim().slice(0, 1)}
+          </Text>
+        ) : (
+          <Icon name="person" size={theme.iconSize.md} color={theme.colors.primary} />
+        )}
+      </Pressable>
     </View>
   );
 }

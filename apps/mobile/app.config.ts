@@ -52,9 +52,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supabaseAnonKey:
       env('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ?? env('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
 
-    // Off unless explicitly enabled (ADR-0017). Parsed as a strict equality
-    // against 'true' so a typo, `1`, or `yes` leaves the flow off rather than
-    // opening a KYC form we cannot yet protect.
-    enableProviderMode: env('EXPO_PUBLIC_ENABLE_PROVIDER_MODE') === 'true',
+    // Moyasar's publishable key — public by design, it can only start a
+    // payment, never move money. Absent, the app uses the development payment
+    // provider. Present, card payments go through Moyasar's form and the
+    // `payments` Edge Function (lib/payment-provider.ts).
+    moyasarPublishableKey: env('EXPO_PUBLIC_MOYASAR_PUBLISHABLE_KEY'),
+
+    // The console's /pay/return page, where Moyasar sends the customer after
+    // 3-D Secure (lib/moyasar-card-form.ts). Defaults to the production console.
+    paymentReturnUrl: env('EXPO_PUBLIC_PAYMENT_RETURN_URL'),
+
+    // Where push tokens come from (expo-notifications reads it here). Not a
+    // secret — it identifies the project, it does not authorise anything.
+    // Absent, the app runs unchanged and simply registers for no pushes.
+    ...(env('EAS_PROJECT_ID') === undefined ? {} : { eas: { projectId: env('EAS_PROJECT_ID') } }),
   },
 });

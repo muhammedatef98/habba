@@ -8,7 +8,7 @@
  *
  * Identifiers are validated here for the user's sake (a typo caught now beats
  * a rejection in three days) and again on the server, which is the one that
- * counts. They are sealed before they leave the device (§11).
+ * counts. The server seals them in Vault (0089); the device keeps nothing.
  */
 
 import { useState } from 'react';
@@ -16,13 +16,33 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { isValidNationalId, isValidSaudiIban, normaliseIban } from '@habba/core';
-import { Button, Card, Field, ListRow, Screen, Text, useTheme } from '@habba/ui';
+import { isValidNationalId, isValidSaudiIban, normaliseIban, toLatinDigits } from '@habba/core';
+import { Button, Card, Field, Row, Screen, Text, useTheme } from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
+import { ConsentCheck } from '@/features/shared/components/ConsentCheck';
+import { ChipRow } from '@/features/shared/components/form/ChipRow';
+import { useLegalDocument } from '@/features/shared/components/LegalDocumentView';
 import { useCanApplyAsProvider } from '@/features/shared/hooks/use-roles';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 type ProviderType = 'individual' | 'workshop';
+
+/** The server's refusals (0089), each to the sentence that tells the person what to fix. */
+const REFUSALS: Readonly<Record<string, string>> = {
+  already_applied: 'provider.upgrade.errors.alreadyApplied',
+  identity_in_use: 'provider.upgrade.errors.identityInUse',
+  invalid_national_id: 'provider.upgrade.errors.nationalId',
+  invalid_iban: 'provider.upgrade.errors.iban',
+  invalid_cr_number: 'provider.upgrade.errors.cr',
+  invalid_business_name: 'provider.upgrade.errors.name',
+  applications_closed: 'provider.upgrade.errors.closed',
+  account_suspended: 'provider.upgrade.errors.suspended',
+};
+
+function refusalKey(message: string): string {
+  return REFUSALS[message] ?? 'provider.upgrade.errors.submit';
+}
 
 export default function BecomeProviderScreen() {
   const { t, i18n } = useTranslation();
@@ -38,16 +58,20 @@ export default function BecomeProviderScreen() {
   const [cityId, setCityId] = useState<string | null>(null);
   const [nationalId, setNationalId] = useState('');
   const [iban, setIban] = useState('');
+  const [crNumber, setCrNumber] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  // The version in force, so the acceptance names the text that was shown (0083).
+  const providerTerms = useLegalDocument('provider_terms');
 
   if (!isAuthenticated) return <Redirect href="/" />;
-  // Covers both cases in one check: ENABLE_PROVIDER_MODE is off, or the role is
+  // Covers both cases in one check: applications are closed, or the role is
   // already held and there is nothing here to apply for. The redirect happens
-  // before render, so with the flag off no field that asks for a national ID or
-  // an IBAN is ever mounted — not disabled, not hidden, not mounted.
-  if (!canApply) return <Redirect href="/profile" />;
+  // before render, so no field that asks for a national ID or an IBAN is ever
+  // mounted for someone who cannot apply — not disabled, not hidden, not mounted.
+  if (!canApply) return <Redirect href="/account" />;
 
   async function handleSubmit() {
     setError(undefined);
@@ -56,23 +80,28 @@ export default function BecomeProviderScreen() {
     if (cityId === null) return setError(t('provider.upgrade.errors.city'));
     if (!isValidNationalId(nationalId)) return setError(t('provider.upgrade.errors.nationalId'));
     if (!isValidSaudiIban(iban)) return setError(t('provider.upgrade.errors.iban'));
+    if (providerType === 'workshop' && !/^[0-9]{10}$/.test(toLatinDigits(crNumber).trim())) {
+      return setError(t('provider.upgrade.errors.cr'));
+    }
+    if (!agreed) return setError(t('legal.providerConsentRequired'));
+    if (providerTerms.data === undefined) return setError(t('legal.loadFailed'));
 
     setSubmitting(true);
     try {
+      // The agreement is recorded before the application: an applicant is
+      // never on file without the terms they applied under.
+      await repository.acceptLegalDocuments([providerTerms.data.id]);
       await repository.applyAsProvider({
         businessNameAr: businessName.trim(),
         providerType,
         cityId,
         nationalId,
         iban: normaliseIban(iban),
+        ...(providerType === 'workshop' ? { crNumber: toLatinDigits(crNumber).trim() } : {}),
       });
       setSubmitted(true);
     } catch (cause) {
-      setError(
-        cause instanceof Error && cause.message === 'already_applied'
-          ? t('provider.upgrade.errors.alreadyApplied')
-          : t('provider.upgrade.errors.submit'),
-      );
+      setError(t(refusalKey(cause instanceof Error ? cause.message : '')));
     } finally {
       setSubmitting(false);
     }
@@ -96,7 +125,7 @@ export default function BecomeProviderScreen() {
         <Button
           testID="upgrade-done"
           label={t('common.done')}
-          onPress={() => router.replace('/profile')}
+          onPress={() => router.replace('/account')}
         />
       </Screen>
     );
@@ -104,12 +133,13 @@ export default function BecomeProviderScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar label={t('settings.title')} />
       <Text variant="title">{t('provider.upgrade.title')}</Text>
       <Text variant="body" tone="muted">
         {t('provider.upgrade.subtitle')}
       </Text>
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+      <Row gap="sm">
         <View style={{ flex: 1 }}>
           <Button
             testID="type-individual"
@@ -128,7 +158,7 @@ export default function BecomeProviderScreen() {
             onPress={() => setProviderType('workshop')}
           />
         </View>
-      </View>
+      </Row>
 
       <Field
         testID="business-name"
@@ -137,20 +167,16 @@ export default function BecomeProviderScreen() {
         onChangeText={setBusinessName}
       />
 
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="label" tone="muted">
-          {t('provider.upgrade.cityLabel')}
-        </Text>
-        {(cities.data ?? []).map((city) => (
-          <ListRow
-            key={city.id}
-            testID={`city-${city.id}`}
-            title={isArabic ? city.nameAr : city.nameEn}
-            selected={cityId === city.id}
-            onPress={() => setCityId(city.id)}
-          />
-        ))}
-      </View>
+      <ChipRow
+        label={t('provider.upgrade.cityLabel')}
+        options={(cities.data ?? []).map((city) => ({
+          key: city.id,
+          label: isArabic ? city.nameAr : city.nameEn,
+        }))}
+        selected={cityId}
+        onSelect={setCityId}
+        testIdPrefix="city"
+      />
 
       <Field
         testID="national-id"
@@ -161,6 +187,18 @@ export default function BecomeProviderScreen() {
         keyboardType="number-pad"
         forceLtrInput
       />
+
+      {providerType === 'workshop' ? (
+        <Field
+          testID="cr-number"
+          label={t('provider.upgrade.crLabel')}
+          hint={t('provider.upgrade.crHint')}
+          value={crNumber}
+          onChangeText={setCrNumber}
+          keyboardType="number-pad"
+          forceLtrInput
+        />
+      ) : null}
 
       <Field
         testID="iban"
@@ -184,6 +222,16 @@ export default function BecomeProviderScreen() {
       <Text variant="caption" tone="subtle">
         {t('provider.upgrade.nafathNote')}
       </Text>
+
+      <ConsentCheck
+        testID="provider-terms-consent"
+        checked={agreed}
+        onChange={(value) => {
+          setAgreed(value);
+          if (value && error === t('legal.providerConsentRequired')) setError(undefined);
+        }}
+        sentence={t('legal.providerConsent')}
+      />
 
       <Button
         testID="submit-application"

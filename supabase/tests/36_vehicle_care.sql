@@ -394,6 +394,10 @@ insert into public.orders (
 set role authenticated;
 select test.become('cc111111-0000-4000-c000-000000000001');
 
+-- Parts took the bill past the hold: the customer covers the difference
+-- before confirming (0078).
+select public.authorise_order_top_up('cc000000-0000-4000-c000-0000000000d1', 'test_top_up_0000d1', d)
+  from (select public.order_top_up_due('cc000000-0000-4000-c000-0000000000d1') as d) due where d > 0;
 update public.orders set status = 'completed'
 where id = 'cc000000-0000-4000-c000-0000000000d1';
 

@@ -19,10 +19,11 @@ import { useTranslation } from 'react-i18next';
 import { isEvidenceComplete } from '@habba/core';
 import { Button, Card, Icon, Screen, StatusPill, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
+import { formatAppointment } from '@/features/shared/lib/dates';
 import { Pressable } from 'react-native';
 
 export default function MyJobsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
 
   const jobs = useQuery({
@@ -116,6 +117,13 @@ export default function MyJobsScreen() {
                     <Text variant="caption" tone="subtle" numeric>
                       {job.orderNumber}
                     </Text>
+                    {job.scheduledFor !== null ? (
+                      <Text variant="bodySmall" tone="muted">
+                        {t('provider.scheduledFor', {
+                          when: formatAppointment(job.scheduledFor, i18n.language),
+                        })}
+                      </Text>
+                    ) : null}
                   </View>
 
                   <StatusPill

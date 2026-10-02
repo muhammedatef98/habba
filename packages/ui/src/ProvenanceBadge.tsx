@@ -12,6 +12,7 @@
 
 import { View } from 'react-native';
 import { Text } from './Text.js';
+import { alignStartFor } from './direction.js';
 import { useTheme } from './theme.js';
 
 export type Provenance = 'self_reported' | 'self_documented' | 'habba_verified' | 'third_party';
@@ -53,7 +54,7 @@ export function ProvenanceBadge({ provenance, label }: ProvenanceBadgeProps) {
       accessibilityRole="text"
       accessibilityLabel={label}
       style={{
-        alignSelf: 'flex-start',
+        alignSelf: alignStartFor(theme.direction, theme.nativeDirection),
         paddingHorizontal: theme.spacing.sm,
         paddingVertical: theme.spacing.xs,
         borderRadius: theme.radius.full,

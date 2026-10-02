@@ -12,12 +12,24 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, ErrorState, Icon, Screen, Text, rowDirectionFor, useTheme } from '@habba/ui';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Icon,
+  Row,
+  Screen,
+  Text,
+  rowDirectionFor,
+  useTheme,
+} from '@habba/ui';
 import { repository } from '@/features/shared/data/repository';
 import { useEmergencyDraft } from '@/features/shared/state/emergency-draft';
 import { useSession } from '@/features/shared/state/session';
 import { serviceIcon } from '@/features/shared/lib/service-icon';
-import { vehicleLabel } from '@/features/shared/lib/vehicle-label';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { priceWithVat } from '@/features/shared/lib/order-price';
+import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicle-label';
 
 export default function ServiceSelectionScreen() {
   const { t, i18n } = useTranslation();
@@ -52,8 +64,11 @@ export default function ServiceSelectionScreen() {
     queryFn: () => repository.listVehicles(),
   });
 
-  // Effective selection: whatever the draft holds, else the home screen's car.
-  const effectiveVehicleId = vehicleId ?? homeVehicleId;
+  // Effective selection: whatever the draft holds, else the home screen's car,
+  // else the first one. Most owners have one car, and making them tap it
+  // before "continue" wakes up is a step for nothing in an emergency — the
+  // chip shows which car is chosen, and another is one tap away.
+  const effectiveVehicleId = vehicleId ?? homeVehicleId ?? vehicles.data?.[0]?.id ?? null;
   const requiresVehicle = service?.requiresVehicle ?? false;
   const canContinue = service !== null && (!requiresVehicle || effectiveVehicleId !== null);
 
@@ -90,11 +105,12 @@ export default function ServiceSelectionScreen() {
           const isSelected = service?.id === option.id;
           return (
             <Card
+              selected={isSelected}
               key={option.id}
               testID={`emergency-service-${option.id}`}
               elevation={isSelected ? 'md' : 'none'}
               onPress={() => selectService(option)}
-              accessibilityLabel={option.nameAr}
+              accessibilityLabel={isArabic ? option.nameAr : option.nameEn}
               style={{
                 // Two per row, with the gap accounted for. minWidth keeps the
                 // card usable if a long service name wraps.
@@ -107,14 +123,31 @@ export default function ServiceSelectionScreen() {
                 backgroundColor: isSelected ? theme.colors.primarySubtle : theme.colors.surface,
               }}
             >
-              <Icon
-                name={serviceIcon(option.icon)}
-                size={theme.iconSize['2xl']}
-                color={isSelected ? theme.colors.primary : theme.colors.textMuted}
-              />
+              <Row justify="space-between" align="flex-start">
+                <Icon
+                  name={serviceIcon(option.icon)}
+                  size={theme.iconSize['2xl']}
+                  color={isSelected ? theme.colors.primary : theme.colors.textMuted}
+                />
+                {isSelected ? (
+                  <View
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: theme.radius.full,
+                      backgroundColor: theme.colors.primary,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Icon name="check" size={theme.iconSize.sm} color={theme.colors.textInverse} />
+                  </View>
+                ) : null}
+              </Row>
               <View style={{ gap: theme.spacing.xs }}>
-                <Text variant="subheading">{option.nameAr}</Text>
-                {option.descriptionAr !== null ? (
+                <Text variant="subheading">{isArabic ? option.nameAr : option.nameEn}</Text>
+                {/* The catalogue's descriptions are Arabic only. */}
+                {isArabic && option.descriptionAr !== null ? (
                   <Text variant="caption" tone="muted">
                     {option.descriptionAr}
                   </Text>
@@ -130,6 +163,27 @@ export default function ServiceSelectionScreen() {
           <Text variant="label" tone="muted">
             {t('vehicle.myVehicles')}
           </Text>
+          {/* No car on file left a heading over nothing and a continue button
+              that never woke up — a dead end, on the one screen where the
+              person reading it may be stranded. */}
+          {vehicles.isSuccess && vehicles.data.length === 0 ? (
+            <Card
+              testID="emergency-no-vehicle"
+              elevation="none"
+              style={{ backgroundColor: theme.colors.surfaceSunken, gap: theme.spacing.sm }}
+            >
+              <Text variant="bodyStrong">{t('home.noVehicleTitle')}</Text>
+              <Text variant="bodySmall" tone="muted">
+                {t('home.noVehicleBody')}
+              </Text>
+              <Button
+                testID="emergency-add-vehicle"
+                label={t('vehicle.addTitle')}
+                size="medium"
+                onPress={() => router.push({ pathname: '/add-vehicle', params: { then: 'back' } })}
+              />
+            </Card>
+          ) : null}
           <View
             style={{
               flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
@@ -141,16 +195,34 @@ export default function ServiceSelectionScreen() {
               const isSelected = effectiveVehicleId === vehicle.id;
               return (
                 <Card
+                  selected={isSelected}
                   key={vehicle.id}
                   testID={`emergency-vehicle-${vehicle.id}`}
                   elevation={isSelected ? 'md' : 'none'}
                   onPress={() => selectVehicle(vehicle.id)}
                   style={{
+                    gap: 2,
                     borderColor: isSelected ? theme.colors.primary : theme.colors.border,
                     borderWidth: isSelected ? 1.5 : 1,
+                    backgroundColor: isSelected ? theme.colors.primarySubtle : theme.colors.surface,
                   }}
                 >
-                  <Text variant="body">
+                  {/* Make and model first — "which car" is answered by the
+                      car, not by its plate — then the owner's own name for
+                      it or the plate underneath. */}
+                  <Text variant="bodyStrong" tone={isSelected ? 'primary' : 'default'}>
+                    {describeVehicleModel(vehicle, {
+                      makes: makes.data,
+                      models: allModels.data,
+                      isArabic,
+                    }) ||
+                      vehicleLabel(vehicle, {
+                        makes: makes.data,
+                        models: allModels.data,
+                        isArabic,
+                      })}
+                  </Text>
+                  <Text variant="caption" tone="muted">
                     {vehicleLabel(vehicle, {
                       makes: makes.data,
                       models: allModels.data,
@@ -165,21 +237,26 @@ export default function ServiceSelectionScreen() {
       ) : null}
 
       {service !== null ? (
-        <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
-          <View
-            style={{
-              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Text variant="caption" tone="muted">
-              {t('emergency.estimatedPrice', { service: service.nameAr })}
-            </Text>
-            <Text variant="bodyStrong" numeric>
-              {t('emergency.priceFixed', { amount: service.basePrice })}
-            </Text>
-          </View>
+        // Stacked, not side by side: in a row the label was squeezed into a
+        // narrow column and the price wrapped over two lines.
+        <Card
+          elevation="none"
+          style={{ backgroundColor: theme.colors.surfaceSunken, gap: theme.spacing.xs }}
+        >
+          <Text variant="caption" tone="muted">
+            {t('emergency.estimatedPrice', {
+              service: isArabic ? service.nameAr : service.nameEn,
+            })}
+          </Text>
+          <Text variant="bodyStrong" numeric>
+            {t('emergency.priceFixed', {
+              // Emergency prices are always fixed centrally (§11).
+              amount:
+                service.basePrice === null
+                  ? '—'
+                  : formatSarDisplay(priceWithVat(service.basePrice)),
+            })}
+          </Text>
         </Card>
       ) : null}
 

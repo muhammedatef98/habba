@@ -23,7 +23,7 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { addSar, applyRate, SAUDI_VAT_RATE, type SarAmount } from '@habba/core';
+import { subtractSar, toLatinDigits, type SarAmount } from '@habba/core';
 import {
   Button,
   Card,
@@ -36,8 +36,11 @@ import {
 } from '@habba/ui';
 import { BookingSteps } from '@/features/customer/components/booking/BookingSteps';
 import { repository } from '@/features/shared/data/repository';
+import { formatAppointment } from '@/features/shared/lib/dates';
 import { daysFromToday, groupSlotsByDay } from '@/features/shared/lib/slot-days';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+import { priceWithVat } from '@/features/shared/lib/order-price';
+import { registerThisDevice } from '@/features/shared/lib/push';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import type { AppointmentSlot } from '@/features/shared/data/types';
 
@@ -71,19 +74,37 @@ export default function BookingSlotScreen() {
     enabled: provider !== null,
   });
 
+  /**
+   * The booking this screen already placed, if confirming it failed after.
+   * The slot is claimed at that point; a retry confirms the same booking
+   * rather than claiming a second slot.
+   */
+  const bookedId = useRef<string | null>(null);
+
   const book = useMutation({
     mutationFn: async () => {
       if (draft.slot === null || service === null) throw new Error('incomplete');
 
-      return repository.bookAppointment({
-        slotId: draft.slot.id,
-        serviceId: service.id,
-        ...(draft.vehicleId !== null ? { vehicleId: draft.vehicleId } : {}),
-        ...(draft.problem.trim().length > 0 ? { problem: draft.problem.trim() } : {}),
-      });
+      const orderId =
+        bookedId.current ??
+        (await repository.bookAppointment({
+          slotId: draft.slot.id,
+          serviceId: service.id,
+          ...(draft.vehicleId !== null ? { vehicleId: draft.vehicleId } : {}),
+          ...(draft.problem.trim().length > 0 ? { problem: draft.problem.trim() } : {}),
+        }));
+      bookedId.current = orderId;
+
+      // Holds the payment and confirms the appointment with the provider.
+      // Until this succeeds the provider has nothing on their schedule.
+      await repository.submitOrder(orderId);
+      return orderId;
     },
     onSuccess: async (orderId) => {
       placed.current = true;
+      // Asked now, when it explains itself: they will want to hear when the
+      // workshop has the car and when the work is done.
+      void registerThisDevice({ prompt: true, locale: i18n.language });
       // The draft is finished the moment the server owns the order; leaving it
       // populated would pre-fill the next booking with this one's answers.
       draft.reset();
@@ -93,6 +114,16 @@ export default function BookingSlotScreen() {
     },
     onError: (cause: unknown) => {
       const message = cause instanceof Error ? cause.message : '';
+      // Closing the card form is a decision, not a failure: no message.
+      if (message === 'submitOrder/payment: cancelled') return;
+
+      // The slot is ours; only the confirmation failed. Keep the selection so
+      // one more tap finishes it.
+      if (bookedId.current !== null) {
+        setError(t('booking.errorPayment'));
+        return;
+      }
+
       setError(
         message.includes('slot_unavailable') || message.includes('no longer available')
           ? t('booking.errorSlotTaken')
@@ -114,27 +145,33 @@ export default function BookingSlotScreen() {
   const activeKey = dayKey ?? days[0]?.key ?? null;
   const activeDay = days.find((day) => day.key === activeKey);
 
-  const subtotal = service.basePrice;
-  const vat = applyRate(subtotal, SAUDI_VAT_RATE);
-  const total = addSar(subtotal, vat);
+  // The provider's price, as shown on their card and as the server quotes it
+  // (0065) — not the catalogue's, which a provider may have priced under.
+  const subtotal = provider.price;
+  const total = priceWithVat(subtotal);
+  const vat = subtractSar(total, subtotal);
 
   const dayLabel = (date: Date) => {
     const offset = daysFromToday(date);
     if (offset === 0) return t('booking.slotToday');
     if (offset === 1) return t('booking.slotTomorrow');
-    return date.toLocaleDateString(
-      i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
-      {
+    return toLatinDigits(
+      date.toLocaleDateString(i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language, {
         weekday: 'short',
         day: 'numeric',
-      },
+        timeZone: 'Asia/Riyadh',
+      }),
     );
   };
 
   const timeLabel = (slot: AppointmentSlot) =>
-    new Date(slot.startsAt).toLocaleTimeString(
-      i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
-      { hour: '2-digit', minute: '2-digit' },
+    toLatinDigits(
+      new Date(slot.startsAt).toLocaleTimeString(
+        i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
+        // Riyadh time, as the confirmation and the technician's schedule show
+        // it (dates.ts `formatAppointment`) — not the phone's zone.
+        { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' },
+      ),
     );
 
   return (
@@ -210,6 +247,7 @@ export default function BookingSlotScreen() {
               const selected = day.key === activeKey;
               return (
                 <Card
+                  selected={selected}
                   key={day.key}
                   testID={`booking-day-${day.key}`}
                   elevation="none"
@@ -249,6 +287,7 @@ export default function BookingSlotScreen() {
               const selected = draft.slot?.id === slot.id;
               return (
                 <Card
+                  selected={selected}
                   key={slot.id}
                   testID={`booking-slot-${slot.id}`}
                   elevation="none"
@@ -302,16 +341,7 @@ export default function BookingSlotScreen() {
               value={undefined}
             />
             <SummaryRow
-              label={new Date(draft.slot.startsAt).toLocaleString(
-                i18n.language.startsWith('ar') ? 'ar-u-nu-latn' : i18n.language,
-                {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                },
-              )}
+              label={formatAppointment(draft.slot.startsAt, i18n.language)}
               value={undefined}
             />
           </View>

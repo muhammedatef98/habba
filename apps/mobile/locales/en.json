@@ -1,1 +1,5 @@
-{}
+{
+  "NSCameraUsageDescription": "Habba uses the camera to film the fault before a technician is sent, and to photograph the work before and after for the car's logbook.",
+  "NSMicrophoneUsageDescription": "Habba uses the microphone to record the sound of the fault in the triage clip, so the technician knows the problem before driving out.",
+  "NSLocationWhenInUseUsageDescription": "Habba uses your location to send the nearest technician to your car, and to share a technician's position with the customer while on the way."
+}

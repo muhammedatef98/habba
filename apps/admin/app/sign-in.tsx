@@ -11,7 +11,7 @@
 'use client';
 
 import { useState } from 'react';
-import { opsAuth, type Operator } from '@/lib/ops-session';
+import { opsAuth, type OpsState } from '@/lib/ops-session';
 
 const MESSAGES: Record<'bad_credentials' | 'not_ops' | 'transport_failed', string> = {
   bad_credentials: 'البريد أو كلمة المرور غير صحيحة.',
@@ -23,7 +23,7 @@ const MESSAGES: Record<'bad_credentials' | 'not_ops' | 'transport_failed', strin
   transport_failed: 'تعذّر الاتصال. حاول مرة أخرى.',
 };
 
-export function SignIn({ onSignedIn }: { readonly onSignedIn: (operator: Operator) => void }) {
+export function SignIn({ onProgress }: { readonly onProgress: (state: OpsState) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,7 +38,9 @@ export function SignIn({ onSignedIn }: { readonly onSignedIn: (operator: Operato
     setBusy(false);
 
     if (result.ok) {
-      onSignedIn(result.operator);
+      // Never straight to the console: the next step is always the second
+      // factor, because the server will not count this session until then.
+      onProgress(result.state);
       return;
     }
     setError(MESSAGES[result.reason]);

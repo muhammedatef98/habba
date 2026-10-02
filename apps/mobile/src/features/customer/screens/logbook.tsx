@@ -36,6 +36,7 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PlateBadge } from '@/features/customer/components/PlateBadge';
 import {
   Button,
   Card,
@@ -47,12 +48,13 @@ import {
   rowDirectionFor,
   useTheme,
 } from '@habba/ui';
-import { CoverageBar } from '@/features/customer/components/logbook/CoverageBar';
 import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCare';
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
-import { shareHabbaReportPdf } from '@/features/shared/lib/report-pdf';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
+import { habbaReportDocument } from '@/features/shared/lib/report-pdf';
+import { DocumentActions } from '@/features/shared/components/DocumentActions';
 import { formatCount } from '@/features/shared/lib/format-number';
 import {
   countByFilter,
@@ -64,6 +66,7 @@ import { describeVehicleModel, vehicleLabel } from '@/features/shared/lib/vehicl
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 import type { MaintenanceItem } from '@/features/shared/data/types';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 /**
  * «ذكّرني لاحقاً» defers by a fortnight, matching `care_default_snooze_days()`
@@ -80,15 +83,19 @@ const FILTER_LABEL_KEY: Readonly<Record<LogbookFilter, string>> = {
   mileage: 'logbook.filterMileage',
 };
 
+/** Below this many entries the history is read at a glance; no filters. */
+const FILTERS_FROM = 6;
+
 export default function LogbookScreen() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
+  const features = useFeatures();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isArabic = i18n.language.startsWith('ar');
 
-  const [reportShared, setReportShared] = useState(false);
+  const [reportReady, setReportReady] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [filter, setFilter] = useState<LogbookFilter>('all');
 
@@ -176,32 +183,28 @@ export default function LogbookScreen() {
     queryFn: () => repository.listAllModels(),
   });
 
-  // Issue, read back, render, share — one action from the owner's side, and
-  // the whole of ADR-0019 from ours. The payload is read back by token rather
-  // than rebuilt from the timeline: the PDF must say what the database froze,
-  // or the document and the record it claims to be are different things.
-  const report = useMutation({
-    mutationFn: async () => {
-      const token = await repository.generateReport(id ?? '');
-      const payload = await repository.getReport(token);
-      if (payload === null) throw new Error('report_missing');
-      return shareHabbaReportPdf(payload);
-    },
-    onSuccess: (result) => {
-      setReportShared(result.ok);
-      setReportError(result.ok ? null : t('logbook.errors.reportShareUnavailable'));
-    },
-    onError: (error: Error) => {
-      setReportShared(false);
-      // A refused report means the logbook failed verification. That is not a
-      // transient error and must not invite a retry — it needs support.
-      setReportError(
-        error.message.includes('failed verification')
-          ? t('logbook.errors.reportChainBroken')
-          : t('logbook.errors.reportFailed'),
-      );
-    },
-  });
+  // Issue and read back — one press from the owner's side, the whole of
+  // ADR-0019 from ours. The payload is read back by token rather than rebuilt
+  // from the timeline: the document must say what the database froze, or the
+  // document and the record it claims to be are different things. Issued once
+  // per visit; viewing and then sharing are the same report.
+  const loadReport = async () => {
+    const token = await repository.generateReport(id ?? '');
+    const payload = await repository.getReport(token);
+    if (payload === null) throw new Error('report_missing');
+    return habbaReportDocument(payload, t('documents.habbaReport'));
+  };
+
+  const onReportFailed = (error: Error) => {
+    setReportReady(false);
+    // A refused report means the logbook failed verification. That is not a
+    // transient error and must not invite a retry — it needs support.
+    setReportError(
+      error.message.includes('failed verification')
+        ? t('logbook.errors.reportChainBroken')
+        : t('logbook.errors.reportFailed'),
+    );
+  };
 
   if (!isAuthenticated) return <Redirect href="/" />;
 
@@ -210,7 +213,7 @@ export default function LogbookScreen() {
   const selfReportedCount = events.length - verifiedCount;
 
   const counts = countByFilter(events);
-  const shown = filterEvents(events, filter);
+  const shown = events.length >= FILTERS_FROM ? filterEvents(events, filter) : events;
 
   const sources = { makes: makes.data, models: models.data, isArabic };
   const car = vehicle.data;
@@ -226,10 +229,8 @@ export default function LogbookScreen() {
 
   return (
     <Screen scrollable style={{ gap: theme.spacing.lg }}>
+      <BackBar label={t('logbook.title')} />
       <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="label" tone="muted">
-          {t('logbook.title')}
-        </Text>
         <Text variant="title">{heading}</Text>
         <View
           style={{
@@ -239,50 +240,51 @@ export default function LogbookScreen() {
           }}
         >
           {car?.plateNormalised != null ? (
-            <Text variant="bodySmall" tone="muted" numeric>
-              {car.plateNormalised}
-            </Text>
+            <PlateBadge plate={car.plateNormalised} variant="compact" />
           ) : null}
           {events.length > 0 ? (
             <Text variant="bodySmall" tone="subtle">
-              {t('logbook.recordsCount', { count: formatCount(events.length, i18n.language) })}
+              {t('logbook.recordsCount', { count: events.length })}
             </Text>
           ) : null}
         </View>
       </View>
 
-      {/* القادم, above حصل and OUTSIDE the timeline's loading branches: what
+      {/* Upcoming maintenance, above the history and OUTSIDE the timeline's loading branches: what
           the car needs next does not depend on the logbook having loaded, and
           a dropped timeline fetch must not take the section that can book a
           service down with it. */}
-      <View style={{ gap: theme.spacing.md }}>
-        <SectionHeader title={t('care.title')} />
-        {care.isPending || documents.isPending ? (
-          <SkeletonCard testID="care-skeleton" lines={2} />
-        ) : care.isError || documents.isError ? (
-          <ErrorState
-            testID="care-error"
-            message={t('errors.offline')}
-            retryLabel={t('common.retry')}
-            retrying={care.isFetching || documents.isFetching}
-            onRetry={() => {
-              void care.refetch();
-              void documents.refetch();
-            }}
-          />
-        ) : (
-          <UpcomingCare
-            testID="care-section"
-            items={care.data ?? []}
-            documents={documents.data ?? []}
-            busyItemId={actOnItem.isPending ? (actOnItem.variables?.itemId ?? null) : null}
-            onDone={(itemId) => actOnItem.mutate({ itemId, kind: 'done' })}
-            onSnooze={(itemId) => actOnItem.mutate({ itemId, kind: 'snooze' })}
-            onBook={(item) => startBooking.mutate(item)}
-            onConfirmOdometer={() => router.push({ pathname: '/mileage', params: { id } })}
-          />
-        )}
-      </View>
+      {/* Reminders switched off in the console (0093) take the section too. */}
+      {features.careReminders ? (
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader title={t('care.title')} />
+          {care.isPending || documents.isPending ? (
+            <SkeletonCard testID="care-skeleton" lines={2} />
+          ) : care.isError || documents.isError ? (
+            <ErrorState
+              testID="care-error"
+              message={t('errors.offline')}
+              retryLabel={t('common.retry')}
+              retrying={care.isFetching || documents.isFetching}
+              onRetry={() => {
+                void care.refetch();
+                void documents.refetch();
+              }}
+            />
+          ) : (
+            <UpcomingCare
+              testID="care-section"
+              items={care.data ?? []}
+              documents={documents.data ?? []}
+              busyItemId={actOnItem.isPending ? (actOnItem.variables?.itemId ?? null) : null}
+              onDone={(itemId) => actOnItem.mutate({ itemId, kind: 'done' })}
+              onSnooze={(itemId) => actOnItem.mutate({ itemId, kind: 'snooze' })}
+              onBook={(item) => startBooking.mutate(item)}
+              onConfirmOdometer={() => router.push({ pathname: '/mileage', params: { id } })}
+            />
+          )}
+        </View>
+      ) : null}
 
       {/* The one screen the product cannot afford to be wrong about. Telling
           an owner with two years of history that their logbook "starts here"
@@ -312,11 +314,13 @@ export default function LogbookScreen() {
             <Text variant="body" tone="muted">
               {t('logbook.emptyBody')}
             </Text>
-            <Button
-              testID="record-service"
-              label={t('logbook.addRecord')}
-              onPress={() => router.push({ pathname: '/record-service', params: { id } })}
-            />
+            {features.recordService ? (
+              <Button
+                testID="record-service"
+                label={t('logbook.addRecord')}
+                onPress={() => router.push({ pathname: '/record-service', params: { id } })}
+              />
+            ) : null}
           </View>
         </Card>
       ) : (
@@ -329,22 +333,28 @@ export default function LogbookScreen() {
               </Text>
             </View>
 
-            <CoverageBar
-              testID="logbook-coverage-bar"
-              verified={verifiedCount}
-              selfReported={selfReportedCount}
-            />
+            <Text testID="logbook-coverage-line" variant="bodySmall" tone="muted">
+              {t('logbook.coverage', {
+                verified: formatCount(verifiedCount, i18n.language),
+                selfReported: formatCount(selfReportedCount, i18n.language),
+              })}
+            </Text>
 
-            <Button
-              testID="generate-report"
-              label={t('logbook.generateReport')}
-              variant="accent"
-              size="medium"
-              onPress={() => report.mutate()}
-              loading={report.isPending}
-            />
+            {features.habbaReport ? (
+              <DocumentActions
+                testID="generate-report"
+                load={loadReport}
+                viewLabel={t('documents.viewReport')}
+                viewVariant="accent"
+                onPrepared={() => {
+                  setReportReady(true);
+                  setReportError(null);
+                }}
+                onLoadError={onReportFailed}
+              />
+            ) : null}
 
-            {reportShared ? (
+            {reportReady ? (
               <View
                 style={{
                   gap: theme.spacing.xs,
@@ -368,12 +378,6 @@ export default function LogbookScreen() {
                 <Text variant="caption" tone="muted">
                   {t('logbook.reportShareHint')}
                 </Text>
-                <Text variant="caption" tone="subtle">
-                  {t('logbook.reportCoverage', {
-                    verified: formatCount(verifiedCount, i18n.language),
-                    total: formatCount(events.length, i18n.language),
-                  })}
-                </Text>
               </View>
             ) : null}
 
@@ -385,51 +389,59 @@ export default function LogbookScreen() {
           </Card>
 
           <View style={{ gap: theme.spacing.md }}>
-            {/* حصل. The same timeline, under the name the section has on the
+            {/* Service history. The same timeline, under the name the section has on the
                 screen — not a second history surface (ADR-0022). */}
             <SectionHeader
               title={t('care.happened')}
-              actionLabel={t('logbook.addRecord')}
-              onAction={() => router.push({ pathname: '/record-service', params: { id } })}
+              {...(features.recordService
+                ? {
+                    actionLabel: t('logbook.addRecord'),
+                    onAction: () => router.push({ pathname: '/record-service', params: { id } }),
+                  }
+                : {})}
             />
 
-            {/* A filter with nothing behind it is a control that punishes
-                curiosity, so an empty bucket is not offered. */}
-            <View
-              style={{
-                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-                flexWrap: 'wrap',
-                gap: theme.spacing.sm,
-              }}
-            >
-              {LOGBOOK_FILTERS.filter((option) => counts[option] > 0).map((option) => {
-                const selected = filter === option;
-                return (
-                  <Card
-                    key={option}
-                    testID={`logbook-filter-${option}`}
-                    elevation="none"
-                    onPress={() => setFilter(option)}
-                    style={{
-                      paddingVertical: theme.spacing.xs,
-                      paddingHorizontal: theme.spacing.md,
-                      minHeight: 36,
-                      justifyContent: 'center',
-                      borderRadius: theme.radius.full,
-                      backgroundColor: selected
-                        ? theme.colors.primarySubtle
-                        : theme.colors.surfaceSunken,
-                      borderColor: selected ? theme.colors.primary : theme.colors.border,
-                      borderWidth: selected ? 1.5 : 1,
-                    }}
-                  >
-                    <Text variant="caption" tone={selected ? 'primary' : 'muted'}>
-                      {`${t(FILTER_LABEL_KEY[option])} · ${formatCount(counts[option], i18n.language)}`}
-                    </Text>
-                  </Card>
-                );
-              })}
-            </View>
+            {/* Filters earn their place only on a long history; a short one is
+                read at a glance. A filter with nothing behind it punishes
+                curiosity, so an empty bucket is not offered either. */}
+            {events.length >= FILTERS_FROM ? (
+              <View
+                style={{
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                  flexWrap: 'wrap',
+                  gap: theme.spacing.sm,
+                }}
+              >
+                {LOGBOOK_FILTERS.filter((option) => counts[option] > 0).map((option) => {
+                  const selected = filter === option;
+                  return (
+                    <Card
+                      selected={selected}
+                      key={option}
+                      testID={`logbook-filter-${option}`}
+                      elevation="none"
+                      onPress={() => setFilter(option)}
+                      style={{
+                        paddingVertical: theme.spacing.xs,
+                        paddingHorizontal: theme.spacing.md,
+                        minHeight: 36,
+                        justifyContent: 'center',
+                        borderRadius: theme.radius.full,
+                        backgroundColor: selected
+                          ? theme.colors.primarySubtle
+                          : theme.colors.surfaceSunken,
+                        borderColor: selected ? theme.colors.primary : theme.colors.border,
+                        borderWidth: selected ? 1.5 : 1,
+                      }}
+                    >
+                      <Text variant="caption" tone={selected ? 'primary' : 'muted'}>
+                        {`${t(FILTER_LABEL_KEY[option])} · ${formatCount(counts[option], i18n.language)}`}
+                      </Text>
+                    </Card>
+                  );
+                })}
+              </View>
+            ) : null}
 
             {shown.length === 0 ? (
               <Text variant="bodySmall" tone="muted">
@@ -457,9 +469,7 @@ export default function LogbookScreen() {
                       {isArabic ? warranty.serviceAr : warranty.serviceEn}
                     </Text>
                     <Text variant="caption" tone="subtle">
-                      {t('transfer.warrantyRemaining', {
-                        days: formatCount(warranty.daysRemaining, i18n.language),
-                      })}
+                      {t('transfer.warrantyRemaining', { count: warranty.daysRemaining })}
                       {warranty.hasOpenClaim ? ` · ${t('transfer.warrantyOpenClaim')}` : ''}
                     </Text>
                   </View>
@@ -482,22 +492,24 @@ export default function LogbookScreen() {
                 size="medium"
                 onPress={() => router.push({ pathname: '/mileage', params: { id } })}
               />
-              <Button
-                testID="logbook-transfer"
-                label={t('transfer.entry')}
-                variant="ghost"
-                size="medium"
-                onPress={() => router.push({ pathname: '/transfer', params: { id } })}
-              />
-              <Text variant="caption" tone="subtle">
-                {t('transfer.entryHint')}
-              </Text>
+              {features.ownershipTransfer ? (
+                <>
+                  <Button
+                    testID="logbook-transfer"
+                    label={t('transfer.entry')}
+                    variant="ghost"
+                    size="medium"
+                    onPress={() => router.push({ pathname: '/transfer', params: { id } })}
+                  />
+                  <Text variant="caption" tone="subtle">
+                    {t('transfer.entryHint')}
+                  </Text>
+                </>
+              ) : null}
             </Card>
           </View>
         </>
       )}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

@@ -17,6 +17,10 @@
 
 import type { SarAmount } from '@habba/core';
 
-export function formatSarDisplay(amount: SarAmount): string {
+/**
+ * Also takes the server's own 2dp strings that were never branded (a
+ * technician's estimated payout arrives as `"120.00"`), for display only.
+ */
+export function formatSarDisplay(amount: SarAmount | string): string {
   return amount.endsWith('.00') ? amount.slice(0, -3) : amount;
 }

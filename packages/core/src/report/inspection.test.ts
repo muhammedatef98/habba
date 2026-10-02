@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  inspectionProgress,
   collectFindings,
   countByRating,
   renderInspectionReport,
@@ -63,6 +64,32 @@ describe('collectFindings', () => {
     const findings = collectFindings(REPORT);
     expect(findings).toHaveLength(3);
     expect(findings.every((f) => f.rating === 'fail' || f.rating === 'attention')).toBe(true);
+  });
+
+  test("carries an item's photos with it, and adds nothing where there are none", () => {
+    const withPhoto: InspectionReport = {
+      ...REPORT,
+      results: Object.fromEntries(
+        Object.entries(REPORT.results).map(([section, items]) => [
+          section,
+          Object.fromEntries(
+            Object.entries(items).map(([item, entry]) => [
+              item,
+              entry.rating === 'fail'
+                ? { ...entry, photos: ['storage://completion-media/o/insp-a.jpg'] }
+                : entry,
+            ]),
+          ),
+        ]),
+      ),
+    };
+
+    const findings = collectFindings(withPhoto);
+    expect(findings.filter((f) => f.rating === 'fail').every((f) => f.photos?.length === 1)).toBe(
+      true,
+    );
+    expect(findings.filter((f) => f.rating !== 'fail').every((f) => !('photos' in f))).toBe(true);
+    expect(collectFindings(REPORT).every((f) => !('photos' in f))).toBe(true);
   });
 
   test('orders by what it costs to fix, not by template order', () => {
@@ -172,5 +199,42 @@ describe('renderInspectionReport', () => {
   test('never renders the buyer identity', () => {
     expect(html).not.toContain('+9665');
     expect(html).not.toContain('customer_id');
+  });
+});
+
+describe('as a file, with no public link (ADR-0019)', () => {
+  test('renders without a link when none is given', () => {
+    const html = renderInspectionReport(REPORT);
+    expect(html).not.toContain('<code>');
+    expect(html).toContain('عن هذا التقرير');
+  });
+});
+
+describe('inspectionProgress', () => {
+  const sections = [
+    {
+      key: 'engine',
+      title_ar: 'المحرك',
+      items: [
+        { key: 'oil', label_ar: 'زيت', required: true },
+        { key: 'belts', label_ar: 'سيور', required: false },
+      ],
+    },
+  ];
+
+  test('counts what is answered and names the required items still open', () => {
+    expect(inspectionProgress(sections, {})).toEqual({
+      answered: 0,
+      total: 2,
+      missingRequired: [{ section: 'engine', item: 'oil' }],
+    });
+  });
+
+  test('an optional item left open does not block submission', () => {
+    expect(inspectionProgress(sections, { engine: { oil: { rating: 'pass' } } })).toEqual({
+      answered: 1,
+      total: 2,
+      missingRequired: [],
+    });
   });
 });

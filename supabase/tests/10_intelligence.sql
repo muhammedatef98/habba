@@ -124,7 +124,7 @@ update public.orders set status = 'checked_in' where id = 'f0000000-0000-4000-c0
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-c000-000000000001';
 -- Recorded through the provider RPC; a customer cannot write evidence (0033).
 select test.become('22222222-0000-4000-c000-000000000002');
-select public.record_completion_evidence('f0000000-0000-4000-c000-000000000001', 62000, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence('f0000000-0000-4000-c000-000000000001', 62000, test.completion_photos('f0000000-0000-4000-c000-000000000001'));
 select test.become('11111111-0000-4000-c000-000000000001');
 select test.become('22222222-0000-4000-c000-000000000002');
 update public.orders
@@ -270,7 +270,9 @@ select test.assert(
 
 
 -- Issuing an invoice ------------------------------------------------------------
-select public.issue_zatca_invoice('f0000000-0000-4000-c000-000000000001') as invoice_id \gset
+-- Issued by completing the order (0074), not by anyone calling for it.
+select id as invoice_id from public.zatca_invoices
+ where order_id = 'f0000000-0000-4000-c000-000000000001' \gset
 
 select test.assert(
   (select invoice_number from public.zatca_invoices where id = :'invoice_id') like 'HB-INV-%',
@@ -350,17 +352,19 @@ select test.assert_eq(
 insert into public.orders
   (id, customer_id, vehicle_id, service_id, fulfilment_mode, status,
    workshop_id, provider_id, quoted_amount, created_by, escrow_status,
-   labour_amount, vat_amount, total_amount, completed_at)
+   labour_amount, vat_amount, total_amount, completed_at, payment_intent_id)
 values
   ('f0000000-0000-4000-c000-000000000002',
    '11111111-0000-4000-c000-000000000001', 'd0000000-0000-4000-c000-000000000001',
    :'svc_oil', 'workshop', 'draft',
    'e0000000-0000-4000-c000-000000000001', 'e0000000-0000-4000-c000-000000000001',
    180, '11111111-0000-4000-c000-000000000001', 'authorised',
-   180, 27, 207, now());
+   180, 27, 207, now(), 'intel_2');
 
 update public.orders set status = 'quoted' where id = 'f0000000-0000-4000-c000-000000000002';
-update public.orders set status = 'accepted', payment_intent_id = 'intel_2'
+-- The payment reference is set with the funding, not by an operator's edit:
+-- payment columns are closed to direct writes, operators included (0069).
+update public.orders set status = 'accepted'
 where id = 'f0000000-0000-4000-c000-000000000002';
 update public.orders set status = 'checked_in' where id = 'f0000000-0000-4000-c000-000000000002';
 update public.orders set status = 'in_progress' where id = 'f0000000-0000-4000-c000-000000000002';
@@ -369,11 +373,14 @@ set completion_mileage = 62500,
     completion_media = '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb
 where id = 'f0000000-0000-4000-c000-000000000002';
 select test.become('22222222-0000-4000-c000-000000000002');
-select public.record_completion_evidence('f0000000-0000-4000-c000-000000000002', 62500,
-  '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence('f0000000-0000-4000-c000-000000000002', 62500, test.completion_photos('f0000000-0000-4000-c000-000000000002'));
 select test.become('11111111-0000-4000-c000-000000000001');
 update public.orders set status = 'awaiting_approval' where id = 'f0000000-0000-4000-c000-000000000002';
 select test.become('11111111-0000-4000-c000-000000000001');
+-- Parts took the bill past the hold: the customer covers the difference
+-- before confirming (0078).
+select public.authorise_order_top_up('f0000000-0000-4000-c000-000000000002', 'test_top_up_000002', d)
+  from (select public.order_top_up_due('f0000000-0000-4000-c000-000000000002') as d) due where d > 0;
 update public.orders set status = 'completed' where id = 'f0000000-0000-4000-c000-000000000002';
 
 select test.become('33333333-0000-4000-c000-000000000003');

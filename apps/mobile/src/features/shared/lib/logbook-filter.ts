@@ -41,6 +41,7 @@ function bucketOf(eventType: TimelineEventType): Exclude<LogbookFilter, 'all'> |
     case 'ownership_transferred':
     case 'alert_raised':
     case 'alert_dismissed':
+    case 'record_annotated':
       return null;
   }
 }

@@ -11,12 +11,17 @@
  * RLS. Nothing here grants anything.
  */
 
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+} from '@tanstack/react-query';
 import { Almarai_800ExtraBold } from '@expo-google-fonts/almarai';
 import {
   IBMPlexSansArabic_400Regular,
@@ -31,15 +36,47 @@ import {
   Outfit_700Bold,
   useFonts,
 } from '@expo-google-fonts/outfit';
-import { ThemeProvider, lightColors } from '@habba/ui';
+import { ThemeProvider } from '@habba/ui';
 import { detectDeviceLocale, initI18n } from '@/features/shared/lib/i18n';
 import { readStoredLocale, readStoredTheme } from '@/features/shared/lib/preferences';
 import { syncLayoutDirection } from '@/features/shared/lib/rtl';
 import { OfflineNotice } from '@/features/shared/components/OfflineNotice';
+import { PlatformNotice } from '@/features/shared/components/PlatformNotice';
+import { PushBridge } from '@/features/shared/components/PushBridge';
+import { CopyOverrides } from '@/features/shared/components/CopyOverrides';
+import { Toast } from '@/features/shared/components/Toast';
+import { VersionGate } from '@/features/shared/components/VersionGate';
+import { LegalGate } from '@/features/shared/components/LegalGate';
+import { useToast } from '@/features/shared/state/toast';
+import { i18next } from '@/features/shared/lib/i18n';
+import { configureNotificationPresentation } from '@/features/shared/lib/push';
 import { useMode } from '@/features/shared/state/mode';
 import { useSession } from '@/features/shared/state/session';
+import { CardFormHost } from '@/features/shared/components/CardFormHost';
+import { AppIntro, INTRO_BACKGROUND } from '@/features/shared/components/AppIntro';
+
+configureNotificationPresentation();
+
+// An app coming back to the foreground is the moment its data is most likely
+// stale — an order moved on while the phone was in a pocket. React Native has
+// no window focus, so TanStack is told about AppState instead.
+focusManager.setEventListener((setFocused) => {
+  const subscription = AppState.addEventListener('change', (state) => {
+    setFocused(state === 'active');
+  });
+  return () => subscription.remove();
+});
 
 const queryClient = new QueryClient({
+  // Any action with no error handling of its own says it failed, rather than
+  // stopping its spinner as though it had worked (state/toast.ts).
+  mutationCache: new MutationCache({
+    onError: (_error, _variables, _context, mutation) => {
+      if (mutation.options.onError !== undefined) return;
+      if (mutation.meta?.['inlineError'] === true) return;
+      useToast.getState().show(i18next.t('errors.actionFailed'));
+    },
+  }),
   defaultOptions: {
     queries: {
       // The technician-in-a-basement case (CLAUDE.md §2.7) applies to
@@ -47,7 +84,9 @@ const queryClient = new QueryClient({
       // the screen the moment a request fails.
       staleTime: 30_000,
       retry: 2,
-      refetchOnWindowFocus: false,
+      // Back from the background: refetch what is stale. A failed refetch
+      // keeps the data already on screen, so offline this costs nothing.
+      refetchOnWindowFocus: true,
     },
   },
 });
@@ -60,6 +99,9 @@ export default function RootLayout() {
   const hydrate = useSession((state) => state.hydrate);
   const restoreMode = useMode((state) => state.restore);
   const [ready, setReady] = useState(false);
+  // Once per cold start: the component lives as long as the process does.
+  const [introDone, setIntroDone] = useState(false);
+  const finishIntro = useCallback(() => setIntroDone(true), []);
 
   // The design's Latin face, used for every figure in the app. Loaded by exact
   // weight because React Native resolves faces by family name and does not
@@ -120,25 +162,19 @@ export default function RootLayout() {
   // in the fallback face and then reflows, which on the tracking screen means
   // the price visibly jumping.
   if (!ready || !fontsLoaded) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: lightColors.background,
-        }}
-      >
-        <ActivityIndicator color={lightColors.primary} />
-      </View>
-    );
+    // The intro's own colour, empty: boot hands straight over to the intro
+    // with nothing changing on screen, instead of a spinner on cream flashing
+    // between the system's launch screen and the teal one.
+    return <View style={{ flex: 1, backgroundColor: INTRO_BACKGROUND }} />;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <ThemeProvider locale={locale} preference={themePreference}>
-          <StatusBar style="auto" />
+          <StatusBar style={introDone ? 'auto' : 'light'} />
+          <PushBridge />
+          <CopyOverrides />
           {/* Above the navigator and outside it, so the notice survives every
               screen change instead of each screen having to remember it.
               Deliberately NOT wrapped in a SafeAreaView: <Screen> already
@@ -151,9 +187,18 @@ export default function RootLayout() {
               screen below it stopped filling the window. */}
           <View style={{ flex: 1 }}>
             <OfflineNotice testID="offline-notice" />
+            <PlatformNotice />
             <View style={{ flex: 1 }}>
-              <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+              <VersionGate>
+                <LegalGate>
+                  <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+                </LegalGate>
+              </VersionGate>
             </View>
+            <Toast />
+            {/* Above every screen: payment can be asked for from any of them. */}
+            <CardFormHost />
+            {introDone ? null : <AppIntro onDone={finishIntro} />}
           </View>
         </ThemeProvider>
       </SafeAreaProvider>

@@ -11,10 +11,12 @@ import { getLocales } from 'expo-localization';
 import {
   DEFAULT_LOCALE,
   FALLBACK_LOCALE,
+  SUPPORTED_LOCALES,
   resolveLocale,
   resources,
   type Locale,
 } from '@habba/i18n';
+import { withOverrides, type CopyOverride } from '@habba/i18n/overrides';
 
 export function detectDeviceLocale(): Locale {
   try {
@@ -44,9 +46,30 @@ export async function initI18n(locale: Locale = detectDeviceLocale()) {
       escapeValue: false,
     },
     returnNull: false,
+    // Re-render on replaced words (applyCopyOverrides), not only on a
+    // language change: an operator's fix should show without a restart.
+    react: { bindI18nStore: 'added' },
   });
 
   return i18next;
+}
+
+/**
+ * Lays the operators' words (0093) over the shipped ones. Each call starts from
+ * the shipped tree, so a row deleted in the console puts the original back on
+ * the next fetch. A replacement that would break its sentence is skipped
+ * (withOverrides).
+ */
+export function applyCopyOverrides(overrides: readonly CopyOverride[]): void {
+  for (const locale of SUPPORTED_LOCALES) {
+    i18next.addResourceBundle(
+      locale,
+      'translation',
+      withOverrides(resources[locale], overrides, locale),
+      true,
+      true,
+    );
+  }
 }
 
 export { i18next };

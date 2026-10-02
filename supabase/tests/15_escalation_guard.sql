@@ -68,7 +68,12 @@ select test.assert_raises(
   'a customer cannot grant themselves any other role either',
   '42501');
 
-select test.assert(not public.is_provider(), 'is_provider() is still false');
+select test.assert_raises($$select public.is_provider('11111111-0000-4000-3333-000000000001')$$,
+  'whether someone is a provider is not a client''s question to ask (0084)', '42501');
+reset role;
+select test.assert(not public.is_provider('11111111-0000-4000-3333-000000000001'),
+  'is_provider() is still false');
+set role authenticated;
 
 -- Nor revoke someone else's, which would be a denial of service against a
 -- working technician.
@@ -113,10 +118,13 @@ select test.assert_eq(
 
 -- Changing the number revokes its verification, so a verified flag cannot be
 -- carried onto a different phone.
+-- The fixture write, as the owner: no client can open the privileged path (0071).
+reset role;
 select public.begin_privileged_write();
 update public.profiles set phone_verified = true
 where id = '11111111-0000-4000-3333-000000000001';
 select public.end_privileged_write();
+set role authenticated;
 
 update public.profiles set phone = '+966509200099'
 where id = '11111111-0000-4000-3333-000000000001';
@@ -128,8 +136,7 @@ select test.assert(
 
 
 -- Report tampering ----------------------------------------------------------------
-select public.append_vehicle_timeline_event(
-  'd0000000-0000-4000-3333-000000000001', 'vehicle_registered', 'تسجيل', 'Registered');
+select public.log_vehicle_registration('d0000000-0000-4000-3333-000000000001');
 select public.generate_habba_report('d0000000-0000-4000-3333-000000000001') as tok \gset
 
 select test.assert_eq(

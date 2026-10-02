@@ -56,11 +56,9 @@ timeline cannot be written directly by anyone, including the owner.
 > **Acceptance:** the upgrade is in-app, the role comes only from approval, and
 > a customer-only user can reach no provider surface.
 
-**This section needs `EXPO_PUBLIC_ENABLE_PROVIDER_MODE=true` in
-`apps/mobile/.env.local`.** It
-ships `false`, so on a default build there is no «اشتغل معنا كفنّي» entry, no
-mode switcher, and no reachable KYC form — which is itself worth checking
-first:
+The upgrade is offered while operators have applications open (console →
+الإعدادات → الميزات). With them closed there is no «اشتغل معنا كفنّي» entry and
+no reachable KYC form, which is itself worth checking first:
 
 | #   | Do this                                                   | Expect                                                                       |
 | --- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |

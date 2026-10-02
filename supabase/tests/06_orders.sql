@@ -219,7 +219,7 @@ where order_id = 'f0000000-0000-4000-8000-000000000001';
 -- nothing more.
 -- Recorded through the provider RPC; a customer cannot write evidence (0033).
 select test.become('22222222-0000-4000-8000-000000000002');
-select public.record_completion_evidence('f0000000-0000-4000-8000-000000000001', 91200, '[{"url":"https://example.test/b.jpg","kind":"before"},{"url":"https://example.test/a.jpg","kind":"after"}]'::jsonb);
+select public.record_completion_evidence('f0000000-0000-4000-8000-000000000001', 91200, test.completion_photos('f0000000-0000-4000-8000-000000000001'));
 select test.become('11111111-0000-4000-8000-000000000001');
 
 update public.orders set status = 'awaiting_approval'
@@ -242,6 +242,10 @@ select test.assert_eq(
    where vehicle_id = 'd0000000-0000-4000-8000-000000000001'),
   0, 'the logbook is empty before completion');
 
+-- Parts took the bill past the hold: the customer covers the difference
+-- before confirming (0078).
+select public.authorise_order_top_up('f0000000-0000-4000-8000-000000000001', 'test_top_up_000001', d)
+  from (select public.order_top_up_due('f0000000-0000-4000-8000-000000000001') as d) due where d > 0;
 update public.orders set status = 'completed'
 where id = 'f0000000-0000-4000-8000-000000000001';
 

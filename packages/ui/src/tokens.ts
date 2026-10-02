@@ -34,7 +34,10 @@ const petrol = {
   // WCAG: the design's dark primary is 500 (#2E8A84), but its own dark label
   // (#04211F) measures 4.09:1 on it — fine for the 19px/700 CTAs, failing for
   // the 16px call button. 400 is that teal lifted to 4.75:1 at any size.
-  400: '#34968F',
+  // Lifted again (was #34968F): as dark-mode *text* — links, a selected
+  // chip's label — it measured 4.27:1 on the card surface and 3.68:1 on the
+  // selected tint. #42AAA2 clears both, and the button label on it gains.
+  400: '#42AAA2',
   500: '#2E8A84',
   600: '#12514F', // base — primary in light
   800: '#0B2E2E',
@@ -62,7 +65,9 @@ const light = {
   borderStrong: '#CFD6D4',
   ink: '#14201F',
   inkMuted: '#4A5654',
-  inkSubtle: '#66706E',
+  // Was #66706E: 4.30:1 on the sunken surface, where captions sit on every
+  // tinted card. One step darker, still distinct from inkMuted.
+  inkSubtle: '#5F6967',
 } as const;
 
 const dark = {
@@ -76,7 +81,8 @@ const dark = {
   // WCAG: the design's dark tertiary (#5C7472) is 3.58:1 on bg — it fails at
   // the 12px timestamps it was used for. Minimally darkened to clear 4.5:1.
   // #5C7472 itself remains correct for borders and dots (see borderStrong).
-  inkSubtle: '#6E8785',
+  // Was #6E8785: 3.95:1 on the dark card surface — every caption in dark mode.
+  inkSubtle: '#809997',
 } as const;
 
 /** Reserved for genuine emergencies. Never decorative, never marketing (§8). */

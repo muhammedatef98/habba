@@ -152,3 +152,17 @@ Three details worth recording because they were not obvious from the layout:
   as the wrong part number and the wrong date. `<bdi>` rather than `dir="ltr"`,
   because a Saudi plate reads «أ ب ج ١٢٣٤» right to left and forcing LTR would
   fix the part numbers by breaking the plates.
+
+## Addendum — read in the app, not only sent out of it
+
+The first cut had one exit: generate, and the share sheet opened. Reading your
+own report meant sending it to yourself. Every document the app produces —
+تقرير هبّة, the inspection report and, since 0074, the tax invoice — is now one
+`ViewableDocument` (title, HTML, file name) with two doors side by side:
+«عرض» opens it in the in-app viewer (`/document`, a `WebView` with JavaScript
+off, since every document is static markup with the QR drawn inline as SVG),
+and «مشاركة PDF» prints the **same HTML** for the share sheet, so what the
+customer reads is what they send. Neither door changes the decision above:
+there is still no public link, and nothing leaves the device unless the owner
+sends it. تقرير هبّة is issued once per visit to the screen, whichever door is
+used first, so viewing and then sharing is one report, not two.

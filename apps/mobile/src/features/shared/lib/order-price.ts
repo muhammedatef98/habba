@@ -20,10 +20,25 @@
  */
 
 import type { Order } from '@/features/shared/data/types';
-import type { SarAmount } from '@habba/core';
+import { addSar, applyRate, SAUDI_VAT_RATE, type SarAmount } from '@habba/core';
 
 export function agreedTotal(order: Order): SarAmount | null {
-  return order.totalAmount ?? order.quotedAmount;
+  if (order.totalAmount !== null) return order.totalAmount;
+  // The quote is before VAT; what the customer agreed to — and what is held on
+  // their card — is the quote with VAT on it.
+  return order.quotedAmount === null ? null : priceWithVat(order.quotedAmount);
+}
+
+/**
+ * What the customer pays for a catalogue price: the price plus VAT.
+ *
+ * Catalogue prices are before VAT, and the server bills VAT on top (0065). So
+ * this is the number shown before the customer commits AND the amount held on
+ * their card — one function, so the two cannot drift apart and the customer
+ * is never shown 120 and charged 138.
+ */
+export function priceWithVat(base: SarAmount): SarAmount {
+  return addSar(base, applyRate(base, SAUDI_VAT_RATE));
 }
 
 /** True once parts and VAT have been settled — i.e. the breakdown is real. */

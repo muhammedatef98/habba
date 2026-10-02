@@ -18,13 +18,16 @@
 
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, EmptyState, Field, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, EmptyState, Field, Row, Screen, Text, useTheme } from '@habba/ui';
+import { formatGregorianDate } from '@/features/shared/lib/dates';
+import { formatCount } from '@/features/shared/lib/format-number';
 import { repository } from '@/features/shared/data/repository';
 import type { TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 interface Reading {
   readonly at: Date;
@@ -42,7 +45,11 @@ function readingsFrom(events: readonly TimelineEvent[]): readonly Reading[] {
   const points = events
     .filter((event) => event.mileage !== null)
     .map((event) => ({ at: new Date(event.occurredAt), mileage: event.mileage as number }))
-    .sort((a, b) => a.at.getTime() - b.at.getTime());
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    // The same figure twice is one reading, not progress: adding a car with
+    // its odometer writes the registration and the reading together, and the
+    // list showed «85,000» twice with «0 km since the previous reading».
+    .filter((point, index, all) => index === 0 || point.mileage !== all[index - 1]?.mileage);
 
   return points.map((point, index) => {
     const previous = index === 0 ? undefined : points[index - 1];
@@ -63,7 +70,6 @@ export default function MileageScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useIsAuthenticated();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const locale = i18n.language === 'ar' ? 'ar-SA' : 'en-GB';
 
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
@@ -122,6 +128,7 @@ export default function MileageScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar label={t('logbook.title')} />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('logbook.mileageTitle')}</Text>
         <Text variant="body" tone="muted">
@@ -134,7 +141,7 @@ export default function MileageScreen() {
           <Text variant="caption" tone="muted">
             {t('logbook.mileageCurrent')}
           </Text>
-          <Text variant="display">{current.toLocaleString(locale)}</Text>
+          <Text variant="display">{formatCount(current, i18n.language)}</Text>
           <Text variant="caption" tone="subtle">
             {t('logbook.mileageUnit')}
           </Text>
@@ -168,6 +175,7 @@ export default function MileageScreen() {
       {readings.length === 0 ? (
         <EmptyState
           testID="mileage-empty"
+          iconName="gauge"
           title={t('logbook.mileageEmptyTitle')}
           body={t('logbook.mileageEmptyBody')}
         />
@@ -175,18 +183,12 @@ export default function MileageScreen() {
         <View style={{ gap: theme.spacing.md }}>
           {readings.map((reading, index) => (
             <View key={`${reading.at.toISOString()}-${index}`} style={{ gap: theme.spacing.xs }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  gap: theme.spacing.sm,
-                }}
-              >
-                <Text variant="body">{reading.mileage.toLocaleString(locale)}</Text>
+              <Row justify="space-between" gap="sm">
+                <Text variant="body">{formatCount(reading.mileage, i18n.language)}</Text>
                 <Text variant="caption" tone="muted">
-                  {reading.at.toLocaleDateString(locale)}
+                  {formatGregorianDate(reading.at.toISOString(), i18n.language)}
                 </Text>
-              </View>
+              </Row>
 
               {/* The bar is the distance covered since the previous reading, so
                   a long gap with little driving reads as a short bar — which is
@@ -230,8 +232,6 @@ export default function MileageScreen() {
           ))}
         </View>
       )}
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

@@ -8,7 +8,7 @@
 
 import { View, type ViewStyle } from 'react-native';
 import { Text } from './Text.js';
-import { rowDirectionFor } from './direction.js';
+import { alignStartFor, rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
 
 export type StatusTone = 'neutral' | 'success' | 'active' | 'emergency';
@@ -53,7 +53,7 @@ export function StatusPill({
         {
           flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
           alignItems: 'center',
-          alignSelf: 'flex-start',
+          alignSelf: alignStartFor(theme.direction, theme.nativeDirection),
           gap: theme.spacing.sm,
           paddingVertical: 6,
           paddingHorizontal: theme.spacing.md,

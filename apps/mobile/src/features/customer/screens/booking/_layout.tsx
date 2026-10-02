@@ -14,11 +14,16 @@
 
 import { Redirect, Stack } from 'expo-router';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { FeatureUnavailable } from '@/features/shared/components/FeatureUnavailable';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 
 export default function BookingLayout() {
   const isAuthenticated = useIsAuthenticated();
+  const features = useFeatures();
 
   if (!isAuthenticated) return <Redirect href="/" />;
+  // Switched off from the console (0081).
+  if (!features.booking) return <FeatureUnavailable testID="booking-unavailable" />;
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

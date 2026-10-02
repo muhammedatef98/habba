@@ -23,18 +23,30 @@ import { BookingSteps } from '@/features/customer/components/booking/BookingStep
 import { repository } from '@/features/shared/data/repository';
 import { serviceIcon } from '@/features/shared/lib/service-icon';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
+// VAT included, as on the home screen, the emergency screen and the card
+// hold: one service must not show two prices on the way to booking it.
+import { priceWithVat } from '@/features/shared/lib/order-price';
 import { vehicleLabel } from '@/features/shared/lib/vehicle-label';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useSession } from '@/features/shared/state/session';
 import type { BookingMode, Service } from '@/features/shared/data/types';
 
 const BOOKING_MODES: readonly BookingMode[] = ['mobile_scheduled', 'workshop'];
 
-/** The single mode a service supports, or null when it supports both. */
-function onlyMode(service: Service): BookingMode | null {
-  const bookable = service.supportedModes.filter((mode): mode is BookingMode =>
-    (BOOKING_MODES as readonly string[]).includes(mode),
+/**
+ * The ways a service can be booked right now: what it supports, less what the
+ * operators have switched off (0093).
+ */
+function bookableModes(service: Service, enabled: readonly BookingMode[]): readonly BookingMode[] {
+  return service.supportedModes.filter((mode): mode is BookingMode =>
+    (enabled as readonly string[]).includes(mode),
   );
+}
+
+/** The single mode a service can be booked in, or null when it has a choice. */
+function onlyMode(service: Service, enabled: readonly BookingMode[]): BookingMode | null {
+  const bookable = bookableModes(service, enabled);
   return bookable.length === 1 ? (bookable[0] as BookingMode) : null;
 }
 
@@ -44,6 +56,10 @@ export default function BookingServiceScreen() {
   const isArabic = i18n.language.startsWith('ar');
 
   const draft = useBookingDraft();
+  const features = useFeatures();
+  const enabledModes = BOOKING_MODES.filter((mode) =>
+    mode === 'workshop' ? features.bookingWorkshop : features.bookingMobile,
+  );
   const homeVehicleId = useSession((state) => state.selectedVehicleId);
 
   const services = useQuery({
@@ -59,9 +75,7 @@ export default function BookingServiceScreen() {
   });
 
   const service = draft.service;
-  const available = service?.supportedModes.filter((mode): mode is BookingMode =>
-    (BOOKING_MODES as readonly string[]).includes(mode),
-  );
+  const available = service === null ? undefined : bookableModes(service, enabledModes);
 
   // One supported mode is not a choice, so it is made rather than asked. In an
   // effect because it is a consequence of the selection, and doing it during
@@ -72,7 +86,9 @@ export default function BookingServiceScreen() {
     }
   }, [available, draft]);
 
-  const effectiveVehicleId = draft.vehicleId ?? homeVehicleId;
+  // The first car when none is chosen yet, as on the emergency screen: most
+  // owners have one, and the chip shows which car the booking is for.
+  const effectiveVehicleId = draft.vehicleId ?? homeVehicleId ?? vehicles.data?.[0]?.id ?? null;
   const needsVehicle = service?.requiresVehicle ?? false;
   const canContinue =
     service !== null && draft.mode !== null && (!needsVehicle || effectiveVehicleId !== null);
@@ -107,84 +123,89 @@ export default function BookingServiceScreen() {
       ) : null}
 
       <View style={{ gap: theme.spacing.sm }}>
-        {services.data?.map((option) => {
-          const selected = service?.id === option.id;
+        {services.data
+          ?.filter((option) => bookableModes(option, enabledModes).length > 0)
+          .map((option) => {
+            const selected = service?.id === option.id;
 
-          return (
-            <Card
-              key={option.id}
-              testID={`booking-service-${option.id}`}
-              elevation={selected ? 'sm' : 'none'}
-              onPress={() => draft.selectService(option)}
-              accessibilityLabel={isArabic ? option.nameAr : option.nameEn}
-              style={{
-                flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-                alignItems: 'center',
-                gap: theme.spacing.md,
-                backgroundColor: selected ? theme.colors.primarySubtle : theme.colors.surface,
-                borderColor: selected ? theme.colors.primary : theme.colors.border,
-                borderWidth: selected ? 1.5 : 1,
-              }}
-            >
-              <View
+            return (
+              <Card
+                selected={selected}
+                key={option.id}
+                testID={`booking-service-${option.id}`}
+                elevation={selected ? 'sm' : 'none'}
+                onPress={() => draft.selectService(option)}
+                accessibilityLabel={isArabic ? option.nameAr : option.nameEn}
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: theme.radius.md,
+                  flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: selected ? theme.colors.surface : theme.colors.surfaceSunken,
+                  gap: theme.spacing.md,
+                  backgroundColor: selected ? theme.colors.primarySubtle : theme.colors.surface,
+                  borderColor: selected ? theme.colors.primary : theme.colors.border,
+                  borderWidth: selected ? 1.5 : 1,
                 }}
               >
-                <Icon
-                  name={serviceIcon(option.icon)}
-                  size={theme.iconSize.md}
-                  color={selected ? theme.colors.primary : theme.colors.textMuted}
-                />
-              </View>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: theme.radius.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: selected ? theme.colors.surface : theme.colors.surfaceSunken,
+                  }}
+                >
+                  <Icon
+                    name={serviceIcon(option.icon)}
+                    size={theme.iconSize.md}
+                    color={selected ? theme.colors.primary : theme.colors.textMuted}
+                  />
+                </View>
 
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text variant="bodyStrong">{isArabic ? option.nameAr : option.nameEn}</Text>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text variant="bodyStrong">{isArabic ? option.nameAr : option.nameEn}</Text>
 
-                {/* `services.description_ar` has no English counterpart in the
+                  {/* `services.description_ar` has no English counterpart in the
                     schema, so the English list would otherwise carry nothing
                     but a name — including for the one service that can only
                     happen in a workshop. That constraint is structured data
                     (`supported_modes`), so it is stated from the data rather
                     than left to a description only half the audience can read. */}
-                {option.descriptionAr !== null && isArabic ? (
-                  <Text variant="caption" tone="muted" numberOfLines={2}>
-                    {option.descriptionAr}
-                  </Text>
-                ) : null}
-
-                <View
-                  style={{
-                    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-                    alignItems: 'center',
-                    gap: theme.spacing.sm,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <Text variant="caption" tone="subtle" numeric>
-                    {t('booking.durationMinutes', { minutes: option.estDurationMin })}
-                  </Text>
-                  {onlyMode(option) !== null ? (
-                    <Text variant="caption" tone="muted">
-                      {onlyMode(option) === 'workshop'
-                        ? t('booking.workshopOnly')
-                        : t('booking.mobileOnly')}
+                  {option.descriptionAr !== null && isArabic ? (
+                    <Text variant="caption" tone="muted" numberOfLines={2}>
+                      {option.descriptionAr}
                     </Text>
                   ) : null}
-                </View>
-              </View>
 
-              <Text variant="bodyStrong" tone="accent" numeric>
-                {t('common.sar', { amount: formatSarDisplay(option.basePrice) })}
-              </Text>
-            </Card>
-          );
-        })}
+                  <View
+                    style={{
+                      flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                      alignItems: 'center',
+                      gap: theme.spacing.sm,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Text variant="caption" tone="subtle" numeric>
+                      {t('booking.durationMinutes', { count: option.estDurationMin })}
+                    </Text>
+                    {onlyMode(option, enabledModes) !== null ? (
+                      <Text variant="caption" tone="muted">
+                        {onlyMode(option, enabledModes) === 'workshop'
+                          ? t('booking.workshopOnly')
+                          : t('booking.mobileOnly')}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <Text variant="bodyStrong" tone="accent" numeric>
+                  {option.basePrice === null
+                    ? t('booking.priceByProvider')
+                    : t('common.sar', { amount: formatSarDisplay(priceWithVat(option.basePrice)) })}
+                </Text>
+              </Card>
+            );
+          })}
       </View>
 
       {service !== null ? (
@@ -212,6 +233,7 @@ export default function BookingServiceScreen() {
                 const selected = draft.mode === mode;
                 return (
                   <Card
+                    selected={selected}
                     key={mode}
                     testID={`booking-mode-${mode}`}
                     elevation="none"
@@ -255,7 +277,9 @@ export default function BookingServiceScreen() {
                   testID="booking-add-vehicle"
                   label={t('vehicle.addTitle')}
                   size="medium"
-                  onPress={() => router.push('/add-vehicle')}
+                  onPress={() =>
+                    router.push({ pathname: '/add-vehicle', params: { then: 'back' } })
+                  }
                 />
               </View>
             </Card>
@@ -271,6 +295,7 @@ export default function BookingServiceScreen() {
                 const selected = effectiveVehicleId === vehicle.id;
                 return (
                   <Card
+                    selected={selected}
                     key={vehicle.id}
                     testID={`booking-vehicle-${vehicle.id}`}
                     elevation="none"

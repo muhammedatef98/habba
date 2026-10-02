@@ -12,10 +12,13 @@
 
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+// Payment ids are unique across holds (0078): a fixed one fails on a reused database.
+import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { renderInspectionReport, type InspectionReport } from '@habba/core';
 import { mintTestJwt } from './test-jwt.js';
+import { applyAsTestProvider } from './test-provider.js';
 
 const POSTGREST_URL = process.env.HABBA_POSTGREST_URL ?? 'http://127.0.0.1:54321';
 const JWT_SECRET = process.env.HABBA_JWT_SECRET ?? 'habba-local-development-jwt-secret-do-not-use';
@@ -110,17 +113,13 @@ beforeAll(async () => {
   if ((existing.data ?? []).length > 0) {
     providerId = (existing.data as { id: string }[])[0]!.id;
   } else {
-    const created = await inspector
-      .from('providers')
-      .insert({
-        owner_profile_id: INSPECTOR_ID,
-        provider_type: 'individual',
-        business_name_ar: 'مركز الفحص المعتمد',
-        city_id: cityId,
-      })
-      .select('id')
-      .single();
-    providerId = (created.data as { id: string }).id;
+    const created = await applyAsTestProvider(inspector, {
+      ownerId: INSPECTOR_ID,
+      providerType: 'individual',
+      businessNameAr: 'مركز الفحص المعتمد',
+      cityId,
+    });
+    providerId = created.id;
   }
 
   await buyer.rpc('test_approve_provider', { p_provider_id: providerId });
@@ -204,7 +203,7 @@ describe.skipIf(!harnessUp)('Phase 5 acceptance — pre-purchase inspection', ()
     // declaring its own order paid was the vulnerability that closed.
     await buyer.rpc('authorise_order_payment', {
       p_order_id: orderId,
-      p_payment_intent_id: 'insp_intent_int',
+      p_payment_intent_id: `insp_intent_${randomUUID()}`,
     });
     await buyer.from('orders').update({ status: 'accepted' }).eq('id', orderId);
 

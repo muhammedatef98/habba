@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatGregorianDate, formatHijriDate, formatMonthLabel, monthKey } from './dates.js';
+import {
+  formatAppointment,
+  formatGregorianDate,
+  formatHijriDate,
+  formatMonthLabel,
+  monthKey,
+} from './dates.js';
 
 const ISO = '2026-09-02T09:00:00.000Z';
 
@@ -58,5 +64,18 @@ describe('formatMonthLabel', () => {
     const label = formatMonthLabel(ISO, 'ar');
     expect(label).toMatch(/2026/);
     expect(label).not.toMatch(/[٠-٩]/);
+  });
+});
+
+describe('formatAppointment', () => {
+  it('reads in Riyadh time whatever zone the device is in', () => {
+    // 09:00Z is 12:00 in Riyadh (UTC+3, no daylight saving).
+    expect(formatAppointment(ISO, 'en')).toMatch(/12:00/);
+  });
+
+  it('uses Latin digits in Arabic (§8)', () => {
+    const arabic = formatAppointment(ISO, 'ar');
+    expect(arabic).not.toMatch(/[٠-٩]/);
+    expect(arabic).toMatch(/12:00/);
   });
 });

@@ -3,28 +3,12 @@
  *
  * `services.icon` is seeded with names chosen for the domain ("truck", "key",
  * "thermometer"), not for whatever the design happened to call its glyphs. The
- * mapping lives here rather than in the seed so the catalogue stays a
- * description of the service and the UI decides how to draw it — renaming a
- * glyph should never mean a database migration.
+ * list lives in @habba/core (catalogue/icons.ts) so the console offers exactly
+ * the names drawn here — renaming a glyph should never mean a migration.
  */
 
+import { catalogueGlyph } from '@habba/core';
 import type { IconName } from '@habba/ui';
-
-const BY_CATALOGUE_NAME: Readonly<Record<string, IconName>> = {
-  truck: 'tow',
-  battery: 'battery',
-  tyre: 'tyre',
-  key: 'lockout',
-  fuel: 'fuel',
-  thermometer: 'radiator',
-  oil: 'oil',
-  filter: 'wrench',
-  brake: 'brake',
-  snowflake: 'ac',
-  wash: 'wash',
-  inspection: 'inspection',
-  wrench: 'wrench',
-};
 
 /**
  * Falls back to `alert` rather than rendering nothing: a card with no glyph
@@ -32,6 +16,5 @@ const BY_CATALOGUE_NAME: Readonly<Record<string, IconName>> = {
  * entry should look unfinished rather than invisible.
  */
 export function serviceIcon(icon: string | null): IconName {
-  if (icon === null) return 'alert';
-  return BY_CATALOGUE_NAME[icon] ?? 'alert';
+  return (catalogueGlyph(icon) as IconName | null) ?? 'alert';
 }

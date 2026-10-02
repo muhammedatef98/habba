@@ -7,8 +7,10 @@
  * drift into marketing use.
  */
 
-import { ActivityIndicator, PixelRatio, Pressable, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, PixelRatio, View, type ViewStyle } from 'react-native';
+import { AnimatedPressable, usePressScale } from './motion.js';
 import { Text } from './Text.js';
+import { alignStartFor } from './direction.js';
 import { scaledHeight } from './font-scale.js';
 import { useTheme } from './theme.js';
 
@@ -41,6 +43,7 @@ export function Button({
 }: ButtonProps) {
   const theme = useTheme();
   const isDisabled = disabled || loading;
+  const press = usePressScale(isDisabled);
 
   const surfaces: Record<ButtonVariant, { background: string; border: string; text: string }> = {
     primary: {
@@ -92,13 +95,17 @@ export function Button({
     justifyContent: 'center',
     // Logical padding — never paddingLeft/Right (§8).
     paddingHorizontal: theme.spacing.lg,
-    alignSelf: fullWidth ? 'stretch' : 'flex-start',
+    // A compact button sits at the reading start — the right, in Arabic —
+    // including on the first launch, when the platform's own start is still
+    // the left (direction.ts).
+    alignSelf: fullWidth ? 'stretch' : alignStartFor(theme.direction, theme.nativeDirection),
   };
 
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
       onPress={onPress}
+      {...press.handlers}
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -106,12 +113,11 @@ export function Button({
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       // Guarantees the 48dp target even when the visual box is smaller.
       hitSlop={Math.max(0, (theme.minTouchTarget - height) / 2)}
-      style={({ pressed }) => [
+      style={[
         base,
         { backgroundColor: surface.background },
-        // Feedback is opacity + scale, both compositor-friendly.
-        pressed && !isDisabled ? { opacity: 0.88, transform: [{ scale: 0.985 }] } : null,
-        isDisabled ? { opacity: 0.45 } : null,
+        // Springs under the thumb (motion.tsx); a disabled button does not.
+        isDisabled ? { opacity: 0.45 } : press.style,
       ]}
     >
       {loading ? (
@@ -123,6 +129,6 @@ export function Button({
           </Text>
         </View>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }

@@ -86,12 +86,19 @@ function report(overrides: Partial<HabbaReport> = {}): HabbaReport {
 }
 
 describe('document shape', () => {
-  test('is an Arabic RTL document in three sheets', () => {
+  test('is one Arabic RTL column that reads on a phone and prints on A4', () => {
     const html = renderHabbaReportPdf(report());
 
     expect(html).toContain('<html lang="ar" dir="rtl">');
-    expect(html.match(/class="sheet"/g)).toHaveLength(3);
+    expect(html.match(/class="sheet"/g)).toHaveLength(1);
     expect(html).toContain('@page { size: A4; margin: 12mm; }');
+  });
+
+  test('speaks plainly: no percentages, charts or technical terms', () => {
+    const html = renderHabbaReportPdf(report());
+    expect(html).not.toContain('hash');
+    expect(html).not.toContain('<svg');
+    expect(html).not.toMatch(/\d+%/);
   });
 
   test('carries no link and no QR anywhere — ADR-0019', () => {
@@ -110,7 +117,7 @@ describe('document shape', () => {
     // The report is frozen at generation (0014). A "printed on" date would
     // imply the contents are current when they are a statement about a moment.
     const html = renderHabbaReportPdf(report());
-    expect(html).toContain('صدر في <bdi>2026-09-06</bdi>');
+    expect(html).toContain('صدر في <bdi>6</bdi> سبتمبر <bdi>2026</bdi>');
   });
 });
 
@@ -151,45 +158,25 @@ describe('what it must never print', () => {
   });
 });
 
-describe('the mileage chart', () => {
-  test('runs right to left: the oldest reading is at the right edge', () => {
+describe('the summary', () => {
+  test('counts what Habba did and what the owner wrote, rather than a percentage', () => {
     const html = renderHabbaReportPdf(report());
-    const points = /<polyline points="([^"]+)"/.exec(html)?.[1];
-    expect(points).toBeDefined();
-
-    const xs = points!.split(' ').map((pair) => Number(pair.split(',')[0]));
-    // Strictly decreasing x as time advances — reading direction, matching the
-    // rest of the page.
-    for (let i = 1; i < xs.length; i += 1) expect(xs[i]!).toBeLessThan(xs[i - 1]!);
+    expect(html).toContain('نفّذتها هبّة بنفسها');
+    expect(html).toContain('سجّلها صاحب السيارة');
   });
 
-  test('direct-labels both ends so the direction cannot be misread', () => {
+  test('states the odometer as a sentence, first reading to last', () => {
     const html = renderHabbaReportPdf(report());
-    expect(html).toContain('38,400 كم');
-    expect(html).toContain('61,200 كم');
-    expect(html).toContain('>2023-04-10<');
-    expect(html).toContain('>2026-01-05<');
+    expect(html).toContain('من <bdi>38,400</bdi> كم في أبريل <bdi>2023</bdi>');
+    expect(html).toContain('إلى <bdi>61,200</bdi> كم في يناير <bdi>2026</bdi>');
   });
 
-  test('a single reading is not drawn as a trend', () => {
+  test('a single reading is not presented as a change', () => {
     const html = renderHabbaReportPdf(
       report({ mileage_history: [{ occurred_at: '2026-01-05', mileage: 61200 }] }),
     );
-    expect(html).not.toContain('<polyline');
-    expect(html).toContain('قراءة واحدة فقط');
-  });
-
-  test('a flat odometer does not divide by zero', () => {
-    const html = renderHabbaReportPdf(
-      report({
-        mileage_history: [
-          { occurred_at: '2025-01-01', mileage: 50000 },
-          { occurred_at: '2026-01-01', mileage: 50000 },
-        ],
-      }),
-    );
-    expect(html).toContain('<polyline');
-    expect(html).not.toContain('NaN');
+    expect(html).toContain('قراءة واحدة حتى الآن');
+    expect(html).not.toContain('إلى <bdi>');
   });
 });
 
@@ -205,11 +192,11 @@ describe('the history', () => {
       }),
     );
 
-    const years = [...html.matchAll(/class="year-number"><bdi>(\d{4})</g)].map((match) => match[1]);
+    const years = [...html.matchAll(/class="year-head"><bdi>(\d{4})</g)].map((match) => match[1]);
     expect(years).toEqual(['2026', '2025', '2024']);
   });
 
-  test('counts what each year is worth to a buyer', () => {
+  test('says who did each job, in words anyone understands', () => {
     const html = renderHabbaReportPdf(
       report({
         events: [
@@ -218,21 +205,20 @@ describe('the history', () => {
         ],
       }),
     );
-    // «سجلان», not «٢ سجل» — the dual is not optional in Arabic, and this is
-    // a document a seller hands to a buyer.
-    expect(html).toContain('سجلان · <bdi>1</bdi> موثّق من هبّة');
+    expect(html).toContain('نفّذتها هبّة ✓');
+    expect(html).toContain('سجّلها المالك');
   });
 
-  test('a year with nothing verified says so rather than showing a bare count', () => {
-    const html = renderHabbaReportPdf(report({ events: [event({ provenance: 'self_reported' })] }));
-    expect(html).toContain('لا شيء موثّق من هبّة');
+  test('dates read as a month and a year, not an ISO string', () => {
+    const html = renderHabbaReportPdf(report({ events: [event({ occurred_at: '2025-08-14' })] }));
+    expect(html).toContain('أغسطس <bdi>2025</bdi>');
   });
 
   test('flags an entry written long after the work, per ADR-0012', () => {
     const html = renderHabbaReportPdf(
       report({ events: [event({ occurred_at: '2025-01-05', recorded_at: '2026-01-05' })] }),
     );
-    expect(html).toContain('سُجّل لاحقاً في <bdi>2026-01-05</bdi>');
+    expect(html).toContain('سُجّلت لاحقاً في يناير <bdi>2026</bdi>');
   });
 
   test('labels detail chips in Arabic and leaves unknown keys legible', () => {
@@ -298,11 +284,10 @@ describe('warranty and inspections', () => {
 });
 
 describe('the verification statement', () => {
-  test('says what the chain proves and what it does not', () => {
+  test('says what is guaranteed and what is not, plainly', () => {
     const html = renderHabbaReportPdf(report());
-    expect(html).toContain('سلسلة السجل مُتحقّق منها');
-    expect(html).toContain('<bdi>8</bdi> سجلات مترابطة');
-    expect(html).toContain('ولا يثبت صحة ما أدخله المالك بنفسه');
+    expect(html).toContain('<bdi>8</bdi> سجلات في هذا التقرير محفوظة كما كُتبت أول مرة');
+    expect(html).toContain('أما ما سجّله المالك فلم تتحقّق منه هبّة');
   });
 
   test('tells the buyer how to verify without a link — ADR-0019', () => {
@@ -315,8 +300,8 @@ describe('the verification statement', () => {
     // belt-and-braces case — but the renderer must never assert what the
     // payload did not.
     const html = renderHabbaReportPdf(report({ chain: { is_valid: false, length: 0 } }));
-    expect(html).toContain('تعذّر التحقّق');
-    expect(html).not.toContain('سلسلة السجل مُتحقّق منها');
+    expect(html).toContain('تعذّر التأكّد من سلامة السجلات');
+    expect(html).not.toContain('محفوظة كما كُتبت أول مرة');
   });
 });
 

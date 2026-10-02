@@ -26,8 +26,28 @@
 import type { SarAmount } from '@habba/core';
 
 export type AuthorisationResult =
-  | { readonly ok: true; readonly paymentIntentId: string; readonly expiresAt: Date }
-  | { readonly ok: false; readonly reason: 'declined' | 'insufficient_funds' | 'transport_failed' };
+  | {
+      readonly ok: true;
+      readonly paymentIntentId: string;
+      readonly expiresAt: Date;
+      /**
+       * The hold is already on the order: the gateway's server side verified
+       * it and recorded it (0077). False for the development provider, whose
+       * word the database takes through authorise_order_payment.
+       */
+      readonly recordedByServer: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | 'declined'
+        | 'insufficient_funds'
+        | 'transport_failed'
+        /** The customer closed the card form. */
+        | 'cancelled'
+        /** A live gateway is configured but no card form is installed. */
+        | 'card_form_unavailable';
+    };
 
 export type CaptureResult =
   | { readonly ok: true; readonly capturedAmount: SarAmount }
@@ -50,8 +70,15 @@ export type RefundResult =
     };
 
 export interface PaymentProvider {
-  /** Holds funds at booking. The order cannot be accepted until this succeeds. */
-  authorise(orderId: string, amount: SarAmount): Promise<AuthorisationResult>;
+  /**
+   * Holds funds: at booking (`initial`), and again for the difference when
+   * approved parts took the final bill past the first hold (`top_up`, 0078).
+   */
+  authorise(
+    orderId: string,
+    amount: SarAmount,
+    purpose?: 'initial' | 'top_up',
+  ): Promise<AuthorisationResult>;
   /** Takes the money. Called only after the customer confirms, or after the dispute window. */
   capture(paymentIntentId: string, amount: SarAmount): Promise<CaptureResult>;
   release(paymentIntentId: string): Promise<RefundResult>;
@@ -84,7 +111,12 @@ export class DevPaymentProvider implements PaymentProvider {
 
   async authorise(orderId: string, amount: SarAmount): Promise<AuthorisationResult> {
     this.counter += 1;
-    const paymentIntentId = `dev_intent_${this.counter}`;
+    // Unique across instances and runs, as a real payment id is: the
+    // database refuses a payment id it has seen before (0078), which is what
+    // stops one payment being presented for two orders.
+    const paymentIntentId = `dev_intent_${Date.now().toString(36)}_${this.counter}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
     const expiresAt = new Date(Date.now() + AUTHORISATION_VALIDITY_DAYS * 86_400_000);
 
     this.intents.set(paymentIntentId, {
@@ -95,7 +127,7 @@ export class DevPaymentProvider implements PaymentProvider {
       refunded: false,
     });
 
-    return { ok: true, paymentIntentId, expiresAt };
+    return { ok: true, paymentIntentId, expiresAt, recordedByServer: false };
   }
 
   async capture(paymentIntentId: string, amount: SarAmount): Promise<CaptureResult> {
@@ -147,5 +179,3 @@ function compareAmounts(a: SarAmount, b: SarAmount): number {
   };
   return toHalalas(a) - toHalalas(b);
 }
-
-export const paymentProvider: PaymentProvider = new DevPaymentProvider();

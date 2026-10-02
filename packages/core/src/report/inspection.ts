@@ -78,14 +78,19 @@ const RECOMMENDATION_AR: Record<Recommendation, string> = {
  * A buyer needs "what is wrong with this car" before "what did it score".
  * Leading with a number invites them to stop reading at a reassuring one.
  */
-export function collectFindings(
-  report: InspectionReport,
-): Array<{ section: string; label: string; rating: ItemRating; note?: string }> {
+export function collectFindings(report: InspectionReport): Array<{
+  section: string;
+  label: string;
+  rating: ItemRating;
+  note?: string;
+  photos?: readonly string[];
+}> {
   const findings: Array<{
     section: string;
     label: string;
     rating: ItemRating;
     note?: string;
+    photos?: readonly string[];
     weight: number;
   }> = [];
 
@@ -101,6 +106,9 @@ export function collectFindings(
         label: item.label_ar,
         rating: entry.rating,
         ...(entry.note === undefined ? {} : { note: entry.note }),
+        ...(entry.photos === undefined || entry.photos.length === 0
+          ? {}
+          : { photos: entry.photos }),
         // Sorted by what it costs to fix, not by template order.
         weight: (item.weight ?? 1) * (section.weight ?? 1) * (entry.rating === 'fail' ? 2 : 1),
       });
@@ -124,13 +132,53 @@ export function countByRating(report: InspectionReport): Record<ItemRating, numb
   return counts;
 }
 
+/**
+ * Where an inspector stands on a form: how much is answered, and which
+ * required items are still open. The same rule the server applies on submit
+ * (0026) — every required item rated — so the button is enabled exactly when
+ * the submission will be accepted.
+ */
+export interface InspectionProgress {
+  readonly answered: number;
+  readonly total: number;
+  readonly missingRequired: readonly { readonly section: string; readonly item: string }[];
+}
+
+export function inspectionProgress(
+  sections: readonly InspectionTemplateSection[],
+  results: Readonly<Record<string, Readonly<Record<string, InspectionResultEntry | undefined>>>>,
+): InspectionProgress {
+  let answered = 0;
+  let total = 0;
+  const missingRequired: { section: string; item: string }[] = [];
+
+  for (const section of sections) {
+    for (const item of section.items) {
+      total += 1;
+      const entry = results[section.key]?.[item.key];
+      if (entry !== undefined) {
+        answered += 1;
+      } else if (item.required === true) {
+        missingRequired.push({ section: section.key, item: item.key });
+      }
+    }
+  }
+
+  return { answered, total, missingRequired };
+}
+
 export interface InspectionRenderOptions {
-  readonly publicUrl: string;
+  /**
+   * Where the live report can be read, if anywhere. Optional since ADR-0019:
+   * reports are generated on the device and shared as a file, and a link to
+   * a host that does not answer is worse than no link.
+   */
+  readonly publicUrl?: string | undefined;
 }
 
 export function renderInspectionReport(
   report: InspectionReport,
-  options: InspectionRenderOptions,
+  options: InspectionRenderOptions = {},
 ): string {
   const { subject } = report;
   const score = report.overall_score;
@@ -298,7 +346,7 @@ export function renderInspectionReport(
       نفّذ هذا الفحص فنّي معتمد من هبّة بتاريخ ${escapeHtml(report.completed_at.slice(0, 10))}.
       يصف التقرير حالة السيارة وقت الفحص فقط، ولا يشمل أعطالاً قد تظهر لاحقاً.
     </p>
-    <code>${escapeHtml(options.publicUrl)}</code>
+    ${options.publicUrl === undefined ? '' : `<code>${escapeHtml(options.publicUrl)}</code>`}
   </section>
 
   <footer>هبّة</footer>

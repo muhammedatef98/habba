@@ -26,6 +26,10 @@ import { BottomSheet, Button, Card, Field, ListRow, Screen, Text, useTheme } fro
 import { repository } from '@/features/shared/data/repository';
 import type { PastServicePart, TimelineAttachment } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
+import { FeatureUnavailable } from '@/features/shared/components/FeatureUnavailable';
+import { DateChips } from '@/features/customer/components/form/DateChips';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 interface FieldErrors {
   summary?: string | undefined;
@@ -59,6 +63,7 @@ function parseDate(value: string): Date | null {
 }
 
 export default function RecordServiceScreen() {
+  const features = useFeatures();
   const { t } = useTranslation();
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -113,7 +118,9 @@ export default function RecordServiceScreen() {
     onError: (error: Error) => {
       // CLAUDE.md §12: plain Arabic, with a next action — never a raw
       // Postgres message.
-      if (error.message.includes('future')) {
+      if (error.message === 'bad_date') {
+        setErrors({ when: t('logbook.errors.dateRequired') });
+      } else if (error.message.includes('future')) {
         setErrors({ when: t('logbook.errors.futureDate') });
       } else if (error.message.includes('lower than the recorded')) {
         setErrors({ mileage: t('logbook.errors.mileageTooLow', { current: '' }) });
@@ -124,6 +131,8 @@ export default function RecordServiceScreen() {
   });
 
   if (!isAuthenticated) return <Redirect href="/" />;
+  // Switched off in the console (0093); the server refuses it regardless.
+  if (!features.recordService) return <FeatureUnavailable testID="record-service-unavailable" />;
 
   /**
    * Stands in for the camera, mirroring the provider evidence screen. The
@@ -176,6 +185,7 @@ export default function RecordServiceScreen() {
 
   return (
     <Screen scrollable>
+      <BackBar label={t('logbook.title')} />
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="title">{t('logbook.recordTitle')}</Text>
         <Text variant="body" tone="muted">
@@ -221,19 +231,21 @@ export default function RecordServiceScreen() {
         multiline
       />
 
-      <Field
-        testID="service-date"
-        label={t('logbook.recordWhen')}
-        value={when}
-        onChangeText={(value) => {
-          setWhen(value);
-          setErrors((prev) => ({ ...prev, when: undefined }));
-        }}
-        placeholder="2025-05-14"
-        error={errors.when}
-        keyboardType="numbers-and-punctuation"
-        forceLtrInput
-      />
+      <View testID="service-date" style={{ gap: theme.spacing.xs }}>
+        <Text variant="label">{t('logbook.recordWhen')}</Text>
+        <DateChips
+          value={when}
+          onChange={(value) => {
+            setWhen(value);
+            setErrors((prev) => ({ ...prev, when: undefined }));
+          }}
+        />
+        {errors.when !== undefined ? (
+          <Text variant="caption" tone="emergency">
+            {errors.when}
+          </Text>
+        ) : null}
+      </View>
 
       <Field
         testID="service-mileage"

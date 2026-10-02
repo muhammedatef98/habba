@@ -14,12 +14,17 @@
  * on the day it was written and stop honouring it on the first edit.
  *
  * Three actions per item, and they are the three things a person actually does
- * when told a service is due: it is already done, not now, or book it.
+ * when told a service is due: it is already done, not now, or book it — but
+ * only when it IS due. Every item carried all three, so a car with nothing
+ * due showed two rows of «تم / ذكّرني لاحقاً / احجز الآن» for oil and filter
+ * whose last change was simply unknown, and the one item that needed doing
+ * looked like the others. An item that is not due yet keeps «تم», which is
+ * how its first date gets recorded.
  */
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Icon, Row, StatusPill, Text, useTheme } from '@habba/ui';
+import { Button, Card, Icon, Row, StatusPill, Text, useTheme, type IconName } from '@habba/ui';
 import {
   byUrgency,
   documentLine,
@@ -60,6 +65,21 @@ const PILL_TONE: Readonly<Record<CareUrgency, 'neutral' | 'success' | 'active'>>
  * Latin digits, and a raw `{{km}}` would render in whatever numbering system
  * the locale happens to default to.
  */
+/**
+ * The item's own picture beside its name. Item types are an open catalogue
+ * (0059), so this reads the key rather than listing it; anything unknown is a
+ * wrench, which is true of every item on the list.
+ */
+function careIcon(itemType: string): IconName {
+  if (/oil/.test(itemType)) return 'oil';
+  if (/brake/.test(itemType)) return 'brake';
+  if (/tyre|tire|wheel/.test(itemType)) return 'tyre';
+  if (/battery/.test(itemType)) return 'battery';
+  if (/(^|_)ac(_|$)|air_con|cabin/.test(itemType)) return 'ac';
+  if (/coolant|radiator/.test(itemType)) return 'radiator';
+  return 'wrench';
+}
+
 function lineValues(line: CareLine, language: string): Record<string, string> {
   return Object.fromEntries(
     Object.entries(line.values).map(([key, value]) => [key, formatCount(value, language)]),
@@ -111,22 +131,70 @@ export function UpcomingCare({
     <View testID={testID} style={{ gap: theme.spacing.md }}>
       {rows.length > 0 ? (
         <Card elevation="sm" style={{ gap: theme.spacing.md }}>
-          {rows.map(({ item, line }) => {
+          {rows.map(({ item, line }, index) => {
             const snoozed = isSnoozed(item);
+            const due = line.urgency === 'overdue' || line.urgency === 'soon';
+            const state = t(line.key, lineValues(line, i18n.language));
             return (
               <View
                 key={item.itemId}
                 testID={`care-item-${item.itemType}`}
-                style={{ gap: theme.spacing.sm }}
+                style={{
+                  gap: theme.spacing.sm,
+                  ...(index === 0
+                    ? {}
+                    : {
+                        borderTopWidth: 1,
+                        borderTopColor: theme.colors.border,
+                        paddingTop: theme.spacing.md,
+                      }),
+                }}
               >
-                <Row gap="sm" align="center" justify="space-between">
-                  <Text variant="bodyStrong">{isArabic ? item.nameAr : item.nameEn}</Text>
-                  <StatusPill
-                    testID={`care-state-${item.itemType}`}
-                    label={t(line.key, lineValues(line, i18n.language))}
-                    tone={PILL_TONE[line.urgency]}
-                    showDot={line.urgency === 'overdue'}
-                  />
+                <Row gap="md" align="center">
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: theme.radius.md,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor:
+                        line.urgency === 'overdue'
+                          ? theme.colors.warningSubtle
+                          : theme.colors.primarySubtle,
+                    }}
+                  >
+                    <Icon
+                      name={careIcon(item.itemType)}
+                      size={theme.iconSize.sm}
+                      color={
+                        line.urgency === 'overdue' ? theme.colors.warning : theme.colors.primary
+                      }
+                    />
+                  </View>
+                  {/* A short state is a pill beside the name; «last time unknown —
+                      record it and we will follow it» is a sentence, and squeezed
+                      into a pill it pushed the name into a corner. */}
+                  {line.urgency === 'unknown' ? (
+                    <View style={{ gap: 2, flex: 1 }}>
+                      <Text variant="bodyStrong">{isArabic ? item.nameAr : item.nameEn}</Text>
+                      <Text testID={`care-state-${item.itemType}`} variant="caption" tone="muted">
+                        {state}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Row gap="sm" align="center" justify="space-between" style={{ flex: 1 }}>
+                      <Text variant="bodyStrong" style={{ flexShrink: 1 }}>
+                        {isArabic ? item.nameAr : item.nameEn}
+                      </Text>
+                      <StatusPill
+                        testID={`care-state-${item.itemType}`}
+                        label={state}
+                        tone={PILL_TONE[line.urgency]}
+                        showDot={line.urgency === 'overdue'}
+                      />
+                    </Row>
+                  )}
                 </Row>
 
                 {snoozed && item.snoozedUntil !== null ? (
@@ -149,16 +217,18 @@ export function UpcomingCare({
                     onPress={() => onDone(item.itemId)}
                     loading={busyItemId === item.itemId}
                   />
-                  <Button
-                    testID={`care-snooze-${item.itemType}`}
-                    label={t('care.snooze')}
-                    variant="ghost"
-                    size="medium"
-                    fullWidth={false}
-                    onPress={() => onSnooze(item.itemId)}
-                    disabled={snoozed}
-                  />
-                  {item.serviceId !== null ? (
+                  {due ? (
+                    <Button
+                      testID={`care-snooze-${item.itemType}`}
+                      label={t('care.snooze')}
+                      variant="ghost"
+                      size="medium"
+                      fullWidth={false}
+                      onPress={() => onSnooze(item.itemId)}
+                      disabled={snoozed}
+                    />
+                  ) : null}
+                  {due && item.serviceId !== null ? (
                     <Button
                       testID={`care-book-${item.itemType}`}
                       label={t('care.book')}

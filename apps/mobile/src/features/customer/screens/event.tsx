@@ -18,19 +18,14 @@ import { View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import {
-  Card,
-  EmptyState,
-  ListRow,
-  ProvenanceBadge,
-  Screen,
-  Text,
-  Button,
-  useTheme,
-} from '@habba/ui';
+import { Card, EmptyState, ListRow, ProvenanceBadge, Screen, Text, useTheme } from '@habba/ui';
+import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { repository } from '@/features/shared/data/repository';
 import type { Provenance } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
+import { formatGregorianDate, formatHijriDate } from '@/features/shared/lib/dates';
+import { formatCount } from '@/features/shared/lib/format-number';
+import { BackBar } from '@/features/shared/components/BackBar';
 
 const PROVENANCE_LABEL_KEY: Record<Provenance, string> = {
   habba_verified: 'logbook.verifiedBadge',
@@ -104,6 +99,7 @@ export default function EventScreen() {
     return (
       <Screen>
         <EmptyState
+          iconName="alert"
           testID="event-missing"
           title={t('logbook.detail.missingTitle')}
           body={t('logbook.detail.missingBody')}
@@ -114,13 +110,18 @@ export default function EventScreen() {
     );
   }
 
-  const occurred = new Date(event.occurredAt);
-  const recorded = new Date(event.recordedAt);
-  const locale = isArabic ? 'ar-SA' : 'en-GB';
+  // Gregorian with Latin digits, the Hijri date beside it (§5). `ar-SA` alone
+  // gave a Hijri date in Arabic-Indic digits with nothing saying which calendar.
+  const bothCalendars = (iso: string) => {
+    const hijri = formatHijriDate(iso, i18n.language);
+    const gregorian = formatGregorianDate(iso, i18n.language);
+    return hijri === null ? gregorian : `${gregorian} · ${hijri}`;
+  };
   const detailEntries = Object.entries(event.details);
 
   return (
     <Screen scrollable>
+      <BackBar label={t('logbook.title')} />
       <ProvenanceBadge
         provenance={event.provenance}
         label={t(PROVENANCE_LABEL_KEY[event.provenance])}
@@ -130,20 +131,14 @@ export default function EventScreen() {
 
       <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
         <View style={{ gap: theme.spacing.sm }}>
-          <ListRow
-            title={t('logbook.detail.occurredAt')}
-            value={occurred.toLocaleDateString(locale)}
-          />
+          <ListRow title={t('logbook.detail.occurredAt')} value={bothCalendars(event.occurredAt)} />
           {/* Both dates, always. "Recorded three years later" is exactly the
               context a buyer needs to weigh an entry (ADR-0012). */}
-          <ListRow
-            title={t('logbook.detail.recordedAt')}
-            value={recorded.toLocaleDateString(locale)}
-          />
+          <ListRow title={t('logbook.detail.recordedAt')} value={bothCalendars(event.recordedAt)} />
           {event.mileage !== null ? (
             <ListRow
               title={t('logbook.detail.mileage')}
-              value={t('logbook.mileageAt', { mileage: event.mileage })}
+              value={t('logbook.mileageAt', { mileage: formatCount(event.mileage, i18n.language) })}
             />
           ) : null}
         </View>
@@ -170,10 +165,19 @@ export default function EventScreen() {
             <ListRow
               key={attachment.url}
               testID={`attachment-${attachment.kind}`}
+              leading={
+                <EvidencePhoto
+                  reference={attachment.url}
+                  size={48}
+                  accessibilityLabel={
+                    attachment.caption ??
+                    t('logbook.detail.attachmentKind', { kind: attachment.kind })
+                  }
+                />
+              }
               title={
                 attachment.caption ?? t('logbook.detail.attachmentKind', { kind: attachment.kind })
               }
-              subtitle={attachment.url}
             />
           ))}
         </View>
@@ -192,8 +196,6 @@ export default function EventScreen() {
           </Text>
         </View>
       </Card>
-
-      <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

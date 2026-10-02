@@ -10,7 +10,7 @@
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, StatCluster, Text, useTheme } from '@habba/ui';
+import { Button, Card, FadeIn, StatCluster, Text, useTheme } from '@habba/ui';
 import { agreedTotal } from '@/features/shared/lib/order-price';
 import { PriceBreakdown } from './PriceBreakdown';
 import { ProviderRow } from './ProviderRow';
@@ -44,7 +44,8 @@ export function Matched({
   const theme = useTheme();
 
   return (
-    <View style={{ gap: theme.spacing.base, flex: 1 }}>
+    // Each state arrives rather than replacing the last between frames.
+    <FadeIn style={{ gap: theme.spacing.base, flex: 1 }}>
       <Card
         testID="matched-banner"
         elevation="none"
@@ -122,6 +123,6 @@ export function Matched({
           onPress={onFindAnother}
         />
       </View>
-    </View>
+    </FadeIn>
   );
 }

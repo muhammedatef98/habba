@@ -5,11 +5,18 @@
  * §9.1: the customer must never accept a number they have not been shown
  * broken down, so the total is always rendered alongside its components rather
  * than on its own.
+ *
+ * Every line reads the same way — «320 ر.س» — as the lines on the quote
+ * screen before it. The total is the amount alone: once parts are on the
+ * bill it is no longer the fixed emergency price, and calling it one would
+ * be telling the customer something untrue about the number they approve.
  */
 
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Text, rowDirectionFor, useTheme } from '@habba/ui';
+import { Row, Text, useTheme } from '@habba/ui';
+import type { SarAmount } from '@habba/core';
+import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { agreedTotal } from '@/features/shared/lib/order-price';
 import type { Order } from '@/features/shared/data/types';
 
@@ -21,28 +28,24 @@ export interface PriceBreakdownProps {
 export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const sar = (amount: SarAmount) => t('common.sar', { amount: formatSarDisplay(amount) });
+  const total = agreedTotal(order);
 
-  const row = (label: string, amount: string) => (
-    <View
-      key={label}
-      style={{
-        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-        justifyContent: 'space-between',
-      }}
-    >
-      <Text variant="caption" tone="muted">
+  const row = (label: string, amount: SarAmount) => (
+    <Row key={label} justify="space-between">
+      <Text variant="bodySmall" tone="muted">
         {label}
       </Text>
-      <Text variant="caption" tone="muted" numeric>
-        {amount}
+      <Text variant="bodySmall" tone="muted" numeric>
+        {sar(amount)}
       </Text>
-    </View>
+    </Row>
   );
 
   return (
     <View testID={testID} style={{ gap: theme.spacing.sm }}>
       {order.labourAmount !== null ? row(t('tracking.labourLine'), order.labourAmount) : null}
-      {order.partsAmount !== null ? row(t('quote.partsTotal'), order.partsAmount) : null}
+      {order.partsAmount !== null ? row(t('tracking.partsLine'), order.partsAmount) : null}
       {order.vatAmount !== null ? row(t('tracking.vatLine'), order.vatAmount) : null}
 
       <View
@@ -53,17 +56,15 @@ export function PriceBreakdown({ order, testID }: PriceBreakdownProps) {
         }}
       />
 
-      <View
-        style={{
-          flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-          justifyContent: 'space-between',
-        }}
-      >
+      <Row justify="space-between">
         <Text variant="bodyStrong">{t('tracking.totalLine')}</Text>
-        <Text variant="bodyStrong" numeric>
-          {t('emergency.priceFixed', { amount: agreedTotal(order) ?? '—' })}
+        <Text variant="subheading" numeric>
+          {total === null ? '—' : sar(total)}
         </Text>
-      </View>
+      </Row>
+      <Text variant="caption" tone="subtle">
+        {t('tracking.inclVat')}
+      </Text>
     </View>
   );
 }

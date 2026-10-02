@@ -2,26 +2,42 @@
  * Groups appointment slots into the days the picker shows as a strip.
  *
  * A selector rather than inline grouping in the screen, because "which day is
- * this slot on" is a local-time question and getting it wrong is invisible
- * until someone books 03:00 Tuesday thinking it is Monday night. Grouping on
- * the local Y-M-D rather than on the ISO string's date is the whole point:
- * `startsAt` is UTC, and Riyadh is +03.
+ * this slot on" is a calendar question and getting it wrong is invisible
+ * until someone books 03:00 Tuesday thinking it is Monday night.
+ *
+ * The calendar is Riyadh's, not the phone's. Slots are published in Riyadh
+ * time (0024's generate_slots) and the booked screen shows Riyadh time
+ * (`formatAppointment`); grouping and labelling by the phone's zone put a
+ * 09:00 slot on the picker and «12:00 م» on the confirmation for anyone whose
+ * phone was not set to Riyadh. Saudi Arabia has no daylight saving, so the
+ * offset is a constant.
  */
 
 import type { AppointmentSlot } from '@/features/shared/data/types';
 
+const RIYADH_OFFSET_MS = 3 * 3_600_000;
+
 export interface SlotDay {
-  /** Local calendar key, `YYYY-MM-DD`. Stable enough to use as a React key. */
+  /** Riyadh calendar key, `YYYY-MM-DD`. Stable enough to use as a React key. */
   readonly key: string;
-  /** Midnight local on that day, for formatting the strip label. */
+  /** Noon in Riyadh on that day; format it with `timeZone: 'Asia/Riyadh'`. */
   readonly date: Date;
   readonly slots: readonly AppointmentSlot[];
 }
 
-function localDayKey(date: Date): string {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+/** The Riyadh calendar date of an instant, as UTC fields of a shifted Date. */
+function riyadhFields(date: Date): { year: number; month: number; day: number } {
+  const shifted = new Date(date.getTime() + RIYADH_OFFSET_MS);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth(),
+    day: shifted.getUTCDate(),
+  };
+}
+
+function riyadhDayKey(date: Date): string {
+  const { year, month, day } = riyadhFields(date);
+  return `${year}-${`${month + 1}`.padStart(2, '0')}-${`${day}`.padStart(2, '0')}`;
 }
 
 export function groupSlotsByDay(slots: readonly AppointmentSlot[]): readonly SlotDay[] {
@@ -29,12 +45,13 @@ export function groupSlotsByDay(slots: readonly AppointmentSlot[]): readonly Slo
 
   for (const slot of slots) {
     const startsAt = new Date(slot.startsAt);
-    const key = localDayKey(startsAt);
-    const midnight = new Date(startsAt.getFullYear(), startsAt.getMonth(), startsAt.getDate());
+    const key = riyadhDayKey(startsAt);
+    const { year, month, day } = riyadhFields(startsAt);
+    const noonRiyadh = new Date(Date.UTC(year, month, day, 12) - RIYADH_OFFSET_MS);
 
     const bucket = byKey.get(key);
     if (bucket === undefined) {
-      byKey.set(key, { date: midnight, slots: [slot] });
+      byKey.set(key, { date: noonRiyadh, slots: [slot] });
     } else {
       bucket.slots.push(slot);
     }
@@ -49,9 +66,12 @@ export function groupSlotsByDay(slots: readonly AppointmentSlot[]): readonly Slo
     .sort((a, b) => a.key.localeCompare(b.key));
 }
 
-/** How many days from today, in local calendar days — not in 24-hour blocks. */
+/** How many Riyadh calendar days from today — not 24-hour blocks. */
 export function daysFromToday(date: Date, now: Date = new Date()): number {
-  const midnightToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const midnightThen = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  return Math.round((midnightThen - midnightToday) / 86_400_000);
+  const then = riyadhFields(date);
+  const today = riyadhFields(now);
+  return Math.round(
+    (Date.UTC(then.year, then.month, then.day) - Date.UTC(today.year, today.month, today.day)) /
+      86_400_000,
+  );
 }

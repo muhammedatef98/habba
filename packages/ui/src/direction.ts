@@ -35,3 +35,14 @@ export function rowDirectionFor(
   const platformIsBehind = locale !== native;
   return platformIsBehind === reverse ? 'row' : 'row-reverse';
 }
+
+/**
+ * `alignSelf` / `alignItems` for "at the reading start" in a column.
+ *
+ * The same disagreement as `rowDirectionFor`, on the cross axis: `flex-start`
+ * is the platform's start, so on the first Arabic launch a badge pinned with
+ * it sat on the left while every heading around it sat on the right.
+ */
+export function alignStartFor(locale: Direction, native: Direction): 'flex-start' | 'flex-end' {
+  return locale === native ? 'flex-start' : 'flex-end';
+}

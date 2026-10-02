@@ -128,12 +128,7 @@ beforeAll(async () => {
 
   vehicleId = (vehicle.data as { id: string }).id;
 
-  await owner.rpc('append_vehicle_timeline_event', {
-    p_vehicle_id: vehicleId,
-    p_event_type: 'vehicle_registered',
-    p_summary_ar: 'تم تسجيل السيارة في هبّة',
-    p_summary_en: 'Vehicle registered with Habba',
-  });
+  await owner.rpc('log_vehicle_registration', { p_vehicle_id: vehicleId });
 });
 
 describe.skipIf(!harnessUp)('Phase 2 acceptance — تقرير هبّة', () => {

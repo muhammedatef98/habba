@@ -6,14 +6,15 @@
  *   - Logical properties only. `paddingStart`/`marginEnd`, never `Left`/`Right`,
  *     so the row mirrors with the layout rather than needing a second style.
  *   - The chevron is a directional icon, so it MUST mirror: it points left in
- *     Arabic and right in English. It is drawn as a character chosen by
- *     direction rather than a mirrored image, because a flipped glyph and a
- *     correct glyph look identical only until someone looks closely.
+ *     Arabic and right in English. It is the same `chevronForward` icon every
+ *     other forward row in the app draws, which mirrors by direction.
  */
 
 import type { ReactNode } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
+import { Icon } from './Icon.js';
 import { Text } from './Text.js';
+import { rowDirectionFor } from './direction.js';
 import { useTheme } from './theme.js';
 
 export interface ListRowProps {
@@ -48,7 +49,10 @@ export function ListRow({
 
   const base: ViewStyle = {
     minHeight: theme.minTouchTarget,
-    flexDirection: 'row',
+    // Resolved against the locale and the platform together (direction.ts):
+    // a plain `row` put the chevron against the title, at the reading start,
+    // on the launch where the two disagree.
+    flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
     alignItems: 'center',
     gap: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
@@ -82,9 +86,7 @@ export function ListRow({
       ) : null}
 
       {chevron ? (
-        <Text variant="body" tone="subtle" accessible={false}>
-          {theme.isRtl ? '‹' : '›'}
-        </Text>
+        <Icon name="chevronForward" size={theme.iconSize.sm} color={theme.colors.textSubtle} />
       ) : null}
     </>
   );

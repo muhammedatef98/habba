@@ -13,29 +13,32 @@ function slot(startsAt: string): AppointmentSlot {
 }
 
 describe('groupSlotsByDay', () => {
-  it('groups by the local calendar day, not by the UTC one', () => {
-    // 2026-03-10 01:00 local is still the 10th locally whatever the offset,
-    // because the fixture is constructed in local time.
+  it("groups by Riyadh's calendar day, whatever zone the phone is in", () => {
     const days = groupSlotsByDay([
-      slot('2026-03-10T09:00:00'),
-      slot('2026-03-10T18:00:00'),
-      slot('2026-03-11T09:00:00'),
+      slot('2026-03-10T09:00:00+03:00'),
+      slot('2026-03-10T23:30:00+03:00'), // 20:30 UTC: still the 10th in Riyadh
+      slot('2026-03-11T00:30:00+03:00'), // 21:30 UTC on the 10th: the 11th in Riyadh
     ]);
 
-    expect(days).toHaveLength(2);
+    expect(days.map((day) => day.key)).toEqual(['2026-03-10', '2026-03-11']);
     expect(days[0]?.slots).toHaveLength(2);
     expect(days[1]?.slots).toHaveLength(1);
   });
 
+  it('labels each day with an instant that is that day in Riyadh', () => {
+    const [day] = groupSlotsByDay([slot('2026-03-10T09:00:00+03:00')]);
+    expect(day?.date.toISOString()).toBe('2026-03-10T09:00:00.000Z');
+  });
+
   it('returns days in order and slots within a day in order', () => {
     const days = groupSlotsByDay([
-      slot('2026-03-11T09:00:00'),
-      slot('2026-03-10T18:00:00'),
-      slot('2026-03-10T09:00:00'),
+      slot('2026-03-11T09:00:00+03:00'),
+      slot('2026-03-10T18:00:00+03:00'),
+      slot('2026-03-10T09:00:00+03:00'),
     ]);
 
     expect(days.map((day) => day.key)).toEqual(['2026-03-10', '2026-03-11']);
-    expect(days[0]?.slots[0]?.startsAt).toBe(new Date('2026-03-10T09:00:00').toISOString());
+    expect(days[0]?.slots[0]?.startsAt).toBe(new Date('2026-03-10T09:00:00+03:00').toISOString());
   });
 
   it('has nothing to group when there are no slots', () => {
@@ -44,17 +47,17 @@ describe('groupSlotsByDay', () => {
 });
 
 describe('daysFromToday', () => {
-  const now = new Date(2026, 2, 10, 23, 30);
+  const now = new Date('2026-03-10T23:30:00+03:00');
 
   it('counts calendar days, so 23:30 tonight to 00:30 tomorrow is one day', () => {
-    expect(daysFromToday(new Date(2026, 2, 11, 0, 30), now)).toBe(1);
+    expect(daysFromToday(new Date('2026-03-11T00:30:00+03:00'), now)).toBe(1);
   });
 
   it('is zero for later today', () => {
-    expect(daysFromToday(new Date(2026, 2, 10, 8, 0), now)).toBe(0);
+    expect(daysFromToday(new Date('2026-03-10T08:00:00+03:00'), now)).toBe(0);
   });
 
   it('counts further days', () => {
-    expect(daysFromToday(new Date(2026, 2, 17, 9, 0), now)).toBe(7);
+    expect(daysFromToday(new Date('2026-03-17T09:00:00+03:00'), now)).toBe(7);
   });
 });

@@ -17,9 +17,11 @@ import { View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { parseSaudiPhone, SAUDI_COUNTRY_CODE } from '@habba/core';
-import { Button, Field, HabbaWordmark, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Field, HabbaWordmark, Row, Screen, Text, useTheme } from '@habba/ui';
 import { otpProvider } from '@/features/shared/lib/otp';
 import { repository } from '@/features/shared/data/repository';
+import { LegalConsent } from '@/features/shared/components/LegalConsent';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useIsApprovedProvider } from '@/features/shared/hooks/use-roles';
 import { useMode } from '@/features/shared/state/mode';
 import { useIsAuthenticated, useSession } from '@/features/shared/state/session';
@@ -28,6 +30,7 @@ export default function PhoneScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const isAuthenticated = useIsAuthenticated();
+  const features = useFeatures();
   const setPendingPhone = useSession((state) => state.setPendingPhone);
   const signInAsGuest = useSession((state) => state.signInAsGuest);
   const mode = useMode((state) => state.mode);
@@ -93,13 +96,24 @@ export default function PhoneScreen() {
   return (
     <Screen scrollable>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
-        <View style={{ gap: theme.spacing.sm }}>
-          {/* The full lockup, not the mark alone: this is the one screen that
-              introduces the brand, and the wordmark is where the name and the
-              gust are shown together. */}
-          <HabbaWordmark size={56} />
-          <Text variant="display">{t('auth.welcomeTitle')}</Text>
-          <Text variant="body" tone="muted">
+        {/* The wordmark IS the greeting. A «أهلاً بك في هبّة» heading under it
+            said the name twice in a row, and the list of selling points under
+            that pushed the phone field — the one thing this screen is for —
+            below the fold. One line says what Habba is; the rest is sign-in. */}
+        <View
+          style={{
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            paddingTop: theme.spacing.xl,
+            paddingBottom: theme.spacing.lg,
+          }}
+        >
+          {/* The wordmark pins itself to the start edge; a centred Row is
+              what moves it to the middle in both directions. */}
+          <Row justify="center" style={{ alignSelf: 'stretch' }}>
+            <HabbaWordmark size={80} />
+          </Row>
+          <Text variant="body" tone="muted" align="center">
             {t('auth.welcomeSubtitle')}
           </Text>
         </View>
@@ -138,17 +152,19 @@ export default function PhoneScreen() {
 
         {/* Phone stays the primary path (§9.1). These are alternatives, and
             their weight in the hierarchy says so — secondary, then ghost. */}
-        <Button
-          testID="email-signin"
-          label={t('auth.useEmail')}
-          variant="secondary"
-          onPress={() => router.push('/email')}
-        />
+        {features.emailLogin ? (
+          <Button
+            testID="email-signin"
+            label={t('auth.useEmail')}
+            variant="secondary"
+            onPress={() => router.push('/email')}
+          />
+        ) : null}
 
         {/* §11: the logbook is top-of-funnel and must never be gated. Letting
             someone in before they hand over a phone number is what that
             actually means in an onboarding screen. */}
-        <View style={{ gap: theme.spacing.xs }}>
+        {features.guestLogin ? (
           <Button
             testID="continue-as-guest"
             label={t('auth.continueAsGuest')}
@@ -156,10 +172,9 @@ export default function PhoneScreen() {
             onPress={() => void handleGuest()}
             loading={enteringAsGuest}
           />
-          <Text variant="caption" tone="subtle" align="center">
-            {t('auth.guestHint')}
-          </Text>
-        </View>
+        ) : null}
+
+        <LegalConsent />
       </View>
     </Screen>
   );

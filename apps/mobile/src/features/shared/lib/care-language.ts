@@ -86,7 +86,7 @@ export function maintenanceLine(item: MaintenanceItem): CareLine {
   if (item.daysRemaining !== null && item.daysRemaining <= CARE_LEAD_DAYS) {
     return {
       key: 'care.item.inDays',
-      values: { days: item.daysRemaining },
+      values: { count: item.daysRemaining },
       certain: true,
       urgency: 'soon',
     };
@@ -104,7 +104,7 @@ export function maintenanceLine(item: MaintenanceItem): CareLine {
   if (item.daysRemaining !== null) {
     return {
       key: 'care.item.inDays',
-      values: { days: item.daysRemaining },
+      values: { count: item.daysRemaining },
       certain: true,
       urgency: 'scheduled',
     };
@@ -128,7 +128,7 @@ export function documentLine(document: VehicleDocument): CareLine {
   if (document.isExpired) {
     return {
       key: 'care.doc.expired',
-      values: { days: Math.abs(document.daysRemaining) },
+      values: { count: Math.abs(document.daysRemaining) },
       certain: true,
       urgency: 'overdue',
     };
@@ -140,7 +140,7 @@ export function documentLine(document: VehicleDocument): CareLine {
 
   return {
     key: 'care.doc.inDays',
-    values: { days: document.daysRemaining },
+    values: { count: document.daysRemaining },
     certain: true,
     urgency: document.daysRemaining <= CARE_LEAD_DAYS ? 'soon' : 'scheduled',
   };
