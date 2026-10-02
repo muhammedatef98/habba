@@ -1837,6 +1837,42 @@ export class FixtureTransport implements Transport {
         );
         return null;
 
+      // 0097, for the demo console: derived from the demo file's own logbook
+      // so a car with more verified history reads better, as it would live.
+      case 'vehicle_health': {
+        const vehicle = s.vehicles.find((v) => v.vehicle.id === args['p_vehicle_id']);
+        if (vehicle === undefined) throw new ApiError('Vehicle not found', 'P0002', null);
+        const services = vehicle.timeline.filter(
+          (entry) => entry.event_type !== 'mileage_recorded',
+        );
+        if (services.length === 0) return { score: null, grade: 'unknown', factors: [] };
+        const undocumented = services.filter(
+          (entry) => entry.provenance === 'self_reported',
+        ).length;
+        const impact = -Math.round((10 * undocumented) / services.length);
+        const score = 100 + impact;
+        return {
+          score,
+          grade:
+            score >= 85 ? 'excellent' : score >= 70 ? 'good' : score >= 50 ? 'fair' : 'attention',
+          factors: impact < 0 ? [{ key: 'undocumented', count: undocumented, impact }] : [],
+        };
+      }
+
+      case 'vehicle_cost_summary':
+        return {
+          total: '1840.00',
+          last_12_months: '985.50',
+          this_year: '720.00',
+          entries: 5,
+          km_12_months: 14200,
+          per_1000_km: '69.40',
+          categories: [
+            { category: 'maintenance', amount: '640.00' },
+            { category: 'emergency', amount: '345.50' },
+          ],
+        };
+
       case 'ops_vehicle_detail': {
         const vehicle = s.vehicles.find((v) => v.vehicle.id === args['p_vehicle_id']);
         if (vehicle === undefined) throw new ApiError('Vehicle not found', 'P0002', null);

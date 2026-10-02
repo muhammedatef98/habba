@@ -3,6 +3,7 @@ import {
   formatAppointment,
   formatGregorianDate,
   formatHijriDate,
+  formatTodayLine,
   formatMonthLabel,
   monthKey,
 } from './dates.js';
@@ -77,5 +78,27 @@ describe('formatAppointment', () => {
     const arabic = formatAppointment(ISO, 'ar');
     expect(arabic).not.toMatch(/[٠-٩]/);
     expect(arabic).toMatch(/12:00/);
+  });
+});
+
+describe('formatTodayLine', () => {
+  // 21:30 UTC on the 1st is already the 2nd in Riyadh.
+  const LATE = new Date('2026-10-01T21:30:00Z');
+
+  it('states the weekday and date in Riyadh, in Latin digits', () => {
+    const line = formatTodayLine(LATE, 'ar');
+    expect(line).toMatch(/الجمعة/);
+    expect(line).toMatch(/\b2\b/);
+    expect(line).not.toMatch(/[٠-٩]/);
+  });
+
+  it('adds the Hijri date beside it in Arabic, where the platform can format one', () => {
+    const line = formatTodayLine(LATE, 'ar');
+    const hijri = formatHijriDate(LATE.toISOString(), 'ar');
+    if (hijri !== null) expect(line).toContain(` · ${hijri}`);
+  });
+
+  it('is Gregorian only in English', () => {
+    expect(formatTodayLine(LATE, 'en')).not.toContain('·');
   });
 });

@@ -1070,7 +1070,11 @@
     "providerTermsHint": "The terms you accepted when you joined",
     "supportTitle": "Provider support",
     "tipTitle": "Tip",
-    "tipEvidence": "Photograph the car before and after every job: the photos protect you in any dispute, and lift your rating."
+    "tipEvidence": "Photograph the car before and after every job: the photos protect you in any dispute, and lift your rating.",
+    "weekTitle": "Last 7 days",
+    "weekBest": "Best day: {{day}} · {{amount}}",
+    "weekChartA11y": "Your net over the last 7 days; the best was {{day}}",
+    "weekEmpty": "No completed jobs in the last 7 days"
   },
   "insights": {
     "healthTitle": "Car health",

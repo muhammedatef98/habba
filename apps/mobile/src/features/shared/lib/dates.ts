@@ -111,3 +111,24 @@ export function monthKey(iso: string): string {
 export function yearKey(iso: string): string {
   return `${new Date(iso).getFullYear()}`;
 }
+
+/**
+ * «الجمعة 2 أكتوبر · 21 ربيع الآخر 1448» — today, as the home header says it.
+ *
+ * Both calendars side by side for the reason §5 gives: Saudi readers live in
+ * both, and the Hijri date is the one that tells you Ramadan is next week.
+ * In English, or where the platform has no Islamic calendar, only the
+ * Gregorian half — never a guessed Hijri date.
+ */
+export function formatTodayLine(at: Date, locale: string): string {
+  const gregorian = toLatinDigits(
+    at.toLocaleDateString(tagFor(locale), {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'Asia/Riyadh',
+    }),
+  );
+  const hijri = formatHijriDate(at.toISOString(), locale);
+  return hijri === null ? gregorian : `${gregorian} · ${hijri}`;
+}

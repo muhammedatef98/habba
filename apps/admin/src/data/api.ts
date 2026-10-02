@@ -35,7 +35,9 @@ import type {
   StaffRole,
   UserFile,
   UserRow,
+  VehicleCostsRow,
   VehicleFile,
+  VehicleHealthRow,
   VerificationStatus,
 } from './types';
 
@@ -235,6 +237,12 @@ export function createApi(transport: Transport) {
 
     // -- Cars ---------------------------------------------------------------------------------------
     vehicle: (id: string) => transport.rpc<VehicleFile>('ops_vehicle_detail', { p_vehicle_id: id }),
+
+    /** صحة السيارة and تكلفة الملكية (0097) — the same figures the owner sees. */
+    vehicleHealth: (id: string) =>
+      transport.rpc<VehicleHealthRow>('vehicle_health', { p_vehicle_id: id }),
+    vehicleCosts: (id: string) =>
+      transport.rpc<VehicleCostsRow>('vehicle_cost_summary', { p_vehicle_id: id }),
 
     annotateVehicle: (id: string, note: string) =>
       transport.rpc<string>('ops_annotate_vehicle', {

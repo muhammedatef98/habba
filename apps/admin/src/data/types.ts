@@ -641,3 +641,25 @@ export interface ProviderKyc {
   /** Sealed by the old dev placeholder, so not readable. */
   readonly legacy: boolean;
 }
+
+/** `vehicle_health()` as it arrives (0097). */
+export interface VehicleHealthRow {
+  readonly score: number | null;
+  readonly grade: 'excellent' | 'good' | 'fair' | 'attention' | 'unknown';
+  readonly factors: readonly {
+    readonly key: string;
+    readonly count: number;
+    readonly impact: number;
+  }[];
+}
+
+/** `vehicle_cost_summary()` as it arrives (0097). Money as 2dp strings. */
+export interface VehicleCostsRow {
+  readonly total: string;
+  readonly last_12_months: string;
+  readonly this_year: string;
+  readonly entries: number;
+  readonly km_12_months: number;
+  readonly per_1000_km: string | null;
+  readonly categories: readonly { readonly category: string; readonly amount: string }[];
+}
