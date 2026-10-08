@@ -296,6 +296,26 @@ export function toDashboard(row: DashboardRow): ProviderDashboard {
   };
 }
 
+/** One of the technician's own appointment times (0104). */
+export interface MySlot {
+  readonly id: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  /** A customer holds it. */
+  readonly booked: boolean;
+  /** Closed to new bookings by the technician. */
+  readonly blocked: boolean;
+}
+
+export interface PublishAvailabilityInput {
+  /** Riyadh calendar days, `YYYY-MM-DD`. */
+  readonly dates: readonly string[];
+  /** Minutes after midnight, Riyadh. */
+  readonly startMinute: number;
+  readonly endMinute: number;
+  readonly slotMinutes: number;
+}
+
 export interface ProviderRepository {
   setOnline(online: boolean): Promise<void>;
   broadcastLocation(position: Position): Promise<void>;
@@ -366,6 +386,11 @@ export interface ProviderRepository {
    * workshop job, an offer not yet accepted, or a job that has ended.
    */
   getJobDestination(orderId: string): Promise<{ lat: number; lon: number } | null>;
+  /** The caller's own coming appointment times, booked and closed included (0104). */
+  listMySlots(days?: number): Promise<readonly MySlot[]>;
+  /** Adds times on the chosen days; returns how many were new. */
+  publishAvailability(input: PublishAvailabilityInput): Promise<number>;
+  setSlotBlocked(slotId: string, blocked: boolean): Promise<void>;
 }
 
 interface OpenJobRow {
@@ -629,6 +654,45 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`getJobDestination: ${error.message}`);
     const row = ((data ?? []) as { lat: number; lon: number }[])[0];
     return row === undefined ? null : { lat: row.lat, lon: row.lon };
+  }
+  async listMySlots(days = 14): Promise<readonly MySlot[]> {
+    const { data, error } = await this.client.rpc('my_slots', { p_days: days });
+    if (error !== null) throw new Error(`listMySlots: ${error.message}`);
+    return (
+      (data ?? []) as {
+        id: string;
+        starts_at: string;
+        ends_at: string;
+        capacity: number;
+        booked_count: number;
+        is_blocked: boolean;
+      }[]
+    ).map((row) => ({
+      id: row.id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      booked: row.booked_count > 0,
+      blocked: row.is_blocked,
+    }));
+  }
+
+  async publishAvailability(input: PublishAvailabilityInput): Promise<number> {
+    const { data, error } = await this.client.rpc('publish_availability', {
+      p_dates: [...input.dates],
+      p_start_minute: input.startMinute,
+      p_end_minute: input.endMinute,
+      p_slot_minutes: input.slotMinutes,
+    });
+    if (error !== null) throw new Error(`publishAvailability: ${error.message}`);
+    return Number(data ?? 0);
+  }
+
+  async setSlotBlocked(slotId: string, blocked: boolean): Promise<void> {
+    const { error } = await this.client.rpc('set_slot_blocked', {
+      p_slot_id: slotId,
+      p_blocked: blocked,
+    });
+    if (error !== null) throw new Error(`setSlotBlocked: ${error.message}`);
   }
 }
 
@@ -1045,6 +1109,43 @@ export class InMemoryProviderRepository implements ProviderRepository {
     const job = this.jobs.get(orderId);
     // The dev job's district, Al-Faisaliyah in Riyadh.
     return job !== undefined && job.addressAr !== null ? { lat: 24.6907, lon: 46.6853 } : null;
+  }
+  private slots: MySlot[] = [];
+
+  async listMySlots(): Promise<readonly MySlot[]> {
+    const now = new Date().toISOString();
+    return this.slots.filter((slot) => slot.startsAt > now);
+  }
+
+  async publishAvailability(input: PublishAvailabilityInput): Promise<number> {
+    let added = 0;
+    for (const day of input.dates) {
+      for (
+        let minute = input.startMinute;
+        minute + input.slotMinutes <= input.endMinute;
+        minute += input.slotMinutes
+      ) {
+        // Riyadh is UTC+3 all year.
+        const starts = new Date(Date.parse(`${day}T00:00:00Z`) + (minute - 180) * 60_000);
+        if (starts.getTime() <= Date.now()) continue;
+        const startsAt = starts.toISOString();
+        if (this.slots.some((slot) => slot.startsAt === startsAt)) continue;
+        this.slots.push({
+          id: `dev-slot-${startsAt}`,
+          startsAt,
+          endsAt: new Date(starts.getTime() + input.slotMinutes * 60_000).toISOString(),
+          booked: false,
+          blocked: false,
+        });
+        added += 1;
+      }
+    }
+    this.slots.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    return added;
+  }
+
+  async setSlotBlocked(slotId: string, blocked: boolean): Promise<void> {
+    this.slots = this.slots.map((slot) => (slot.id === slotId ? { ...slot, blocked } : slot));
   }
 }
 

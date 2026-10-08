@@ -932,8 +932,9 @@ export class SupabaseRepository implements Repository {
     // The catalogue price is the fallback: `custom_price` is null for every
     // fixed-price service (0018's price guard), which is most of them.
     const service = await this.serviceById(serviceId);
+    const nextSlots = await this.nextOpenSlots((rows as BookingProviderRow[]).map((row) => row.id));
 
-    return (rows as BookingProviderRow[]).flatMap((row) => {
+    const providers = (rows as BookingProviderRow[]).flatMap((row) => {
       const workshop = Array.isArray(row.workshops) ? row.workshops[0] : row.workshops;
       const custom = row.provider_services?.[0]?.custom_price ?? null;
       const price = custom === null ? (service?.basePrice ?? null) : toSar(custom);
@@ -953,8 +954,41 @@ export class SupabaseRepository implements Repository {
         jobsCompleted: row.jobs_completed,
         addressAr: workshop?.address_ar ?? null,
         price,
+        nextSlotAt: nextSlots.get(row.id) ?? null,
       };
     });
+
+    // Bookable first; the server's rating order within each group.
+    return [
+      ...providers.filter((provider) => provider.nextSlotAt !== null),
+      ...providers.filter((provider) => provider.nextSlotAt === null),
+    ];
+  }
+
+  /**
+   * Each provider's earliest open time, by the same rule `listSlots` and
+   * `book_appointment` use: coming, not blocked, with a place left.
+   */
+  private async nextOpenSlots(providerIds: readonly string[]): Promise<Map<string, string>> {
+    const next = new Map<string, string>();
+    if (providerIds.length === 0) return next;
+    const rows = unwrap(
+      await this.client
+        .from('appointment_slots')
+        .select('provider_id, starts_at, capacity, booked_count')
+        .in('provider_id', [...providerIds])
+        .eq('is_blocked', false)
+        .gt('starts_at', new Date().toISOString())
+        .order('starts_at')
+        .limit(500),
+      'nextOpenSlots',
+    ) as { provider_id: string; starts_at: string; capacity: number; booked_count: number }[];
+    for (const row of rows) {
+      if (row.booked_count < row.capacity && !next.has(row.provider_id)) {
+        next.set(row.provider_id, row.starts_at);
+      }
+    }
+    return next;
   }
 
   private async serviceById(serviceId: string): Promise<Service | null> {
