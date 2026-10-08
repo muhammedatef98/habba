@@ -17,6 +17,7 @@
  */
 
 import { Redirect, Stack } from 'expo-router';
+import { EvidenceSync } from '@/features/provider/components/EvidenceSync';
 import { useIsApprovedProvider, useRoles } from '@/features/shared/hooks/use-roles';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 
@@ -33,5 +34,11 @@ export default function ProviderLayout() {
 
   if (!isProvider) return <Redirect href="/vehicles" />;
 
-  return <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />;
+  return (
+    <>
+      {/* Sends evidence queued underground once the signal is back (ADR-0012). */}
+      <EvidenceSync />
+      <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }} />
+    </>
+  );
 }

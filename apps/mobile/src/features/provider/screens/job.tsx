@@ -22,6 +22,7 @@ import { providerRepository } from '@/features/provider/data/provider-repository
 import { useLiveRefresh } from '@/features/shared/lib/live';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
 import { navigationLinks } from '@/features/provider/lib/navigate';
+import { loadDraft, syncEvidenceNow } from '@/features/provider/lib/evidence-queue';
 import { formatAppointment } from '@/features/shared/lib/dates';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { BackBar } from '@/features/shared/components/BackBar';
@@ -125,6 +126,20 @@ export default function JobScreen() {
     data.offer === null &&
     data.fulfilmentMode !== 'workshop' &&
     ['accepted', 'en_route', 'arrived', 'in_progress'].includes(data.status);
+  // Evidence saved on the phone and not yet sent (ADR-0012).
+  const queued = useQuery({
+    queryKey: ['evidence-draft', id],
+    queryFn: () => loadDraft(id ?? ''),
+    enabled: id !== undefined,
+  });
+  const sendNow = useMutation({
+    mutationFn: () => syncEvidenceNow(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['evidence-draft', id] });
+      await queryClient.invalidateQueries({ queryKey: ['job', id] });
+    },
+  });
+
   const destination = useQuery({
     queryKey: ['job-destination', id],
     queryFn: () => providerRepository.getJobDestination(id ?? ''),
@@ -211,6 +226,38 @@ export default function JobScreen() {
               </Text>
             ) : null}
           </View>
+        </Card>
+      ) : null}
+
+      {queued.data?.submitRequested === true ? (
+        <Card
+          testID="evidence-queued-banner"
+          elevation="none"
+          style={{
+            gap: theme.spacing.sm,
+            backgroundColor: theme.colors.warningSubtle,
+            borderColor: theme.colors.warningBorder,
+            borderWidth: 1,
+          }}
+        >
+          <Text variant="bodyStrong">{t('provider.evidenceQueuedTitle')}</Text>
+          <Text variant="caption" tone="muted">
+            {queued.data.lastError !== null
+              ? t('provider.evidenceRefused')
+              : t('provider.evidenceQueuedBody', {
+                  count: queued.data.photos.filter((photo) => photo.uploaded === null).length,
+                })}
+          </Text>
+          {queued.data.lastError === null ? (
+            <Button
+              testID="evidence-send-now"
+              label={t('provider.evidenceSendNow')}
+              variant="secondary"
+              size="medium"
+              onPress={() => sendNow.mutate()}
+              loading={sendNow.isPending}
+            />
+          ) : null}
         </Card>
       ) : null}
 

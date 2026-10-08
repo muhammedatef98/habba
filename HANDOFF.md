@@ -382,6 +382,21 @@ as a user would. The fixes that matter beyond one screen:
   Android, Google's web link as fallback) and «Waze» under the address
   (`provider/lib/navigate.ts`, tested).
 
+### Evidence that survives a basement (ADR-0012, §2.7)
+
+- Completion photos are kept on the phone first (documents directory), then
+  uploaded; offline they show «محفوظة على جهازك». Mileage, warranty and the
+  save are a draft on disk (`provider/lib/evidence-draft.ts`, tested), sent by
+  `EvidenceSync` when the signal returns — even after the app was closed.
+  The job screen shows the queued draft with «أرسل الآن»; a server refusal is
+  shown, not retried. Hand-back stays online.
+
+### Database performance (0100, suite 66)
+
+- Every public policy evaluates `auth.uid()` once per query
+  (`(select auth.uid())`); suite 66 fails on a bare call. Covering indexes
+  for the foreign keys the app joins on. Applied on the hosted project.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
