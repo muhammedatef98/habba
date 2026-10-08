@@ -728,7 +728,9 @@
     "partErrorPrice": "Enter a valid price, like 350 or 349.50.",
     "partErrorQuantity": "Quantity is a whole number above zero.",
     "partErrorWarranty": "Part warranty is a number of days, at most 730.",
-    "partSendFailed": "The part didn't go through. Check your connection and try again."
+    "partSendFailed": "The part didn't go through. Check your connection and try again.",
+    "directions": "Directions",
+    "waze": "Waze"
   },
   "profile": {
     "title": "My account",

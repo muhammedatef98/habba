@@ -12,15 +12,16 @@
  */
 
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Row, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { useLiveRefresh } from '@/features/shared/lib/live';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
+import { navigationLinks } from '@/features/provider/lib/navigate';
 import { formatAppointment } from '@/features/shared/lib/dates';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { BackBar } from '@/features/shared/components/BackBar';
@@ -114,6 +115,22 @@ export default function JobScreen() {
   );
 
   const data = job.data;
+
+  // Where to drive (0099): only for a mobile job that is this technician's
+  // and still live. The server answers null otherwise; asking only then
+  // saves the request.
+  const driving =
+    data !== null &&
+    data !== undefined &&
+    data.offer === null &&
+    data.fulfilmentMode !== 'workshop' &&
+    ['accepted', 'en_route', 'arrived', 'in_progress'].includes(data.status);
+  const destination = useQuery({
+    queryKey: ['job-destination', id],
+    queryFn: () => providerRepository.getJobDestination(id ?? ''),
+    enabled: driving,
+    staleTime: Infinity,
+  });
 
   if (data === null || data === undefined) {
     return (
@@ -213,6 +230,34 @@ export default function JobScreen() {
               <Text variant="bodyStrong">{data.addressAr}</Text>
             </View>
           )}
+
+          {driving && destination.data !== null && destination.data !== undefined ? (
+            <Row gap="sm" testID="job-navigate">
+              <View style={{ flex: 1 }}>
+                <Button
+                  testID="job-directions"
+                  label={t('provider.directions')}
+                  variant="primary"
+                  size="medium"
+                  onPress={() => {
+                    const links = navigationLinks(destination.data!, Platform.OS);
+                    void Linking.openURL(links.native).catch(() => Linking.openURL(links.web));
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  testID="job-waze"
+                  label={t('provider.waze')}
+                  variant="secondary"
+                  size="medium"
+                  onPress={() =>
+                    void Linking.openURL(navigationLinks(destination.data!, Platform.OS).waze)
+                  }
+                />
+              </View>
+            </Row>
+          ) : null}
 
           {data.problemDescription !== null ? (
             <View style={{ gap: theme.spacing.xs }}>

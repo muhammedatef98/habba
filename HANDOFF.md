@@ -372,6 +372,16 @@ as a user would. The fixes that matter beyond one screen:
 - **Not yet done on the project:** leaked-password protection
   (Authentication → Policies, one switch).
 
+### Directions to the customer (0099, suite 65)
+
+- `job_destination(order)` returns the customer's pin as `lat`/`lon` to the
+  assigned technician while a mobile job is live (accepted → in progress);
+  nothing for an offer (ADR-0013), another technician, the customer, or a
+  finished job.
+- The job screen shows «الاتجاهات» (Apple Maps on iOS, Google navigation on
+  Android, Google's web link as fallback) and «Waze» under the address
+  (`provider/lib/navigate.ts`, tested).
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
