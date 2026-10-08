@@ -519,7 +519,6 @@
       "explained": "Explained the issue"
     },
     "evidenceTitle": "Photos of the work",
-    "contactUnavailable": "Calling the technician isn't available yet.",
     "notSentTitle": "Your request hasn't been sent",
     "notSentBody": "Your request is saved but wasn't sent because the payment didn't finish. Send it now.",
     "notSentAction": "Send request",
@@ -637,7 +636,6 @@
     "gapAfter": "Photo after the work",
     "cameraDenied": "Habba needs the camera to document the work. Allow it in Settings, then try again.",
     "photoUploadFailed": "The photo did not upload. Check your connection and take it again.",
-    "evidenceSaveFailed": "The evidence was not saved. Check your connection and tap Save again.",
     "upgrade": {
       "cardTitle": "Work with us as a technician",
       "cardBody": "Experienced with cars? Submit your details and start taking jobs once verified.",
@@ -728,7 +726,17 @@
     "partErrorPrice": "Enter a valid price, like 350 or 349.50.",
     "partErrorQuantity": "Quantity is a whole number above zero.",
     "partErrorWarranty": "Part warranty is a number of days, at most 730.",
-    "partSendFailed": "The part didn't go through. Check your connection and try again."
+    "partSendFailed": "The part didn't go through. Check your connection and try again.",
+    "directions": "Directions",
+    "waze": "Waze",
+    "photoQueued": "Saved on your phone — uploads when you're back online",
+    "photoUploaded": "Uploaded",
+    "evidenceQueuedTitle": "Evidence saved on your phone",
+    "evidenceQueuedBody_one": "One photo is waiting to upload. Everything is sent automatically when you're back online, even if you close the app.",
+    "evidenceQueuedBody_other": "{{count}} photos are waiting to upload. Everything is sent automatically when you're back online, even if you close the app.",
+    "evidenceSendNow": "Send now",
+    "evidenceRefused": "The server did not accept this evidence. Check the job's status, or contact support.",
+    "messageCustomer": "Message the customer"
   },
   "profile": {
     "title": "My account",
@@ -1111,5 +1119,30 @@
     "cat_wash": "Washes",
     "cat_bodywork": "Bodywork",
     "cat_misc": "Other"
+  },
+  "chat": {
+    "titleCustomer": "Chat with the technician",
+    "titleProvider": "Chat with the customer",
+    "emptyTitle": "No messages yet",
+    "emptyBody": "Write what helps get the job done: exactly where the car is, or when you'll arrive. Neither side sees the other's number.",
+    "placeholder": "Write a message",
+    "send": "Send",
+    "loadFailed": "Couldn't load the messages.",
+    "closed": "This chat closed when the order finished.",
+    "error": {
+      "closed": "This chat closed when the order finished.",
+      "not_party": "You can't message on this order.",
+      "length": "That message is too long. The limit is 1,000 characters.",
+      "rate": "You've sent a lot of messages in a minute. Wait a moment and try again.",
+      "network": "The message didn't send. Check your connection and try again."
+    },
+    "quick": {
+      "onMyWay": "On my way to you",
+      "whereExactly": "I've arrived — where exactly is the car?",
+      "runningLate": "I'll be a little late",
+      "underground": "The car's in an underground car park",
+      "besideCar": "I'm next to the car",
+      "tellOnArrival": "Message me when you arrive"
+    }
   }
 }

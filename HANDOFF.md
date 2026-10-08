@@ -372,6 +372,51 @@ as a user would. The fixes that matter beyond one screen:
 - **Not yet done on the project:** leaked-password protection
   (Authentication → Policies, one switch).
 
+### Directions to the customer (0099, suite 65)
+
+- `job_destination(order)` returns the customer's pin as `lat`/`lon` to the
+  assigned technician while a mobile job is live (accepted → in progress);
+  nothing for an offer (ADR-0013), another technician, the customer, or a
+  finished job.
+- The job screen shows «الاتجاهات» (Apple Maps on iOS, Google navigation on
+  Android, Google's web link as fallback) and «Waze» under the address
+  (`provider/lib/navigate.ts`, tested).
+
+### Evidence that survives a basement (ADR-0012, §2.7)
+
+- Completion photos are kept on the phone first (documents directory), then
+  uploaded; offline they show «محفوظة على جهازك». Mileage, warranty and the
+  save are a draft on disk (`provider/lib/evidence-draft.ts`, tested), sent by
+  `EvidenceSync` when the signal returns — even after the app was closed.
+  The job screen shows the queued draft with «أرسل الآن»; a server refusal is
+  shown, not retried. Hand-back stays online.
+
+### Database performance (0100, suite 66)
+
+- Every public policy evaluates `auth.uid()` once per query
+  (`(select auth.uid())`); suite 66 fails on a bare call. Covering indexes
+  for the foreign keys the app joins on. Applied on the hosted project.
+
+### Messages on an order (0101, suite 67)
+
+- `order_messages` + `send_order_message`: the customer and the assigned
+  technician write to each other from acceptance until hand-back
+  (accepted → awaiting_approval); closed before and after. Read through RLS
+  as the order; written only through the function (party, status, 1–1000
+  characters, 20 a minute). The other side gets a push «رسالة من العميل /
+  الفنّي» that opens `/chat` on the right side. Neither number is ever shown.
+- Operators (0102): no direct read. The order file in the console has
+  «المحادثة», which asks for a reason, records the read and the reason in
+  the audit log under the operator's name, and only then shows the thread.
+- App: «محادثة» on the customer's tracking card, «مراسلة العميل» on the
+  technician's job screen, quick replies per side, live via Realtime.
+- Erasure and export (0103): deleting an account replaces the person's own
+  messages with «رسالة محذوفة» (the other side's stay); the console's data
+  export includes what the person sent.
+- ⚠️ Legal follow-up: the published privacy policy does not yet mention order
+  messages. The exact AR/EN additions are in `docs/legal/README.md` («إضافات
+  مطلوبة للإصدار 2»); publish them from the console as version 2.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
@@ -385,6 +430,10 @@ as a user would. The fixes that matter beyond one screen:
   (GO-LIVE §7). Build 1 failed on Android release lint because the iOS
   permission strings were flat in `locales/*.json`. They are now nested
   under `"ios"`.
+- ⚠️ **Build 3 predates the Maps key** (`GOOGLE_MAPS_ANDROID_API_KEY`, GO-LIVE §7 step 6):
+  its maps draw grey on a real device, and it has no splash or notification
+  icon. Rebuild once the key is set as an EAS `production` variable; an
+  Android store build now refuses to start without it.
 - **iOS:** not built. EAS has no Apple credentials. Someone has to run
   `npx eas-cli build -p ios --profile production` once, interactively, and
   sign in to the Apple Developer account. After that, non-interactive builds

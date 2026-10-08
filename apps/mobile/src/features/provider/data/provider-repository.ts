@@ -361,6 +361,11 @@ export interface ProviderRepository {
   ): Promise<void>;
   /** The caller's own earnings, payouts, ratings and recent work (0095). */
   getDashboard(): Promise<ProviderDashboard>;
+  /**
+   * The customer's pin for a live job of this technician's (0099); null for a
+   * workshop job, an offer not yet accepted, or a job that has ended.
+   */
+  getJobDestination(orderId: string): Promise<{ lat: number; lon: number } | null>;
 }
 
 interface OpenJobRow {
@@ -617,6 +622,13 @@ export class SupabaseProviderRepository implements ProviderRepository {
     const { data, error } = await this.client.rpc('provider_dashboard');
     if (error !== null) throw new Error(`getDashboard: ${error.message}`);
     return toDashboard(data as DashboardRow);
+  }
+
+  async getJobDestination(orderId: string): Promise<{ lat: number; lon: number } | null> {
+    const { data, error } = await this.client.rpc('job_destination', { p_order_id: orderId });
+    if (error !== null) throw new Error(`getJobDestination: ${error.message}`);
+    const row = ((data ?? []) as { lat: number; lon: number }[])[0];
+    return row === undefined ? null : { lat: row.lat, lon: row.lon };
   }
 }
 
@@ -1027,6 +1039,12 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async getDashboard(): Promise<ProviderDashboard> {
     return DEV_DASHBOARD;
+  }
+
+  async getJobDestination(orderId: string): Promise<{ lat: number; lon: number } | null> {
+    const job = this.jobs.get(orderId);
+    // The dev job's district, Al-Faisaliyah in Riyadh.
+    return job !== undefined && job.addressAr !== null ? { lat: 24.6907, lon: 46.6853 } : null;
   }
 }
 

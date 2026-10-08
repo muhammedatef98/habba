@@ -11,8 +11,9 @@
 'use client';
 
 import { useState } from 'react';
+import { ApiError } from '@/data/transport';
 import { api, PAGE_SIZE, type OrderFilter } from '@/data/api';
-import type { OrderFile, OrderRow } from '@/data/types';
+import type { OrderFile, OrderMessageRow, OrderRow } from '@/data/types';
 import { dateTime, money, phone } from '@/lib/format';
 import {
   ESCROW,
@@ -419,6 +420,8 @@ function OrderFileView({
             </Card>
           ) : null}
 
+          {file.provider !== null ? <MessagesCard orderId={order.id} /> : null}
+
           <NotesCard table="orders" id={order.id} notes={file.notes} onChanged={reload} />
         </div>
 
@@ -631,6 +634,78 @@ function OrderFileView({
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * The order's conversation, behind a stated reason (0102). It is two people
+ * talking, so it is not part of the file that opens with every click: the
+ * operator says why, the server records it under their name, and only then
+ * shows it.
+ */
+function MessagesCard({ orderId }: { readonly orderId: string }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<readonly OrderMessageRow[] | null>(null);
+
+  const open = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setMessages(await api.orderMessages(orderId, reason));
+    } catch (cause) {
+      setError(
+        cause instanceof ApiError && cause.code === '23514'
+          ? 'اكتب سبباً واضحاً (3 أحرف على الأقل).'
+          : 'تعذّر تحميل المحادثة.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="المحادثة">
+      {messages === null ? (
+        <div className="grid">
+          <p className="subtle">
+            رسائل العميل والفنّي على هذا الطلب. فتحها يُسجَّل في سجل التدقيق باسمك مع السبب.
+          </p>
+          <Field label="سبب الاطلاع" hint="مثلاً: شكوى العميل عن التأخير.">
+            <input value={reason} onChange={(event) => setReason(event.target.value)} />
+          </Field>
+          {error !== null ? (
+            <p className="notice" data-tone="bad">
+              {error}
+            </p>
+          ) : null}
+          <div>
+            <Button busy={busy} disabled={reason.trim().length < 3} onClick={() => void open()}>
+              اعرض المحادثة
+            </Button>
+          </div>
+        </div>
+      ) : messages.length === 0 ? (
+        <p className="subtle">لا توجد رسائل على هذا الطلب.</p>
+      ) : (
+        <ul className="list">
+          {messages.map((message) => (
+            <li
+              key={message.id}
+              className="timeline-item"
+              data-tone={message.sender_side === 'provider' ? 'brand' : undefined}
+            >
+              <div>{message.body}</div>
+              <div className="subtle">
+                {message.sender_side === 'provider' ? 'الفنّي' : 'العميل'} · {message.sender_name} ·{' '}
+                <span className="numeric">{dateTime(message.created_at)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

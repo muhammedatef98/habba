@@ -102,6 +102,9 @@ export function AppIntro({ onDone }: { readonly onDone: () => void }) {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
+          // The streaks start and end off-screen; clipped here, they never
+          // widen the page behind them.
+          overflow: 'hidden',
           opacity: exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
           transform: [{ scale: exit.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
         },

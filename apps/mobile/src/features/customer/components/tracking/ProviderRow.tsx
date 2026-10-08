@@ -5,19 +5,19 @@
  * roadside stays named and reachable throughout, rather than being introduced
  * once and then reduced to a dot on a map.
  *
- * ⚠️ Call and chat are inert until a number is supplied, and that is
- * deliberate. They previously dialled a hardcoded `+966500000000`, which is
- * nobody — a customer standing next to a broken-down car would have believed
- * they had reached their technician. A button that does nothing is bad; a
- * button that confidently calls the wrong number during an emergency is worse.
+ * Chat is the order's own thread (0101): it opens at acceptance and closes
+ * at hand-back, and neither side ever sees the other's number.
  *
- * The number has to come from the server, and should be a masked relay rather
- * than the technician's own line — handing out a personal mobile is a privacy
- * decision nobody has made, and it survives long after the job ends.
- * `ProviderSummary` carries no phone field yet, so today these render disabled.
+ * ⚠️ Call appears only when a number is supplied, and that is deliberate. It
+ * previously dialled a hardcoded `+966500000000`, which is nobody — a
+ * customer standing next to a broken-down car would have believed they had
+ * reached their technician. The number has to come from the server, and
+ * should be a masked relay rather than the technician's own line;
+ * `ProviderSummary` carries no phone field yet, so today it is absent.
  */
 
 import { Linking, View } from 'react-native';
+import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { ProviderSummary } from '@/features/shared/data/types';
@@ -32,6 +32,8 @@ export interface ProviderRowProps {
    * that is not the technician.
    */
   readonly contactNumber?: string | undefined;
+  /** The order whose thread the chat button opens; absent while it is closed. */
+  readonly chatOrderId?: string | undefined;
   readonly testID?: string;
 }
 
@@ -40,6 +42,7 @@ export function ProviderRow({
   showActions = true,
   detail,
   contactNumber,
+  chatOrderId,
   testID,
 }: ProviderRowProps) {
   const { t } = useTranslation();
@@ -109,45 +112,35 @@ export function ProviderRow({
         </View>
       </View>
 
-      {showActions ? (
-        <View style={{ gap: theme.spacing.sm }}>
-          <View
-            style={{
-              flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
-              gap: theme.spacing.sm,
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Button
-                testID="tracking-call"
-                label={t('tracking.callAction')}
-                size="medium"
-                disabled={contactNumber === undefined}
-                onPress={() => {
-                  if (contactNumber === undefined) return;
-                  void Linking.openURL(`tel:${contactNumber}`);
-                }}
-              />
-            </View>
+      {showActions && (contactNumber !== undefined || chatOrderId !== undefined) ? (
+        <View
+          style={{
+            flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+            gap: theme.spacing.sm,
+          }}
+        >
+          {chatOrderId !== undefined ? (
             <View style={{ flex: 1 }}>
               <Button
                 testID="tracking-chat"
                 label={t('tracking.chatAction')}
-                variant="secondary"
                 size="medium"
-                disabled={contactNumber === undefined}
-                onPress={() => {
-                  if (contactNumber === undefined) return;
-                  void Linking.openURL(`sms:${contactNumber}`);
-                }}
+                onPress={() =>
+                  router.push({ pathname: '/chat', params: { id: chatOrderId, side: 'customer' } })
+                }
               />
             </View>
-          </View>
-
-          {contactNumber === undefined ? (
-            <Text variant="caption" tone="subtle">
-              {t('tracking.contactUnavailable')}
-            </Text>
+          ) : null}
+          {contactNumber !== undefined ? (
+            <View style={{ flex: 1 }}>
+              <Button
+                testID="tracking-call"
+                label={t('tracking.callAction')}
+                variant="secondary"
+                size="medium"
+                onPress={() => void Linking.openURL(`tel:${contactNumber}`)}
+              />
+            </View>
           ) : null}
         </View>
       ) : null}

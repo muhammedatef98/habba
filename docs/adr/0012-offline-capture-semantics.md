@@ -1,6 +1,7 @@
 # ADR-0012 — Offline capture: occurred_at vs recorded_at, and what the chain proves
 
-- **Status:** Proposed — needed before Phase 3
+- **Status:** Accepted in part — the completion-evidence queue is built (2026-10-08, see below);
+  occurred_at/recorded_at and offline state transitions are not
 - **Date:** 2026-08-26
 - **Relates to:** `CLAUDE.md` §2.2, §2.7; ADR-0003, ADR-0004
 
@@ -94,3 +95,19 @@ proven."_ See ADR-0005 — the same discipline applies to both provenance and or
 - Maximum offline queue age before a job is escalated to ops as stuck.
 - Whether photos upload opportunistically on any connectivity, or only on Wi-Fi (data cost matters
   to providers).
+
+## Implemented (2026-10-08)
+
+The capture half, for completion evidence (`apps/mobile/src/features/provider/lib/evidence-draft.ts`,
+`evidence-queue.ts`, `components/EvidenceSync.tsx`):
+
+- A photo is copied into the app's documents directory the moment it is taken, then uploaded; with
+  no signal it stays on the phone, marked «محفوظة على جهازك».
+- Mileage, the warranty chosen and the intent to save are kept with the photos in a draft on disk,
+  which survives the app being closed.
+- A sync pass runs on opening the provider side, on reconnecting and on returning to the
+  foreground: it uploads what is waiting and calls `record_completion_evidence` once everything is
+  up. A transient failure waits for the next pass; a server refusal is kept on the draft and shown.
+- State transitions and hand-back remain online, as the table above says.
+
+Not built: `occurred_at`/`recorded_at` on the timeline, and offline step transitions.

@@ -26,7 +26,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#12514F"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -37,8 +42,26 @@
           "forcesRTL": true
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#12514F",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#12514F",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ],
       [
         "expo-camera",
         {
@@ -58,12 +81,16 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "تستخدم هبّة الموقع لإرسال أقرب فنّي إلى سيارتك، ولمشاركة موقع الفنّي مع العميل أثناء توجّهه إليه."
+          "locationWhenInUsePermission": "تستخدم هبّة الموقع لإرسال أقرب فنّي إلى سيارتك، ولمشاركة موقع الفنّي مع العميل أثناء توجّهه إليه.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false
         }
       ],
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "color": "#12514F"
         }
       ]

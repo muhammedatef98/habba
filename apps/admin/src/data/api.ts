@@ -20,6 +20,7 @@ import type {
   LegalDocumentRow,
   NewLegalDocument,
   OrderFile,
+  OrderMessageRow,
   OrderRow,
   PaymentOperation,
   Payout,
@@ -111,6 +112,13 @@ export function createApi(transport: Transport) {
       }),
 
     order: (id: string) => transport.rpc<OrderFile>('ops_order_detail', { p_order_id: id }),
+
+    /** The order's message thread; the read and its reason go on the audit log (0102). */
+    orderMessages: (id: string, reason: string) =>
+      transport.rpc<OrderMessageRow[]>('ops_order_messages', {
+        p_order_id: id,
+        p_reason: reason,
+      }),
 
     cancelOrder: (id: string, reason: string) =>
       transport.rpc<void>('ops_cancel_order', { p_order_id: id, p_reason: reason }),

@@ -45,6 +45,12 @@ export type OpsState =
   | { readonly stage: 'signed_out' }
   | { readonly stage: 'enrol'; readonly enrolment: TotpEnrolment }
   | { readonly stage: 'verify'; readonly factorId: string }
+  /**
+   * Arrived from a password-reset email: a new password is set before
+   * anything else, with the authenticator code when the account has one, so
+   * the email alone is not enough to take over an operator account.
+   */
+  | { readonly stage: 'recover'; readonly factorId: string | null }
   | { readonly stage: 'ready'; readonly operator: Operator };
 
 export type SignInResult =
@@ -55,8 +61,26 @@ export type VerifyResult =
   | { readonly ok: true; readonly state: OpsState }
   | { readonly ok: false; readonly reason: 'bad_code' | 'transport_failed' };
 
+export type ResetRequestResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: 'rate_limited' | 'transport_failed' };
+
+export type RecoverResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly reason: 'bad_code' | 'weak_password' | 'same_password' | 'transport_failed';
+    };
+
 export interface OpsAuth {
   signIn(email: string, password: string): Promise<SignInResult>;
+  /**
+   * Emails a link to set a new password. Answers the same whether or not the
+   * address has an account, so the form cannot be used to find out who does.
+   */
+  requestPasswordReset(email: string): Promise<ResetRequestResult>;
+  /** Sets the new password from a reset link's session, then signs out. */
+  completeRecovery(factorId: string | null, code: string, password: string): Promise<RecoverResult>;
   /** Where an already-open tab stands, re-read from the server. */
   current(): Promise<OpsState>;
   verify(factorId: string, code: string): Promise<VerifyResult>;
@@ -92,9 +116,59 @@ class SupabaseOpsAuth implements OpsAuth {
     }
   }
 
+  async requestPasswordReset(email: string): Promise<ResetRequestResult> {
+    const { error } = await this.client.auth.resetPasswordForEmail(email.trim(), {
+      // Back to this console, wherever it runs: local or Vercel, no
+      // hardcoded URL (§5.1.6). The address must be in Supabase's allowed
+      // redirect URLs, which the README's deployment steps already require.
+      redirectTo: `${window.location.origin}/`,
+    });
+    if (error === null) return { ok: true };
+    if (error.status === 429) return { ok: false, reason: 'rate_limited' };
+    // Anything else is answered as sent: an unknown address must look the
+    // same as a known one.
+    return error.status !== undefined && error.status < 500
+      ? { ok: true }
+      : { ok: false, reason: 'transport_failed' };
+  }
+
+  async completeRecovery(
+    factorId: string | null,
+    code: string,
+    password: string,
+  ): Promise<RecoverResult> {
+    if (factorId !== null) {
+      const verified = await this.client.auth.mfa.challengeAndVerify({
+        factorId,
+        code: code.trim(),
+      });
+      if (verified.error !== null) return { ok: false, reason: 'bad_code' };
+    }
+    const { error } = await this.client.auth.updateUser({ password });
+    if (error !== null) {
+      if (error.code === 'weak_password') return { ok: false, reason: 'weak_password' };
+      if (error.code === 'same_password') return { ok: false, reason: 'same_password' };
+      return { ok: false, reason: 'transport_failed' };
+    }
+    recoveryPending = false;
+    // A fresh sign-in with the new password, and the eight hours start from
+    // there — not from a session that began with an emailed link.
+    await this.client.auth.signOut();
+    return { ok: true };
+  }
+
   async current(): Promise<OpsState> {
     const { data } = await this.client.auth.getSession();
     if (data.session === null) return { stage: 'signed_out' };
+    if (recoveryPending) {
+      try {
+        const factors = await this.client.auth.mfa.listFactors();
+        const verified = factors.data?.totp.find((factor) => factor.status === 'verified');
+        return { stage: 'recover', factorId: verified?.id ?? null };
+      } catch {
+        return { stage: 'signed_out' };
+      }
+    }
     try {
       const state = await this.resolve();
       if (state === 'not_ops') {
@@ -213,6 +287,14 @@ class DevOpsAuth implements OpsAuth {
     return { ok: true, state: this.state };
   }
 
+  async requestPasswordReset(): Promise<ResetRequestResult> {
+    return { ok: true };
+  }
+
+  async completeRecovery(): Promise<RecoverResult> {
+    return { ok: true };
+  }
+
   async current(): Promise<OpsState> {
     if (this.state.stage === 'ready' && this.state.operator.expiresAt.getTime() <= Date.now()) {
       this.state = { stage: 'verify', factorId: 'dev-factor' };
@@ -240,6 +322,16 @@ class DevOpsAuth implements OpsAuth {
     this.state = { stage: 'signed_out' };
   }
 }
+
+/**
+ * Read before the client starts: it consumes the reset link's fragment as it
+ * initialises, and with it the only sign that this session came from one.
+ */
+const linkFragment = typeof window === 'undefined' ? '' : window.location.hash;
+let recoveryPending = /(^|[#&])type=recovery(&|$)/.test(linkFragment);
+
+/** The reset link was used or had expired; the sign-in screen says so. */
+export const recoveryLinkFailed = /(^|[#&])error_code=/.test(linkFragment);
 
 const url = process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? '';
 const key = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] ?? '';

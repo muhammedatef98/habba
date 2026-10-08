@@ -71,6 +71,7 @@ import type {
   NewRatingInput,
   NewVehicleInput,
   Order,
+  OrderMessage,
   OrderPart,
   OrderStatus,
   IncomingTransfer,
@@ -258,6 +259,15 @@ export interface Repository {
   getDispatchTelemetry(orderId: string): Promise<DispatchTelemetry | null>;
   listOrderParts(orderId: string): Promise<readonly OrderPart[]>;
   approveOrderPart(partId: string): Promise<void>;
+  /** The order's message thread, oldest first (0101). */
+  listOrderMessages(orderId: string): Promise<readonly OrderMessage[]>;
+  /**
+   * Sends a message as the caller. `side` is only the demo build's guess at
+   * who is writing; the server decides from the order itself. Throws
+   * `chat:closed` / `chat:length` / `chat:rate` / `chat:not_party` on a
+   * refusal.
+   */
+  sendOrderMessage(orderId: string, body: string, side: OrderMessage['side']): Promise<void>;
   /** The customer's "no" to a quoted part. Recorded, never billed (0067). */
   declineOrderPart(partId: string): Promise<void>;
   cancelOrder(orderId: string, reason?: string): Promise<void>;
@@ -1623,6 +1633,29 @@ export class InMemoryRepository implements Repository {
 
   async listOrderParts(orderId: string) {
     return this.orders.listParts(orderId);
+  }
+
+  private readonly messages = new Map<string, OrderMessage[]>();
+
+  async listOrderMessages(orderId: string): Promise<readonly OrderMessage[]> {
+    return this.messages.get(orderId) ?? [];
+  }
+
+  async sendOrderMessage(orderId: string, body: string, side: OrderMessage['side']): Promise<void> {
+    const text = body.trim();
+    if (text.length === 0 || text.length > 1000) throw new Error('chat:length');
+    const thread = this.messages.get(orderId) ?? [];
+    this.messages.set(orderId, [
+      ...thread,
+      {
+        id: `dev-msg-${Date.now()}`,
+        orderId,
+        side,
+        mine: true,
+        body: text,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
   }
 
   async approveOrderPart(partId: string): Promise<void> {

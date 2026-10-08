@@ -14,7 +14,7 @@
 
 import type { AppMode } from '@/features/shared/state/mode';
 
-export type PushPathname = '/tracking' | '/quote' | '/vehicles' | '/job' | '/';
+export type PushPathname = '/tracking' | '/quote' | '/vehicles' | '/job' | '/chat' | '/';
 
 export interface PushTarget {
   readonly mode: AppMode;
@@ -71,6 +71,18 @@ export function targetFor(data: unknown): PushTarget | null {
             params: { id: validId },
             refresh: [['job', validId], ['open-jobs'], ['my-jobs']],
           };
+    case '/chat': {
+      // A message on an order (0101). `side` is the recipient's side, so a
+      // technician browsing as a customer lands back in provider mode.
+      if (validId === null) return null;
+      const side = stringField(payload, 'side') === 'provider' ? 'provider' : 'customer';
+      return {
+        mode: side,
+        pathname: '/chat',
+        params: { id: validId, side },
+        refresh: [['order-messages', validId]],
+      };
+    }
     case '/':
       // The provider's home — the shift screen — after a job fell through.
       return { mode: 'provider', pathname: '/', params: {}, refresh: [['open-jobs'], ['my-jobs']] };

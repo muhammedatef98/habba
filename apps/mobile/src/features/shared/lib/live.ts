@@ -23,7 +23,7 @@ import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { getSupabaseClient } from '@/features/shared/lib/supabase';
 
 export interface LiveSource {
-  readonly table: 'orders' | 'order_parts' | 'order_offers';
+  readonly table: 'orders' | 'order_parts' | 'order_offers' | 'order_messages';
   /** A Realtime filter, e.g. `id=eq.<uuid>`. Omitted: every row RLS allows. */
   readonly filter?: string | undefined;
 }

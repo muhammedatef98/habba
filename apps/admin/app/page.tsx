@@ -12,10 +12,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { opsAuth, type OpsState } from '@/lib/ops-session';
 import { SignIn } from './sign-in';
 import { TwoFactor } from './two-factor';
+import { Recover } from './recover';
 import { Shell } from './console/shell';
 
 export default function AdminEntry() {
   const [state, setState] = useState<OpsState | null>(null);
+  const [notice, setNotice] = useState<string | undefined>(undefined);
 
   // Re-checked on load rather than trusted from storage: the role and the
   // session's standing are read from the server each time (ops_whoami, 0068),
@@ -44,7 +46,20 @@ export default function AdminEntry() {
     );
   }
 
-  if (state.stage === 'signed_out') return <SignIn onProgress={setState} />;
+  if (state.stage === 'signed_out') return <SignIn onProgress={setState} notice={notice} />;
+
+  if (state.stage === 'recover') {
+    return (
+      <Recover
+        state={state}
+        onDone={() => {
+          setNotice('حُفظت كلمة المرور الجديدة. سجّل الدخول بها.');
+          setState({ stage: 'signed_out' });
+        }}
+        onCancel={() => void opsAuth.signOut().then(() => setState({ stage: 'signed_out' }))}
+      />
+    );
+  }
 
   if (state.stage === 'enrol' || state.stage === 'verify') {
     return (

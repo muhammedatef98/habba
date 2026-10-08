@@ -12,15 +12,18 @@
  */
 
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
-import { Button, Card, Screen, Text, useTheme } from '@habba/ui';
+import { Button, Card, Row, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { useLiveRefresh } from '@/features/shared/lib/live';
+import { chatOpen } from '@/features/shared/lib/chat';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
+import { navigationLinks } from '@/features/provider/lib/navigate';
+import { loadDraft, syncEvidenceNow } from '@/features/provider/lib/evidence-queue';
 import { formatAppointment } from '@/features/shared/lib/dates';
 import { formatSarDisplay } from '@/features/shared/lib/money-format';
 import { BackBar } from '@/features/shared/components/BackBar';
@@ -115,6 +118,36 @@ export default function JobScreen() {
 
   const data = job.data;
 
+  // Where to drive (0099): only for a mobile job that is this technician's
+  // and still live. The server answers null otherwise; asking only then
+  // saves the request.
+  const driving =
+    data !== null &&
+    data !== undefined &&
+    data.offer === null &&
+    data.fulfilmentMode !== 'workshop' &&
+    ['accepted', 'en_route', 'arrived', 'in_progress'].includes(data.status);
+  // Evidence saved on the phone and not yet sent (ADR-0012).
+  const queued = useQuery({
+    queryKey: ['evidence-draft', id],
+    queryFn: () => loadDraft(id ?? ''),
+    enabled: id !== undefined,
+  });
+  const sendNow = useMutation({
+    mutationFn: () => syncEvidenceNow(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['evidence-draft', id] });
+      await queryClient.invalidateQueries({ queryKey: ['job', id] });
+    },
+  });
+
+  const destination = useQuery({
+    queryKey: ['job-destination', id],
+    queryFn: () => providerRepository.getJobDestination(id ?? ''),
+    enabled: driving,
+    staleTime: Infinity,
+  });
+
   if (data === null || data === undefined) {
     return (
       <Screen>
@@ -197,6 +230,38 @@ export default function JobScreen() {
         </Card>
       ) : null}
 
+      {queued.data?.submitRequested === true ? (
+        <Card
+          testID="evidence-queued-banner"
+          elevation="none"
+          style={{
+            gap: theme.spacing.sm,
+            backgroundColor: theme.colors.warningSubtle,
+            borderColor: theme.colors.warningBorder,
+            borderWidth: 1,
+          }}
+        >
+          <Text variant="bodyStrong">{t('provider.evidenceQueuedTitle')}</Text>
+          <Text variant="caption" tone="muted">
+            {queued.data.lastError !== null
+              ? t('provider.evidenceRefused')
+              : t('provider.evidenceQueuedBody', {
+                  count: queued.data.photos.filter((photo) => photo.uploaded === null).length,
+                })}
+          </Text>
+          {queued.data.lastError === null ? (
+            <Button
+              testID="evidence-send-now"
+              label={t('provider.evidenceSendNow')}
+              variant="secondary"
+              size="medium"
+              onPress={() => sendNow.mutate()}
+              loading={sendNow.isPending}
+            />
+          ) : null}
+        </Card>
+      ) : null}
+
       <Card>
         <View style={{ gap: theme.spacing.sm }}>
           {/* Present only once assigned — before acceptance the server does
@@ -213,6 +278,47 @@ export default function JobScreen() {
               <Text variant="bodyStrong">{data.addressAr}</Text>
             </View>
           )}
+
+          {driving && destination.data !== null && destination.data !== undefined ? (
+            <Row gap="sm" testID="job-navigate">
+              <View style={{ flex: 1 }}>
+                <Button
+                  testID="job-directions"
+                  label={t('provider.directions')}
+                  variant="primary"
+                  size="medium"
+                  onPress={() => {
+                    const links = navigationLinks(destination.data!, Platform.OS);
+                    void Linking.openURL(links.native).catch(() => Linking.openURL(links.web));
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  testID="job-waze"
+                  label={t('provider.waze')}
+                  variant="secondary"
+                  size="medium"
+                  onPress={() =>
+                    void Linking.openURL(navigationLinks(destination.data!, Platform.OS).waze)
+                  }
+                />
+              </View>
+            </Row>
+          ) : null}
+
+          {/* The order's thread (0101) — the customer's number is never shown. */}
+          {data.offer === null && chatOpen(data.status) ? (
+            <Button
+              testID="job-chat"
+              label={t('provider.messageCustomer')}
+              variant="secondary"
+              size="medium"
+              onPress={() =>
+                router.push({ pathname: '/chat', params: { id: id ?? '', side: 'provider' } })
+              }
+            />
+          ) : null}
 
           {data.problemDescription !== null ? (
             <View style={{ gap: theme.spacing.xs }}>
