@@ -91,6 +91,7 @@ import type {
   VehicleMake,
   VehicleModel,
   VehicleWarranty,
+  WarrantyClaimInput,
 } from './types.js';
 
 export interface GuestUpgradeInput {
@@ -377,6 +378,12 @@ export interface Repository {
    * cover and cannot read the order that carries it.
    */
   listVehicleWarranties(vehicleId: string): Promise<readonly VehicleWarranty[]>;
+  /**
+   * Claims a live warranty: a free re-service, confirmed with the provider who
+   * did the original (0105). Throws `warranty:open_claim`, `warranty:location`,
+   * `warranty:expired` or `warranty:not_owner` on a refusal.
+   */
+  requestWarrantyService(input: WarrantyClaimInput): Promise<string>;
 
   // القادم — the care section (0058–0062, ADR-0022).
   //
@@ -973,6 +980,7 @@ class DevOrderSimulator {
       completionMedia: [],
       warrantyDays: null,
       scheduledFor: null,
+      parentOrderId: null,
     };
     this.orders.set(id, order);
 
@@ -1069,6 +1077,7 @@ class DevOrderSimulator {
       completionMedia: [],
       warrantyDays: null,
       scheduledFor,
+      parentOrderId: null,
     });
 
     return id;
@@ -2024,6 +2033,11 @@ export class InMemoryRepository implements Repository {
     ]);
 
     return transfer.vehicleId;
+  }
+
+  async requestWarrantyService(input: WarrantyClaimInput): Promise<string> {
+    if (input.problem.trim().length < 5) throw new Error('warranty:problem');
+    return `dev-warranty-${input.orderId}`;
   }
 
   async listVehicleWarranties(_vehicleId: string): Promise<readonly VehicleWarranty[]> {

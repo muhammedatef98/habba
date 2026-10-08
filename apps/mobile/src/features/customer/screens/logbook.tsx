@@ -499,14 +499,54 @@ export default function LogbookScreen() {
                   {t('transfer.warrantiesBody')}
                 </Text>
                 {warranties.data.map((warranty) => (
-                  <View key={warranty.orderId} style={{ gap: 2 }}>
-                    <Text variant="bodySmall">
-                      {isArabic ? warranty.serviceAr : warranty.serviceEn}
-                    </Text>
-                    <Text variant="caption" tone="subtle">
-                      {t('transfer.warrantyRemaining', { count: warranty.daysRemaining })}
-                      {warranty.hasOpenClaim ? ` · ${t('transfer.warrantyOpenClaim')}` : ''}
-                    </Text>
+                  <View
+                    key={warranty.orderId}
+                    testID={`warranty-${warranty.orderId}`}
+                    style={{ gap: theme.spacing.sm }}
+                  >
+                    <View style={{ gap: 2 }}>
+                      <Text variant="bodySmall">
+                        {isArabic ? warranty.serviceAr : warranty.serviceEn}
+                      </Text>
+                      <Text variant="caption" tone="subtle">
+                        {t('transfer.warrantyRemaining', { count: warranty.daysRemaining })}
+                        {warranty.hasOpenClaim ? ` · ${t('transfer.warrantyOpenClaim')}` : ''}
+                      </Text>
+                    </View>
+                    {/* The differentiator (§1.5): failed inside its cover,
+                        redone free by whoever did it (0105). */}
+                    {warranty.openClaimId !== null ? (
+                      <Button
+                        testID={`warranty-follow-${warranty.orderId}`}
+                        label={t('warranty.follow')}
+                        variant="secondary"
+                        size="medium"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/tracking',
+                            params: { id: warranty.openClaimId ?? '' },
+                          })
+                        }
+                      />
+                    ) : features.warrantyClaims ? (
+                      <Button
+                        testID={`warranty-claim-${warranty.orderId}`}
+                        label={t('warranty.claim')}
+                        variant="secondary"
+                        size="medium"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/warranty-claim',
+                            params: {
+                              order: warranty.orderId,
+                              service: isArabic ? warranty.serviceAr : warranty.serviceEn,
+                              provider: warranty.providerNameAr ?? '',
+                              mode: warranty.fulfilmentMode,
+                            },
+                          })
+                        }
+                      />
+                    ) : null}
                   </View>
                 ))}
               </Card>

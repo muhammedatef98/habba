@@ -428,6 +428,28 @@ as a user would. The fixes that matter beyond one screen:
 - The customer's provider picker shows each provider's next open time, puts
   bookable ones first, and does not open an empty time list for the rest.
 
+### Closing the unreachable features (0105–0107, suites 69–71)
+
+An audit of every callable server function against the three apps found
+features that existed on the server and nowhere on screen. Each now reaches
+the customer, the provider and the console:
+
+- **Warranty claims (0105).** «اطلب الإصلاح بالضمان» on each live warranty in
+  دفتر السيارة → describe the fault (and where the car is now, for a job done
+  at the car) → `request_warranty_service` confirms a free re-service with the
+  same provider, who gets «مطالبة ضمان». An on-demand original comes back as a
+  scheduled visit (no broadcast). Tracking says «إعادة خدمة بالضمان — مجاناً»;
+  the job screen and «طلباتي» mark it; the console's order file lists claims.
+- **Handover code (0106).** The technician enters the customer's 4-digit code
+  at the car; the customer sees it verified. `require_handover_code` (console
+  → الإعدادات → التشغيل, off by default) makes it mandatory before work starts
+  — turn it on after the new build is out. Ops re-issue a locked code with a
+  reason. New switches: `feature_order_chat`, `feature_warranty_claims`.
+- **Workshop details (0107).** «ورشتي» for workshops: address, map point,
+  hours, bays (`upsert_workshop`). A workshop without them is not offered for
+  booking, and its shift screen says so. The console's provider file shows the
+  calendar: open/booked/closed times and the next open one.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),

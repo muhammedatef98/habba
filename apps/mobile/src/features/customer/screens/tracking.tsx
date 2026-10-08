@@ -301,9 +301,28 @@ function TrackingBody() {
 
   const booked = current.fulfilmentMode !== 'mobile_ondemand';
 
+  // A free re-service under warranty (0105) says so on every state of it:
+  // the customer should never wonder whether this one will be charged.
+  const warrantyBanner =
+    current.parentOrderId !== null ? (
+      <Card
+        testID="tracking-warranty"
+        elevation="none"
+        style={{ backgroundColor: theme.colors.successSubtle, gap: 2 }}
+      >
+        <Text variant="bodyStrong" tone="success">
+          {t('warranty.trackingTitle')}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {t('warranty.trackingBody')}
+        </Text>
+      </Card>
+    ) : null;
+
   if (booked && status === 'accepted') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <Booked
           order={current}
           provider={providerData}
@@ -317,6 +336,7 @@ function TrackingBody() {
   if (SEARCHING.includes(status)) {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <Searching
           telemetry={telemetry}
           onCancel={() => cancel.mutate()}
@@ -344,6 +364,7 @@ function TrackingBody() {
   if (status === 'quoted') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <Matched
           order={current}
           provider={providerData}
@@ -357,6 +378,7 @@ function TrackingBody() {
   if (status === 'accepted' || status === 'en_route') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <LiveTracking
           order={current}
           provider={providerData}
@@ -372,6 +394,7 @@ function TrackingBody() {
   if (status === 'arrived') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <Arrived order={current} provider={providerData} progress={progress} />
       </Screen>
     );
@@ -382,6 +405,7 @@ function TrackingBody() {
   if (status === 'in_progress' || status === 'checked_in') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <InProgress
           order={current}
           provider={providerData}
@@ -398,6 +422,7 @@ function TrackingBody() {
   if (status === 'awaiting_approval') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <Card testID="tracking-confirm-completion">
           <View style={{ gap: theme.spacing.sm }}>
             <Text variant="heading">{t('tracking.confirmCompletionTitle')}</Text>
@@ -483,6 +508,7 @@ function TrackingBody() {
   if (status === 'completed') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <Completed
           order={current}
           provider={providerData}
@@ -512,6 +538,7 @@ function TrackingBody() {
   if (status === 'disputed') {
     return (
       <Screen scrollable>
+        {warrantyBanner}
         <Card testID="order-disputed" elevation="sm" style={{ gap: theme.spacing.sm }}>
           <Text variant="heading">{t('tracking.disputedTitle')}</Text>
           <Text variant="bodySmall" tone="muted">

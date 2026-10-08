@@ -338,6 +338,8 @@ export interface Order {
   readonly warrantyDays: number | null;
   /** The appointment time for a booked order; null for an emergency. */
   readonly scheduledFor: string | null;
+  /** Set on a free warranty re-service: the original job it redoes (0105). */
+  readonly parentOrderId: string | null;
 }
 
 export type EscrowStatus = 'none' | 'authorised' | 'captured' | 'released' | 'refunded' | 'failed';
@@ -370,6 +372,8 @@ export interface PlatformStatus {
   readonly suspensionReason: string | null;
   /** The parts of the app operators can switch off (0081). */
   readonly features: AppFeatures;
+  /** A technician enters the customer's handover code before work starts (0106). */
+  readonly handoverRequired: boolean;
   /** Builds below this are asked to update before anything else (0081). */
   readonly minAppVersion: string;
   readonly appStoreUrl: string;
@@ -377,6 +381,10 @@ export interface PlatformStatus {
 }
 
 export interface AppFeatures {
+  /** Messages inside an order (0101, 0106). */
+  readonly orderChat: boolean;
+  /** Claiming a warranty from the logbook (0105, 0106). */
+  readonly warrantyClaims: boolean;
   readonly emergency: boolean;
   readonly booking: boolean;
   readonly videoTriage: boolean;
@@ -480,6 +488,8 @@ export interface JobProgress {
    * would defeat the entire control. Rendered only when present.
    */
   readonly handoverCode?: string | undefined;
+  /** The technician entered the code; the customer can stop reading it out (0106). */
+  readonly handoverVerified?: boolean | undefined;
   readonly lastUpdateAt?: string | undefined;
 }
 
@@ -576,6 +586,19 @@ export interface VehicleWarranty {
   readonly expiresAt: string;
   readonly daysRemaining: number;
   readonly hasOpenClaim: boolean;
+  /** How the original was done; a workshop claim needs no location (0105). */
+  readonly fulfilmentMode: FulfilmentMode;
+  /** The open claim, to follow it from the logbook. */
+  readonly openClaimId: string | null;
+}
+
+/** A warranty claim, as the customer files it (0105). */
+export interface WarrantyClaimInput {
+  readonly orderId: string;
+  readonly problem: string;
+  /** Where the car is now. Omitted: the original job's address, for its payer. */
+  readonly location?: { readonly lat: number; readonly lon: number } | undefined;
+  readonly addressAr?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------

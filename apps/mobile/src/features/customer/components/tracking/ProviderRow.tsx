@@ -21,6 +21,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Text, rowDirectionFor, useTheme } from '@habba/ui';
 import type { ProviderSummary } from '@/features/shared/data/types';
+import { useFeatures } from '@/features/shared/hooks/use-platform';
 
 export interface ProviderRowProps {
   readonly provider: ProviderSummary;
@@ -47,6 +48,8 @@ export function ProviderRow({
 }: ProviderRowProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  // Ops can switch messages off (0106); the server refuses them either way.
+  const chatOrderIdShown = useFeatures().orderChat ? chatOrderId : undefined;
 
   const initial = provider.businessNameAr.trim().charAt(0);
 
@@ -112,21 +115,24 @@ export function ProviderRow({
         </View>
       </View>
 
-      {showActions && (contactNumber !== undefined || chatOrderId !== undefined) ? (
+      {showActions && (contactNumber !== undefined || chatOrderIdShown !== undefined) ? (
         <View
           style={{
             flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
             gap: theme.spacing.sm,
           }}
         >
-          {chatOrderId !== undefined ? (
+          {chatOrderIdShown !== undefined ? (
             <View style={{ flex: 1 }}>
               <Button
                 testID="tracking-chat"
                 label={t('tracking.chatAction')}
                 size="medium"
                 onPress={() =>
-                  router.push({ pathname: '/chat', params: { id: chatOrderId, side: 'customer' } })
+                  router.push({
+                    pathname: '/chat',
+                    params: { id: chatOrderIdShown, side: 'customer' },
+                  })
                 }
               />
             </View>

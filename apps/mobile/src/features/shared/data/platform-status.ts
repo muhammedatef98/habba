@@ -16,7 +16,10 @@ export const DEFAULT_PLATFORM_STATUS: PlatformStatus = {
   // On until the server says otherwise: a switch that cannot be read (offline,
   // a first launch) must not hide the emergency button. The server refuses a
   // switched-off request regardless (0081).
+  handoverRequired: false,
   features: {
+    orderChat: true,
+    warrantyClaims: true,
     emergency: true,
     booking: true,
     videoTriage: true,

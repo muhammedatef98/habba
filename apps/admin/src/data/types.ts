@@ -259,6 +259,14 @@ export interface OrderFile {
   }[];
   readonly payout: { readonly payout_id: string; readonly status: PayoutStatus } | null;
   readonly parent_order: { readonly id: string; readonly order_number: string } | null;
+  /** Free re-services claimed on this job under its warranty (0105). */
+  readonly warranty_claims?: readonly {
+    readonly id: string;
+    readonly order_number: string;
+    readonly status: OrderStatus;
+    readonly problem_description: string | null;
+    readonly created_at: string;
+  }[];
   readonly notes: readonly Note[];
 }
 
@@ -402,6 +410,13 @@ export interface ProviderFile {
     readonly custom_price: number | null;
     readonly offered: boolean;
   }[];
+  /** The calendar customers book against, next 14 days (0104, 0107). */
+  readonly availability?: {
+    readonly open: number;
+    readonly booked: number;
+    readonly closed: number;
+    readonly next_open_at: string | null;
+  };
   readonly workshop: {
     readonly address_ar: string;
     readonly bay_count: number;

@@ -180,6 +180,7 @@ function baseOrder(
     ],
     payout: null,
     parent_order: null,
+    warranty_claims: [],
     notes: [],
   };
 }
@@ -648,6 +649,36 @@ function seed(): State {
       64,
     ),
     setting('feature_booking', true, 'boolean', 'features', 'حجز المواعيد', null, true, 20),
+    setting(
+      'feature_order_chat',
+      true,
+      'boolean',
+      'features',
+      'المحادثة داخل الطلب',
+      null,
+      true,
+      300,
+    ),
+    setting(
+      'feature_warranty_claims',
+      true,
+      'boolean',
+      'features',
+      'المطالبة بالضمان من التطبيق',
+      null,
+      true,
+      310,
+    ),
+    setting(
+      'require_handover_code',
+      false,
+      'boolean',
+      'ops',
+      'اشتراط رمز التسليم قبل بدء العمل',
+      null,
+      true,
+      320,
+    ),
     setting(
       'feature_video_triage',
       true,
@@ -1395,6 +1426,11 @@ export class FixtureTransport implements Transport {
 
       case 'ops_order_detail':
         return this.orderFile(args['p_order_id']);
+
+      case 'ops_reissue_handover': {
+        reasonOf(args['p_reason']);
+        return undefined;
+      }
 
       case 'ops_order_messages': {
         reasonOf(args['p_reason']);

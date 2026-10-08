@@ -252,6 +252,15 @@ still ships to every user's device, where it can be read and probed.
 
 ## 6. WORKING AGREEMENT (standing instructions)
 
+**Every feature lands on all three surfaces, or it is not done** (owner's rule,
+2026-10-08). A new capability is finished only when the customer side, the
+provider side and the ops console each have what their role needs from it:
+the customer can use it, the technician/workshop can act on it, and an
+operator can see it and intervene. A server function that no screen calls is
+a gap, not a feature — the empty appointment list (0104) came from exactly
+that. Before calling work done, check that every new RPC is reachable from the
+surface it is meant for.
+
 **Ship every change to both places, immediately.** Every edit is committed and
 pushed to the working branch in the same turn it is made — local and GitHub are
 never allowed to drift. Run `pnpm typecheck && pnpm lint && pnpm test` before the

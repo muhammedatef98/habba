@@ -79,6 +79,7 @@ import type {
   VehicleMake,
   VehicleModel,
   VehicleWarranty,
+  WarrantyClaimInput,
 } from './types.js';
 import type {
   GuestUpgradeInput,
@@ -265,6 +266,7 @@ interface OrderRow {
   readonly completion_media: readonly CompletionMedia[] | null;
   warranty_days: number | null;
   scheduled_for: string | null;
+  parent_order_id: string | null;
 }
 
 interface OrderPartRow {
@@ -330,6 +332,7 @@ function toOrder(row: OrderRow): Order {
     completionMedia: row.completion_media ?? [],
     warrantyDays: row.warranty_days ?? null,
     scheduledFor: row.scheduled_for ?? null,
+    parentOrderId: row.parent_order_id ?? null,
   };
 }
 
@@ -413,6 +416,8 @@ interface VehicleWarrantyRow {
   readonly warranty_expires_at: string;
   readonly days_remaining: number;
   readonly has_open_claim: boolean;
+  readonly fulfilment_mode: FulfilmentMode;
+  readonly open_claim_id: string | null;
 }
 
 interface MaintenanceItemRow {
@@ -939,6 +944,10 @@ export class SupabaseRepository implements Repository {
       const custom = row.provider_services?.[0]?.custom_price ?? null;
       const price = custom === null ? (service?.basePrice ?? null) : toSar(custom);
 
+      // A workshop that has not said where it is (0107) has nowhere to
+      // drive to; it is not offered until it has.
+      if (mode === 'workshop' && (workshop === undefined || workshop === null)) return [];
+
       // A provider who has not priced a service the catalogue does not price
       // either has nothing to book at. Offering them showed "0.00", and the
       // booking went through with nothing held and nothing billed.
@@ -1048,7 +1057,7 @@ export class SupabaseRepository implements Repository {
     const { data, error } = await this.client
       .from('orders')
       .select(
-        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media, warranty_days, scheduled_for',
+        'id, status, fulfilment_mode, vehicle_id, service_id, provider_id, service_address_ar, problem_description, quoted_amount, parts_amount, labour_amount, vat_amount, total_amount, escrow_status, completion_media, warranty_days, scheduled_for, parent_order_id',
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -1128,6 +1137,9 @@ export class SupabaseRepository implements Repository {
       // Once verified there is nothing left to show — the technician has
       // already proved they are the right person.
       ...(code !== undefined && handover.data?.verified_at === null ? { handoverCode: code } : {}),
+      ...(handover.data?.verified_at !== null && handover.data?.verified_at !== undefined
+        ? { handoverVerified: true }
+        : {}),
     };
   }
 
@@ -1660,7 +1672,10 @@ export class SupabaseRepository implements Repository {
         ratings: values['feature_ratings'] !== false,
         mapSearch: values['feature_map_search'] !== false,
         savedPlaces: values['feature_saved_places'] !== false,
+        orderChat: values['feature_order_chat'] !== false,
+        warrantyClaims: values['feature_warranty_claims'] !== false,
       },
+      handoverRequired: values['require_handover_code'] === true,
       minAppVersion: text('min_app_version'),
       appStoreUrl: text('app_store_url'),
       playStoreUrl: text('play_store_url'),
@@ -1937,7 +1952,35 @@ export class SupabaseRepository implements Repository {
       expiresAt: row.warranty_expires_at,
       daysRemaining: row.days_remaining,
       hasOpenClaim: row.has_open_claim,
+      fulfilmentMode: row.fulfilment_mode,
+      openClaimId: row.open_claim_id,
     }));
+  }
+
+  async requestWarrantyService(input: WarrantyClaimInput): Promise<string> {
+    const { data, error } = await this.client.rpc('request_warranty_service', {
+      p_order_id: input.orderId,
+      p_problem: input.problem,
+      p_lon: input.location?.lon ?? null,
+      p_lat: input.location?.lat ?? null,
+      p_address_ar: input.addressAr ?? null,
+    });
+    if (error !== null) {
+      // Which refusal it was decides what the screen says (0055, 0105).
+      const code = error.code ?? '';
+      const reason =
+        code === '23505'
+          ? 'warranty:open_claim'
+          : error.message.includes('location is required')
+            ? 'warranty:location'
+            : error.message.includes('expired')
+              ? 'warranty:expired'
+              : code === '42501'
+                ? 'warranty:not_owner'
+                : `requestWarrantyService: ${error.message}`;
+      throw new Error(reason);
+    }
+    return data as string;
   }
 
   // القادم -------------------------------------------------------------------

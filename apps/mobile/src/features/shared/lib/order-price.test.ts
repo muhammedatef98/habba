@@ -22,6 +22,7 @@ function order(fields: Partial<Order>): Order {
     completionMedia: [],
     warrantyDays: null,
     scheduledFor: null,
+    parentOrderId: null,
     ...fields,
   };
 }

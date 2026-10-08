@@ -16,11 +16,18 @@ import { Linking, Platform, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } from '@habba/core';
-import { Button, Card, Row, Screen, Text, useTheme } from '@habba/ui';
+import {
+  canQuoteParts,
+  canRecordEvidence,
+  isEvidenceComplete,
+  nextJobStep,
+  toLatinDigits,
+} from '@habba/core';
+import { Button, Card, Field, Row, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { useLiveRefresh } from '@/features/shared/lib/live';
 import { chatOpen } from '@/features/shared/lib/chat';
+import { useFeatures, usePlatformStatus } from '@/features/shared/hooks/use-platform';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
 import { navigationLinks } from '@/features/provider/lib/navigate';
 import { loadDraft, syncEvidenceNow } from '@/features/provider/lib/evidence-queue';
@@ -61,6 +68,46 @@ export default function JobScreen() {
   });
 
   const [notice, setNotice] = useState<string | undefined>(undefined);
+  const features = useFeatures();
+  const handoverRequired = usePlatformStatus().handoverRequired;
+  const [handoverInput, setHandoverInput] = useState('');
+  const [handoverMessage, setHandoverMessage] = useState<string | null>(null);
+
+  // The customer reads a four-digit code out at the car (0047); the
+  // technician enters it here so the car is worked on only by the person
+  // Habba sent. The code itself is never readable from this side.
+  const atTheCar =
+    job.data !== null &&
+    job.data !== undefined &&
+    job.data.offer === null &&
+    job.data.status === 'arrived' &&
+    job.data.fulfilmentMode !== 'workshop';
+  const handover = useQuery({
+    queryKey: ['handover', id],
+    queryFn: () => providerRepository.getHandoverStatus(id ?? ''),
+    enabled: atTheCar,
+  });
+  const verifyHandover = useMutation({
+    mutationFn: (code: string) => providerRepository.verifyHandoverCode(id ?? '', code),
+    meta: { inlineError: true },
+    onSuccess: async (matched) => {
+      setHandoverInput('');
+      setHandoverMessage(matched ? null : t('handover.wrong'));
+      await queryClient.invalidateQueries({ queryKey: ['handover', id] });
+    },
+    onError: async (cause) => {
+      setHandoverMessage(
+        cause instanceof Error && cause.message === 'handover:locked'
+          ? t('handover.locked')
+          : t('handover.failed'),
+      );
+      await queryClient.invalidateQueries({ queryKey: ['handover', id] });
+    },
+  });
+  const handoverBlocks =
+    atTheCar && handoverRequired && handover.data !== undefined && handover.data.issued
+      ? !handover.data.verified
+      : false;
 
   const quotable = job.data !== null && job.data !== undefined && canQuoteParts(job.data.status);
   const parts = useQuery({
@@ -193,6 +240,22 @@ export default function JobScreen() {
             ? `${data.orderNumber} · ${t(`job.status.${data.status}`)}`
             : t(`job.status.${data.status}`)}
         </Text>
+        {/* Free, and the technician's own earlier work (0105): said before
+            anything else so the job is never quoted or treated as new. */}
+        {data.isWarranty ? (
+          <Card
+            testID="job-warranty"
+            elevation="none"
+            style={{ backgroundColor: theme.colors.warningSubtle, gap: 2 }}
+          >
+            <Text variant="bodyStrong" tone="warning">
+              {t('warranty.jobTitle')}
+            </Text>
+            <Text variant="caption" tone="muted">
+              {t('warranty.jobBody')}
+            </Text>
+          </Card>
+        ) : null}
         {data.scheduledFor !== null ? (
           <Text testID="job-scheduled" variant="bodyStrong">
             {t('provider.scheduledFor', {
@@ -308,7 +371,7 @@ export default function JobScreen() {
           ) : null}
 
           {/* The order's thread (0101) — the customer's number is never shown. */}
-          {data.offer === null && chatOpen(data.status) ? (
+          {data.offer === null && features.orderChat && chatOpen(data.status) ? (
             <Button
               testID="job-chat"
               label={t('provider.messageCustomer')}
@@ -390,6 +453,56 @@ export default function JobScreen() {
         </Card>
       ) : null}
 
+      {atTheCar && handover.data !== undefined && handover.data.issued ? (
+        <Card testID="job-handover" style={{ gap: theme.spacing.sm }}>
+          {handover.data.verified ? (
+            <Text variant="bodyStrong" tone="success" testID="job-handover-verified">
+              {t('handover.verifiedProvider')}
+            </Text>
+          ) : handover.data.locked ? (
+            <Text variant="bodySmall" tone="warning">
+              {t('handover.locked')}
+            </Text>
+          ) : (
+            <>
+              <Text variant="bodyStrong">{t('handover.title')}</Text>
+              <Text variant="caption" tone="muted">
+                {handoverRequired ? t('handover.requiredHint') : t('handover.hint')}
+              </Text>
+              <Row gap="sm" align="center">
+                <View style={{ flex: 1 }}>
+                  <Field
+                    testID="job-handover-input"
+                    label={t('handover.label')}
+                    value={handoverInput}
+                    onChangeText={(value) =>
+                      setHandoverInput(value.replace(/[^0-9٠-٩]/g, '').slice(0, 4))
+                    }
+                    keyboardType="number-pad"
+                    forceLtrInput
+                    maxLength={4}
+                  />
+                </View>
+              </Row>
+              <Button
+                testID="job-handover-verify"
+                label={t('handover.verify')}
+                variant="secondary"
+                size="medium"
+                loading={verifyHandover.isPending}
+                disabled={toLatinDigits(handoverInput).length !== 4}
+                onPress={() => verifyHandover.mutate(toLatinDigits(handoverInput))}
+              />
+              {handoverMessage !== null ? (
+                <Text variant="caption" tone="warning">
+                  {handoverMessage}
+                </Text>
+              ) : null}
+            </>
+          )}
+        </Card>
+      ) : null}
+
       {step.action === 'none' ? (
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
           <Text variant="caption" tone="muted">
@@ -404,7 +517,7 @@ export default function JobScreen() {
           label={t(step.labelKey)}
           onPress={() => advance.mutate()}
           loading={advance.isPending}
-          disabled={blockedForEvidence || blockedForParts || blockedForInspection}
+          disabled={blockedForEvidence || blockedForParts || blockedForInspection || handoverBlocks}
         />
       )}
 

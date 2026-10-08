@@ -120,6 +120,10 @@ export function createApi(transport: Transport) {
         p_reason: reason,
       }),
 
+    /** A fresh handover code after the old one locked (0106). */
+    reissueHandover: (id: string, reason: string) =>
+      transport.rpc<void>('ops_reissue_handover', { p_order_id: id, p_reason: reason }),
+
     cancelOrder: (id: string, reason: string) =>
       transport.rpc<void>('ops_cancel_order', { p_order_id: id, p_reason: reason }),
 

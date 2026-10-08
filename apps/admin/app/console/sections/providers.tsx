@@ -469,6 +469,20 @@ function ProviderFileView({
                       ['عدد المداخل', String(file.workshop.bay_count)],
                     ] as const)
                   : []),
+                ...(file.availability !== undefined
+                  ? ([
+                      [
+                        'المواعيد (14 يوماً)',
+                        `${file.availability.open} متاح · ${file.availability.booked} محجوز · ${file.availability.closed} مغلق`,
+                      ],
+                      [
+                        'أقرب موعد متاح',
+                        file.availability.next_open_at !== null
+                          ? dateTime(file.availability.next_open_at)
+                          : 'لم ينشر مواعيد — لن يظهر للحجز',
+                      ],
+                    ] as const)
+                  : []),
               ]}
             />
           </Card>
