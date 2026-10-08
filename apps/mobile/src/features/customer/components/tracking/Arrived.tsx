@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, FadeIn, Text, useTheme } from '@habba/ui';
 import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
+import { chatOpen } from '@/features/shared/lib/chat';
 import type { JobProgress, Order, ProviderSummary } from '@/features/shared/data/types';
 
 export interface ArrivedProps {
@@ -88,7 +89,13 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
         </Card>
       ) : null}
 
-      {provider !== null ? <ProviderRow testID="arrived-provider" provider={provider} /> : null}
+      {provider !== null ? (
+        <ProviderRow
+          testID="arrived-provider"
+          provider={provider}
+          chatOrderId={chatOpen(order.status) ? order.id : undefined}
+        />
+      ) : null}
 
       <View style={{ flex: 1 }} />
 

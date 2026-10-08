@@ -60,6 +60,7 @@ import type {
   NewRatingInput,
   NewVehicleInput,
   Order,
+  OrderMessage,
   OrderPart,
   Profile,
   ProviderApplication,
@@ -1269,6 +1270,46 @@ export class SupabaseRepository implements Repository {
     );
 
     return (rows as OrderPartRow[]).map(toOrderPart);
+  }
+
+  async listOrderMessages(orderId: string): Promise<readonly OrderMessage[]> {
+    const userId = this.userId();
+    const rows = unwrap(
+      await this.client
+        .from('order_messages')
+        .select('id, order_id, sender_id, sender_side, body, created_at')
+        .eq('order_id', orderId)
+        .order('created_at'),
+      'listOrderMessages',
+    ) as {
+      id: string;
+      order_id: string;
+      sender_id: string;
+      sender_side: 'customer' | 'provider';
+      body: string;
+      created_at: string;
+    }[];
+    return rows.map((row) => ({
+      id: row.id,
+      orderId: row.order_id,
+      side: row.sender_side,
+      mine: row.sender_id === userId,
+      body: row.body,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async sendOrderMessage(orderId: string, body: string): Promise<void> {
+    const { error } = await this.client.rpc('send_order_message', {
+      p_order_id: orderId,
+      p_body: body,
+    });
+    if (error !== null) {
+      // The server's hint names the refusal (0101); anything else is a
+      // failure to reach it.
+      const hint = typeof error.hint === 'string' ? error.hint : '';
+      throw new Error(hint.startsWith('chat:') ? hint : `sendOrderMessage: ${error.message}`);
+    }
   }
 
   async approveOrderPart(partId: string): Promise<void> {

@@ -397,6 +397,20 @@ as a user would. The fixes that matter beyond one screen:
   (`(select auth.uid())`); suite 66 fails on a bare call. Covering indexes
   for the foreign keys the app joins on. Applied on the hosted project.
 
+### Messages on an order (0101, suite 67)
+
+- `order_messages` + `send_order_message`: the customer and the assigned
+  technician write to each other from acceptance until hand-back
+  (accepted → awaiting_approval); closed before and after. Read through RLS
+  as the order; written only through the function (party, status, 1–1000
+  characters, 20 a minute). The other side gets a push «رسالة من العميل /
+  الفنّي» that opens `/chat` on the right side. Neither number is ever shown.
+- App: «محادثة» on the customer's tracking card, «مراسلة العميل» on the
+  technician's job screen, quick replies per side, live via Realtime.
+- ⚠️ Legal follow-up: the published privacy policy does not yet mention that
+  order messages are stored. Add it in the next version from the console
+  (Legal → new version), with a retention line (kept with the order).
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),

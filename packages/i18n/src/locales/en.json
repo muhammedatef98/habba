@@ -519,7 +519,6 @@
       "explained": "Explained the issue"
     },
     "evidenceTitle": "Photos of the work",
-    "contactUnavailable": "Calling the technician isn't available yet.",
     "notSentTitle": "Your request hasn't been sent",
     "notSentBody": "Your request is saved but wasn't sent because the payment didn't finish. Send it now.",
     "notSentAction": "Send request",
@@ -736,7 +735,8 @@
     "evidenceQueuedBody_one": "One photo is waiting to upload. Everything is sent automatically when you're back online, even if you close the app.",
     "evidenceQueuedBody_other": "{{count}} photos are waiting to upload. Everything is sent automatically when you're back online, even if you close the app.",
     "evidenceSendNow": "Send now",
-    "evidenceRefused": "The server did not accept this evidence. Check the job's status, or contact support."
+    "evidenceRefused": "The server did not accept this evidence. Check the job's status, or contact support.",
+    "messageCustomer": "Message the customer"
   },
   "profile": {
     "title": "My account",
@@ -1119,5 +1119,30 @@
     "cat_wash": "Washes",
     "cat_bodywork": "Bodywork",
     "cat_misc": "Other"
+  },
+  "chat": {
+    "titleCustomer": "Chat with the technician",
+    "titleProvider": "Chat with the customer",
+    "emptyTitle": "No messages yet",
+    "emptyBody": "Write what helps get the job done: exactly where the car is, or when you'll arrive. Neither side sees the other's number.",
+    "placeholder": "Write a message",
+    "send": "Send",
+    "loadFailed": "Couldn't load the messages.",
+    "closed": "This chat closed when the order finished.",
+    "error": {
+      "closed": "This chat closed when the order finished.",
+      "not_party": "You can't message on this order.",
+      "length": "That message is too long. The limit is 1,000 characters.",
+      "rate": "You've sent a lot of messages in a minute. Wait a moment and try again.",
+      "network": "The message didn't send. Check your connection and try again."
+    },
+    "quick": {
+      "onMyWay": "On my way to you",
+      "whereExactly": "I've arrived — where exactly is the car?",
+      "runningLate": "I'll be a little late",
+      "underground": "The car's in an underground car park",
+      "besideCar": "I'm next to the car",
+      "tellOnArrival": "Message me when you arrive"
+    }
   }
 }

@@ -28,6 +28,7 @@ import {
 import { EvidencePhoto } from '@/features/shared/components/EvidencePhoto';
 import { AgreedTotalRow } from './AgreedTotalRow';
 import { ProviderRow } from './ProviderRow';
+import { chatOpen } from '@/features/shared/lib/chat';
 import type { JobProgress, Order, ProviderSummary } from '@/features/shared/data/types';
 
 export interface InProgressProps {
@@ -139,6 +140,7 @@ export function InProgress({
         <Card elevation="none" style={{ backgroundColor: theme.colors.surfaceSunken }}>
           <ProviderRow
             provider={provider}
+            chatOrderId={chatOpen(order.status) ? order.id : undefined}
             {...(progress?.lastUpdateAt !== undefined ? { detail: progress.lastUpdateAt } : {})}
           />
         </Card>

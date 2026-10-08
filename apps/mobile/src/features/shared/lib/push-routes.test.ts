@@ -18,6 +18,19 @@ describe('targetFor', () => {
     expect(target?.refresh).toContainEqual(['open-jobs']);
   });
 
+  it('opens a message thread on the side it was sent to', () => {
+    const toProvider = targetFor({ route: '/chat', id: ORDER, side: 'provider' });
+    expect(toProvider?.mode).toBe('provider');
+    expect(toProvider?.params).toEqual({ id: ORDER, side: 'provider' });
+    expect(toProvider?.refresh).toContainEqual(['order-messages', ORDER]);
+
+    const toCustomer = targetFor({ route: '/chat', id: ORDER, side: 'anything else' });
+    expect(toCustomer?.mode).toBe('customer');
+    expect(toCustomer?.params).toEqual({ id: ORDER, side: 'customer' });
+
+    expect(targetFor({ route: '/chat', id: 'nope', side: 'provider' })).toBeNull();
+  });
+
   it('opens nothing for a route it does not know — the payload is input', () => {
     expect(targetFor({ route: '/profile', id: ORDER })).toBeNull();
     expect(targetFor({ route: 'https://example.test', id: ORDER })).toBeNull();

@@ -395,6 +395,23 @@ export interface AppFeatures {
   readonly savedPlaces: boolean;
 }
 
+/**
+ * A message in a live order's thread (0101). Neither side sees the other's
+ * number; the server decides who may write and when.
+ */
+export interface OrderMessage {
+  readonly id: string;
+  readonly orderId: string;
+  readonly side: 'customer' | 'provider';
+  /** Written by the person reading it. */
+  readonly mine: boolean;
+  readonly body: string;
+  readonly createdAt: string;
+}
+
+/** Why the server refused a message, when it said. */
+export type OrderMessageRefusal = 'closed' | 'length' | 'rate' | 'not_party';
+
 export interface OrderPart {
   readonly id: string;
   readonly orderId: string;

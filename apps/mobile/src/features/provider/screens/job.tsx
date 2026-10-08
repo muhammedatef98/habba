@@ -20,6 +20,7 @@ import { canQuoteParts, canRecordEvidence, isEvidenceComplete, nextJobStep } fro
 import { Button, Card, Row, Screen, Text, useTheme } from '@habba/ui';
 import { providerRepository } from '@/features/provider/data/provider-repository';
 import { useLiveRefresh } from '@/features/shared/lib/live';
+import { chatOpen } from '@/features/shared/lib/chat';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
 import { navigationLinks } from '@/features/provider/lib/navigate';
 import { loadDraft, syncEvidenceNow } from '@/features/provider/lib/evidence-queue';
@@ -304,6 +305,19 @@ export default function JobScreen() {
                 />
               </View>
             </Row>
+          ) : null}
+
+          {/* The order's thread (0101) — the customer's number is never shown. */}
+          {data.offer === null && chatOpen(data.status) ? (
+            <Button
+              testID="job-chat"
+              label={t('provider.messageCustomer')}
+              variant="secondary"
+              size="medium"
+              onPress={() =>
+                router.push({ pathname: '/chat', params: { id: id ?? '', side: 'provider' } })
+              }
+            />
           ) : null}
 
           {data.problemDescription !== null ? (

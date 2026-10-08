@@ -26,6 +26,7 @@ import {
 } from '@habba/ui';
 import { agreedTotal } from '@/features/shared/lib/order-price';
 import { ProviderRow } from './ProviderRow';
+import { chatOpen } from '@/features/shared/lib/chat';
 import type {
   JobProgress,
   Order,
@@ -135,7 +136,13 @@ export function LiveTracking({ order, provider, progress, onShare }: LiveTrackin
           : {})}
       />
 
-      {provider !== null ? <ProviderRow testID="live-provider" provider={provider} /> : null}
+      {provider !== null ? (
+        <ProviderRow
+          testID="live-provider"
+          provider={provider}
+          chatOrderId={chatOpen(order.status) ? order.id : undefined}
+        />
+      ) : null}
 
       <View style={{ flex: 1 }} />
 
