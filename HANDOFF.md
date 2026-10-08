@@ -372,6 +372,24 @@ as a user would. The fixes that matter beyond one screen:
 - **Not yet done on the project:** leaked-password protection
   (Authentication → Policies, one switch).
 
+## 6c. Store builds, as of 2026-10-08
+
+- EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
+  linked in `apps/mobile/app.json`. The GitHub repo is **not** connected to
+  it on expo.dev, so the Expo MCP's `build_run` refuses. Builds are run with
+  `eas build` from an EAS sandbox, or from the Release workflow once the
+  `EXPO_TOKEN` secret is set.
+- **Android:** production build `87c75daa-…` (versionCode 3) **finished**. The
+  `.aab` is on the build page on expo.dev. Not submitted: EAS has no Google
+  service-account key yet, and Google requires the first upload by hand
+  (GO-LIVE §7). Build 1 failed on Android release lint because the iOS
+  permission strings were flat in `locales/*.json`. They are now nested
+  under `"ios"`.
+- **iOS:** not built. EAS has no Apple credentials. Someone has to run
+  `npx eas-cli build -p ios --profile production` once, interactively, and
+  sign in to the Apple Developer account. After that, non-interactive builds
+  work.
+
 ## 7. Open decisions — these block launch, and none is a coding task
 
 | #   | Decision                                                | Blocks                                                                                                                                                                                                              |

@@ -176,6 +176,8 @@ Expo Go بلا build خاص.
    - حساب Google Play Console (25 دولاراً مرّة واحدة)، وتطبيق بالمعرّف `sa.habba.app`.
    - حساب خدمة في Google Cloud بصلاحية الإصدار في Play Console، ومفتاحه (JSON) يُرفع إلى
      EAS: `npx eas-cli credentials` ← Android ← Google Service Account.
+   - ✅ أوّل بناء Android للمتجر جاهز (versionCode 3): من expo.dev ← habba ← Builds نزّل
+     ملف `.aab` — ثم الخطوة التالية.
    - ⚠️ **أوّل إصدار على Google Play يُرفع يدوياً**: Google لا تقبل الرفع عبر الواجهة
      البرمجية لتطبيق لم يُرفع له ملف قط. شغّل Release مع إلغاء «Submit»، نزّل ملف
      `.aab` من صفحة البناء على expo.dev، وارفعه بيدك في Play Console ← Internal testing.
