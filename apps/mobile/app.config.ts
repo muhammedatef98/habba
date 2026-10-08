@@ -68,11 +68,33 @@ export function missingForStore(extra?: ConfigContext['config']['extra']): strin
   ).map((names) => names.replace('|', ' or '));
 }
 
+/**
+ * Android draws every map with Google Maps (react-native-maps' default
+ * provider there), and a release build without a Maps SDK key draws a grey
+ * square: no streets, no pin to drag. Expo Go hides this because it carries
+ * Expo's own key, so it is only ever found on the first Play Store install.
+ *
+ * The key ends up in the APK's manifest — that is how the SDK reads it — so it
+ * is restricted in Google Cloud to the Android app `sa.habba.app` and its
+ * signing certificate, and kept out of the repository as an EAS variable
+ * (docs/GO-LIVE.md §7). iOS uses Apple Maps and needs nothing.
+ */
+export const ANDROID_MAPS_KEY = 'GOOGLE_MAPS_ANDROID_API_KEY';
+
+/** What an Android store build is missing on top of `missingForStore`. */
+export function missingForAndroidStore(): string[] {
+  return env(ANDROID_MAPS_KEY) === undefined ? [ANDROID_MAPS_KEY] : [];
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   // EAS sets EAS_BUILD_PROFILE on its build machines; `production` is the
-  // profile the store builds use (eas.json).
+  // profile the store builds use (eas.json). EAS_BUILD_PLATFORM says which
+  // store this one is for.
   if (process.env['EAS_BUILD_PROFILE'] === 'production') {
-    const missing = missingForStore(config.extra);
+    const missing = [
+      ...missingForStore(config.extra),
+      ...(process.env['EAS_BUILD_PLATFORM'] === 'android' ? missingForAndroidStore() : []),
+    ];
     if (missing.length > 0) {
       throw new Error(
         `A store build needs ${missing.join(', ')}. Set them as EAS environment ` +
@@ -84,10 +106,23 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 };
 
 function buildConfig(config: ConfigContext['config']): ExpoConfig {
+  const mapsKey = env(ANDROID_MAPS_KEY);
   return {
     ...config,
     name: config.name ?? 'هبّة',
     slug: config.slug ?? 'habba',
+
+    ...(mapsKey === undefined
+      ? {}
+      : {
+          android: {
+            ...config.android,
+            config: {
+              ...config.android?.config,
+              googleMaps: { apiKey: mapsKey },
+            },
+          },
+        }),
 
     extra: {
       ...config.extra,

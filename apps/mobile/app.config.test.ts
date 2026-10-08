@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import appConfig, { missingForStore } from './app.config';
 
@@ -11,6 +13,8 @@ const KEYS = [
   'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'EXPO_PUBLIC_SUPABASE_ANON_KEY',
   'EAS_PROJECT_ID',
+  'EAS_BUILD_PLATFORM',
+  'GOOGLE_MAPS_ANDROID_API_KEY',
 ] as const;
 const saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
 
@@ -67,5 +71,64 @@ describe('app.config for the stores', () => {
     process.env['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'] = 'sb_publishable_x';
     const config = appConfig({ ...base, config: { ...base.config, extra } });
     expect(config.extra?.['eas']).toEqual(extra.eas);
+  });
+
+  it('refuses an Android store build without a Maps key — the map would be grey', () => {
+    clear();
+    process.env['EAS_BUILD_PROFILE'] = 'production';
+    process.env['EAS_BUILD_PLATFORM'] = 'android';
+    process.env['EXPO_PUBLIC_SUPABASE_URL'] = 'https://x.supabase.co';
+    process.env['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'] = 'sb_publishable_x';
+    process.env['EAS_PROJECT_ID'] = '00000000-0000-0000-0000-000000000000';
+    expect(() => appConfig(base)).toThrow(/GOOGLE_MAPS_ANDROID_API_KEY/);
+
+    process.env['GOOGLE_MAPS_ANDROID_API_KEY'] = 'AIza-test';
+    expect(appConfig(base).android?.config?.googleMaps?.apiKey).toBe('AIza-test');
+  });
+
+  it('does not ask an iOS store build for it — iOS draws Apple Maps', () => {
+    clear();
+    process.env['EAS_BUILD_PROFILE'] = 'production';
+    process.env['EAS_BUILD_PLATFORM'] = 'ios';
+    process.env['EXPO_PUBLIC_SUPABASE_URL'] = 'https://x.supabase.co';
+    process.env['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'] = 'sb_publishable_x';
+    process.env['EAS_PROJECT_ID'] = '00000000-0000-0000-0000-000000000000';
+    expect(appConfig(base).android?.config?.googleMaps).toBeUndefined();
+  });
+});
+
+/**
+ * Apple rejects a build whose Info.plist asks for something with Expo's
+ * English placeholder ("Allow $(PRODUCT_NAME) to …") — and every plugin adds
+ * one by default for permissions this app never requests (always-on location,
+ * motion, Face ID). Each is either our own sentence or switched off.
+ */
+describe('permissions the stores will read', () => {
+  const app = JSON.parse(readFileSync(join(__dirname, 'app.json'), 'utf8')) as {
+    expo: { plugins: (string | [string, Record<string, unknown>])[] };
+  };
+  const options = (name: string) => {
+    const entry = app.expo.plugins.find((plugin) =>
+      Array.isArray(plugin) ? plugin[0] === name : plugin === name,
+    );
+    return Array.isArray(entry) ? entry[1] : {};
+  };
+
+  it('switches off the location and Face ID prompts the app never shows', () => {
+    expect(options('expo-location')).toMatchObject({
+      locationAlwaysAndWhenInUsePermission: false,
+      locationAlwaysPermission: false,
+      motionUsagePermission: false,
+    });
+    expect(options('expo-secure-store')).toMatchObject({ faceIDPermission: false });
+  });
+
+  it('words every prompt it does show itself', () => {
+    for (const name of ['expo-camera', 'expo-image-picker', 'expo-location']) {
+      for (const [key, value] of Object.entries(options(name))) {
+        if (!/Permission$/.test(key) || value === false) continue;
+        expect(value, `${name}.${key}`).toMatch(/هبّة/);
+      }
+    }
   });
 });
