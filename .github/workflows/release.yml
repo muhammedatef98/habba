@@ -2,13 +2,13 @@
 #
 # Manual only (Actions → Release → Run workflow). A store submission is not
 # something a push should do by accident, and the first one of each needs a
-# person anyway (docs/release.md).
+# person anyway (docs/GO-LIVE.md §7).
 #
 # What it needs, all outside this repository:
 #   - the EXPO_TOKEN repository secret (an Expo access token);
 #   - the EAS project, with its production environment variables
-#     (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-#     EAS_PROJECT_ID) — app.config.ts refuses a production build without them;
+#     (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+#     the project ID is in app.json) — app.config.ts refuses a production build without them;
 #   - store credentials stored on EAS: an App Store Connect API key, and a
 #     Google Play service-account key.
 name: Release
@@ -42,7 +42,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::The EXPO_TOKEN repository secret is not set. See docs/release.md."
+            echo "::error::The EXPO_TOKEN repository secret is not set. See docs/GO-LIVE.md §7."
             exit 1
           fi
 
