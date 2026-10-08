@@ -134,6 +134,14 @@ In the Supabase dashboard, enable **TOTP** under Authentication → Multi-Factor
 The operator signs in with email and password, then enrols their authenticator
 on the first visit.
 
+**Forgotten password.** «نسيت كلمة المرور؟» on the sign-in screen emails a
+reset link (the same answer whether or not the address has an account). The
+link opens the console on «كلمة مرور جديدة», which asks for the new password
+and — when the account has a second factor — the authenticator code, so the
+inbox alone cannot take an operator account. Then the operator signs in again.
+The link returns to the console's own origin, so that origin must be in
+Supabase → Authentication → URL Configuration → Redirect URLs (step 4 below).
+
 ## Deploying to Vercel
 
 1. Import the repository and set **Root Directory** to `apps/admin`. Vercel
