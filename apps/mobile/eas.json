@@ -17,6 +17,10 @@
       },
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zelhhlcfyhdqbxsykpnk.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable__gv_FpGrcdFH1NFbVnMucA_c5Z-tLoJ"
       }
     },
     "production": {
@@ -28,7 +32,11 @@
       "ios": {
         "buildConfiguration": "Release"
       },
-      "environment": "production"
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zelhhlcfyhdqbxsykpnk.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable__gv_FpGrcdFH1NFbVnMucA_c5Z-tLoJ"
+      }
     }
   },
   "submit": {
