@@ -1396,6 +1396,29 @@ export class FixtureTransport implements Transport {
       case 'ops_order_detail':
         return this.orderFile(args['p_order_id']);
 
+      case 'ops_order_messages': {
+        reasonOf(args['p_reason']);
+        const file = this.orderFile(args['p_order_id']);
+        if (file.provider === null) return [];
+        const at = Date.parse(file.order.created_at);
+        return [
+          {
+            id: `${file.order.id}-m1`,
+            sender_side: 'provider',
+            sender_name: file.provider.business_name_ar,
+            body: 'في الطريق إليك',
+            created_at: new Date(at + 6 * 60_000).toISOString(),
+          },
+          {
+            id: `${file.order.id}-m2`,
+            sender_side: 'customer',
+            sender_name: file.customer?.full_name ?? '',
+            body: 'السيارة في الموقف تحت الأرض، الدور -2',
+            created_at: new Date(at + 8 * 60_000).toISOString(),
+          },
+        ];
+      }
+
       case 'ops_cancel_order': {
         const reason = reasonOf(args['p_reason']);
         const file = this.orderFile(args['p_order_id']);

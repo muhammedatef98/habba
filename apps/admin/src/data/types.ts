@@ -133,6 +133,15 @@ export interface PaymentOperation {
   readonly requested_by_name?: string | null;
 }
 
+/** A message in an order's thread, as an operator reads it (0102). */
+export interface OrderMessageRow {
+  readonly id: string;
+  readonly sender_side: 'customer' | 'provider';
+  readonly sender_name: string;
+  readonly body: string;
+  readonly created_at: string;
+}
+
 export interface OrderFile {
   readonly order: {
     readonly id: string;

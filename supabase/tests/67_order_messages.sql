@@ -134,4 +134,36 @@ select test.assert_raises(
 
 reset role;
 
+-- Operators: only through the audited function, and only with a reason (0102).
+insert into auth.users (id, phone) values ('66666666-0000-4000-6767-000000000006', '+966509670006');
+insert into public.profiles (id, full_name, phone)
+values ('66666666-0000-4000-6767-000000000006', 'التشغيل', '+966509670006');
+select test.grant_role('66666666-0000-4000-6767-000000000006', 'ops');
+
+select test.become('66666666-0000-4000-6767-000000000006');
+set role authenticated;
+select test.assert_eq(
+  (select count(*)::int from public.order_messages where order_id = :'job'), 0,
+  'an operator cannot read a thread directly');
+select test.assert_raises(
+  format($$select public.ops_order_messages('%s', '')$$, :'job'),
+  'nor through the console without a reason', '23514');
+select test.assert_eq(
+  jsonb_array_length(public.ops_order_messages(:'job', 'شكوى العميل عن التأخير')), 2,
+  'with a reason, the whole thread');
+reset role;
+select test.assert(
+  exists (select 1 from public.audit_log
+           where actor_id = '66666666-0000-4000-6767-000000000006'
+             and action = 'read' and target_table = 'order_messages'
+             and target_id = :'job' and after ->> 'reason' = 'شكوى العميل عن التأخير'),
+  'and the read is on the record, with the reason');
+
+select test.become('22222222-0000-4000-6767-000000000002');
+set role authenticated;
+select test.assert_raises(
+  format($$select public.ops_order_messages('%s', 'فضول')$$, :'job'),
+  'a party is not an operator', '42501');
+reset role;
+
 rollback;

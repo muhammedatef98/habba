@@ -405,6 +405,9 @@ as a user would. The fixes that matter beyond one screen:
   as the order; written only through the function (party, status, 1–1000
   characters, 20 a minute). The other side gets a push «رسالة من العميل /
   الفنّي» that opens `/chat` on the right side. Neither number is ever shown.
+- Operators (0102): no direct read. The order file in the console has
+  «المحادثة», which asks for a reason, records the read and the reason in
+  the audit log under the operator's name, and only then shows the thread.
 - App: «محادثة» on the customer's tracking card, «مراسلة العميل» on the
   technician's job screen, quick replies per side, live via Realtime.
 - ⚠️ Legal follow-up: the published privacy policy does not yet mention that
