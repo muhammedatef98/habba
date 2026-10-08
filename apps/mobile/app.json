@@ -8,7 +8,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "orientation": "portrait",
-    "newArchEnabled": true,
     "locales": {
       "ar": "./locales/ar.json",
       "en": "./locales/en.json"
@@ -24,7 +23,6 @@
     },
     "android": {
       "package": "sa.habba.app",
-      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#12514F"
