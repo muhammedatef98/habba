@@ -385,6 +385,10 @@ as a user would. The fixes that matter beyond one screen:
   (GO-LIVE §7). Build 1 failed on Android release lint because the iOS
   permission strings were flat in `locales/*.json`. They are now nested
   under `"ios"`.
+- ⚠️ **Build 3 predates the Maps key** (`GOOGLE_MAPS_ANDROID_API_KEY`, GO-LIVE §7 step 6):
+  its maps draw grey on a real device, and it has no splash or notification
+  icon. Rebuild once the key is set as an EAS `production` variable; an
+  Android store build now refuses to start without it.
 - **iOS:** not built. EAS has no Apple credentials. Someone has to run
   `npx eas-cli build -p ios --profile production` once, interactively, and
   sign in to the Apple Developer account. After that, non-interactive builds
