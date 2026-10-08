@@ -18,7 +18,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
-        "CFBundleDevelopmentRegion": "ar"
+        "CFBundleDevelopmentRegion": "ar",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
