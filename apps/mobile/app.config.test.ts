@@ -57,4 +57,15 @@ describe('app.config for the stores', () => {
     expect(config.extra?.['supabaseUrl']).toBe('https://x.supabase.co');
     expect(config.extra?.['eas']).toEqual({ projectId: '00000000-0000-0000-0000-000000000000' });
   });
+
+  it('accepts the project ID app.json carries in place of the variable', () => {
+    clear();
+    const extra = { eas: { projectId: '045794c7-1c02-411c-b2b7-68c4a3d2fe40' } };
+    expect(missingForStore(extra)).toHaveLength(2);
+    process.env['EAS_BUILD_PROFILE'] = 'production';
+    process.env['EXPO_PUBLIC_SUPABASE_URL'] = 'https://x.supabase.co';
+    process.env['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'] = 'sb_publishable_x';
+    const config = appConfig({ ...base, config: { ...base.config, extra } });
+    expect(config.extra?.['eas']).toEqual(extra.eas);
+  });
 });

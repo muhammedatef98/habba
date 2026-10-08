@@ -20,7 +20,7 @@ Supabase، ومزوّد الرسائل (OTP)، وبوابة الدفع. لا ش�
 | -------------------------------------- | --------------------------------- |
 | `EXPO_PUBLIC_SUPABASE_URL`             | Settings → API                    |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Settings → API Keys (publishable) |
-| `EAS_PROJECT_ID`                       | `eas init` — للإشعارات            |
+| `EAS_PROJECT_ID`                       | مثبّت في `app.json` — للإشعارات   |
 
 بمجرّد ضبطها يعمل التطبيق على قاعدة البيانات الحقيقية بدل وضع التجربة، ويبقى
 تسجيل الدخول محفوظاً في Keychain بعد إغلاق التطبيق.
@@ -156,12 +156,14 @@ Expo Go بلا build خاص.
 
 **الإعداد مرّة واحدة:**
 
-1. **حساب Expo ومشروع EAS:** أنشئ حساباً على expo.dev، ثم من جهازك داخل `apps/mobile`:
-   `npx eas-cli login` ثم `npx eas-cli init`. انسخ معرّف المشروع (Project ID).
-2. **متغيّرات البناء على EAS** (expo.dev ← المشروع ← Environment variables، بيئة
-   **production**): `EXPO_PUBLIC_SUPABASE_URL` و`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   و`EAS_PROJECT_ID`. **بناء المتجر يرفض أن يبدأ إن نقص أيّ منها** (`app.config.ts`) —
-   وإلا لخرج التطبيق في وضع التجربة: بيانات وهمية ورمز دخول 123456.
+1. **حساب Expo ومشروع EAS:** ✅ تمّ — المشروع `@muhammedatef98/habba`، ومعرّفه
+   (`045794c7-…`) و`owner` و`slug` مثبّتة في `apps/mobile/app.json`.
+2. **إعدادات Supabase للبناء:** ✅ تمّ — رابط المشروع والمفتاح العامّ (publishable) في
+   `apps/mobile/eas.json` (`build.production.env` و`build.preview.env`). كلاهما عامّ بطبيعته
+   ويُشحن داخل التطبيق أصلاً؛ الحماية من RLS لا من إخفائهما. تغييرهما يكون بتعديل `eas.json` (قيمه تتقدّم على متغيّرات EAS بنفس الاسم).
+   **بناء المتجر يرفض أن
+   يبدأ إن نقص أيّ منها** (`app.config.ts`) — وإلا لخرج التطبيق في وضع التجربة: بيانات
+   وهمية ورمز دخول 123456.
 3. **رمز Expo في GitHub:** expo.dev ← Account settings ← Access tokens ← أنشئ رمزاً،
    وضعه في المستودع: Settings ← Secrets and variables ← Actions ← `EXPO_TOKEN`.
 4. **Apple:**

@@ -47,10 +47,24 @@ export const REQUIRED_FOR_STORE = [
   'EAS_PROJECT_ID',
 ] as const;
 
-/** The variables a store build is missing, by name. Empty when it may proceed. */
-export function missingForStore(): string[] {
+/** The project ID `app.json` carries, if any (`extra.eas.projectId`). */
+function committedProjectId(extra: ConfigContext['config']['extra']): string | undefined {
+  const eas: unknown = extra?.['eas'];
+  if (typeof eas !== 'object' || eas === null) return undefined;
+  const id: unknown = (eas as Record<string, unknown>)['projectId'];
+  return typeof id === 'string' && id.trim() !== '' ? id.trim() : undefined;
+}
+
+/**
+ * The variables a store build is missing, by name. Empty when it may proceed.
+ * The EAS project ID is not a secret and identifies the app, so `app.json`
+ * may carry it; the environment variable then only overrides it.
+ */
+export function missingForStore(extra?: ConfigContext['config']['extra']): string[] {
   return REQUIRED_FOR_STORE.filter((names) =>
-    names.split('|').every((name) => env(name) === undefined),
+    names === 'EAS_PROJECT_ID' && committedProjectId(extra) !== undefined
+      ? false
+      : names.split('|').every((name) => env(name) === undefined),
   ).map((names) => names.replace('|', ' or '));
 }
 
@@ -58,11 +72,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // EAS sets EAS_BUILD_PROFILE on its build machines; `production` is the
   // profile the store builds use (eas.json).
   if (process.env['EAS_BUILD_PROFILE'] === 'production') {
-    const missing = missingForStore();
+    const missing = missingForStore(config.extra);
     if (missing.length > 0) {
       throw new Error(
         `A store build needs ${missing.join(', ')}. Set them as EAS environment ` +
-          'variables for the production environment (docs/release.md).',
+          'variables for the production environment (docs/GO-LIVE.md §7).',
       );
     }
   }
@@ -103,7 +117,9 @@ function buildConfig(config: ConfigContext['config']): ExpoConfig {
       // Where push tokens come from (expo-notifications reads it here). Not a
       // secret — it identifies the project, it does not authorise anything.
       // Absent, the app runs unchanged and simply registers for no pushes.
-      ...(env('EAS_PROJECT_ID') === undefined ? {} : { eas: { projectId: env('EAS_PROJECT_ID') } }),
+      ...(env('EAS_PROJECT_ID') === undefined
+        ? {}
+        : { eas: { ...config.extra?.['eas'], projectId: env('EAS_PROJECT_ID') } }),
     },
   };
 }
