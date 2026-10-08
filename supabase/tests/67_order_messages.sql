@@ -166,4 +166,21 @@ select test.assert_raises(
   'a party is not an operator', '42501');
 reset role;
 
+-- The person's words follow the person (0103).
+select test.become('66666666-0000-4000-6767-000000000006');
+select test.assert_eq(
+  jsonb_array_length(public.ops_export_user_data('11111111-0000-4000-6767-000000000001',
+                                                 'طلب العميل نسخة من بياناته') -> 'order_messages'),
+  1, 'an export carries what the person wrote');
+
+update public.orders set status = 'cancelled', cancellation_reason = 'اختبار' where id = :'job';
+select test.become('11111111-0000-4000-6767-000000000001');
+select public.delete_my_account('DELETE');
+select test.assert_eq(
+  (select body from public.order_messages where id = :'m2'), 'رسالة محذوفة',
+  'deleting the account erases what they wrote');
+select test.assert_eq(
+  (select body from public.order_messages where id = :'m1'), 'في الطريق إليك',
+  'and keeps what the other side wrote');
+
 rollback;

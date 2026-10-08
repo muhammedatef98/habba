@@ -410,9 +410,12 @@ as a user would. The fixes that matter beyond one screen:
   the audit log under the operator's name, and only then shows the thread.
 - App: «محادثة» on the customer's tracking card, «مراسلة العميل» on the
   technician's job screen, quick replies per side, live via Realtime.
-- ⚠️ Legal follow-up: the published privacy policy does not yet mention that
-  order messages are stored. Add it in the next version from the console
-  (Legal → new version), with a retention line (kept with the order).
+- Erasure and export (0103): deleting an account replaces the person's own
+  messages with «رسالة محذوفة» (the other side's stay); the console's data
+  export includes what the person sent.
+- ⚠️ Legal follow-up: the published privacy policy does not yet mention order
+  messages. The exact AR/EN additions are in `docs/legal/README.md` («إضافات
+  مطلوبة للإصدار 2»); publish them from the console as version 2.
 
 ## 6c. Store builds, as of 2026-10-08
 
