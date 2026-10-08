@@ -8,10 +8,9 @@
 -- and writes it to the audit log with the reader's name — the same shape as
 -- a personal-data export (0070).
 
-drop policy order_messages_read on public.order_messages;
-
-create policy order_messages_read on public.order_messages
-  for select to authenticated
+-- One statement in place, rather than drop and create: the table is in the
+-- realtime publication, and the shorter the lock, the less it waits on it.
+alter policy order_messages_read on public.order_messages
   using (
     exists (
       select 1 from public.orders o
