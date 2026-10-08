@@ -811,7 +811,7 @@ const BOOKABLE_SERVICES: readonly Service[] = [
  * meaningless if one side of it is empty — and a flow that offers a choice and
  * then has nothing behind it is worse than not offering it.
  */
-interface DevProvider extends BookingProvider {
+interface DevProvider extends Omit<BookingProvider, 'nextSlotAt'> {
   readonly serviceIds: readonly string[];
   readonly modes: readonly BookingMode[];
 }
@@ -1537,6 +1537,7 @@ export class InMemoryRepository implements Repository {
         // fixtures carry 0.00 rather than a duplicated number so a price
         // change in the catalogue cannot leave the picker quoting a stale one.
         price: service?.basePrice ?? provider.price,
+        nextSlotAt: devSlotsFor(provider.id, new Date())[0]?.startsAt ?? null,
       }))
       .sort((a, b) => b.ratingAvg - a.ratingAvg);
   }

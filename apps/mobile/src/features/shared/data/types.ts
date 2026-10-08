@@ -216,6 +216,12 @@ export interface BookingProvider {
   readonly addressAr: string | null;
   /** What this provider charges — their own price where allowed, else the catalogue's. */
   readonly price: SarAmount;
+  /**
+   * The earliest time this provider can still be booked, or null when they
+   * have published none (0104). The picker says so rather than leading the
+   * customer to an empty list of times.
+   */
+  readonly nextSlotAt: string | null;
 }
 
 /** One bookable window. `remaining` is capacity minus what is already booked. */

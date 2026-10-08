@@ -417,6 +417,17 @@ as a user would. The fixes that matter beyond one screen:
   messages. The exact AR/EN additions are in `docs/legal/README.md` («إضافات
   مطلوبة للإصدار 2»); publish them from the console as version 2.
 
+### A technician's own calendar (0104, suite 68)
+
+- Booking a visit lists the chosen technician's times, and nothing in the app
+  ever published any — every technician showed an empty list. «مواعيدي»
+  (from ملفي, and a reminder on the shift screen while none are open)
+  publishes chosen days inside one daily window and appointment length, in
+  Riyadh time; tapping a coming time closes or reopens it, booked times are
+  left alone. Server: `publish_availability`, `my_slots`, `set_slot_blocked`.
+- The customer's provider picker shows each provider's next open time, puts
+  bookable ones first, and does not open an empty time list for the rest.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),

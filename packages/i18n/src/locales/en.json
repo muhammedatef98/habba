@@ -359,7 +359,9 @@
     "workshopOnly": "Workshop only",
     "mobileOnly": "Mobile only",
     "errorPayment": "Your time is booked, but the payment didn't go through. Tap “Confirm booking” again.",
-    "priceByProvider": "Price set by the technician or workshop"
+    "priceByProvider": "Price set by the technician or workshop",
+    "providerNextSlot": "Next available: {{when}}",
+    "providerNoSlots": "No times available right now"
   },
   "emergency": {
     "title": "Emergency request",
@@ -1144,5 +1146,38 @@
       "besideCar": "I'm next to the car",
       "tellOnArrival": "Message me when you arrive"
     }
+  },
+  "availability": {
+    "title": "My schedule",
+    "menuHint": "The times customers can book you",
+    "intro": "Customers can book a visit only at the times you publish here. Pick your days and working hours, then publish.",
+    "publishTitle": "Publish new times",
+    "days": "Days",
+    "from": "From",
+    "to": "To",
+    "earlier": "Earlier",
+    "later": "Later",
+    "length": "Appointment length",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "summary_one": "Adds 1 appointment on the chosen days ({{days}}).",
+    "summary_other": "Adds up to {{count}} appointments on the chosen days ({{days}}).",
+    "pickDays": "Pick at least one day.",
+    "publish": "Publish times",
+    "published_one": "1 time added.",
+    "published_other": "{{count}} times added.",
+    "nothingNew": "These times are already published.",
+    "publishFailed": "Couldn't publish your times. Check your connection and try again.",
+    "toggleFailed": "Couldn't change that time. Try again.",
+    "comingTitle": "Your coming times",
+    "loadFailed": "Couldn't load your times.",
+    "empty": "You haven't published any times yet, so customers can't book you until you do.",
+    "tapHint": "Tap a time to close it to bookings, or open it again.",
+    "booked": "Booked",
+    "closed": "Closed",
+    "open": "Open",
+    "nudgeTitle": "No times published",
+    "nudgeBody": "Publish your working hours so customers can book a visit.",
+    "nudgeAction": "Publish my times"
   }
 }

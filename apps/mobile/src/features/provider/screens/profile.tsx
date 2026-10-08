@@ -243,6 +243,13 @@ export default function ProviderProfileScreen() {
         <SectionTitle title={t('pro.sectionAccount')} />
         <MenuGroup>
           <MenuRow
+            testID="pro-availability"
+            icon="calendar"
+            title={t('availability.title')}
+            subtitle={t('availability.menuHint')}
+            onPress={() => router.push('/availability')}
+          />
+          <MenuRow
             testID="switch-to-customer"
             icon="home"
             title={t('profile.switchToCustomer')}

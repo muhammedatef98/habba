@@ -34,6 +34,7 @@ import { formatSarDisplay } from '@/features/shared/lib/money-format';
 // VAT included, as on the home screen, the emergency screen and the card
 // hold: one service must not show two prices on the way to booking it.
 import { priceWithVat } from '@/features/shared/lib/order-price';
+import { formatAppointment } from '@/features/shared/lib/dates';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import type { BookingProvider } from '@/features/shared/data/types';
 
@@ -91,6 +92,9 @@ export default function BookingProviderScreen() {
         <View style={{ gap: theme.spacing.md }}>
           {rows.map((provider) => {
             const selected = draft.provider?.id === provider.id;
+            // No published times: shown, so the customer knows they exist,
+            // but not a way into an empty list of times.
+            const bookable = provider.nextSlotAt !== null;
 
             return (
               <Card
@@ -98,12 +102,17 @@ export default function BookingProviderScreen() {
                 key={provider.id}
                 testID={`booking-provider-${provider.id}`}
                 elevation={selected ? 'sm' : 'none'}
-                onPress={() => {
-                  draft.selectProvider(provider);
-                  router.push('/booking/slot');
-                }}
+                {...(bookable
+                  ? {
+                      onPress: () => {
+                        draft.selectProvider(provider);
+                        router.push('/booking/slot');
+                      },
+                    }
+                  : {})}
                 accessibilityLabel={nameOf(provider)}
                 style={{
+                  opacity: bookable ? 1 : 0.6,
                   gap: theme.spacing.md,
                   backgroundColor: theme.colors.surface,
                   borderColor: selected ? theme.colors.primary : theme.colors.border,
@@ -161,6 +170,28 @@ export default function BookingProviderScreen() {
                         {t('booking.providerJobs', {
                           jobs: formatCount(provider.jobsCompleted, i18n.language),
                         })}
+                      </Text>
+                    </View>
+
+                    <View
+                      testID={`booking-provider-next-${provider.id}`}
+                      style={{
+                        flexDirection: rowDirectionFor(theme.direction, theme.nativeDirection),
+                        alignItems: 'center',
+                        gap: theme.spacing.xs,
+                      }}
+                    >
+                      <Icon
+                        name="calendar"
+                        size={14}
+                        color={bookable ? theme.colors.primary : theme.colors.textSubtle}
+                      />
+                      <Text variant="caption" tone={bookable ? 'primary' : 'subtle'}>
+                        {provider.nextSlotAt !== null
+                          ? t('booking.providerNextSlot', {
+                              when: formatAppointment(provider.nextSlotAt, i18n.language),
+                            })
+                          : t('booking.providerNoSlots')}
                       </Text>
                     </View>
                   </View>

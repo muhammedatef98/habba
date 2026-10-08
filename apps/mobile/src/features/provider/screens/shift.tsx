@@ -50,6 +50,14 @@ export default function ShiftScreen() {
     router.push({ pathname: '/job', params: { id: orderId } });
   }, []);
 
+  // Booked visits come only from published times (0104); a technician with
+  // none is invisible to every customer booking ahead.
+  const mySlots = useQuery({
+    queryKey: ['my-slots'],
+    queryFn: () => providerRepository.listMySlots(21),
+    staleTime: 60_000,
+  });
+
   const openJobs = useQuery({
     queryKey: ['open-jobs'],
     queryFn: () => providerRepository.listOpenJobs(),
@@ -204,6 +212,31 @@ export default function ShiftScreen() {
         busy={toggle.isPending}
         onToggle={() => toggle.mutate(!isOnline)}
       />
+
+      {mySlots.data !== undefined && mySlots.data.every((slot) => slot.blocked) ? (
+        <Card
+          testID="shift-no-slots"
+          elevation="none"
+          style={{ borderWidth: 1, borderColor: theme.colors.border, gap: theme.spacing.sm }}
+        >
+          <Row gap="sm" align="center">
+            <Icon name="calendar" size={theme.iconSize.md} color={theme.colors.primary} />
+            <Text variant="bodyStrong" style={{ flex: 1 }}>
+              {t('availability.nudgeTitle')}
+            </Text>
+          </Row>
+          <Text variant="bodySmall" tone="muted">
+            {t('availability.nudgeBody')}
+          </Text>
+          <Button
+            testID="shift-open-availability"
+            label={t('availability.nudgeAction')}
+            variant="secondary"
+            size="medium"
+            onPress={() => router.push('/availability')}
+          />
+        </Card>
+      ) : null}
 
       {/* Online but unreachable while closed is the case that quietly costs a
           technician their jobs — so it is said, with the way out. A simulator
