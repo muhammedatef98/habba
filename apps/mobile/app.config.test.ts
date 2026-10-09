@@ -14,7 +14,6 @@ const KEYS = [
   'EXPO_PUBLIC_SUPABASE_ANON_KEY',
   'EAS_PROJECT_ID',
   'EAS_BUILD_PLATFORM',
-  'GOOGLE_MAPS_ANDROID_API_KEY',
 ] as const;
 const saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
 
@@ -73,27 +72,16 @@ describe('app.config for the stores', () => {
     expect(config.extra?.['eas']).toEqual(extra.eas);
   });
 
-  it('refuses an Android store build without a Maps key — the map would be grey', () => {
-    clear();
-    process.env['EAS_BUILD_PROFILE'] = 'production';
-    process.env['EAS_BUILD_PLATFORM'] = 'android';
-    process.env['EXPO_PUBLIC_SUPABASE_URL'] = 'https://x.supabase.co';
-    process.env['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'] = 'sb_publishable_x';
-    process.env['EAS_PROJECT_ID'] = '00000000-0000-0000-0000-000000000000';
-    expect(() => appConfig(base)).toThrow(/GOOGLE_MAPS_ANDROID_API_KEY/);
-
-    process.env['GOOGLE_MAPS_ANDROID_API_KEY'] = 'AIza-test';
-    expect(appConfig(base).android?.config?.googleMaps?.apiKey).toBe('AIza-test');
-  });
-
-  it('does not ask an iOS store build for it — iOS draws Apple Maps', () => {
-    clear();
-    process.env['EAS_BUILD_PROFILE'] = 'production';
-    process.env['EAS_BUILD_PLATFORM'] = 'ios';
-    process.env['EXPO_PUBLIC_SUPABASE_URL'] = 'https://x.supabase.co';
-    process.env['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'] = 'sb_publishable_x';
-    process.env['EAS_PROJECT_ID'] = '00000000-0000-0000-0000-000000000000';
-    expect(appConfig(base).android?.config?.googleMaps).toBeUndefined();
+  it('asks neither store build for a map key — no Google Maps anywhere', () => {
+    for (const platform of ['android', 'ios']) {
+      clear();
+      process.env['EAS_BUILD_PROFILE'] = 'production';
+      process.env['EAS_BUILD_PLATFORM'] = platform;
+      process.env['EXPO_PUBLIC_SUPABASE_URL'] = 'https://x.supabase.co';
+      process.env['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'] = 'sb_publishable_x';
+      process.env['EAS_PROJECT_ID'] = '00000000-0000-0000-0000-000000000000';
+      expect(appConfig(base).android?.config?.googleMaps).toBeUndefined();
+    }
   });
 });
 
@@ -129,6 +117,33 @@ describe('permissions the stores will read', () => {
         if (!/Permission$/.test(key) || value === false) continue;
         expect(value, `${name}.${key}`).toMatch(/هبّة/);
       }
+    }
+  });
+});
+
+/**
+ * Android draws OpenStreetMap through MapLibre and iOS draws Apple Maps
+ * (owner's decision, 2026-10-09). Each library is linked into its own app
+ * only, and only that platform's files import it.
+ */
+describe('one map library per platform', () => {
+  const mapDir = join(__dirname, 'src/features/customer/components/map');
+  const read = (file: string) => readFileSync(join(mapDir, file), 'utf8');
+
+  it('links react-native-maps into iOS only and MapLibre into Android only', async () => {
+    const config = (await import('./react-native.config.js')) as {
+      default: { dependencies: Record<string, { platforms: Record<string, null> }> };
+    };
+    const deps = config.default.dependencies;
+    expect(deps['react-native-maps']?.platforms).toEqual({ android: null });
+    expect(deps['@maplibre/maplibre-react-native']?.platforms).toEqual({ ios: null });
+  });
+
+  it('keeps Google Maps out of the Android map files and MapLibre out of the iOS ones', () => {
+    for (const name of ['LocationPicker', 'RouteMap']) {
+      expect(read(`${name}.android.tsx`)).not.toMatch(/from 'react-native-maps'/);
+      expect(read(`${name}.android.tsx`)).toMatch(/@maplibre\/maplibre-react-native/);
+      expect(read(`${name}.tsx`)).not.toMatch(/maplibre/);
     }
   });
 });

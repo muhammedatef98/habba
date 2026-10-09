@@ -183,16 +183,11 @@ Expo Go بلا build خاص.
      `.aab` من صفحة البناء على expo.dev، وارفعه بيدك في Play Console ← Internal testing.
      بعدها يرفع Release تلقائياً.
 
-6. **مفتاح خرائط Google لأندرويد:** خرائط أندرويد تُرسم بـ Google Maps، ونسخة المتجر بلا
-   مفتاح تُظهر مربّعاً رمادياً بلا شوارع ولا دبّوس (Expo Go يخفي ذلك لأنه يحمل مفتاح Expo).
-   - Google Cloud Console ← APIs & Services ← فعّل **Maps SDK for Android** ← Credentials ←
-     Create credentials ← API key.
-   - قيّد المفتاح: Application restrictions ← Android apps ← الحزمة `sa.habba.app` وبصمة
-     SHA-1 لشهادة التوقيع (من `npx eas-cli credentials` ← Android، ومن Play Console ←
-     App integrity إن كانت Google تعيد التوقيع). API restrictions ← Maps SDK for Android فقط.
-   - ضعه في EAS لا في المستودع: expo.dev ← المشروع ← Environment variables ← `production` ←
-     `GOOGLE_MAPS_ANDROID_API_KEY`. **بناء أندرويد للمتجر يرفض أن يبدأ بدونه**
-     (`app.config.ts`). iOS يستعمل خرائط Apple ولا يحتاج شيئاً.
+6. **الخرائط بلا مفاتيح:** iOS يرسم خرائط Apple (react-native-maps)، وAndroid يرسم
+   OpenStreetMap عبر MapLibre وخدمة OpenFreeMap (قرار المالك 2026-10-09: لا خرائط Google).
+   لا مفتاح ولا حساب ولا فاتورة لأيّ منهما. كل مكتبة مربوطة بمنصّتها فقط
+   (`apps/mobile/react-native.config.js`)، والشاشتان في `*.android.tsx`. لا عرض أقمار
+   صناعية على Android: OpenFreeMap بلا صور، والخدمات المجانية للصور تمنع الاستخدام التجاري.
 
 **ما يرفعه Release:** Android إلى مسار **Internal testing** كمسوّدة؛ iOS إلى
 **TestFlight**. النشر للعامة خطوة يدوية في كل متجر بعد التجربة — عن قصد.
