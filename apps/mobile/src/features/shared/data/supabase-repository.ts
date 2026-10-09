@@ -79,6 +79,8 @@ import type {
   VehicleMake,
   VehicleModel,
   VehicleWarranty,
+  LogbookSeal,
+  OdometerReset,
   WarrantyClaimInput,
 } from './types.js';
 import type {
@@ -405,6 +407,16 @@ interface IncomingTransferRow {
   readonly first_record_at: string | null;
   readonly open_warranties: number;
   readonly attempts_exhausted: boolean;
+}
+
+interface LogbookSealRow {
+  readonly is_valid: boolean;
+  readonly entries: number;
+  readonly verified_entries: number;
+  readonly first_at: string | null;
+  readonly last_at: string | null;
+  readonly odometer_replaced: boolean;
+  readonly odometer_corrected: boolean;
 }
 
 interface VehicleWarrantyRow {
@@ -1674,6 +1686,7 @@ export class SupabaseRepository implements Repository {
         savedPlaces: values['feature_saved_places'] !== false,
         orderChat: values['feature_order_chat'] !== false,
         warrantyClaims: values['feature_warranty_claims'] !== false,
+        jobHistory: values['feature_job_history'] !== false,
       },
       handoverRequired: values['require_handover_code'] === true,
       minAppVersion: text('min_app_version'),
@@ -1955,6 +1968,31 @@ export class SupabaseRepository implements Repository {
       fulfilmentMode: row.fulfilment_mode,
       openClaimId: row.open_claim_id,
     }));
+  }
+
+  async getLogbookSeal(vehicleId: string): Promise<LogbookSeal> {
+    const { data, error } = await this.client.rpc('logbook_seal', { p_vehicle_id: vehicleId });
+    if (error !== null) throw new Error(`getLogbookSeal: ${error.message}`);
+    const row = (data as readonly LogbookSealRow[] | null)?.[0];
+    if (row === undefined) throw new Error('getLogbookSeal: no row');
+    return {
+      isValid: row.is_valid,
+      entries: row.entries,
+      verifiedEntries: row.verified_entries,
+      firstAt: row.first_at,
+      lastAt: row.last_at,
+      odometerReplaced: row.odometer_replaced,
+      odometerCorrected: row.odometer_corrected,
+    };
+  }
+
+  async replaceOdometer(vehicleId: string, km: number, reason: OdometerReset): Promise<void> {
+    const { error } = await this.client.rpc('replace_odometer_cluster', {
+      p_vehicle_id: vehicleId,
+      p_km: km,
+      p_reason: reason,
+    });
+    if (error !== null) throw new Error(`replaceOdometer: ${error.message}`);
   }
 
   async requestWarrantyService(input: WarrantyClaimInput): Promise<string> {

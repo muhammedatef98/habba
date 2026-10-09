@@ -38,6 +38,7 @@ import type {
   UserRow,
   VehicleCostsRow,
   VehicleFile,
+  TimelineSweep,
   VehicleHealthRow,
   VerificationStatus,
 } from './types';
@@ -249,6 +250,9 @@ export function createApi(transport: Transport) {
 
     // -- Cars ---------------------------------------------------------------------------------------
     vehicle: (id: string) => transport.rpc<VehicleFile>('ops_vehicle_detail', { p_vehicle_id: id }),
+
+    /** Walks every logbook's hash chain; the sweep goes on the audit log (0108). */
+    verifyTimelines: () => transport.rpc<TimelineSweep>('ops_verify_timelines', {}),
 
     /** صحة السيارة and تكلفة الملكية (0097) — the same figures the owner sees. */
     vehicleHealth: (id: string) =>

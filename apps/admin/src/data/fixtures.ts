@@ -1935,8 +1935,24 @@ export class FixtureTransport implements Transport {
       case 'ops_vehicle_detail': {
         const vehicle = s.vehicles.find((v) => v.vehicle.id === args['p_vehicle_id']);
         if (vehicle === undefined) throw new ApiError('Vehicle not found', 'P0002', null);
-        return vehicle;
+        return {
+          ...vehicle,
+          chain: vehicle.chain ?? {
+            is_valid: true,
+            checked_count: vehicle.timeline.length,
+            first_invalid_id: null,
+            reason: null,
+          },
+        };
       }
+
+      case 'ops_verify_timelines':
+        return {
+          checked_vehicles: s.vehicles.length,
+          checked_entries: s.vehicles.reduce((sum, v) => sum + v.timeline.length, 0),
+          checked_at: new Date().toISOString(),
+          broken: [],
+        };
 
       case 'ops_annotate_vehicle': {
         const note = reasonOf(args['p_note_ar']);

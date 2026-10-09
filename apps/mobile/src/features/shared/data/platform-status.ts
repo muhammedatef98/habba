@@ -20,6 +20,7 @@ export const DEFAULT_PLATFORM_STATUS: PlatformStatus = {
   features: {
     orderChat: true,
     warrantyClaims: true,
+    jobHistory: true,
     emergency: true,
     booking: true,
     videoTriage: true,

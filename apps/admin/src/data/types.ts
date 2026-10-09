@@ -517,6 +517,30 @@ export interface VehicleFile {
   }[];
   readonly orders: readonly BriefOrder[];
   readonly notes: readonly Note[];
+  /** The hash chain walked on every read of the file (0108). */
+  readonly chain?: ChainCheck;
+}
+
+/** One logbook's chain, walked end to end (0010, 0108). */
+export interface ChainCheck {
+  readonly is_valid: boolean;
+  readonly checked_count: number;
+  readonly first_invalid_id: string | null;
+  readonly reason: string | null;
+}
+
+/** Every logbook's chain, walked by ops_verify_timelines (0108). */
+export interface TimelineSweep {
+  readonly checked_vehicles: number;
+  readonly checked_entries: number;
+  readonly checked_at: string;
+  readonly broken: readonly {
+    readonly vehicle_id: string;
+    readonly label: string | null;
+    readonly checked_count: number;
+    readonly first_invalid_id: string | null;
+    readonly reason: string | null;
+  }[];
 }
 
 export interface DisputeRow extends Dispute {

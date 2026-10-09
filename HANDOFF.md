@@ -450,6 +450,26 @@ the customer, the provider and the console:
   booking, and its shift screen says so. The console's provider file shows the
   calendar: open/booked/closed times and the next open one.
 
+### The sealed logbook, on every surface (0108, suite 72)
+
+The timeline was always hash-chained; only the Habba report ever checked it.
+
+- **Customer.** دفتر السيارة's coverage card opens with «سجلّ مختوم»: the chain
+  walked server-side (`logbook_seal`), the entry count, and whether the
+  odometer was ever replaced or corrected. A broken chain says so and sends
+  the owner to support. The mileage screen no longer dead-ends on a lower
+  reading: «استبدلت العدّاد» / «القراءة السابقة كانت خطأ» calls
+  `replace_odometer_cluster`, written to the logbook where a buyer sees it.
+- **Technician.** On a live job, «سجل السيارة»: earlier services, dates,
+  mileage and who vouches for each (`job_vehicle_history`). Summaries only —
+  no photos, details, addresses or names — and only between acceptance and
+  hand-back. Switch: `feature_job_history` (console → الإعدادات → الميزات).
+  The owner's logbook says the technician can see it.
+- **Console.** The vehicle file states whether the chain holds; المركبات has
+  «افحص كل الدفاتر» (`ops_verify_timelines`), which walks every chain, lists
+  any broken one and is written to the audit log. A broken chain means a
+  direct database edit: treat it as a security incident.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),

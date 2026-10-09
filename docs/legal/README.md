@@ -19,7 +19,7 @@
 مع محامٍ مرخّص في المملكة قبل الإطلاق، وخصوصاً: نموذج الحجز والتحصيل (ADR-0008)،
 ونقل البيانات خارج المملكة (ADR-0010)، وحدود المسؤولية، ومدة عدم الالتفاف على المنصة.
 
-## إضافات مطلوبة للإصدار 2 — رسائل الطلب (0101–0103)
+## إضافات مطلوبة للإصدار 2 — رسائل الطلب (0101–0103) وسجل السيارة للفنّي (0108)
 
 أُضيفت المحادثة داخل الطلب بعد نشر الإصدار 1، فسياسة الخصوصية المنشورة لا تذكرها.
 تُنشر هذه الإضافات من لوحة التشغيل ← «الشروط والسياسات» ← إصدار جديد من سياسة
@@ -42,3 +42,9 @@
 > - نحتفظ برسائل الطلب مع الطلب نفسه. لا يطّلع عليها فريق هبّة إلا لسبب، كمعالجة شكوى، ويُسجَّل كل اطّلاع باسم من اطّلع وسببه. عند حذف حسابك تُستبدل رسائلك بعبارة «رسالة محذوفة».
 
 > - We keep an order's messages with the order. Habba staff read them only for a reason, such as handling a complaint, and every such read is recorded with the reader's name and reason. When you delete your account, your messages are replaced with "Message deleted".
+
+**§3 «مقدّم الخدمة المكلّف بطلبك» — بند جديد (0108):**
+
+> - ملخّص صيانة سيارتك السابقة من دفتر السيارة (نوع العمل وتاريخه وقراءة العدّاد ومن وثّقه)، ما دام الطلب قائماً فقط، دون صور أو عناوين أو أسماء. يمكن لهبّة إيقاف ذلك.
+
+> - A summary of your car's earlier servicing from its logbook (what was done, when, the odometer reading and who documented it), only while the order is live, with no photos, addresses or names. Habba can switch this off.

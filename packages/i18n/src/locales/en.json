@@ -1246,5 +1246,35 @@
     "nudgeTitle": "Complete your workshop details",
     "nudgeBody": "Your workshop won't appear to customers booking until it has an address and location.",
     "nudgeAction": "Complete workshop details"
+  },
+  "seal": {
+    "title": "Sealed logbook",
+    "body": "Entries: {{entries}}. Each one is chained to the one before it by a digital fingerprint, so no entry can be changed or removed without it showing — not even by Habba.",
+    "brokenTitle": "The logbook's seal could not be verified",
+    "brokenBody": "One entry does not match its fingerprint. No Habba report can be issued for this car until support has reviewed it; please contact us.",
+    "odometerReplaced": "This car's odometer was replaced, and that shows in the logbook and on the Habba report.",
+    "odometerCorrected": "An earlier odometer reading was corrected, and that shows in the logbook and on the Habba report.",
+    "sharedWithTechnician": "The technician on a live job sees the service summary only — no photos, addresses or names."
+  },
+  "odometer": {
+    "title": "Lower than the recorded odometer",
+    "body": "An odometer does not normally go down. If there is a reason, choose it and it is recorded in the logbook as it is.",
+    "cluster_replaced": "I replaced the odometer",
+    "cluster_replacedHint": "A new or used cluster was fitted. The distance driven before it is kept.",
+    "correction": "The previous reading was wrong",
+    "correctionHint": "A wrong number was entered before. This reading replaces it.",
+    "save": "Record {{km}} km",
+    "onRecord": "This shows in the logbook and on the Habba report for any buyer, and cannot be removed.",
+    "newSeries": "New odometer or corrected reading"
+  },
+  "jobHistory": {
+    "title": "The car's history",
+    "sealed": "Sealed, unchanged logbook",
+    "unsealed": "The logbook's seal could not be verified",
+    "mileage": "{{km}} km",
+    "odometerReset": "The odometer was replaced or a reading corrected before.",
+    "empty": "No service recorded for this car yet.",
+    "more": "Show {{n}} more",
+    "less": "Show less"
   }
 }

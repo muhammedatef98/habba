@@ -385,6 +385,8 @@ export interface AppFeatures {
   readonly orderChat: boolean;
   /** Claiming a warranty from the logbook (0105, 0106). */
   readonly warrantyClaims: boolean;
+  /** The technician on a live job reads the car's service history (0108). */
+  readonly jobHistory: boolean;
   readonly emergency: boolean;
   readonly booking: boolean;
   readonly videoTriage: boolean;
@@ -591,6 +593,23 @@ export interface VehicleWarranty {
   /** The open claim, to follow it from the logbook. */
   readonly openClaimId: string | null;
 }
+
+/**
+ * The seal on a car's logbook (0108): whether the hash chain still checks out,
+ * and how much of it Habba itself vouches for (ADR-0005).
+ */
+export interface LogbookSeal {
+  readonly isValid: boolean;
+  readonly entries: number;
+  readonly verifiedEntries: number;
+  readonly firstAt: string | null;
+  readonly lastAt: string | null;
+  readonly odometerReplaced: boolean;
+  readonly odometerCorrected: boolean;
+}
+
+/** Why a new odometer series starts (0058): a new cluster, or a typo fixed. */
+export type OdometerReset = 'cluster_replaced' | 'correction';
 
 /** A warranty claim, as the customer files it (0105). */
 export interface WarrantyClaimInput {

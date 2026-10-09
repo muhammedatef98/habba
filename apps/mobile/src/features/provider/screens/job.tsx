@@ -29,6 +29,7 @@ import { useLiveRefresh } from '@/features/shared/lib/live';
 import { chatOpen } from '@/features/shared/lib/chat';
 import { useFeatures, usePlatformStatus } from '@/features/shared/hooks/use-platform';
 import { distanceLabel } from '@/features/provider/lib/distance-band';
+import { JobVehicleHistoryCard } from '@/features/provider/components/JobVehicleHistoryCard';
 import { navigationLinks } from '@/features/provider/lib/navigate';
 import { loadDraft, syncEvidenceNow } from '@/features/provider/lib/evidence-queue';
 import { formatAppointment } from '@/features/shared/lib/dates';
@@ -108,6 +109,21 @@ export default function JobScreen() {
     atTheCar && handoverRequired && handover.data !== undefined && handover.data.issued
       ? !handover.data.verified
       : false;
+
+  // The car's history while the job is live (0108). The server decides when
+  // it opens and closes; this only avoids asking when it certainly would not.
+  const historyOpen =
+    features.jobHistory &&
+    job.data !== null &&
+    job.data !== undefined &&
+    job.data.offer === null &&
+    chatOpen(job.data.status);
+  const history = useQuery({
+    queryKey: ['job-history', id],
+    queryFn: () => providerRepository.getJobHistory(id ?? ''),
+    enabled: historyOpen,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const quotable = job.data !== null && job.data !== undefined && canQuoteParts(job.data.status);
   const parts = useQuery({
@@ -264,6 +280,10 @@ export default function JobScreen() {
           </Text>
         ) : null}
       </View>
+
+      {historyOpen && history.data !== undefined ? (
+        <JobVehicleHistoryCard history={history.data} />
+      ) : null}
 
       {/* What a technician needs to decide on an offer: how far, and what it
           pays. The address arrives once they accept (ADR-0013). */}

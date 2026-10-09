@@ -400,6 +400,45 @@ export interface ProviderRepository {
   /** The caller's workshop, or null before it has been set up (0107). */
   getMyWorkshop(): Promise<WorkshopProfile | null>;
   saveWorkshop(profile: WorkshopProfile): Promise<void>;
+  /**
+   * The car's service history while the job is live (0108): summaries only,
+   * and whether the logbook's seal holds. Throws `history:disabled` when ops
+   * switched it off.
+   */
+  getJobHistory(orderId: string): Promise<JobVehicleHistory>;
+}
+
+/** What the technician on a live job may read of the car's logbook (0108). */
+export interface JobVehicleHistory {
+  readonly isValid: boolean;
+  readonly entries: number;
+  readonly currentMileage: number | null;
+  readonly odometerReset: boolean;
+  readonly events: readonly JobHistoryEvent[];
+}
+
+export interface JobHistoryEvent {
+  readonly eventType: string;
+  readonly occurredAt: string;
+  readonly mileage: number | null;
+  readonly provenance: 'self_reported' | 'self_documented' | 'habba_verified' | 'third_party';
+  readonly summaryAr: string;
+  readonly summaryEn: string;
+}
+
+interface JobHistoryRow {
+  readonly is_valid: boolean;
+  readonly entries: number;
+  readonly current_mileage: number | null;
+  readonly odometer_replaced: boolean;
+  readonly events: readonly {
+    readonly event_type: string;
+    readonly occurred_at: string;
+    readonly mileage: number | null;
+    readonly provenance: JobHistoryEvent['provenance'];
+    readonly summary_ar: string;
+    readonly summary_en: string;
+  }[];
 }
 
 /** A workshop's own address, point, bays and hours (0023, 0107). */
@@ -724,6 +763,30 @@ export class SupabaseProviderRepository implements ProviderRepository {
     if (error !== null) throw new Error(`getHandoverStatus: ${error.message}`);
     const row = ((data ?? []) as HandoverStatus[])[0];
     return row ?? { issued: false, verified: false, locked: false };
+  }
+
+  async getJobHistory(orderId: string): Promise<JobVehicleHistory> {
+    const { data, error } = await this.client.rpc('job_vehicle_history', { p_order_id: orderId });
+    if (error !== null) {
+      throw new Error(
+        error.hint === 'history:disabled' ? 'history:disabled' : `getJobHistory: ${error.message}`,
+      );
+    }
+    const row = data as JobHistoryRow;
+    return {
+      isValid: row.is_valid,
+      entries: row.entries,
+      currentMileage: row.current_mileage,
+      odometerReset: row.odometer_replaced,
+      events: row.events.map((event) => ({
+        eventType: event.event_type,
+        occurredAt: event.occurred_at,
+        mileage: event.mileage,
+        provenance: event.provenance,
+        summaryAr: event.summary_ar,
+        summaryEn: event.summary_en,
+      })),
+    };
   }
 
   async verifyHandoverCode(orderId: string, code: string): Promise<boolean> {
@@ -1233,6 +1296,35 @@ export class InMemoryProviderRepository implements ProviderRepository {
   async getHandoverStatus(orderId: string): Promise<HandoverStatus> {
     const state = this.handovers.get(orderId) ?? { verified: false, attempts: 0 };
     return { issued: true, verified: state.verified, locked: state.attempts >= 5 };
+  }
+
+  async getJobHistory(_orderId: string): Promise<JobVehicleHistory> {
+    // The dev car's history: one service Habba did, one the owner typed.
+    const day = 24 * 60 * 60 * 1000;
+    return {
+      isValid: true,
+      entries: 4,
+      currentMileage: 84_200,
+      odometerReset: false,
+      events: [
+        {
+          eventType: 'service_completed',
+          occurredAt: new Date(Date.now() - 95 * day).toISOString(),
+          mileage: 80_150,
+          provenance: 'habba_verified',
+          summaryAr: 'تغيير زيت وفلتر — 5W-30',
+          summaryEn: 'Oil and filter change — 5W-30',
+        },
+        {
+          eventType: 'parts_replaced',
+          occurredAt: new Date(Date.now() - 240 * day).toISOString(),
+          mileage: 72_400,
+          provenance: 'self_reported',
+          summaryAr: 'تبديل البطارية',
+          summaryEn: 'Battery replaced',
+        },
+      ],
+    };
   }
 
   async verifyHandoverCode(orderId: string, code: string): Promise<boolean> {

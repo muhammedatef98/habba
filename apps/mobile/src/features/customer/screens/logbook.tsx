@@ -53,6 +53,7 @@ import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCar
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { OwnershipCostCard } from '@/features/customer/components/logbook/OwnershipCostCard';
 import { VehicleHealthCard } from '@/features/customer/components/logbook/VehicleHealthCard';
+import { LogbookSealStrip } from '@/features/customer/components/logbook/LogbookSealStrip';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
@@ -138,6 +139,16 @@ export default function LogbookScreen() {
   const health = useQuery({
     queryKey: ['vehicle-health', id],
     queryFn: () => repository.getVehicleHealth(id ?? ''),
+    enabled: id !== undefined,
+  });
+
+  // The seal (0108): the chain walked server-side. Optional like the two
+  // cards above — a failed check hides the strip, it does not claim a break.
+  const seal = useQuery({
+    // Under the timeline's key, so every write that refetches the history
+    // re-walks the chain too.
+    queryKey: ['timeline', id, 'seal'],
+    queryFn: () => repository.getLogbookSeal(id ?? ''),
     enabled: id !== undefined,
   });
 
@@ -360,6 +371,10 @@ export default function LogbookScreen() {
                 {t('logbook.coverageBody')}
               </Text>
             </View>
+
+            {seal.data !== undefined ? (
+              <LogbookSealStrip seal={seal.data} sharedWithTechnician={features.jobHistory} />
+            ) : null}
 
             <Text testID="logbook-coverage-line" variant="bodySmall" tone="muted">
               {t('logbook.coverage', {
