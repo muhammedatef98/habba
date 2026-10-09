@@ -19,6 +19,7 @@
     "@habba/core": "workspace:*",
     "@habba/i18n": "workspace:*",
     "@habba/ui": "workspace:*",
+    "@maplibre/maplibre-react-native": "11.5.0",
     "@supabase/supabase-js": "^2.95.1",
     "@tanstack/react-query": "^5.96.4",
     "expo": "~57.0.27",

@@ -487,6 +487,27 @@ and no Edge Function calls it — so it never appeared. It now leads with the
 most urgent unsnoozed item of the car's own schedule (`mostPressingItem`), the
 same schedule the daily sweep reminds about; the old alert is only a fallback.
 
+### State on 2026-10-09 (after PR #19)
+
+- Hosted Supabase is at 0109. Privacy policy v2 is published (re-acceptance
+  required); its additions are listed in `docs/legal/README.md`.
+- `require_handover_code` stays **off** until a build containing the
+  handover box (8c25109 or later) is on technicians' phones: with it on, an
+  older build cannot start any mobile job.
+- **No store or preview build can start from CI**: the `EXPO_TOKEN`
+  repository secret is not set (the preview job skips, Release fails at
+  "Require an Expo token"), and the EAS project has no linked GitHub repo, so
+  EAS cannot build from GitHub either. The last production build is Android
+  build 3 (2026-10-08, before 0105).
+- Update 2026-10-09: the EAS project is now linked to GitHub, so builds start
+  from main. **Android no longer uses Google Maps** (owner's decision): the two
+  map screens have `.android.tsx` versions on MapLibre + OpenFreeMap (no key,
+  no account), `react-native.config.js` links react-native-maps into iOS only
+  and MapLibre into Android only, and `app.config.ts` no longer asks for
+  `GOOGLE_MAPS_ANDROID_API_KEY`. iOS is unchanged (Apple Maps). Android has no
+  satellite toggle (no free imagery allowed for commercial use).
+- Leaked-password protection needs Supabase Pro; the org is on Free.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
@@ -500,10 +521,9 @@ same schedule the daily sweep reminds about; the old alert is only a fallback.
   (GO-LIVE §7). Build 1 failed on Android release lint because the iOS
   permission strings were flat in `locales/*.json`. They are now nested
   under `"ios"`.
-- ⚠️ **Build 3 predates the Maps key** (`GOOGLE_MAPS_ANDROID_API_KEY`, GO-LIVE §7 step 6):
-  its maps draw grey on a real device, and it has no splash or notification
-  icon. Rebuild once the key is set as an EAS `production` variable; an
-  Android store build now refuses to start without it.
+- ⚠️ **Build 3 is superseded:** its maps draw grey on a real device (it used
+  Google Maps without a key) and it has no splash or notification icon.
+  Android now draws OpenStreetMap through MapLibre and needs no key.
 - **iOS:** not built. EAS has no Apple credentials. Someone has to run
   `npx eas-cli build -p ios --profile production` once, interactively, and
   sign in to the Apple Developer account. After that, non-interactive builds
