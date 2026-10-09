@@ -487,6 +487,21 @@ and no Edge Function calls it — so it never appeared. It now leads with the
 most urgent unsnoozed item of the car's own schedule (`mostPressingItem`), the
 same schedule the daily sweep reminds about; the old alert is only a fallback.
 
+### State on 2026-10-09 (after PR #19)
+
+- Hosted Supabase is at 0109. Privacy policy v2 is published (re-acceptance
+  required); its additions are listed in `docs/legal/README.md`.
+- `require_handover_code` stays **off** until a build containing the
+  handover box (8c25109 or later) is on technicians' phones: with it on, an
+  older build cannot start any mobile job.
+- **No store or preview build can start from CI**: the `EXPO_TOKEN`
+  repository secret is not set (the preview job skips, Release fails at
+  "Require an Expo token"), and the EAS project has no linked GitHub repo, so
+  EAS cannot build from GitHub either. The last production build is Android
+  build 3 (2026-10-08, before 0105). The Android Maps key is set on EAS
+  (that build would have refused to start without it).
+- Leaked-password protection needs Supabase Pro; the org is on Free.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
