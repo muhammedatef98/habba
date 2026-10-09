@@ -519,6 +519,16 @@ export interface VehicleFile {
   readonly notes: readonly Note[];
   /** The hash chain walked on every read of the file (0108). */
   readonly chain?: ChainCheck;
+  /** Care reminders the owner was sent, and how each was answered (0109). */
+  readonly reminders?: readonly {
+    readonly id: string;
+    readonly sent_at: string;
+    readonly title_ar: string;
+    readonly body_ar: string;
+    readonly items: number;
+    readonly response: 'done' | 'snoozed' | 'ignored' | null;
+    readonly responded_at: string | null;
+  }[];
 }
 
 /** One logbook's chain, walked end to end (0010, 0108). */

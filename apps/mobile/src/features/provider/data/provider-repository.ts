@@ -415,6 +415,17 @@ export interface JobVehicleHistory {
   readonly currentMileage: number | null;
   readonly odometerReset: boolean;
   readonly events: readonly JobHistoryEvent[];
+  /** What is due or nearly due on the car (0109): something to offer while there. */
+  readonly due: readonly JobDueItem[];
+}
+
+export interface JobDueItem {
+  readonly nameAr: string;
+  readonly nameEn: string;
+  readonly isDue: boolean;
+  readonly kmRemaining: number | null;
+  readonly daysRemaining: number | null;
+  readonly kmIsEstimated: boolean;
 }
 
 export interface JobHistoryEvent {
@@ -438,6 +449,14 @@ interface JobHistoryRow {
     readonly provenance: JobHistoryEvent['provenance'];
     readonly summary_ar: string;
     readonly summary_en: string;
+  }[];
+  readonly due?: readonly {
+    readonly name_ar: string;
+    readonly name_en: string;
+    readonly is_due: boolean;
+    readonly km_remaining: number | null;
+    readonly days_remaining: number | null;
+    readonly km_is_estimated: boolean;
   }[];
 }
 
@@ -785,6 +804,14 @@ export class SupabaseProviderRepository implements ProviderRepository {
         provenance: event.provenance,
         summaryAr: event.summary_ar,
         summaryEn: event.summary_en,
+      })),
+      due: (row.due ?? []).map((item) => ({
+        nameAr: item.name_ar,
+        nameEn: item.name_en,
+        isDue: item.is_due,
+        kmRemaining: item.km_remaining,
+        daysRemaining: item.days_remaining,
+        kmIsEstimated: item.km_is_estimated,
       })),
     };
   }
@@ -1322,6 +1349,16 @@ export class InMemoryProviderRepository implements ProviderRepository {
           provenance: 'self_reported',
           summaryAr: 'تبديل البطارية',
           summaryEn: 'Battery replaced',
+        },
+      ],
+      due: [
+        {
+          nameAr: 'زيت المحرك',
+          nameEn: 'Engine oil',
+          isDue: true,
+          kmRemaining: -1_050,
+          daysRemaining: null,
+          kmIsEstimated: true,
         },
       ],
     };

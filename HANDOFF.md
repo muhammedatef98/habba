@@ -470,6 +470,17 @@ The timeline was always hash-chained; only the Habba report ever checked it.
   any broken one and is written to the audit log. A broken chain means a
   direct database edit: treat it as a security incident.
 
+### Every warning, and whether the owner acted on it (0109, suite 73)
+
+Care reminders were recorded (0062) but never answered: `respond_to_reminder`
+had no caller and the push carried no reminder id. Now the answer is recorded
+where it happens — when a reminded item is done («تم», or a Habba job) or
+snoozed, the reminders that carried it in the last 30 days are answered
+server-side. The push opens that car's logbook instead of the car list. The
+technician's «سجل السيارة» also lists what is due on the car, to offer while
+there (extra work still goes through the customer's approval). The console's
+vehicle file lists every reminder and its answer.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),

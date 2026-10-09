@@ -373,6 +373,45 @@ function VehicleFileView({
             )}
           </Card>
 
+          {file.reminders !== undefined ? (
+            <Card title="تنبيهات الصيانة">
+              {file.reminders.length === 0 ? (
+                <p className="muted">لم يُرسل تنبيه لهذه السيارة.</p>
+              ) : (
+                <>
+                  <p className="subtle">
+                    استجاب المالك لـ{' '}
+                    {file.reminders.filter((reminder) => reminder.response !== null).length} من{' '}
+                    {file.reminders.length}. تُسجَّل الاستجابة حين يُنجز البند أو يؤجّله، من التطبيق
+                    أو بطلب في هبّة.
+                  </p>
+                  <ul className="list">
+                    {file.reminders.map((reminder) => (
+                      <li key={reminder.id} className="timeline-item">
+                        <strong>{reminder.title_ar}</strong>{' '}
+                        {reminder.response === 'done' ? (
+                          <Badge tone="good">أُنجز</Badge>
+                        ) : reminder.response === 'snoozed' ? (
+                          <Badge tone="neutral">أُجّل</Badge>
+                        ) : reminder.response === 'ignored' ? (
+                          <Badge tone="warn">تجاهله</Badge>
+                        ) : (
+                          <Badge tone="warn">بلا ردّ</Badge>
+                        )}
+                        <div className="subtle">
+                          {dateTime(reminder.sent_at)} · {reminder.items} بند
+                          {reminder.responded_at !== null
+                            ? ` · ردّ ${dateTime(reminder.responded_at)}`
+                            : ''}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </Card>
+          ) : null}
+
           <Card title="تقارير هبّة">
             {file.reports.length === 0 ? (
               <p className="muted">لم يُصدر تقرير.</p>

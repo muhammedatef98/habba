@@ -1943,6 +1943,7 @@ export class FixtureTransport implements Transport {
             first_invalid_id: null,
             reason: null,
           },
+          reminders: vehicle.reminders ?? [],
         };
       }
 

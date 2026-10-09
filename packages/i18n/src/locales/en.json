@@ -1275,6 +1275,13 @@
     "odometerReset": "The odometer was replaced or a reading corrected before.",
     "empty": "No service recorded for this car yet.",
     "more": "Show {{n}} more",
-    "less": "Show less"
+    "less": "Show less",
+    "dueTitle": "Due on this car",
+    "dueHint": "You can offer it to the customer while you are at the car; any extra work goes through their approval, like parts.",
+    "overdueKm": "{{km}} km overdue",
+    "overdue": "Overdue",
+    "inKm": "in {{km}} km",
+    "inDays": "in {{days}} days",
+    "soon": "Soon"
   }
 }

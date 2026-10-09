@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Card, Icon, ProvenanceBadge, Row, Text, useTheme } from '@habba/ui';
-import type { JobVehicleHistory } from '@/features/provider/data/provider-repository';
+import type { JobDueItem, JobVehicleHistory } from '@/features/provider/data/provider-repository';
 import { formatGregorianDate } from '@/features/shared/lib/dates';
 import { formatCount } from '@/features/shared/lib/format-number';
 
@@ -34,6 +34,10 @@ export function JobVehicleHistoryCard({ history }: { readonly history: JobVehicl
   const [open, setOpen] = useState(false);
   const isArabic = i18n.language.startsWith('ar');
   const shown = open ? history.events : history.events.slice(0, FOLDED);
+  const dueText = (item: JobDueItem) => {
+    const line = dueLine(item, i18n.language);
+    return t(line.key, line.values);
+  };
 
   return (
     <Card testID="job-history" style={{ gap: theme.spacing.md }}>
@@ -60,6 +64,30 @@ export function JobVehicleHistoryCard({ history }: { readonly history: JobVehicl
           </Text>
         ) : null}
       </View>
+
+      {history.due.length > 0 ? (
+        <View
+          testID="job-history-due"
+          style={{
+            gap: theme.spacing.xs,
+            padding: theme.spacing.md,
+            borderRadius: theme.radius.md,
+            backgroundColor: theme.colors.warningSubtle,
+          }}
+        >
+          <Text variant="label" tone="warning">
+            {t('jobHistory.dueTitle')}
+          </Text>
+          {history.due.map((item, index) => (
+            <Text key={`${item.nameEn}-${index}`} variant="bodySmall">
+              {`${isArabic ? item.nameAr : item.nameEn} — ${dueText(item)}`}
+            </Text>
+          ))}
+          <Text variant="caption" tone="muted">
+            {t('jobHistory.dueHint')}
+          </Text>
+        </View>
+      ) : null}
 
       {history.events.length === 0 ? (
         <Text variant="bodySmall" tone="subtle" testID="job-history-empty">
@@ -114,4 +142,31 @@ export function JobVehicleHistoryCard({ history }: { readonly history: JobVehicl
       )}
     </Card>
   );
+}
+
+/** «متأخر ~١٬٠٥٠ كم» / «خلال ٣٠٠ كم» / «خلال ١٢ يوماً» — estimated distances say so. */
+function dueLine(
+  item: JobDueItem,
+  locale: string,
+): { readonly key: string; readonly values: Readonly<Record<string, string>> } {
+  const approx = item.kmIsEstimated ? '~' : '';
+  if (item.kmRemaining !== null && item.kmRemaining < 0) {
+    return {
+      key: 'jobHistory.overdueKm',
+      values: { km: `${approx}${formatCount(-item.kmRemaining, locale)}` },
+    };
+  }
+  if (item.daysRemaining !== null && item.daysRemaining < 0) {
+    return { key: 'jobHistory.overdue', values: {} };
+  }
+  if (item.kmRemaining !== null) {
+    return {
+      key: 'jobHistory.inKm',
+      values: { km: `${approx}${formatCount(item.kmRemaining, locale)}` },
+    };
+  }
+  if (item.daysRemaining !== null) {
+    return { key: 'jobHistory.inDays', values: { days: formatCount(item.daysRemaining, locale) } };
+  }
+  return { key: item.isDue ? 'jobHistory.overdue' : 'jobHistory.soon', values: {} };
 }

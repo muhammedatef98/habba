@@ -14,7 +14,8 @@
 
 import type { AppMode } from '@/features/shared/state/mode';
 
-export type PushPathname = '/tracking' | '/quote' | '/vehicles' | '/job' | '/chat' | '/';
+export type PushPathname =
+  '/tracking' | '/quote' | '/vehicles' | '/logbook' | '/job' | '/chat' | '/';
 
 export interface PushTarget {
   readonly mode: AppMode;
@@ -61,7 +62,16 @@ export function targetFor(data: unknown): PushTarget | null {
             ],
           };
     case '/vehicles':
-      return { mode: 'customer', pathname: '/vehicles', params: {}, refresh: [['vehicles']] };
+      // A care reminder names its car (0109) and opens that car's logbook,
+      // where the due items are; an older one without a car opens the list.
+      return validId === null
+        ? { mode: 'customer', pathname: '/vehicles', params: {}, refresh: [['vehicles']] }
+        : {
+            mode: 'customer',
+            pathname: '/logbook',
+            params: { id: validId },
+            refresh: [['care', validId], ['vehicles']],
+          };
     case '/job':
       return validId === null
         ? null

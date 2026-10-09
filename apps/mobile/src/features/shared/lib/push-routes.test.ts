@@ -12,6 +12,17 @@ describe('targetFor', () => {
     expect(target?.refresh).toContainEqual(['order', ORDER]);
   });
 
+  it("opens the car's logbook for a care reminder, and the list for one without a car", () => {
+    const target = targetFor({ route: '/vehicles', id: ORDER, vehicleId: ORDER });
+    expect(target?.mode).toBe('customer');
+    expect(target?.pathname).toBe('/logbook');
+    expect(target?.params).toEqual({ id: ORDER });
+    expect(target?.refresh).toContainEqual(['care', ORDER]);
+
+    expect(targetFor({ route: '/vehicles' })?.pathname).toBe('/vehicles');
+    expect(targetFor({ route: '/vehicles', id: 'not-an-id' })?.pathname).toBe('/vehicles');
+  });
+
   it('switches a technician to provider mode for a job offer', () => {
     const target = targetFor({ route: '/job', id: ORDER });
     expect(target?.mode).toBe('provider');
