@@ -203,7 +203,11 @@ end;
 $$;
 
 
-drop function public.vehicle_warranties(uuid);
+-- Renamed aside rather than dropped: the return type changes, and a rename
+-- keeps the step non-destructive (the old body stays, callable by nobody).
+alter function public.vehicle_warranties(uuid) rename to vehicle_warranties_0055;
+revoke execute on function public.vehicle_warranties_0055(uuid) from public, anon, authenticated;
+
 create function public.vehicle_warranties(p_vehicle_id uuid)
 returns table (
   order_id            uuid,
