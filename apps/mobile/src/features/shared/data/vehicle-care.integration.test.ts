@@ -253,3 +253,30 @@ describe.skipIf(!harnessUp)('the care section against real PostgREST + RLS', () 
     expect(written.error).not.toBeNull();
   });
 });
+
+describe.skipIf(!harnessUp)('the sealed logbook (0108)', () => {
+  test('the owner reads the seal, and a replaced odometer is written onto it', async () => {
+    const repo = new SupabaseRepository(clientFor(OWNER_ID), () => OWNER_ID);
+
+    const before = await repo.getLogbookSeal(vehicleId);
+    expect(before.isValid).toBe(true);
+    expect(before.entries).toBeGreaterThan(0);
+    expect(before.odometerReplaced).toBe(false);
+
+    // Lower than the head: refused as a reading, allowed as a new cluster.
+    await expect(repo.recordMileage(vehicleId, 1200)).rejects.toThrow();
+    await repo.replaceOdometer(vehicleId, 1200, 'cluster_replaced');
+
+    const after = await repo.getLogbookSeal(vehicleId);
+    expect(after.isValid).toBe(true);
+    expect(after.odometerReplaced).toBe(true);
+    expect(after.entries).toBeGreaterThan(before.entries);
+    expect((await repo.getVehicle(vehicleId))?.currentMileage).toBe(1200);
+  });
+
+  test('nobody else can read it', async () => {
+    const repo = new SupabaseRepository(clientFor(STRANGER_ID), () => STRANGER_ID);
+    await expect(repo.getLogbookSeal(vehicleId)).rejects.toThrow();
+    await expect(repo.replaceOdometer(vehicleId, 10, 'correction')).rejects.toThrow();
+  });
+});

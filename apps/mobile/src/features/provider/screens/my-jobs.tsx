@@ -117,6 +117,15 @@ export default function MyJobsScreen() {
                     <Text variant="caption" tone="subtle" numeric>
                       {job.orderNumber}
                     </Text>
+                    {job.isWarranty ? (
+                      <Text
+                        variant="caption"
+                        tone="warning"
+                        testID={`my-job-warranty-${job.orderId}`}
+                      >
+                        {t('warranty.badge')}
+                      </Text>
+                    ) : null}
                     {job.scheduledFor !== null ? (
                       <Text variant="bodySmall" tone="muted">
                         {t('provider.scheduledFor', {

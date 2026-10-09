@@ -53,6 +53,7 @@ import { UpcomingCare } from '@/features/customer/components/logbook/UpcomingCar
 import { LogbookTimeline } from '@/features/customer/components/logbook/LogbookTimeline';
 import { OwnershipCostCard } from '@/features/customer/components/logbook/OwnershipCostCard';
 import { VehicleHealthCard } from '@/features/customer/components/logbook/VehicleHealthCard';
+import { LogbookSealStrip } from '@/features/customer/components/logbook/LogbookSealStrip';
 import { SectionHeader } from '@/features/customer/components/home/SectionHeader';
 import { repository } from '@/features/shared/data/repository';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
@@ -138,6 +139,16 @@ export default function LogbookScreen() {
   const health = useQuery({
     queryKey: ['vehicle-health', id],
     queryFn: () => repository.getVehicleHealth(id ?? ''),
+    enabled: id !== undefined,
+  });
+
+  // The seal (0108): the chain walked server-side. Optional like the two
+  // cards above — a failed check hides the strip, it does not claim a break.
+  const seal = useQuery({
+    // Under the timeline's key, so every write that refetches the history
+    // re-walks the chain too.
+    queryKey: ['timeline', id, 'seal'],
+    queryFn: () => repository.getLogbookSeal(id ?? ''),
     enabled: id !== undefined,
   });
 
@@ -361,6 +372,10 @@ export default function LogbookScreen() {
               </Text>
             </View>
 
+            {seal.data !== undefined ? (
+              <LogbookSealStrip seal={seal.data} sharedWithTechnician={features.jobHistory} />
+            ) : null}
+
             <Text testID="logbook-coverage-line" variant="bodySmall" tone="muted">
               {t('logbook.coverage', {
                 verified: formatCount(verifiedCount, i18n.language),
@@ -499,14 +514,54 @@ export default function LogbookScreen() {
                   {t('transfer.warrantiesBody')}
                 </Text>
                 {warranties.data.map((warranty) => (
-                  <View key={warranty.orderId} style={{ gap: 2 }}>
-                    <Text variant="bodySmall">
-                      {isArabic ? warranty.serviceAr : warranty.serviceEn}
-                    </Text>
-                    <Text variant="caption" tone="subtle">
-                      {t('transfer.warrantyRemaining', { count: warranty.daysRemaining })}
-                      {warranty.hasOpenClaim ? ` · ${t('transfer.warrantyOpenClaim')}` : ''}
-                    </Text>
+                  <View
+                    key={warranty.orderId}
+                    testID={`warranty-${warranty.orderId}`}
+                    style={{ gap: theme.spacing.sm }}
+                  >
+                    <View style={{ gap: 2 }}>
+                      <Text variant="bodySmall">
+                        {isArabic ? warranty.serviceAr : warranty.serviceEn}
+                      </Text>
+                      <Text variant="caption" tone="subtle">
+                        {t('transfer.warrantyRemaining', { count: warranty.daysRemaining })}
+                        {warranty.hasOpenClaim ? ` · ${t('transfer.warrantyOpenClaim')}` : ''}
+                      </Text>
+                    </View>
+                    {/* The differentiator (§1.5): failed inside its cover,
+                        redone free by whoever did it (0105). */}
+                    {warranty.openClaimId !== null ? (
+                      <Button
+                        testID={`warranty-follow-${warranty.orderId}`}
+                        label={t('warranty.follow')}
+                        variant="secondary"
+                        size="medium"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/tracking',
+                            params: { id: warranty.openClaimId ?? '' },
+                          })
+                        }
+                      />
+                    ) : features.warrantyClaims ? (
+                      <Button
+                        testID={`warranty-claim-${warranty.orderId}`}
+                        label={t('warranty.claim')}
+                        variant="secondary"
+                        size="medium"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/warranty-claim',
+                            params: {
+                              order: warranty.orderId,
+                              service: isArabic ? warranty.serviceAr : warranty.serviceEn,
+                              provider: warranty.providerNameAr ?? '',
+                              mode: warranty.fulfilmentMode,
+                            },
+                          })
+                        }
+                      />
+                    ) : null}
                   </View>
                 ))}
               </Card>

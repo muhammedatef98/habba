@@ -385,6 +385,29 @@ function OrderFileView({
             />
           </Card>
 
+          {(file.warranty_claims ?? []).length > 0 ? (
+            <Card title="مطالبات الضمان">
+              <ul className="list">
+                {(file.warranty_claims ?? []).map((claim) => (
+                  <li key={claim.id} className="timeline-item" data-tone="brand">
+                    <div>
+                      <a className="link numeric" href={hrefFor('orders', claim.id)}>
+                        {claim.order_number}
+                      </a>{' '}
+                      <LabelBadge value={label(ORDER_STATUS, claim.status)} />
+                    </div>
+                    {claim.problem_description !== null ? (
+                      <div>«{claim.problem_description}»</div>
+                    ) : null}
+                    <div className="subtle">
+                      إعادة خدمة مجانية لدى مقدّم الخدمة نفسه · {dateTime(claim.created_at)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           {file.disputes.length > 0 ? (
             <Card title="الشكاوى">
               <ul className="list">
@@ -625,10 +648,29 @@ function OrderFileView({
             <Card title="رمز التسليم">
               <KeyValue
                 items={[
-                  ['المحاولات', String(file.handover.attempts)],
+                  ['المحاولات', `${file.handover.attempts} من 5`],
                   ['تم التحقق', dateTime(file.handover.verified_at)],
                 ]}
               />
+              {file.handover.verified_at === null ? (
+                <div style={{ marginTop: 'var(--space-sm)' }}>
+                  {file.handover.attempts >= 5 ? (
+                    <p className="notice" data-tone="warn">
+                      الرمز مقفل بعد 5 محاولات خاطئة، ولن يستطيع الفنّي بدء العمل إن كان «اشتراط رمز
+                      التسليم» مفعّلاً.
+                    </p>
+                  ) : null}
+                  <ActionButton
+                    label="إعادة إصدار الرمز"
+                    size="small"
+                    description="يُنشأ رمز جديد يظهر للعميل في التطبيق، وتُصفَّر المحاولات. استخدمه بعد التحقق من هوية العميل والفنّي."
+                    reasonLabel="لماذا يُعاد إصدار الرمز؟"
+                    onConfirm={(reason) => api.reissueHandover(file.order.id, reason)}
+                    onDone={reload}
+                    success="أُعيد إصدار رمز التسليم."
+                  />
+                </div>
+              ) : null}
             </Card>
           ) : null}
         </div>

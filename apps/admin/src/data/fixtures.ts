@@ -180,6 +180,7 @@ function baseOrder(
     ],
     payout: null,
     parent_order: null,
+    warranty_claims: [],
     notes: [],
   };
 }
@@ -648,6 +649,36 @@ function seed(): State {
       64,
     ),
     setting('feature_booking', true, 'boolean', 'features', 'حجز المواعيد', null, true, 20),
+    setting(
+      'feature_order_chat',
+      true,
+      'boolean',
+      'features',
+      'المحادثة داخل الطلب',
+      null,
+      true,
+      300,
+    ),
+    setting(
+      'feature_warranty_claims',
+      true,
+      'boolean',
+      'features',
+      'المطالبة بالضمان من التطبيق',
+      null,
+      true,
+      310,
+    ),
+    setting(
+      'require_handover_code',
+      false,
+      'boolean',
+      'ops',
+      'اشتراط رمز التسليم قبل بدء العمل',
+      null,
+      true,
+      320,
+    ),
     setting(
       'feature_video_triage',
       true,
@@ -1396,6 +1427,11 @@ export class FixtureTransport implements Transport {
       case 'ops_order_detail':
         return this.orderFile(args['p_order_id']);
 
+      case 'ops_reissue_handover': {
+        reasonOf(args['p_reason']);
+        return undefined;
+      }
+
       case 'ops_order_messages': {
         reasonOf(args['p_reason']);
         const file = this.orderFile(args['p_order_id']);
@@ -1899,8 +1935,25 @@ export class FixtureTransport implements Transport {
       case 'ops_vehicle_detail': {
         const vehicle = s.vehicles.find((v) => v.vehicle.id === args['p_vehicle_id']);
         if (vehicle === undefined) throw new ApiError('Vehicle not found', 'P0002', null);
-        return vehicle;
+        return {
+          ...vehicle,
+          chain: vehicle.chain ?? {
+            is_valid: true,
+            checked_count: vehicle.timeline.length,
+            first_invalid_id: null,
+            reason: null,
+          },
+          reminders: vehicle.reminders ?? [],
+        };
       }
+
+      case 'ops_verify_timelines':
+        return {
+          checked_vehicles: s.vehicles.length,
+          checked_entries: s.vehicles.reduce((sum, v) => sum + v.timeline.length, 0),
+          checked_at: new Date().toISOString(),
+          broken: [],
+        };
 
       case 'ops_annotate_vehicle': {
         const note = reasonOf(args['p_note_ar']);

@@ -91,6 +91,9 @@ import type {
   VehicleMake,
   VehicleModel,
   VehicleWarranty,
+  WarrantyClaimInput,
+  LogbookSeal,
+  OdometerReset,
 } from './types.js';
 
 export interface GuestUpgradeInput {
@@ -377,6 +380,20 @@ export interface Repository {
    * cover and cannot read the order that carries it.
    */
   listVehicleWarranties(vehicleId: string): Promise<readonly VehicleWarranty[]>;
+  /**
+   * Claims a live warranty: a free re-service, confirmed with the provider who
+   * did the original (0105). Throws `warranty:open_claim`, `warranty:location`,
+   * `warranty:expired` or `warranty:not_owner` on a refusal.
+   */
+  requestWarrantyService(input: WarrantyClaimInput): Promise<string>;
+  /** The seal on the logbook: the chain checked end to end, server-side (0108). */
+  getLogbookSeal(vehicleId: string): Promise<LogbookSeal>;
+  /**
+   * Starts a new odometer series: the cluster was replaced, or the last reading
+   * was a mistake (0058). The only way a reading is allowed to go down, and it
+   * is written to the logbook where a buyer will see it.
+   */
+  replaceOdometer(vehicleId: string, km: number, reason: OdometerReset): Promise<void>;
 
   // القادم — the care section (0058–0062, ADR-0022).
   //
@@ -973,6 +990,7 @@ class DevOrderSimulator {
       completionMedia: [],
       warrantyDays: null,
       scheduledFor: null,
+      parentOrderId: null,
     };
     this.orders.set(id, order);
 
@@ -1069,6 +1087,7 @@ class DevOrderSimulator {
       completionMedia: [],
       warrantyDays: null,
       scheduledFor,
+      parentOrderId: null,
     });
 
     return id;
@@ -1204,6 +1223,7 @@ const HEALTH_SERVICE_EVENTS: ReadonlySet<TimelineEvent['eventType']> = new Set([
 export class InMemoryRepository implements Repository {
   private readonly vehicles = new Map<string, Vehicle>();
   private readonly timeline = new Map<string, TimelineEvent[]>();
+  private readonly odometerResets = new Map<string, Set<OdometerReset>>();
   private readonly orders = new DevOrderSimulator();
   private transfers: OwnershipTransfer[] = [];
   /**
@@ -2024,6 +2044,58 @@ export class InMemoryRepository implements Repository {
     ]);
 
     return transfer.vehicleId;
+  }
+
+  async requestWarrantyService(input: WarrantyClaimInput): Promise<string> {
+    if (input.problem.trim().length < 5) throw new Error('warranty:problem');
+    return `dev-warranty-${input.orderId}`;
+  }
+
+  async getLogbookSeal(vehicleId: string): Promise<LogbookSeal> {
+    const events = this.timeline.get(vehicleId) ?? [];
+    const times = events.map((event) => event.occurredAt).sort();
+    return {
+      isValid: true,
+      entries: events.length,
+      verifiedEntries: events.filter(
+        (event) => event.provenance === 'habba_verified' || event.provenance === 'third_party',
+      ).length,
+      firstAt: times[0] ?? null,
+      lastAt: times[times.length - 1] ?? null,
+      odometerReplaced: this.odometerResets.get(vehicleId)?.has('cluster_replaced') ?? false,
+      odometerCorrected: this.odometerResets.get(vehicleId)?.has('correction') ?? false,
+    };
+  }
+
+  async replaceOdometer(vehicleId: string, km: number, reason: OdometerReset): Promise<void> {
+    const vehicle = this.vehicles.get(vehicleId);
+    if (vehicle === undefined) throw new Error('not_found');
+    const resets = this.odometerResets.get(vehicleId) ?? new Set<OdometerReset>();
+    resets.add(reason);
+    this.odometerResets.set(vehicleId, resets);
+    this.vehicles.set(vehicleId, { ...vehicle, currentMileage: km });
+    const events = this.timeline.get(vehicleId) ?? [];
+    const now = new Date().toISOString();
+    events.push({
+      id: `evt-${vehicleId}-${events.length + 1}`,
+      vehicleId,
+      eventType: 'mileage_recorded',
+      occurredAt: now,
+      recordedAt: now,
+      mileage: km,
+      provenance: 'self_reported',
+      summaryAr:
+        reason === 'cluster_replaced'
+          ? `استُبدل العدّاد: ${km} كم`
+          : `صُحّحت قراءة العدّاد: ${km} كم`,
+      summaryEn:
+        reason === 'cluster_replaced'
+          ? `Odometer replaced: ${km} km`
+          : `Odometer reading corrected: ${km} km`,
+      details: { reason },
+      attachments: [],
+    });
+    this.timeline.set(vehicleId, events);
   }
 
   async listVehicleWarranties(_vehicleId: string): Promise<readonly VehicleWarranty[]> {

@@ -62,6 +62,8 @@ export interface AssignedJob {
   readonly inspectionFiled: boolean;
   /** A pre-purchase inspection has no vehicle: the car is not the customer's yet. */
   readonly hasVehicle: boolean;
+  /** A free re-service of this technician's own earlier work (0105). */
+  readonly isWarranty: boolean;
   /**
    * Present while the job is still an offer to this technician, not yet
    * theirs. What they need to decide — how far, how much — and nothing that
@@ -391,6 +393,87 @@ export interface ProviderRepository {
   /** Adds times on the chosen days; returns how many were new. */
   publishAvailability(input: PublishAvailabilityInput): Promise<number>;
   setSlotBlocked(slotId: string, blocked: boolean): Promise<void>;
+  /** Whether the customer's handover code is issued, verified or locked — never the code (0106). */
+  getHandoverStatus(orderId: string): Promise<HandoverStatus>;
+  /** Tests the code the customer reads out; true when it matches (0047). */
+  verifyHandoverCode(orderId: string, code: string): Promise<boolean>;
+  /** The caller's workshop, or null before it has been set up (0107). */
+  getMyWorkshop(): Promise<WorkshopProfile | null>;
+  saveWorkshop(profile: WorkshopProfile): Promise<void>;
+  /**
+   * The car's service history while the job is live (0108): summaries only,
+   * and whether the logbook's seal holds. Throws `history:disabled` when ops
+   * switched it off.
+   */
+  getJobHistory(orderId: string): Promise<JobVehicleHistory>;
+}
+
+/** What the technician on a live job may read of the car's logbook (0108). */
+export interface JobVehicleHistory {
+  readonly isValid: boolean;
+  readonly entries: number;
+  readonly currentMileage: number | null;
+  readonly odometerReset: boolean;
+  readonly events: readonly JobHistoryEvent[];
+  /** What is due or nearly due on the car (0109): something to offer while there. */
+  readonly due: readonly JobDueItem[];
+}
+
+export interface JobDueItem {
+  readonly nameAr: string;
+  readonly nameEn: string;
+  readonly isDue: boolean;
+  readonly kmRemaining: number | null;
+  readonly daysRemaining: number | null;
+  readonly kmIsEstimated: boolean;
+}
+
+export interface JobHistoryEvent {
+  readonly eventType: string;
+  readonly occurredAt: string;
+  readonly mileage: number | null;
+  readonly provenance: 'self_reported' | 'self_documented' | 'habba_verified' | 'third_party';
+  readonly summaryAr: string;
+  readonly summaryEn: string;
+}
+
+interface JobHistoryRow {
+  readonly is_valid: boolean;
+  readonly entries: number;
+  readonly current_mileage: number | null;
+  readonly odometer_replaced: boolean;
+  readonly events: readonly {
+    readonly event_type: string;
+    readonly occurred_at: string;
+    readonly mileage: number | null;
+    readonly provenance: JobHistoryEvent['provenance'];
+    readonly summary_ar: string;
+    readonly summary_en: string;
+  }[];
+  readonly due?: readonly {
+    readonly name_ar: string;
+    readonly name_en: string;
+    readonly is_due: boolean;
+    readonly km_remaining: number | null;
+    readonly days_remaining: number | null;
+    readonly km_is_estimated: boolean;
+  }[];
+}
+
+/** A workshop's own address, point, bays and hours (0023, 0107). */
+export interface WorkshopProfile {
+  readonly addressAr: string;
+  readonly lat: number;
+  readonly lon: number;
+  readonly bayCount: number;
+  /** `{"sun": [["08:00","20:00"]], ...}`; a missing day is closed. */
+  readonly openingHours: Readonly<Record<string, readonly (readonly [string, string])[]>>;
+}
+
+export interface HandoverStatus {
+  readonly issued: boolean;
+  readonly verified: boolean;
+  readonly locked: boolean;
 }
 
 interface OpenJobRow {
@@ -437,7 +520,7 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .from('orders')
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
-          'completion_mileage, completion_media, vehicle_id, scheduled_for, ' +
+          'completion_mileage, completion_media, vehicle_id, scheduled_for, parent_order_id, ' +
           'services(name_ar, requires_completion_photos, requires_completion_mileage, inspection_template_key), ' +
           'vehicles(current_mileage), inspection_reports(id)',
       )
@@ -460,7 +543,7 @@ export class SupabaseProviderRepository implements ProviderRepository {
       .from('orders')
       .select(
         'id, order_number, status, fulfilment_mode, service_address_ar, problem_description, ' +
-          'completion_mileage, completion_media, vehicle_id, scheduled_for, ' +
+          'completion_mileage, completion_media, vehicle_id, scheduled_for, parent_order_id, ' +
           'services(name_ar, requires_completion_photos, requires_completion_mileage, inspection_template_key), ' +
           'vehicles(current_mileage), inspection_reports(id)',
       )
@@ -694,10 +777,95 @@ export class SupabaseProviderRepository implements ProviderRepository {
     });
     if (error !== null) throw new Error(`setSlotBlocked: ${error.message}`);
   }
+  async getHandoverStatus(orderId: string): Promise<HandoverStatus> {
+    const { data, error } = await this.client.rpc('handover_status', { p_order_id: orderId });
+    if (error !== null) throw new Error(`getHandoverStatus: ${error.message}`);
+    const row = ((data ?? []) as HandoverStatus[])[0];
+    return row ?? { issued: false, verified: false, locked: false };
+  }
+
+  async getJobHistory(orderId: string): Promise<JobVehicleHistory> {
+    const { data, error } = await this.client.rpc('job_vehicle_history', { p_order_id: orderId });
+    if (error !== null) {
+      throw new Error(
+        error.hint === 'history:disabled' ? 'history:disabled' : `getJobHistory: ${error.message}`,
+      );
+    }
+    const row = data as JobHistoryRow;
+    return {
+      isValid: row.is_valid,
+      entries: row.entries,
+      currentMileage: row.current_mileage,
+      odometerReset: row.odometer_replaced,
+      events: row.events.map((event) => ({
+        eventType: event.event_type,
+        occurredAt: event.occurred_at,
+        mileage: event.mileage,
+        provenance: event.provenance,
+        summaryAr: event.summary_ar,
+        summaryEn: event.summary_en,
+      })),
+      due: (row.due ?? []).map((item) => ({
+        nameAr: item.name_ar,
+        nameEn: item.name_en,
+        isDue: item.is_due,
+        kmRemaining: item.km_remaining,
+        daysRemaining: item.days_remaining,
+        kmIsEstimated: item.km_is_estimated,
+      })),
+    };
+  }
+
+  async verifyHandoverCode(orderId: string, code: string): Promise<boolean> {
+    const { data, error } = await this.client.rpc('verify_handover_code', {
+      p_order_id: orderId,
+      p_code: code,
+    });
+    if (error !== null) {
+      throw new Error(
+        error.code === '23514' ? 'handover:locked' : `verifyHandoverCode: ${error.message}`,
+      );
+    }
+    return data === true;
+  }
+  async getMyWorkshop(): Promise<WorkshopProfile | null> {
+    const { data, error } = await this.client.rpc('my_workshop');
+    if (error !== null) throw new Error(`getMyWorkshop: ${error.message}`);
+    const row = (
+      (data ?? []) as {
+        address_ar: string;
+        lat: number;
+        lon: number;
+        bay_count: number;
+        opening_hours: WorkshopProfile['openingHours'];
+      }[]
+    )[0];
+    return row === undefined
+      ? null
+      : {
+          addressAr: row.address_ar,
+          lat: row.lat,
+          lon: row.lon,
+          bayCount: row.bay_count,
+          openingHours: row.opening_hours ?? {},
+        };
+  }
+
+  async saveWorkshop(profile: WorkshopProfile): Promise<void> {
+    const { error } = await this.client.rpc('upsert_workshop', {
+      p_address_ar: profile.addressAr,
+      p_lon: profile.lon,
+      p_lat: profile.lat,
+      p_bay_count: profile.bayCount,
+      p_opening_hours: profile.openingHours,
+    });
+    if (error !== null) throw new Error(`saveWorkshop: ${error.message}`);
+  }
 }
 
 interface OrderRow {
   id: string;
+  parent_order_id?: string | null;
   order_number: string;
   status: OrderStatus;
   fulfilment_mode: FulfilmentMode;
@@ -781,6 +949,7 @@ function offerAsJob(offer: OpenJob): AssignedJob {
     inspectionTemplateKey: null,
     inspectionFiled: false,
     hasVehicle: false,
+    isWarranty: false,
     offer: {
       distanceBucket: offer.distanceBucket,
       districtNameAr: offer.districtNameAr,
@@ -811,6 +980,7 @@ function toAssignedJob(row: unknown): AssignedJob {
       ? order.inspection_reports.length > 0
       : order.inspection_reports !== null && order.inspection_reports !== undefined,
     hasVehicle: order.vehicle_id !== null && order.vehicle_id !== undefined,
+    isWarranty: order.parent_order_id !== null && order.parent_order_id !== undefined,
     offer: null,
   };
 }
@@ -1012,6 +1182,7 @@ export class InMemoryProviderRepository implements ProviderRepository {
       inspectionTemplateKey: null,
       inspectionFiled: false,
       hasVehicle: true,
+      isWarranty: false,
       offer: null,
     });
     return 'accepted';
@@ -1146,6 +1317,70 @@ export class InMemoryProviderRepository implements ProviderRepository {
 
   async setSlotBlocked(slotId: string, blocked: boolean): Promise<void> {
     this.slots = this.slots.map((slot) => (slot.id === slotId ? { ...slot, blocked } : slot));
+  }
+  private readonly handovers = new Map<string, { verified: boolean; attempts: number }>();
+
+  async getHandoverStatus(orderId: string): Promise<HandoverStatus> {
+    const state = this.handovers.get(orderId) ?? { verified: false, attempts: 0 };
+    return { issued: true, verified: state.verified, locked: state.attempts >= 5 };
+  }
+
+  async getJobHistory(_orderId: string): Promise<JobVehicleHistory> {
+    // The dev car's history: one service Habba did, one the owner typed.
+    const day = 24 * 60 * 60 * 1000;
+    return {
+      isValid: true,
+      entries: 4,
+      currentMileage: 84_200,
+      odometerReset: false,
+      events: [
+        {
+          eventType: 'service_completed',
+          occurredAt: new Date(Date.now() - 95 * day).toISOString(),
+          mileage: 80_150,
+          provenance: 'habba_verified',
+          summaryAr: 'تغيير زيت وفلتر — 5W-30',
+          summaryEn: 'Oil and filter change — 5W-30',
+        },
+        {
+          eventType: 'parts_replaced',
+          occurredAt: new Date(Date.now() - 240 * day).toISOString(),
+          mileage: 72_400,
+          provenance: 'self_reported',
+          summaryAr: 'تبديل البطارية',
+          summaryEn: 'Battery replaced',
+        },
+      ],
+      due: [
+        {
+          nameAr: 'زيت المحرك',
+          nameEn: 'Engine oil',
+          isDue: true,
+          kmRemaining: -1_050,
+          daysRemaining: null,
+          kmIsEstimated: true,
+        },
+      ],
+    };
+  }
+
+  async verifyHandoverCode(orderId: string, code: string): Promise<boolean> {
+    const state = this.handovers.get(orderId) ?? { verified: false, attempts: 0 };
+    if (state.verified) return true;
+    if (state.attempts >= 5) throw new Error('handover:locked');
+    // The dev build's code, shown on the customer's arrived screen.
+    const matched = code === '4827';
+    this.handovers.set(orderId, { verified: matched, attempts: state.attempts + 1 });
+    return matched;
+  }
+  private workshop: WorkshopProfile | null = null;
+
+  async getMyWorkshop(): Promise<WorkshopProfile | null> {
+    return this.workshop;
+  }
+
+  async saveWorkshop(profile: WorkshopProfile): Promise<void> {
+    this.workshop = profile;
   }
 }
 

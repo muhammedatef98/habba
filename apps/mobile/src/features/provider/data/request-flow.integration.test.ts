@@ -318,6 +318,21 @@ describe.skipIf(!harnessUp)('an emergency request, through the app', () => {
     expect(mine.some((candidate) => candidate.orderId === orderId)).toBe(true);
   });
 
+  test("the car's sealed history opens to the technician on the job, and only to them", async () => {
+    const history = await technician(TECH_ID).getJobHistory(orderId);
+    expect(history.isValid).toBe(true);
+    // A car with nothing behind it yet: an empty history, not a refusal.
+    expect(history.events.length).toBeLessThanOrEqual(history.entries);
+    // Summaries only (0108): nothing that could carry a photo or an address.
+    for (const event of history.events) {
+      expect(Object.keys(event).sort()).toEqual(
+        ['eventType', 'mileage', 'occurredAt', 'provenance', 'summaryAr', 'summaryEn'].sort(),
+      );
+    }
+
+    await expect(technician(RIVAL_ID).getJobHistory(orderId)).rejects.toThrow();
+  });
+
   test('the technician works it through to hand-back, one button at a time', async () => {
     const walked = await workTheJob(TECH_ID, orderId, 41000, 90);
     expect(walked).toEqual(['en_route', 'arrived', 'in_progress', 'awaiting_approval']);
@@ -348,6 +363,10 @@ describe.skipIf(!harnessUp)('an emergency request, through the app', () => {
 
     const warranties = await customer().listVehicleWarranties(vehicleId);
     expect(warranties.some((warranty) => warranty.orderId === orderId)).toBe(true);
+  });
+
+  test("once it is handed back, the car's history closes again", async () => {
+    await expect(technician(TECH_ID).getJobHistory(orderId)).rejects.toThrow();
   });
 
   test('each phone was told what it needed to know, and nothing it did itself', async () => {

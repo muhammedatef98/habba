@@ -53,6 +53,18 @@ export function Arrived({ order, provider, progress }: ArrivedProps) {
         </View>
       </Card>
 
+      {progress?.handoverVerified === true ? (
+        <Card
+          testID="handover-verified"
+          elevation="none"
+          style={{ backgroundColor: theme.colors.successSubtle }}
+        >
+          <Text variant="bodyStrong" tone="success">
+            {t('handover.verifiedCustomer', { name: providerName })}
+          </Text>
+        </Card>
+      ) : null}
+
       {code !== undefined ? (
         <Card testID="handover-code" style={{ alignItems: 'center' }}>
           <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>

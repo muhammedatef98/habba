@@ -242,6 +242,15 @@ export default function ProviderProfileScreen() {
       <View style={{ gap: theme.spacing.md }}>
         <SectionTitle title={t('pro.sectionAccount')} />
         <MenuGroup>
+          {profile?.providerType === 'workshop' ? (
+            <MenuRow
+              testID="pro-workshop"
+              icon="home"
+              title={t('workshop.title')}
+              subtitle={t('workshop.menuHint')}
+              onPress={() => router.push('/workshop')}
+            />
+          ) : null}
           <MenuRow
             testID="pro-availability"
             icon="calendar"

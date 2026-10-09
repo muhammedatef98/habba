@@ -259,6 +259,14 @@ export interface OrderFile {
   }[];
   readonly payout: { readonly payout_id: string; readonly status: PayoutStatus } | null;
   readonly parent_order: { readonly id: string; readonly order_number: string } | null;
+  /** Free re-services claimed on this job under its warranty (0105). */
+  readonly warranty_claims?: readonly {
+    readonly id: string;
+    readonly order_number: string;
+    readonly status: OrderStatus;
+    readonly problem_description: string | null;
+    readonly created_at: string;
+  }[];
   readonly notes: readonly Note[];
 }
 
@@ -402,6 +410,13 @@ export interface ProviderFile {
     readonly custom_price: number | null;
     readonly offered: boolean;
   }[];
+  /** The calendar customers book against, next 14 days (0104, 0107). */
+  readonly availability?: {
+    readonly open: number;
+    readonly booked: number;
+    readonly closed: number;
+    readonly next_open_at: string | null;
+  };
   readonly workshop: {
     readonly address_ar: string;
     readonly bay_count: number;
@@ -502,6 +517,40 @@ export interface VehicleFile {
   }[];
   readonly orders: readonly BriefOrder[];
   readonly notes: readonly Note[];
+  /** The hash chain walked on every read of the file (0108). */
+  readonly chain?: ChainCheck;
+  /** Care reminders the owner was sent, and how each was answered (0109). */
+  readonly reminders?: readonly {
+    readonly id: string;
+    readonly sent_at: string;
+    readonly title_ar: string;
+    readonly body_ar: string;
+    readonly items: number;
+    readonly response: 'done' | 'snoozed' | 'ignored' | null;
+    readonly responded_at: string | null;
+  }[];
+}
+
+/** One logbook's chain, walked end to end (0010, 0108). */
+export interface ChainCheck {
+  readonly is_valid: boolean;
+  readonly checked_count: number;
+  readonly first_invalid_id: string | null;
+  readonly reason: string | null;
+}
+
+/** Every logbook's chain, walked by ops_verify_timelines (0108). */
+export interface TimelineSweep {
+  readonly checked_vehicles: number;
+  readonly checked_entries: number;
+  readonly checked_at: string;
+  readonly broken: readonly {
+    readonly vehicle_id: string;
+    readonly label: string | null;
+    readonly checked_count: number;
+    readonly first_invalid_id: string | null;
+    readonly reason: string | null;
+  }[];
 }
 
 export interface DisputeRow extends Dispute {

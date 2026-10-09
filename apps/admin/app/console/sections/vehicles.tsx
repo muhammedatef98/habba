@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 import { api } from '@/data/api';
-import type { SearchHit, VehicleFile, VehicleHealthRow } from '@/data/types';
+import type { SearchHit, TimelineSweep, VehicleFile, VehicleHealthRow } from '@/data/types';
 import { date, dateTime, money } from '@/lib/format';
 import { label, ORDER_STATUS, PROVENANCE, TIMELINE_EVENT, TRANSFER_STATUS } from '../labels';
 import { go, hrefFor } from '../router';
@@ -76,6 +76,7 @@ function VehicleSearch() {
           {error}
         </p>
       ) : null}
+      <IntegritySweep />
       {hits === null ? null : hits.length === 0 ? (
         <Empty>لا سيارة بهذه البيانات.</Empty>
       ) : (
@@ -95,6 +96,77 @@ function VehicleSearch() {
         />
       )}
     </>
+  );
+}
+
+/**
+ * Every logbook's seal, checked at once (0108).
+ *
+ * The chain is what تقرير هبّة sells: a buyer trusts the record because no
+ * row can change without it showing. This walks every chain and names any car
+ * whose record no longer matches — which means someone with database access
+ * changed a row, and is an incident, not a support ticket. The sweep itself
+ * goes on the audit log.
+ */
+function IntegritySweep() {
+  const [result, setResult] = useState<TimelineSweep | null>(null);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      setResult(await api.verifyTimelines());
+    } catch (cause) {
+      setError(explain(cause));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Card
+      title="سلامة دفاتر السيارات"
+      actions={
+        <Button onClick={() => void run()} disabled={running}>
+          {running ? 'جارٍ الفحص…' : 'افحص كل الدفاتر'}
+        </Button>
+      }
+    >
+      <p className="muted">
+        كل سجل في دفتر أي سيارة مربوط بما قبله ببصمة. الفحص يعيد حساب البصمات كلها ويذكر أي دفتر
+        تغيّر فيه سجل بعد كتابته.
+      </p>
+      {error !== null ? (
+        <p className="notice" data-tone="bad">
+          {error}
+        </p>
+      ) : null}
+      {result === null ? null : result.broken.length === 0 ? (
+        <p className="notice" data-tone="good">
+          سليمة كلها: {result.checked_vehicles} سيارة و{result.checked_entries} سجلاً، فُحصت{' '}
+          {dateTime(result.checked_at)}.
+        </p>
+      ) : (
+        <>
+          <p className="notice" data-tone="bad">
+            {result.broken.length} دفتر لم يطابق بصماته من أصل {result.checked_vehicles}. هذا يعني
+            تعديلاً مباشراً في قاعدة البيانات؛ لن يصدر لها تقرير هبّة.
+          </p>
+          <DataTable
+            rows={result.broken}
+            rowKey={(row) => row.vehicle_id}
+            onRowClick={(row) => go('vehicles', row.vehicle_id)}
+            columns={[
+              { label: 'السيارة', render: (row) => <strong>{row.label ?? row.vehicle_id}</strong> },
+              { label: 'سجلات سليمة قبل الكسر', numeric: true, render: (row) => row.checked_count },
+              { label: 'السبب', render: (row) => <span className="subtle">{row.reason}</span> },
+            ]}
+          />
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -158,6 +230,19 @@ function VehicleFileView({
 
       <div className="grid main-side">
         <div className="grid">
+          {file.chain !== undefined ? (
+            file.chain.is_valid ? (
+              <p className="notice" data-tone="good">
+                الدفتر مختوم: {file.chain.checked_count} سجلاً تطابق بصماتها ولم يُعدَّل أي منها.
+              </p>
+            ) : (
+              <p className="notice" data-tone="bad">
+                الدفتر غير سليم: تطابقت {file.chain.checked_count} سجلات ثم انكسرت السلسلة
+                {file.chain.reason !== null ? ` (${file.chain.reason})` : ''}. لن يصدر تقرير هبّة
+                لهذه السيارة. هذا تعديل مباشر في قاعدة البيانات ويُعامَل كحادثة أمنية.
+              </p>
+            )
+          ) : null}
           <Card title={`دفتر السيارة (${file.timeline.length} سجل، ${verified} موثّق من هبّة)`}>
             {file.timeline.length === 0 ? (
               <p className="muted">لا سجلات.</p>
@@ -287,6 +372,45 @@ function VehicleFileView({
               </ul>
             )}
           </Card>
+
+          {file.reminders !== undefined ? (
+            <Card title="تنبيهات الصيانة">
+              {file.reminders.length === 0 ? (
+                <p className="muted">لم يُرسل تنبيه لهذه السيارة.</p>
+              ) : (
+                <>
+                  <p className="subtle">
+                    استجاب المالك لـ{' '}
+                    {file.reminders.filter((reminder) => reminder.response !== null).length} من{' '}
+                    {file.reminders.length}. تُسجَّل الاستجابة حين يُنجز البند أو يؤجّله، من التطبيق
+                    أو بطلب في هبّة.
+                  </p>
+                  <ul className="list">
+                    {file.reminders.map((reminder) => (
+                      <li key={reminder.id} className="timeline-item">
+                        <strong>{reminder.title_ar}</strong>{' '}
+                        {reminder.response === 'done' ? (
+                          <Badge tone="good">أُنجز</Badge>
+                        ) : reminder.response === 'snoozed' ? (
+                          <Badge tone="neutral">أُجّل</Badge>
+                        ) : reminder.response === 'ignored' ? (
+                          <Badge tone="warn">تجاهله</Badge>
+                        ) : (
+                          <Badge tone="warn">بلا ردّ</Badge>
+                        )}
+                        <div className="subtle">
+                          {dateTime(reminder.sent_at)} · {reminder.items} بند
+                          {reminder.responded_at !== null
+                            ? ` · ردّ ${dateTime(reminder.responded_at)}`
+                            : ''}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </Card>
+          ) : null}
 
           <Card title="تقارير هبّة">
             {file.reports.length === 0 ? (

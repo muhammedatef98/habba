@@ -122,6 +122,14 @@ export default function ShiftScreen() {
 
   const jobs = openJobs.data ?? [];
   const dashboard = useProviderDashboard();
+  const isWorkshop = dashboard.data?.profile.providerType === 'workshop';
+  // A workshop with no address is not offered to anyone booking (0107).
+  const myWorkshop = useQuery({
+    queryKey: ['my-workshop'],
+    queryFn: () => providerRepository.getMyWorkshop(),
+    enabled: isWorkshop,
+    staleTime: 60_000,
+  });
   const profile = dashboard.data?.profile;
   const today = dashboard.data?.periods.today;
   const businessName =
@@ -212,6 +220,31 @@ export default function ShiftScreen() {
         busy={toggle.isPending}
         onToggle={() => toggle.mutate(!isOnline)}
       />
+
+      {isWorkshop && myWorkshop.data === null ? (
+        <Card
+          testID="shift-no-workshop"
+          elevation="none"
+          style={{ borderWidth: 1, borderColor: theme.colors.warning, gap: theme.spacing.sm }}
+        >
+          <Row gap="sm" align="center">
+            <Icon name="pin" size={theme.iconSize.md} color={theme.colors.warningFg} />
+            <Text variant="bodyStrong" style={{ flex: 1 }}>
+              {t('workshop.nudgeTitle')}
+            </Text>
+          </Row>
+          <Text variant="bodySmall" tone="muted">
+            {t('workshop.nudgeBody')}
+          </Text>
+          <Button
+            testID="shift-open-workshop"
+            label={t('workshop.nudgeAction')}
+            variant="secondary"
+            size="medium"
+            onPress={() => router.push('/workshop')}
+          />
+        </Card>
+      ) : null}
 
       {mySlots.data !== undefined && mySlots.data.every((slot) => slot.blocked) ? (
         <Card

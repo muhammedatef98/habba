@@ -170,3 +170,23 @@ const URGENCY_RANK: Readonly<Record<CareUrgency, number>> = {
 export function byUrgency(a: CareLine, b: CareLine): number {
   return URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency];
 }
+
+/**
+ * The one item the home card leads with: the most urgent of the car's own
+ * schedule that is due or nearly due and not snoozed, or null when nothing is.
+ *
+ * The home card read the catalogue's alerts (0029), which nothing in
+ * production generates — so it never showed. The car's own schedule (0059) is
+ * what the daily sweep reminds about, so it is what the home card says too.
+ */
+export function mostPressingItem(
+  items: readonly MaintenanceItem[],
+  now: number = Date.now(),
+): { readonly item: MaintenanceItem; readonly line: CareLine } | null {
+  const pressing = items
+    .filter((item) => !isSnoozed(item, now))
+    .map((item) => ({ item, line: maintenanceLine(item) }))
+    .filter(({ line }) => line.urgency === 'overdue' || line.urgency === 'soon')
+    .sort((a, b) => byUrgency(a.line, b.line));
+  return pressing[0] ?? null;
+}

@@ -25,7 +25,7 @@ import { Button, Card, EmptyState, Field, Row, Screen, Text, useTheme } from '@h
 import { formatGregorianDate } from '@/features/shared/lib/dates';
 import { formatCount } from '@/features/shared/lib/format-number';
 import { repository } from '@/features/shared/data/repository';
-import type { TimelineEvent } from '@/features/shared/data/types';
+import type { OdometerReset, TimelineEvent } from '@/features/shared/data/types';
 import { useIsAuthenticated } from '@/features/shared/state/session';
 import { BackBar } from '@/features/shared/components/BackBar';
 
@@ -73,6 +73,10 @@ export default function MileageScreen() {
 
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
+  // A reading below the current one is refused, unless the owner says why
+  // (0058): a new cluster, or a mistake in the reading before.
+  const [lowReading, setLowReading] = useState<number | null>(null);
+  const [resetReason, setResetReason] = useState<OdometerReset>('cluster_replaced');
 
   const vehicle = useQuery({
     queryKey: ['vehicle', id],
@@ -103,12 +107,28 @@ export default function MileageScreen() {
     onError: (cause: Error) => {
       // The odometer only moves forward — enforced server-side (0034), so the
       // message here explains the rule rather than inventing it.
+      const tooLow = cause.message.includes('lower') || cause.message.includes('rollback');
+      if (tooLow) setLowReading(Number(value));
       setError(
-        cause.message.includes('lower') || cause.message.includes('rollback')
+        tooLow
           ? t('logbook.errors.mileageTooLow', { current: vehicle.data?.currentMileage ?? 0 })
           : t('errors.generic'),
       );
     },
+  });
+
+  const reset = useMutation({
+    mutationFn: (km: number) => repository.replaceOdometer(id ?? '', km, resetReason),
+    onSuccess: async () => {
+      setValue('');
+      setLowReading(null);
+      setError(undefined);
+      await queryClient.invalidateQueries({ queryKey: ['timeline', id] });
+      await queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
+      await queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      await queryClient.invalidateQueries({ queryKey: ['vehicle-health', id] });
+    },
+    onError: () => setError(t('errors.generic')),
   });
 
   if (!isAuthenticated) return <Redirect href="/" />;
@@ -124,6 +144,7 @@ export default function MileageScreen() {
     }
     if (parsed < current) {
       setError(t('logbook.errors.mileageTooLow', { current }));
+      setLowReading(parsed);
       return;
     }
     record.mutate();
@@ -159,6 +180,7 @@ export default function MileageScreen() {
         onChangeText={(next) => {
           setValue(next.replace(/\D/g, ''));
           setError(undefined);
+          setLowReading(null);
         }}
         error={error}
         keyboardType="number-pad"
@@ -172,6 +194,49 @@ export default function MileageScreen() {
         loading={record.isPending}
         disabled={value.length === 0}
       />
+
+      {lowReading !== null ? (
+        <Card testID="odometer-reset" elevation="none" style={{ gap: theme.spacing.md }}>
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text variant="bodyStrong">{t('odometer.title')}</Text>
+            <Text variant="caption" tone="muted">
+              {t('odometer.body')}
+            </Text>
+          </View>
+          {(['cluster_replaced', 'correction'] as const).map((reason) => {
+            const on = resetReason === reason;
+            return (
+              <Card
+                key={reason}
+                testID={`odometer-reason-${reason}`}
+                selected={on}
+                elevation="none"
+                onPress={() => setResetReason(reason)}
+                style={{
+                  gap: 2,
+                  borderWidth: on ? 1.5 : 1,
+                  borderColor: on ? theme.colors.primary : theme.colors.border,
+                }}
+              >
+                <Text variant="bodyStrong">{t(`odometer.${reason}`)}</Text>
+                <Text variant="caption" tone="muted">
+                  {t(`odometer.${reason}Hint`)}
+                </Text>
+              </Card>
+            );
+          })}
+          <Button
+            testID="odometer-reset-save"
+            label={t('odometer.save', { km: formatCount(lowReading, i18n.language) })}
+            variant="secondary"
+            loading={reset.isPending}
+            onPress={() => reset.mutate(lowReading)}
+          />
+          <Text variant="caption" tone="subtle">
+            {t('odometer.onRecord')}
+          </Text>
+        </Card>
+      ) : null}
 
       <Text variant="heading">{t('logbook.mileageHistory')}</Text>
 
@@ -216,7 +281,7 @@ export default function MileageScreen() {
                 <View
                   style={{
                     height: 8,
-                    width: `${maxDelta === 0 ? 0 : Math.round(((reading.delta ?? 0) / maxDelta) * 100)}%`,
+                    width: `${maxDelta === 0 ? 0 : Math.round((Math.max(reading.delta ?? 0, 0) / maxDelta) * 100)}%`,
                     backgroundColor: theme.colors.primary,
                     borderRadius: theme.radius.full,
                   }}
@@ -226,10 +291,12 @@ export default function MileageScreen() {
               <Text variant="caption" tone="subtle">
                 {reading.delta === null
                   ? t('logbook.mileageFirstReading')
-                  : t('logbook.mileageSince', {
-                      km: Math.round(reading.delta),
-                      perDay: Math.round(reading.perDay ?? 0),
-                    })}
+                  : reading.delta < 0
+                    ? t('odometer.newSeries')
+                    : t('logbook.mileageSince', {
+                        km: Math.round(reading.delta),
+                        perDay: Math.round(reading.perDay ?? 0),
+                      })}
               </Text>
             </View>
           ))}

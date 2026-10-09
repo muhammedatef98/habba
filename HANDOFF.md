@@ -428,6 +428,65 @@ as a user would. The fixes that matter beyond one screen:
 - The customer's provider picker shows each provider's next open time, puts
   bookable ones first, and does not open an empty time list for the rest.
 
+### Closing the unreachable features (0105–0107, suites 69–71)
+
+An audit of every callable server function against the three apps found
+features that existed on the server and nowhere on screen. Each now reaches
+the customer, the provider and the console:
+
+- **Warranty claims (0105).** «اطلب الإصلاح بالضمان» on each live warranty in
+  دفتر السيارة → describe the fault (and where the car is now, for a job done
+  at the car) → `request_warranty_service` confirms a free re-service with the
+  same provider, who gets «مطالبة ضمان». An on-demand original comes back as a
+  scheduled visit (no broadcast). Tracking says «إعادة خدمة بالضمان — مجاناً»;
+  the job screen and «طلباتي» mark it; the console's order file lists claims.
+- **Handover code (0106).** The technician enters the customer's 4-digit code
+  at the car; the customer sees it verified. `require_handover_code` (console
+  → الإعدادات → التشغيل, off by default) makes it mandatory before work starts
+  — turn it on after the new build is out. Ops re-issue a locked code with a
+  reason. New switches: `feature_order_chat`, `feature_warranty_claims`.
+- **Workshop details (0107).** «ورشتي» for workshops: address, map point,
+  hours, bays (`upsert_workshop`). A workshop without them is not offered for
+  booking, and its shift screen says so. The console's provider file shows the
+  calendar: open/booked/closed times and the next open one.
+
+### The sealed logbook, on every surface (0108, suite 72)
+
+The timeline was always hash-chained; only the Habba report ever checked it.
+
+- **Customer.** دفتر السيارة's coverage card opens with «سجلّ مختوم»: the chain
+  walked server-side (`logbook_seal`), the entry count, and whether the
+  odometer was ever replaced or corrected. A broken chain says so and sends
+  the owner to support. The mileage screen no longer dead-ends on a lower
+  reading: «استبدلت العدّاد» / «القراءة السابقة كانت خطأ» calls
+  `replace_odometer_cluster`, written to the logbook where a buyer sees it.
+- **Technician.** On a live job, «سجل السيارة»: earlier services, dates,
+  mileage and who vouches for each (`job_vehicle_history`). Summaries only —
+  no photos, details, addresses or names — and only between acceptance and
+  hand-back. Switch: `feature_job_history` (console → الإعدادات → الميزات).
+  The owner's logbook says the technician can see it.
+- **Console.** The vehicle file states whether the chain holds; المركبات has
+  «افحص كل الدفاتر» (`ops_verify_timelines`), which walks every chain, lists
+  any broken one and is written to the audit log. A broken chain means a
+  direct database edit: treat it as a security incident.
+
+### Every warning, and whether the owner acted on it (0109, suite 73)
+
+Care reminders were recorded (0062) but never answered: `respond_to_reminder`
+had no caller and the push carried no reminder id. Now the answer is recorded
+where it happens — when a reminded item is done («تم», or a Habba job) or
+snoozed, the reminders that carried it in the last 30 days are answered
+server-side. The push opens that car's logbook instead of the car list. The
+technician's «سجل السيارة» also lists what is due on the car, to offer while
+there (extra work still goes through the customer's approval). The console's
+vehicle file lists every reminder and its answer.
+
+The home screen's «مستحق» line on the car card read `maintenance_alerts`
+(0029), which nothing in production fills — `run_maintenance_scan` has no cron
+and no Edge Function calls it — so it never appeared. It now leads with the
+most urgent unsnoozed item of the car's own schedule (`mostPressingItem`), the
+same schedule the daily sweep reminds about; the old alert is only a fallback.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
