@@ -498,8 +498,12 @@ same schedule the daily sweep reminds about; the old alert is only a fallback.
   repository secret is not set (the preview job skips, Release fails at
   "Require an Expo token"), and the EAS project has no linked GitHub repo, so
   EAS cannot build from GitHub either. The last production build is Android
-  build 3 (2026-10-08, before 0105). The Android Maps key is set on EAS
-  (that build would have refused to start without it).
+  build 3 (2026-10-08, before 0105).
+- Update 2026-10-09: the EAS project is now linked to GitHub, so builds start
+  from main. The Android store build from main (77e77b66) was refused by
+  `app.config.ts`: **`GOOGLE_MAPS_ANDROID_API_KEY` is not set** in the EAS
+  production environment (§7 step 6). The preview APK does not require it, but
+  its map shows no streets without it.
 - Leaked-password protection needs Supabase Pro; the org is on Free.
 
 ## 6c. Store builds, as of 2026-10-08
