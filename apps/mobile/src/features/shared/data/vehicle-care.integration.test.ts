@@ -254,7 +254,7 @@ describe.skipIf(!harnessUp)('the care section against real PostgREST + RLS', () 
   });
 });
 
-describe('the sealed logbook (0108)', () => {
+describe.skipIf(!harnessUp)('the sealed logbook (0108)', () => {
   test('the owner reads the seal, and a replaced odometer is written onto it', async () => {
     const repo = new SupabaseRepository(clientFor(OWNER_ID), () => OWNER_ID);
 
