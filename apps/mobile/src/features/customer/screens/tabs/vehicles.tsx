@@ -50,6 +50,7 @@ import { repository } from '@/features/shared/data/repository';
 import { useFeatures } from '@/features/shared/hooks/use-platform';
 import { useLiveRefresh } from '@/features/shared/lib/live';
 import { formatCount, formatShortDate } from '@/features/shared/lib/format-number';
+import { mostPressingItem } from '@/features/shared/lib/care-language';
 import { summariseLogbook } from '@/features/shared/lib/logbook-summary';
 import { useBookingDraft } from '@/features/shared/state/booking-draft';
 import { useEmergencyDraft } from '@/features/shared/state/emergency-draft';
@@ -159,6 +160,15 @@ export default function HomeScreen() {
     enabled: primaryVehicleId !== undefined,
   });
 
+  // The car's own schedule (0059): what the daily sweep reminds about, so
+  // what the home card says. Same key as the logbook's القادم, so «تم» there
+  // clears it here.
+  const care = useQuery({
+    queryKey: ['care', primaryVehicleId],
+    queryFn: () => repository.listMaintenanceItems(primaryVehicleId ?? ''),
+    enabled: primaryVehicleId !== undefined && features.careReminders,
+  });
+
   const health = useQuery({
     queryKey: ['vehicle-health', primaryVehicleId],
     queryFn: () => repository.getVehicleHealth(primaryVehicleId ?? ''),
@@ -210,6 +220,7 @@ export default function HomeScreen() {
 
   // Reminders switched off in the console (0093) take the home alert with them.
   const alert = features.careReminders ? (alerts.data ?? [])[0] : undefined;
+  const pressing = features.careReminders ? mostPressingItem(care.data ?? []) : null;
 
   function openEmergency() {
     if (!hasVehicles) {
@@ -329,22 +340,46 @@ export default function HomeScreen() {
               models={allModels.data}
               {...(logbook !== undefined ? { recordCount: logbook.recordCount } : {})}
               {...(lastServiceLabel !== undefined ? { lastServiceLabel } : {})}
-              {...(alert !== undefined
+              {...(pressing !== null
                 ? {
                     alert: {
-                      message: isArabic ? alert.messageAr : alert.messageEn,
-                      ...(alert.estimatedKm !== null
-                        ? {
-                            detail: t('home.lastReading', {
-                              km: formatCount(alert.estimatedKm, i18n.language),
-                            }),
-                          }
-                        : {}),
+                      message: `${isArabic ? pressing.item.nameAr : pressing.item.nameEn} — ${t(
+                        pressing.line.key,
+                        Object.fromEntries(
+                          Object.entries(pressing.line.values).map(([key, value]) => [
+                            key,
+                            formatCount(value, i18n.language),
+                          ]),
+                        ),
+                      )}`,
                     },
                     onAlertPress: () =>
-                      bookService(bookable.data?.find((service) => service.id === alert.serviceId)),
+                      pressing.item.serviceId === null
+                        ? router.push({ pathname: '/logbook', params: { id: primaryVehicleId } })
+                        : bookService(
+                            bookable.data?.find(
+                              (service) => service.id === pressing.item.serviceId,
+                            ),
+                          ),
                   }
-                : {})}
+                : alert !== undefined
+                  ? {
+                      alert: {
+                        message: isArabic ? alert.messageAr : alert.messageEn,
+                        ...(alert.estimatedKm !== null
+                          ? {
+                              detail: t('home.lastReading', {
+                                km: formatCount(alert.estimatedKm, i18n.language),
+                              }),
+                            }
+                          : {}),
+                      },
+                      onAlertPress: () =>
+                        bookService(
+                          bookable.data?.find((service) => service.id === alert.serviceId),
+                        ),
+                    }
+                  : {})}
               {...(health.data !== undefined ? { health: health.data } : {})}
               onSelect={selectVehicle}
               onOpenLogbook={() =>

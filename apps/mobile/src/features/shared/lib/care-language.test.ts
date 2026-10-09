@@ -5,6 +5,7 @@ import {
   documentLine,
   isSnoozed,
   maintenanceLine,
+  mostPressingItem,
   CARE_LEAD_DAYS,
 } from './care-language.js';
 
@@ -177,5 +178,26 @@ describe('byUrgency', () => {
       'scheduled',
       'unknown',
     ]);
+  });
+});
+
+describe('mostPressingItem — what the home card leads with', () => {
+  test('the most urgent due item, ahead of one that is only approaching', () => {
+    const soon = item({ itemId: 'soon', kmRemaining: 300 });
+    const overdue = item({ itemId: 'overdue', dueByKm: true, isDue: true, kmRemaining: -500 });
+    expect(mostPressingItem([soon, overdue], NOW)?.item.itemId).toBe('overdue');
+  });
+
+  test('nothing when everything is a long way off', () => {
+    expect(mostPressingItem([item()], NOW)).toBeNull();
+  });
+
+  test('a snoozed item does not come back on the home screen', () => {
+    const snoozed = item({
+      dueByKm: true,
+      isDue: true,
+      snoozedUntil: new Date(NOW + 5 * DAY).toISOString(),
+    });
+    expect(mostPressingItem([snoozed], NOW)).toBeNull();
   });
 });

@@ -481,6 +481,12 @@ technician's «سجل السيارة» also lists what is due on the car, to off
 there (extra work still goes through the customer's approval). The console's
 vehicle file lists every reminder and its answer.
 
+The home screen's «مستحق» line on the car card read `maintenance_alerts`
+(0029), which nothing in production fills — `run_maintenance_scan` has no cron
+and no Edge Function calls it — so it never appeared. It now leads with the
+most urgent unsnoozed item of the car's own schedule (`mostPressingItem`), the
+same schedule the daily sweep reminds about; the old alert is only a fallback.
+
 ## 6c. Store builds, as of 2026-10-08
 
 - EAS project `@muhammedatef98/habba` (`045794c7-1c02-411c-b2b7-68c4a3d2fe40`),
